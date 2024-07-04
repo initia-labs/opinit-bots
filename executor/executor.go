@@ -52,8 +52,8 @@ func NewExecutor(cfg *types.Config, logger *zap.Logger, cdc codec.Codec, txConfi
 		ac:  cdc.InterfaceRegistry().SigningContext().AddressCodec(),
 	}
 
-	executor.registerHostEventHandlers()
-	executor.registerChildEventHandlers()
+	executor.registerHostHandlers()
+	executor.registerChildHandlers()
 
 	return executor
 }
@@ -72,10 +72,13 @@ func (ex Executor) Start(cmdCtx context.Context) error {
 	return nil
 }
 
-func (ex Executor) registerHostEventHandlers() {
+func (ex Executor) registerHostHandlers() {
+	ex.hostNode.RegisterTxHandler(ex.hostTxHandler)
+
 	ex.hostNode.RegisterEventHandler(ophosttypes.EventTypeInitiateTokenDeposit, ex.initiateDepositHandler)
 }
 
-func (ex Executor) registerChildEventHandlers() {
+func (ex Executor) registerChildHandlers() {
 	ex.childNode.RegisterEventHandler(opchildtypes.EventTypeFinalizeTokenDeposit, ex.finalizeDepositHandler)
+	ex.childNode.RegisterEventHandler(opchildtypes.EventTypeUpdateOracle, ex.updateOracleHandler)
 }

@@ -218,7 +218,7 @@ func (n Node) handleEvent(height int64, txIndex int64, eventIndex int64, event a
 	if n.eventHandlers[event.GetType()] == nil {
 		return nil
 	}
-	n.logger.Info("handle event", zap.String("name", n.name), zap.Int64("height", height), zap.String("type", event.GetType()))
+	n.logger.Debug("handle event", zap.String("name", n.name), zap.Int64("height", height), zap.String("type", event.GetType()))
 
 	// Prepare (height, txIndex, eventIndex) to process the event
 	err := n.eventHandlers[event.Type](EventHandlerArgs{

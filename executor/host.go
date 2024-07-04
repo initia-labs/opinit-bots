@@ -10,8 +10,37 @@ import (
 	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
 	"github.com/initia-labs/opinit-bots-go/node"
 
+	comettypes "github.com/cometbft/cometbft/types"
+
 	sdk "github.com/cosmos/cosmos-sdk/types"
 )
+
+func (ex Executor) hostTxHandler(args node.TxHandlerArgs) error {
+	if args.TxIndex == 0 {
+		return ex.oracleTxHandler(args.BlockHeight, args.Tx)
+	}
+	return nil
+}
+
+func (ex Executor) oracleTxHandler(blockHeight int64, tx comettypes.Tx) error {
+	sender, err := ex.ac.BytesToString(ex.childNode.GetAddress())
+	if err != nil {
+		return err
+	}
+
+	msg := opchildtypes.NewMsgUpdateOracle(
+		sender,
+		uint64(blockHeight),
+		tx,
+	)
+	err = msg.Validate(ex.ac)
+	if err != nil {
+		return err
+	}
+
+	ex.childNode.SendTx(msg)
+	return nil
+}
 
 func (ex Executor) initiateDepositHandler(args node.EventHandlerArgs) error {
 	var bridgeId int64
