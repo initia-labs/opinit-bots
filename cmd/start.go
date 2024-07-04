@@ -2,13 +2,11 @@ package cmd
 
 import (
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
-	"go.uber.org/zap"
 
 	bot "github.com/initia-labs/opinit-bots-go/bot"
 )
 
-func startCmd(v *viper.Viper, logger *zap.Logger) *cobra.Command {
+func startCmd(ctx *cmdContext) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:  "start [bot-name]",
 		Args: cobra.ExactArgs(1),
@@ -18,7 +16,7 @@ func startCmd(v *viper.Viper, logger *zap.Logger) *cobra.Command {
 				return err
 			}
 
-			bot, err := bot.NewBot(args[0], configPath, logger)
+			bot, err := bot.NewBot(args[0], configPath, ctx.logger)
 			if err != nil {
 				return err
 			}
@@ -26,6 +24,6 @@ func startCmd(v *viper.Viper, logger *zap.Logger) *cobra.Command {
 		},
 	}
 
-	cmd = configFlag(v, cmd)
+	cmd = configFlag(ctx.v, cmd)
 	return cmd
 }
