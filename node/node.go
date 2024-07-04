@@ -4,9 +4,10 @@ import (
 	"context"
 	"time"
 
-	comettypes "github.com/cometbft/cometbft/abci/types"
+	abcitypes "github.com/cometbft/cometbft/abci/types"
 	rpchttp "github.com/cometbft/cometbft/rpc/client/http"
 	rpccoretypes "github.com/cometbft/cometbft/rpc/core/types"
+	comettypes "github.com/cometbft/cometbft/types"
 	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/client/tx"
 	"github.com/cosmos/cosmos-sdk/codec"
@@ -21,10 +22,18 @@ type EventHandlerArgs struct {
 	BlockHeight     int64
 	TxIndex         int64
 	EventIndex      int64
-	EventAttributes []comettypes.EventAttribute
+	EventAttributes []abcitypes.EventAttribute
 }
 
 type EventHandlerFn func(EventHandlerArgs) error
+
+type TxHandlerArgs struct {
+	BlockHeight int64
+	TxIndex     int64
+	Tx          comettypes.Tx
+}
+
+type TxHandlerFn func(TxHandlerArgs) error
 
 const POLLING_INTERVAL = 1 * time.Second
 const MSG_QUEUE_SIZE = 100
@@ -40,6 +49,7 @@ type Node struct {
 
 	lastProcessedHeight int64
 	eventHandlers       map[string]EventHandlerFn
+	txHandler           TxHandlerFn
 	msgQueue            chan sdk.Msg
 
 	cdc        codec.Codec
@@ -103,6 +113,10 @@ func NewNode(name string, cfg NodeConfig, logger *zap.Logger, cdc codec.Codec, t
 	return n, err
 }
 
+func (n *Node) RegisterTxHandler(fn TxHandlerFn) {
+	n.txHandler = fn
+}
+
 func (n Node) RegisterEventHandler(eventType string, fn EventHandlerFn) {
 	n.eventHandlers[eventType] = fn
 }
@@ -117,7 +131,7 @@ func (n Node) BlockProcessLooper(ctx context.Context) error {
 		case <-timer.C:
 		}
 
-		err := n.handleNewBlocks(ctx)
+		err := n.fetchNewBlocks(ctx)
 		if err != nil {
 			n.logger.Error("failed to get block results", zap.Error(err))
 			continue
@@ -125,7 +139,7 @@ func (n Node) BlockProcessLooper(ctx context.Context) error {
 	}
 }
 
-func (n *Node) handleNewBlocks(ctx context.Context) error {
+func (n *Node) fetchNewBlocks(ctx context.Context) error {
 	// TODO: save processed block height & receive new blocks from the last processed block
 	status, err := n.Status(ctx)
 	if err != nil {
@@ -143,11 +157,24 @@ func (n *Node) handleNewBlocks(ctx context.Context) error {
 	}
 
 	for queryHeight := n.lastProcessedHeight + 1; queryHeight <= latestHeight; queryHeight++ {
-		blockResult, err := n.BlockResults(ctx, &queryHeight)
-		if err != nil {
-			return err
+		var block *rpccoretypes.ResultBlock
+		var blockResult *rpccoretypes.ResultBlockResults
+
+		if n.txHandler != nil {
+			block, err = n.Block(ctx, &queryHeight)
+			if err != nil {
+				return err
+			}
 		}
-		err = n.handleBlockResult(ctx, blockResult)
+
+		if len(n.eventHandlers) != 0 {
+			blockResult, err = n.BlockResults(ctx, &queryHeight)
+			if err != nil {
+				return err
+			}
+		}
+
+		err = n.handleNewBlock(block, blockResult)
 		if err != nil {
 			return err
 		}
@@ -156,7 +183,24 @@ func (n *Node) handleNewBlocks(ctx context.Context) error {
 	return nil
 }
 
-func (n Node) handleBlockResult(ctx context.Context, blockResult *rpccoretypes.ResultBlockResults) error {
+func (n Node) handleNewBlock(block *rpccoretypes.ResultBlock, blockResult *rpccoretypes.ResultBlockResults) error {
+	if block != nil {
+		for txIndex, tx := range block.Block.Txs {
+			err := n.txHandler(TxHandlerArgs{
+				BlockHeight: block.Block.Height,
+				TxIndex:     int64(txIndex),
+				Tx:          tx,
+			})
+			if err != nil {
+				// TODO: handle error
+				return err
+			}
+		}
+	}
+
+	if blockResult == nil {
+		return nil
+	}
 	for txIndex, txResult := range blockResult.TxsResults {
 		events := txResult.GetEvents()
 		for eventIndex, event := range events {
@@ -170,7 +214,7 @@ func (n Node) handleBlockResult(ctx context.Context, blockResult *rpccoretypes.R
 	return nil
 }
 
-func (n Node) handleEvent(height int64, txIndex int64, eventIndex int64, event comettypes.Event) error {
+func (n Node) handleEvent(height int64, txIndex int64, eventIndex int64, event abcitypes.Event) error {
 	if n.eventHandlers[event.GetType()] == nil {
 		return nil
 	}
