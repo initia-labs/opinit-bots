@@ -28,7 +28,7 @@ func (n Node) handleTx(ctx context.Context, msgs []sdk.Msg) error {
 	}
 	hash := fmt.Sprintf("%X", comettypes.Tx(txBytes).Hash())
 
-	n.logger.Info("broadcast tx", zap.String("name", n.name), zap.String("hash", hash), zap.Int("length", len(msgs)))
+	n.logger.Debug("broadcast tx", zap.String("name", n.name), zap.String("hash", hash), zap.Int("length", len(msgs)))
 
 	// TODO: use sync & wait tx until it is included in a block
 	res, err := n.BroadcastTxCommit(ctx, txBytes)
@@ -36,7 +36,7 @@ func (n Node) handleTx(ctx context.Context, msgs []sdk.Msg) error {
 		return err
 	}
 
-	n.logger.Info("tx result", zap.String("name", n.name), zap.String("hash", hash), zap.Int64("height", res.Height))
+	n.logger.Debug("tx result", zap.String("name", n.name), zap.String("hash", hash), zap.Int64("height", res.Height))
 	return nil
 }
 
@@ -58,7 +58,6 @@ func (n *Node) buildMessages(
 	}
 
 	n.txf = n.txf.WithGas(adjusted)
-	// Build the transaction builder
 	txb, err := n.txf.BuildUnsignedTx(msgs...)
 	if err != nil {
 		return nil, err
@@ -69,7 +68,6 @@ func (n *Node) buildMessages(
 	}
 
 	tx := txb.GetTx()
-	// Generate the transaction bytes
 	txBytes, err = n.txConfig.TxEncoder()(tx)
 	if err != nil {
 		return nil, err
@@ -78,7 +76,6 @@ func (n *Node) buildMessages(
 	return txBytes, nil
 }
 
-// PrepareFactory mutates the tx factory with the appropriate account number, sequence number, and min gas settings.
 func (n *Node) PrepareFactory(txf tx.Factory) (tx.Factory, error) {
 	var (
 		err      error

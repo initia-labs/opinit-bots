@@ -6,6 +6,7 @@ import (
 )
 
 type cmdContext struct {
-	v      *viper.Viper
-	logger *zap.Logger
+	v        *viper.Viper
+	logger   *zap.Logger
+	homePath string
 }

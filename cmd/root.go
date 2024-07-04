@@ -1,14 +1,19 @@
 package cmd
 
 import (
+	"os"
+	"path/filepath"
+
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
 
+var defaultHome = filepath.Join(os.Getenv("HOME"), ".opinit")
+
 func NewRootCmd() *cobra.Command {
-	cmdContext := &cmdContext{
+	ctx := &cmdContext{
 		v: viper.New(),
 	}
 
@@ -17,7 +22,7 @@ func NewRootCmd() *cobra.Command {
 	}
 
 	rootCmd.PersistentPreRunE = func(cmd *cobra.Command, _ []string) (err error) {
-		cmdContext.logger, err = getLogger(cmdContext.v.GetString("log-level"))
+		ctx.logger, err = getLogger(ctx.v.GetString("log-level"))
 		if err != nil {
 			return err
 		}
@@ -25,16 +30,21 @@ func NewRootCmd() *cobra.Command {
 	}
 
 	rootCmd.PersistentPostRun = func(cmd *cobra.Command, _ []string) {
-		_ = cmdContext.logger.Sync()
+		_ = ctx.logger.Sync()
+	}
+
+	rootCmd.PersistentFlags().StringVar(&ctx.homePath, flagHome, defaultHome, "set home directory")
+	if err := ctx.v.BindPFlag(flagHome, rootCmd.PersistentFlags().Lookup(flagHome)); err != nil {
+		panic(err)
 	}
 
 	rootCmd.PersistentFlags().String("log-level", "", "log level format (info, debug, warn, error, panic or fatal)")
-	if err := cmdContext.v.BindPFlag("log-level", rootCmd.PersistentFlags().Lookup("log-level")); err != nil {
+	if err := ctx.v.BindPFlag("log-level", rootCmd.PersistentFlags().Lookup("log-level")); err != nil {
 		panic(err)
 	}
 
 	rootCmd.AddCommand(
-		startCmd(cmdContext),
+		startCmd(ctx),
 	)
 	return rootCmd
 }

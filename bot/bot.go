@@ -12,6 +12,7 @@ import (
 	initiaapp "github.com/initia-labs/initia/app"
 	"github.com/initia-labs/initia/app/params"
 	"github.com/initia-labs/opinit-bots-go/bot/types"
+	"github.com/initia-labs/opinit-bots-go/db"
 	"github.com/initia-labs/opinit-bots-go/executor"
 	executortypes "github.com/initia-labs/opinit-bots-go/executor/types"
 	"go.uber.org/zap"
@@ -35,7 +36,7 @@ func LoadJsonConfig(path string, config types.Config) error {
 	return nil
 }
 
-func NewBot(name string, configPath string, logger *zap.Logger) (types.Bot, error) {
+func NewBot(name string, logger *zap.Logger, homePath string, configPath string) (types.Bot, error) {
 	SetSDKConfig()
 
 	encodingConfig := params.MakeEncodingConfig()
@@ -54,7 +55,11 @@ func NewBot(name string, configPath string, logger *zap.Logger) (types.Bot, erro
 		if err != nil {
 			return nil, err
 		}
-		return executor.NewExecutor(cfg, logger, appCodec, txConfig), nil
+		db, err := db.NewDB(homePath)
+		if err != nil {
+			return nil, err
+		}
+		return executor.NewExecutor(cfg, db.WithPrefix([]byte(name)), logger, appCodec, txConfig), nil
 	}
 
 	return nil, errors.New("not providing bot name")

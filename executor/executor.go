@@ -5,7 +5,8 @@ import (
 
 	"cosmossdk.io/core/address"
 	bottypes "github.com/initia-labs/opinit-bots-go/bot/types"
-	"github.com/initia-labs/opinit-bots-go/executor/types"
+	executortypes "github.com/initia-labs/opinit-bots-go/executor/types"
+	"github.com/initia-labs/opinit-bots-go/types"
 	"go.uber.org/zap"
 
 	"github.com/initia-labs/opinit-bots-go/node"
@@ -23,20 +24,21 @@ type Executor struct {
 	hostNode  *node.Node
 	childNode *node.Node
 
-	cfg    *types.Config
+	cfg    *executortypes.Config
+	db     types.DB
 	logger *zap.Logger
 
 	cdc codec.Codec
 	ac  address.Codec
 }
 
-func NewExecutor(cfg *types.Config, logger *zap.Logger, cdc codec.Codec, txConfig client.TxConfig) *Executor {
-	hostNode, err := node.NewNode("host", cfg.HostNode, logger, cdc, txConfig)
+func NewExecutor(cfg *executortypes.Config, db types.DB, logger *zap.Logger, cdc codec.Codec, txConfig client.TxConfig) *Executor {
+	hostNode, err := node.NewNode(types.HostNodeName, cfg.HostNode, db.WithPrefix(types.HostNodePrefix), logger, cdc, txConfig)
 	if err != nil {
 		panic(err)
 	}
 
-	childNode, err := node.NewNode("child", cfg.ChildNode, logger, cdc, txConfig)
+	childNode, err := node.NewNode(types.ChildNodeName, cfg.ChildNode, db.WithPrefix(types.ChildNodePrefix), logger, cdc, txConfig)
 	if err != nil {
 		panic(err)
 	}
@@ -46,6 +48,7 @@ func NewExecutor(cfg *types.Config, logger *zap.Logger, cdc codec.Codec, txConfi
 		childNode: childNode,
 
 		cfg:    cfg,
+		db:     db,
 		logger: logger,
 
 		cdc: cdc,
@@ -69,7 +72,8 @@ func (ex Executor) Start(cmdCtx context.Context) error {
 	<-cmdCtx.Done()
 	hostDone()
 	childDone()
-	return nil
+
+	return ex.db.Close()
 }
 
 func (ex Executor) registerHostHandlers() {

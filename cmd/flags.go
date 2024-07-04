@@ -6,6 +6,7 @@ import (
 )
 
 const (
+	flagHome            = "home"
 	flagConfigPath      = "config"
 	flagExecutorKeyName = "executor"
 )

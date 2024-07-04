@@ -15,6 +15,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/tx/signing"
+	"github.com/initia-labs/opinit-bots-go/types"
 	"go.uber.org/zap"
 )
 
@@ -45,6 +46,7 @@ type Node struct {
 
 	name   string
 	cfg    NodeConfig
+	db     types.DB
 	logger *zap.Logger
 
 	lastProcessedHeight int64
@@ -59,7 +61,7 @@ type Node struct {
 	txf        tx.Factory
 }
 
-func NewNode(name string, cfg NodeConfig, logger *zap.Logger, cdc codec.Codec, txConfig client.TxConfig) (*Node, error) {
+func NewNode(name string, cfg NodeConfig, db types.DB, logger *zap.Logger, cdc codec.Codec, txConfig client.TxConfig) (*Node, error) {
 	client, err := client.NewClientFromNode(cfg.RPC)
 
 	// Use memory keyring for now
@@ -74,6 +76,7 @@ func NewNode(name string, cfg NodeConfig, logger *zap.Logger, cdc codec.Codec, t
 
 		name:          name,
 		cfg:           cfg,
+		db:            db,
 		logger:        logger,
 		eventHandlers: make(map[string]EventHandlerFn),
 		msgQueue:      make(chan sdk.Msg, MSG_QUEUE_SIZE),
@@ -233,9 +236,10 @@ func (n Node) handleEvent(height int64, txIndex int64, eventIndex int64, event a
 
 func (n Node) TxBroadCastLooper(ctx context.Context) {
 	// no need to execute this goroutine if mnemonic is not set
-	if n.cfg.Mnemonic == "" {
+	if !n.hasKey() {
 		return
 	}
+
 	timer := time.NewTicker(time.Second)
 	for {
 		select {
@@ -271,4 +275,11 @@ func (n Node) popMsgs() []sdk.Msg {
 
 func (n Node) SendTx(msg sdk.Msg) {
 	n.msgQueue <- msg
+}
+
+func (n Node) hasKey() bool {
+	if n.cfg.Mnemonic == "" {
+		return false
+	}
+	return true
 }

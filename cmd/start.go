@@ -16,7 +16,7 @@ func startCmd(ctx *cmdContext) *cobra.Command {
 				return err
 			}
 
-			bot, err := bot.NewBot(args[0], configPath, ctx.logger)
+			bot, err := bot.NewBot(args[0], ctx.logger, ctx.homePath, configPath)
 			if err != nil {
 				return err
 			}
