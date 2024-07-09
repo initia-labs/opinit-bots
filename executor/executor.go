@@ -6,6 +6,7 @@ import (
 	"cosmossdk.io/core/address"
 	bottypes "github.com/initia-labs/opinit-bots-go/bot/types"
 	executortypes "github.com/initia-labs/opinit-bots-go/executor/types"
+	nodetypes "github.com/initia-labs/opinit-bots-go/node/types"
 	"github.com/initia-labs/opinit-bots-go/types"
 	"go.uber.org/zap"
 
@@ -16,6 +17,8 @@ import (
 
 	opchildtypes "github.com/initia-labs/OPinit/x/opchild/types"
 	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
+
+	sdk "github.com/cosmos/cosmos-sdk/types"
 )
 
 var _ bottypes.Bot = &Executor{}
@@ -30,15 +33,20 @@ type Executor struct {
 
 	cdc codec.Codec
 	ac  address.Codec
+
+	hostProcessedMsgs           []nodetypes.ProcessedMsgs
+	childMsgQueue               []sdk.Msg
+	childPendingTxs             []nodetypes.PendingTxInfo
+	childAllPendingTxsProcessed chan struct{}
 }
 
 func NewExecutor(cfg *executortypes.Config, db types.DB, logger *zap.Logger, cdc codec.Codec, txConfig client.TxConfig) *Executor {
-	hostNode, err := node.NewNode(types.HostNodeName, cfg.HostNode, db.WithPrefix(types.HostNodePrefix), logger, cdc, txConfig)
+	hostNode, err := node.NewNode(nodetypes.HostNodeName, cfg.HostNode, db.WithPrefix([]byte(nodetypes.HostNodeName)), logger.Named(nodetypes.HostNodeName), cdc, txConfig)
 	if err != nil {
 		panic(err)
 	}
 
-	childNode, err := node.NewNode(types.ChildNodeName, cfg.ChildNode, db.WithPrefix(types.ChildNodePrefix), logger, cdc, txConfig)
+	childNode, err := node.NewNode(nodetypes.ChildNodeName, cfg.ChildNode, db.WithPrefix([]byte(nodetypes.ChildNodeName)), logger.Named(nodetypes.ChildNodeName), cdc, txConfig)
 	if err != nil {
 		panic(err)
 	}
@@ -53,6 +61,11 @@ func NewExecutor(cfg *executortypes.Config, db types.DB, logger *zap.Logger, cdc
 
 		cdc: cdc,
 		ac:  cdc.InterfaceRegistry().SigningContext().AddressCodec(),
+
+		hostProcessedMsgs:           make([]nodetypes.ProcessedMsgs, 0),
+		childMsgQueue:               make([]sdk.Msg, 0),
+		childPendingTxs:             make([]nodetypes.PendingTxInfo, 0),
+		childAllPendingTxsProcessed: make(chan struct{}),
 	}
 
 	executor.registerHostHandlers()
@@ -63,13 +76,13 @@ func NewExecutor(cfg *executortypes.Config, db types.DB, logger *zap.Logger, cdc
 
 func (ex Executor) Start(cmdCtx context.Context) error {
 	hostCtx, hostDone := context.WithCancel(cmdCtx)
-	go ex.hostNode.BlockProcessLooper(hostCtx)
-	go ex.hostNode.TxBroadCastLooper(hostCtx)
 	childCtx, childDone := context.WithCancel(cmdCtx)
-	go ex.childNode.BlockProcessLooper(childCtx)
-	go ex.childNode.TxBroadCastLooper(childCtx)
+	ex.hostNode.Start(hostCtx)
+	ex.childNode.Start(childCtx)
 
 	<-cmdCtx.Done()
+
+	// TODO: safely shut down
 	hostDone()
 	childDone()
 
@@ -77,12 +90,14 @@ func (ex Executor) Start(cmdCtx context.Context) error {
 }
 
 func (ex Executor) registerHostHandlers() {
+	ex.hostNode.RegisterBeginBlockHandler(ex.hostBeginBlockHandler)
 	ex.hostNode.RegisterTxHandler(ex.hostTxHandler)
-
 	ex.hostNode.RegisterEventHandler(ophosttypes.EventTypeInitiateTokenDeposit, ex.initiateDepositHandler)
+	ex.hostNode.RegisterEndBlockHandler(ex.hostEndBlockHandler)
 }
 
 func (ex Executor) registerChildHandlers() {
 	ex.childNode.RegisterEventHandler(opchildtypes.EventTypeFinalizeTokenDeposit, ex.finalizeDepositHandler)
 	ex.childNode.RegisterEventHandler(opchildtypes.EventTypeUpdateOracle, ex.updateOracleHandler)
+	ex.childNode.RegisterEndBlockHandler(ex.childEndBlockHandler)
 }

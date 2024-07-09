@@ -2,12 +2,9 @@ package node
 
 import (
 	"context"
-	"time"
+	"sync"
 
-	abcitypes "github.com/cometbft/cometbft/abci/types"
 	rpchttp "github.com/cometbft/cometbft/rpc/client/http"
-	rpccoretypes "github.com/cometbft/cometbft/rpc/core/types"
-	comettypes "github.com/cometbft/cometbft/types"
 	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/client/tx"
 	"github.com/cosmos/cosmos-sdk/codec"
@@ -15,53 +12,39 @@ import (
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/tx/signing"
+	nodetypes "github.com/initia-labs/opinit-bots-go/node/types"
 	"github.com/initia-labs/opinit-bots-go/types"
 	"go.uber.org/zap"
 )
-
-type EventHandlerArgs struct {
-	BlockHeight     int64
-	TxIndex         int64
-	EventIndex      int64
-	EventAttributes []abcitypes.EventAttribute
-}
-
-type EventHandlerFn func(EventHandlerArgs) error
-
-type TxHandlerArgs struct {
-	BlockHeight int64
-	TxIndex     int64
-	Tx          comettypes.Tx
-}
-
-type TxHandlerFn func(TxHandlerArgs) error
-
-const POLLING_INTERVAL = 1 * time.Second
-const MSG_QUEUE_SIZE = 100
-const GAS_ADJUSTMENT = 1.5
-const KEY_NAME = "key"
 
 type Node struct {
 	*rpchttp.HTTP
 
 	name   string
-	cfg    NodeConfig
+	cfg    nodetypes.NodeConfig
 	db     types.DB
 	logger *zap.Logger
 
-	lastProcessedHeight int64
-	eventHandlers       map[string]EventHandlerFn
-	txHandler           TxHandlerFn
-	msgQueue            chan sdk.Msg
+	eventHandlers     map[string]nodetypes.EventHandlerFn
+	knownMsgErrors    map[sdk.Msg]nodetypes.KnownErrors
+	txHandler         nodetypes.TxHandlerFn
+	beginBlockHandler nodetypes.BeginBlockHandlerFn
+	endBlockHandler   nodetypes.EndBlockHandlerFn
 
 	cdc        codec.Codec
 	txConfig   client.TxConfig
 	keyBase    keyring.Keyring
 	keyAddress sdk.AccAddress
 	txf        tx.Factory
+
+	lastProcessedBlockHeight int64
+	pendingTxMu              *sync.Mutex
+	pendingTxs               []nodetypes.PendingTxInfo
+
+	pendingProcessedData nodetypes.ProcessedData
 }
 
-func NewNode(name string, cfg NodeConfig, db types.DB, logger *zap.Logger, cdc codec.Codec, txConfig client.TxConfig) (*Node, error) {
+func NewNode(name string, cfg nodetypes.NodeConfig, db types.DB, logger *zap.Logger, cdc codec.Codec, txConfig client.TxConfig) (*Node, error) {
 	client, err := client.NewClientFromNode(cfg.RPC)
 
 	// Use memory keyring for now
@@ -74,207 +57,40 @@ func NewNode(name string, cfg NodeConfig, db types.DB, logger *zap.Logger, cdc c
 	n := &Node{
 		HTTP: client,
 
-		name:          name,
-		cfg:           cfg,
-		db:            db,
-		logger:        logger,
-		eventHandlers: make(map[string]EventHandlerFn),
-		msgQueue:      make(chan sdk.Msg, MSG_QUEUE_SIZE),
+		name:   name,
+		cfg:    cfg,
+		db:     db,
+		logger: logger,
+
+		eventHandlers:  make(map[string]nodetypes.EventHandlerFn),
+		knownMsgErrors: make(map[sdk.Msg]nodetypes.KnownErrors),
 
 		cdc:      cdc,
 		txConfig: txConfig,
 		keyBase:  keyBase,
+
+		pendingTxMu: &sync.Mutex{},
+		pendingTxs:  make([]nodetypes.PendingTxInfo, 0),
+
+		pendingProcessedData: make(nodetypes.ProcessedData, 0),
 	}
 
-	if cfg.Mnemonic != "" {
-		_, err := n.keyBase.NewAccount(KEY_NAME, cfg.Mnemonic, "", hd.CreateHDPath(sdk.GetConfig().GetCoinType(), 0, 0).String(), hd.Secp256k1)
-		if err != nil {
-			return nil, err
-		}
-		// to check if the key is normally created
-		// TODO: delete this code
-		key, err := n.keyBase.Key(KEY_NAME)
-		if err != nil {
-			return nil, err
-		}
-
-		addr, err := key.GetAddress()
-		if err != nil {
-			return nil, err
-		}
-		n.keyAddress = addr
-
-		n.txf = tx.Factory{}.
-			WithAccountRetriever(n).
-			WithChainID(cfg.ChainID).
-			WithTxConfig(txConfig).
-			WithGasAdjustment(GAS_ADJUSTMENT).
-			WithGasPrices(cfg.GasPrice).
-			WithKeybase(n.keyBase).
-			WithSignMode(signing.SignMode_SIGN_MODE_DIRECT)
-	}
-	return n, err
-}
-
-func (n *Node) RegisterTxHandler(fn TxHandlerFn) {
-	n.txHandler = fn
-}
-
-func (n Node) RegisterEventHandler(eventType string, fn EventHandlerFn) {
-	n.eventHandlers[eventType] = fn
-}
-
-func (n Node) BlockProcessLooper(ctx context.Context) error {
-	timer := time.NewTicker(POLLING_INTERVAL)
-
-	for {
-		select {
-		case <-ctx.Done():
-			return nil
-		case <-timer.C:
-		}
-
-		err := n.fetchNewBlocks(ctx)
-		if err != nil {
-			n.logger.Error("failed to get block results", zap.Error(err))
-			continue
-		}
-	}
-}
-
-func (n *Node) fetchNewBlocks(ctx context.Context) error {
-	// TODO: save processed block height & receive new blocks from the last processed block
-	status, err := n.Status(ctx)
+	err = n.loadSyncInfo()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	latestHeight := status.SyncInfo.LatestBlockHeight
-	if n.lastProcessedHeight >= latestHeight {
-		return nil
-	}
-
-	// TODO: save last processed height and delete this code
-	if n.lastProcessedHeight == 0 {
-		n.lastProcessedHeight = latestHeight - 1
-	}
-
-	for queryHeight := n.lastProcessedHeight + 1; queryHeight <= latestHeight; queryHeight++ {
-		var block *rpccoretypes.ResultBlock
-		var blockResult *rpccoretypes.ResultBlockResults
-
-		if n.txHandler != nil {
-			block, err = n.Block(ctx, &queryHeight)
-			if err != nil {
-				return err
-			}
-		}
-
-		if len(n.eventHandlers) != 0 {
-			blockResult, err = n.BlockResults(ctx, &queryHeight)
-			if err != nil {
-				return err
-			}
-		}
-
-		err = n.handleNewBlock(block, blockResult)
+	if n.hasKey() {
+		err := n.prepareBroadcaster()
 		if err != nil {
-			return err
-		}
-		n.lastProcessedHeight = queryHeight
-	}
-	return nil
-}
-
-func (n Node) handleNewBlock(block *rpccoretypes.ResultBlock, blockResult *rpccoretypes.ResultBlockResults) error {
-	if block != nil {
-		for txIndex, tx := range block.Block.Txs {
-			err := n.txHandler(TxHandlerArgs{
-				BlockHeight: block.Block.Height,
-				TxIndex:     int64(txIndex),
-				Tx:          tx,
-			})
-			if err != nil {
-				// TODO: handle error
-				return err
-			}
+			return nil, err
 		}
 	}
-
-	if blockResult == nil {
-		return nil
-	}
-	for txIndex, txResult := range blockResult.TxsResults {
-		events := txResult.GetEvents()
-		for eventIndex, event := range events {
-			err := n.handleEvent(blockResult.Height, int64(txIndex), int64(eventIndex), event)
-			if err != nil {
-				// TODO: handle error
-				return err
-			}
-		}
-	}
-	return nil
+	return n, nil
 }
 
-func (n Node) handleEvent(height int64, txIndex int64, eventIndex int64, event abcitypes.Event) error {
-	if n.eventHandlers[event.GetType()] == nil {
-		return nil
-	}
-	n.logger.Debug("handle event", zap.String("name", n.name), zap.Int64("height", height), zap.String("type", event.GetType()))
-
-	// Prepare (height, txIndex, eventIndex) to process the event
-	err := n.eventHandlers[event.Type](EventHandlerArgs{
-		BlockHeight:     height,
-		TxIndex:         txIndex,
-		EventIndex:      eventIndex,
-		EventAttributes: event.GetAttributes(),
-	})
-	// Store to success event
-	return err
-}
-
-func (n Node) TxBroadCastLooper(ctx context.Context) {
-	// no need to execute this goroutine if mnemonic is not set
-	if !n.hasKey() {
-		return
-	}
-
-	timer := time.NewTicker(time.Second)
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-timer.C:
-			// Broadcast tx
-			msgs := n.popMsgs()
-			if len(msgs) == 0 {
-				continue
-			}
-			err := n.handleTx(ctx, msgs)
-			if err != nil {
-				n.logger.Error("failed to broadcast tx", zap.String("name", n.name), zap.Error(err))
-				continue
-			}
-		}
-	}
-}
-
-func (n Node) popMsgs() []sdk.Msg {
-	msgs := make([]sdk.Msg, 0, len(n.msgQueue))
-	for range len(n.msgQueue) {
-		msg := <-n.msgQueue
-		msgs = append(msgs, msg)
-		// TODO: check total msg size if it is over tx max size or not
-		if len(msgs) >= 10 {
-			break
-		}
-	}
-	return msgs
-}
-
-func (n Node) SendTx(msg sdk.Msg) {
-	n.msgQueue <- msg
+func (n Node) Start(ctx context.Context) {
+	go n.blockProcessLooper(ctx)
 }
 
 func (n Node) hasKey() bool {
@@ -282,4 +98,139 @@ func (n Node) hasKey() bool {
 		return false
 	}
 	return true
+}
+
+func (n *Node) prepareBroadcaster() error {
+	_, err := n.keyBase.NewAccount(nodetypes.KEY_NAME, n.cfg.Mnemonic, "", hd.CreateHDPath(sdk.GetConfig().GetCoinType(), 0, 0).String(), hd.Secp256k1)
+	if err != nil {
+		return err
+	}
+	// to check if the key is normally created
+	// TODO: delete this code
+	key, err := n.keyBase.Key(nodetypes.KEY_NAME)
+	if err != nil {
+		return err
+	}
+
+	addr, err := key.GetAddress()
+	if err != nil {
+		return err
+	}
+	n.keyAddress = addr
+
+	n.txf = tx.Factory{}.
+		WithAccountRetriever(n).
+		WithChainID(n.cfg.ChainID).
+		WithTxConfig(n.txConfig).
+		WithGasAdjustment(nodetypes.GAS_ADJUSTMENT).
+		WithGasPrices(n.cfg.GasPrice).
+		WithKeybase(n.keyBase).
+		WithSignMode(signing.SignMode_SIGN_MODE_DIRECT)
+
+	err = n.loadAccount()
+	if err != nil {
+		return err
+	}
+
+	dbBatchKVs := make([]types.KV, 0)
+
+	loadedPendingTxs, err := n.loadPendingTxs()
+	if err != nil {
+		return err
+	}
+	// TODO: handle mismatched sequence & pending txs
+	if len(loadedPendingTxs) > 0 {
+		lastSavedSequence := loadedPendingTxs[len(loadedPendingTxs)-1].Sequence
+		if loadedPendingTxs[0].ProcessedHeight-n.lastProcessedBlockHeight >= nodetypes.TIMEOUT_HEIGHT {
+			// delete existing pending txs
+			pendingKVs, err := n.RawKVPendingTxs(loadedPendingTxs, true)
+			if err != nil {
+				return err
+			}
+			dbBatchKVs = append(dbBatchKVs, pendingKVs...)
+
+			// convert pending txs to pending msgs
+			for _, txInfo := range loadedPendingTxs {
+				tx, err := n.DecodeTx(txInfo.Tx)
+				if err != nil {
+					return err
+				}
+				n.pendingProcessedData = append(n.pendingProcessedData, nodetypes.ProcessedMsgs{
+					Msgs: tx.GetMsgs(),
+					Save: txInfo.Save,
+				})
+			}
+		} else {
+			n.pendingTxs = loadedPendingTxs
+			n.txf = n.txf.WithSequence(lastSavedSequence + 1)
+		}
+	}
+
+	loadedProcessedData, err := n.loadProcessedMsgs()
+	if err != nil {
+		return err
+	}
+
+	// append existing pending msgs
+	if len(loadedProcessedData) > 0 {
+		for _, processedMsg := range loadedProcessedData {
+			n.pendingProcessedData = append(n.pendingProcessedData, processedMsg)
+		}
+	}
+
+	kvProcessedMsgs, err := n.RawKVProcessedMsgs(n.pendingProcessedData)
+	if err != nil {
+		return err
+	}
+	dbBatchKVs = append(dbBatchKVs, kvProcessedMsgs)
+
+	// save all pending msgs first, then broadcast them
+	err = n.db.RawBatchSet(dbBatchKVs...)
+	if err != nil {
+		return err
+	}
+
+	for i, processedMsg := range n.pendingProcessedData {
+		err := n.BroadcastMsgs(processedMsg)
+		if err != nil {
+			return err
+		}
+		err = n.SaveProcessedMsgs(n.pendingProcessedData[i+1:])
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (n Node) GetHeight() int64 {
+	return n.lastProcessedBlockHeight + 1
+}
+
+func (n *Node) getClientCtx() client.Context {
+	return client.Context{}.WithClient(n).
+		WithInterfaceRegistry(n.cdc.InterfaceRegistry()).
+		WithChainID(n.cfg.ChainID).
+		WithCodec(n.cdc).
+		WithFromAddress(n.keyAddress)
+}
+
+func (n *Node) RegisterTxHandler(fn nodetypes.TxHandlerFn) {
+	n.txHandler = fn
+}
+
+func (n *Node) RegisterEventHandler(eventType string, fn nodetypes.EventHandlerFn) {
+	n.eventHandlers[eventType] = fn
+}
+
+func (n *Node) RegisterBeginBlockHandler(fn nodetypes.BeginBlockHandlerFn) {
+	n.beginBlockHandler = fn
+}
+
+func (n *Node) RegisterEndBlockHandler(fn nodetypes.EndBlockHandlerFn) {
+	n.endBlockHandler = fn
+}
+
+func (n *Node) RegisterErrors(msg sdk.Msg, knownErrors nodetypes.KnownErrors) {
+	n.knownMsgErrors[msg] = knownErrors
 }

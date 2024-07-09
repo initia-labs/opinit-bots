@@ -3,22 +3,22 @@ package types
 import (
 	"errors"
 
-	"github.com/initia-labs/opinit-bots-go/node"
+	nodetypes "github.com/initia-labs/opinit-bots-go/node/types"
 )
 
 type Config struct {
-	HostNode  node.NodeConfig `json:"host_node"`
-	ChildNode node.NodeConfig `json:"child_node"`
-	BridgeId  int64           `json:"bridge_id"`
+	HostNode  nodetypes.NodeConfig `json:"host_node"`
+	ChildNode nodetypes.NodeConfig `json:"child_node"`
+	BridgeId  int64                `json:"bridge_id"`
 }
 
 func DefaultConfig() *Config {
 	return &Config{
-		HostNode: node.NodeConfig{
+		HostNode: nodetypes.NodeConfig{
 			RPC:     "tcp://localhost:26657",
 			ChainID: "localhost",
 		},
-		ChildNode: node.NodeConfig{
+		ChildNode: nodetypes.NodeConfig{
 			RPC:      "tcp://localhost:27657",
 			ChainID:  "l2",
 			Mnemonic: "",

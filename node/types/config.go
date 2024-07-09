@@ -1,4 +1,4 @@
-package node
+package types
 
 type NodeConfig struct {
 	RPC      string `json:"rpc"`

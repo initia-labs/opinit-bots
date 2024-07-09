@@ -6,8 +6,6 @@ import (
 	"math"
 
 	abci "github.com/cometbft/cometbft/abci/types"
-	comettypes "github.com/cometbft/cometbft/types"
-	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/client/tx"
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
@@ -15,100 +13,79 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	txtypes "github.com/cosmos/cosmos-sdk/types/tx"
 	"github.com/cosmos/cosmos-sdk/types/tx/signing"
-	"go.uber.org/zap"
+	authsigning "github.com/cosmos/cosmos-sdk/x/auth/signing"
+	nodetypes "github.com/initia-labs/opinit-bots-go/node/types"
 )
 
-func (n Node) handleTx(ctx context.Context, msgs []sdk.Msg) error {
-	txBytes, err := n.buildMessages(
-		ctx,
-		msgs,
-	)
-	if err != nil {
-		return err
-	}
-	hash := fmt.Sprintf("%X", comettypes.Tx(txBytes).Hash())
+func (n *Node) BroadcastMsgs(processedMsgs nodetypes.ProcessedMsgs) error {
+	ctx := context.Background()
 
-	n.logger.Debug("broadcast tx", zap.String("name", n.name), zap.String("hash", hash), zap.Int("length", len(msgs)))
-
-	// TODO: use sync & wait tx until it is included in a block
-	res, err := n.BroadcastTxCommit(ctx, txBytes)
+	sequence := n.txf.Sequence()
+	txBytes, err := n.BuildMessages(ctx, processedMsgs.Msgs)
 	if err != nil {
 		return err
 	}
 
-	n.logger.Debug("tx result", zap.String("name", n.name), zap.String("hash", hash), zap.Int64("height", res.Height))
+	res, err := n.BroadcastTxSync(ctx, txBytes)
+	if err != nil {
+		fmt.Println(res, err)
+		// TODO: handle error, may repeat sending tx
+		return fmt.Errorf("broadcast txs: %w", err)
+	}
+
+	n.txf = n.txf.WithSequence(n.txf.Sequence() + 1)
+	pendingTx := nodetypes.PendingTxInfo{
+		ProcessedHeight: n.GetHeight(),
+		Sequence:        sequence,
+		Tx:              txBytes,
+		Save:            processedMsgs.Save,
+	}
+	err = n.savePendingTx(sequence, pendingTx)
+	if err != nil {
+		return err
+	}
+	n.appendLocalPendingTx(pendingTx)
 	return nil
 }
 
-func (n *Node) buildMessages(
+func (n Node) BuildMessages(
 	ctx context.Context,
 	msgs []sdk.Msg,
 ) (
 	txBytes []byte,
 	err error,
 ) {
-	n.txf, err = n.PrepareFactory(n.txf)
+	txf := n.txf
+
+	_, adjusted, err := n.CalculateGas(ctx, txf, msgs...)
 	if err != nil {
 		return nil, err
 	}
 
-	_, adjusted, err := n.CalculateGas(ctx, n.txf, msgs...)
+	// not use simulation for now to handle account's sequence locally
+	// TODO: use simulation
+	// n.txf = n.txf.WithGas(uint64(1_000_000 + nodetypes.PER_MSG_GAS_LIMIT*len(msgs)))
+	txf = txf.WithGas(adjusted)
+	txb, err := txf.BuildUnsignedTx(msgs...)
 	if err != nil {
 		return nil, err
 	}
 
-	n.txf = n.txf.WithGas(adjusted)
-	txb, err := n.txf.BuildUnsignedTx(msgs...)
-	if err != nil {
-		return nil, err
-	}
-
-	if err = tx.Sign(ctx, n.txf, KEY_NAME, txb, false); err != nil {
+	if err = tx.Sign(ctx, txf, nodetypes.KEY_NAME, txb, false); err != nil {
 		return nil, err
 	}
 
 	tx := txb.GetTx()
-	txBytes, err = n.txConfig.TxEncoder()(tx)
+	txBytes, err = n.EncodeTx(tx)
 	if err != nil {
 		return nil, err
 	}
-
 	return txBytes, nil
 }
 
-func (n *Node) PrepareFactory(txf tx.Factory) (tx.Factory, error) {
-	var (
-		err      error
-		num, seq uint64
-	)
-
-	cliCtx := client.Context{}.WithClient(n).
-		WithInterfaceRegistry(n.cdc.InterfaceRegistry()).
-		WithChainID(n.cfg.ChainID).
-		WithCodec(n.cdc).
-		WithFromAddress(n.keyAddress)
-
-	initNum, initSeq := txf.AccountNumber(), txf.Sequence()
-	if initNum == 0 || initSeq == 0 {
-		num, seq, err = txf.AccountRetriever().GetAccountNumberSequence(cliCtx, n.keyAddress)
-		if err != nil {
-			return tx.Factory{}, err
-		}
-
-		if initNum == 0 {
-			txf = txf.WithAccountNumber(num)
-		}
-
-		if initSeq == 0 {
-			txf = txf.WithSequence(seq)
-		}
-	}
-	return txf, nil
-}
-
 // CalculateGas simulates a tx to generate the appropriate gas settings before broadcasting a tx.
-func (n *Node) CalculateGas(ctx context.Context, txf tx.Factory, msgs ...sdk.Msg) (txtypes.SimulateResponse, uint64, error) {
-	keyInfo, err := n.keyBase.Key(KEY_NAME)
+func (n Node) CalculateGas(ctx context.Context, txf tx.Factory, msgs ...sdk.Msg) (txtypes.SimulateResponse, uint64, error) {
+	keyInfo, err := n.keyBase.Key(nodetypes.KEY_NAME)
 	if err != nil {
 		return txtypes.SimulateResponse{}, 0, err
 	}
@@ -140,12 +117,12 @@ func (n *Node) CalculateGas(ctx context.Context, txf tx.Factory, msgs ...sdk.Msg
 // AdjustEstimatedGas adjusts the estimated gas usage by multiplying it by the gas adjustment factor
 // and return estimated gas is higher than max gas error. If the gas usage is zero, the adjusted gas
 // is also zero.
-func (n *Node) AdjustEstimatedGas(gasUsed uint64) (uint64, error) {
+func (n Node) AdjustEstimatedGas(gasUsed uint64) (uint64, error) {
 	if gasUsed == 0 {
 		return gasUsed, nil
 	}
 
-	gas := GAS_ADJUSTMENT * float64(gasUsed)
+	gas := nodetypes.GAS_ADJUSTMENT * float64(gasUsed)
 	if math.IsInf(gas, 1) {
 		return 0, fmt.Errorf("infinite gas used")
 	}
@@ -193,4 +170,48 @@ func BuildSimTx(info *keyring.Record, txf tx.Factory, msgs ...sdk.Msg) ([]byte, 
 // workaround to get access to the wrapper TxBuilder's method GetProtoTx().
 type protoTxProvider interface {
 	GetProtoTx() *txtypes.Tx
+}
+
+func (n *Node) appendLocalPendingTx(tx nodetypes.PendingTxInfo) {
+	n.pendingTxMu.Lock()
+	defer n.pendingTxMu.Unlock()
+
+	n.pendingTxs = append(n.pendingTxs, tx)
+}
+
+func (n *Node) getLocalPendingTx() nodetypes.PendingTxInfo {
+	n.pendingTxMu.Lock()
+	defer n.pendingTxMu.Unlock()
+
+	return n.pendingTxs[0]
+}
+
+func (n *Node) localPendingTxLength() int {
+	n.pendingTxMu.Lock()
+	defer n.pendingTxMu.Unlock()
+
+	return len(n.pendingTxs)
+}
+
+func (n *Node) deleteLocalPendingTx() {
+	n.pendingTxMu.Lock()
+	defer n.pendingTxMu.Unlock()
+
+	n.pendingTxs = n.pendingTxs[1:]
+}
+
+func (n *Node) EncodeTx(tx authsigning.Tx) ([]byte, error) {
+	txBytes, err := n.txConfig.TxEncoder()(tx)
+	if err != nil {
+		return nil, err
+	}
+	return txBytes, nil
+}
+
+func (n *Node) DecodeTx(txBytes []byte) (authsigning.Tx, error) {
+	tx, err := n.txConfig.TxDecoder()(txBytes)
+	if err != nil {
+		return nil, err
+	}
+	return tx.(authsigning.Tx), nil
 }

@@ -3,6 +3,7 @@ package bot
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 
@@ -11,14 +12,14 @@ import (
 	"github.com/cosmos/cosmos-sdk/x/auth"
 	initiaapp "github.com/initia-labs/initia/app"
 	"github.com/initia-labs/initia/app/params"
-	"github.com/initia-labs/opinit-bots-go/bot/types"
+	bottypes "github.com/initia-labs/opinit-bots-go/bot/types"
 	"github.com/initia-labs/opinit-bots-go/db"
 	"github.com/initia-labs/opinit-bots-go/executor"
 	executortypes "github.com/initia-labs/opinit-bots-go/executor/types"
 	"go.uber.org/zap"
 )
 
-func LoadJsonConfig(path string, config types.Config) error {
+func LoadJsonConfig(path string, config bottypes.Config) error {
 	file, err := os.Open(path)
 	if err != nil {
 		return err
@@ -36,7 +37,7 @@ func LoadJsonConfig(path string, config types.Config) error {
 	return nil
 }
 
-func NewBot(name string, logger *zap.Logger, homePath string, configPath string) (types.Bot, error) {
+func NewBot(name string, logger *zap.Logger, homePath string, configPath string) (bottypes.Bot, error) {
 	SetSDKConfig()
 
 	encodingConfig := params.MakeEncodingConfig()
@@ -49,17 +50,17 @@ func NewBot(name string, logger *zap.Logger, homePath string, configPath string)
 	auth.AppModuleBasic{}.RegisterLegacyAminoCodec(encodingConfig.Amino)
 
 	switch name {
-	case "executor":
+	case bottypes.ExecutorName:
 		cfg := &executortypes.Config{}
 		err := LoadJsonConfig(configPath, cfg)
 		if err != nil {
 			return nil, err
 		}
-		db, err := db.NewDB(homePath)
+		db, err := db.NewDB(getDBPath(homePath, name))
 		if err != nil {
 			return nil, err
 		}
-		return executor.NewExecutor(cfg, db.WithPrefix([]byte(name)), logger, appCodec, txConfig), nil
+		return executor.NewExecutor(cfg, db, logger, appCodec, txConfig), nil
 	}
 
 	return nil, errors.New("not providing bot name")
@@ -80,4 +81,8 @@ func SetSDKConfig() {
 	sdkConfig.SetBech32PrefixForConsensusNode(consNodeAddressPrefix, consNodePubKeyPrefix)
 	sdkConfig.SetAddressVerifier(initiaapp.VerifyAddressLen())
 	sdkConfig.Seal()
+}
+
+func getDBPath(homePath string, botName string) string {
+	return fmt.Sprintf(homePath+"/%s.db", botName)
 }

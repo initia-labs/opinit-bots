@@ -15,6 +15,16 @@ import (
 
 var _ client.AccountRetriever = &Node{}
 
+func (n *Node) loadAccount() error {
+	account, _, err := n.GetAccountWithHeight(n.getClientCtx(), n.keyAddress)
+	if err != nil {
+		return err
+	}
+	n.txf = n.txf.WithAccountNumber(account.GetAccountNumber())
+	n.txf = n.txf.WithSequence(account.GetSequence())
+	return nil
+}
+
 func (n Node) GetAddress() sdk.AccAddress {
 	return n.keyAddress
 }
