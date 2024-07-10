@@ -4,6 +4,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"strconv"
+	"time"
 
 	"cosmossdk.io/math"
 	opchildtypes "github.com/initia-labs/OPinit/x/opchild/types"
@@ -32,8 +33,9 @@ func (ex *Executor) hostEndBlockHandler(args nodetypes.EndBlockArgs) error {
 
 	if len(ex.childMsgQueue) != 0 {
 		ex.hostProcessedMsgs = append(ex.hostProcessedMsgs, nodetypes.ProcessedMsgs{
-			Msgs: ex.childMsgQueue,
-			Save: true,
+			Msgs:      ex.childMsgQueue,
+			Timestamp: time.Now().UnixNano(),
+			Save:      true,
 		})
 	}
 
@@ -66,8 +68,9 @@ func (ex *Executor) hostTxHandler(args nodetypes.TxHandlerArgs) error {
 		}
 
 		ex.hostProcessedMsgs = append(ex.hostProcessedMsgs, nodetypes.ProcessedMsgs{
-			Msgs: []sdk.Msg{msg},
-			Save: false,
+			Msgs:      []sdk.Msg{msg},
+			Timestamp: time.Now().UnixNano(),
+			Save:      false,
 		})
 	}
 	return nil

@@ -174,12 +174,20 @@ func (n *Node) prepareBroadcaster() error {
 			n.pendingTxs = loadedPendingTxs
 			n.txf = n.txf.WithSequence(lastSavedSequence + 1)
 		}
+
+		for i, pendingTx := range loadedPendingTxs {
+			n.logger.Debug("pending tx", zap.Int("index", i), zap.String("tx", pendingTx.String()))
+		}
 	}
 
 	loadedProcessedData, err := n.loadProcessedData()
 	if err != nil {
 		return err
 	}
+	for i, pendingMsgs := range loadedProcessedData {
+		n.logger.Debug("pending msgs", zap.Int("index", i), zap.String("msgs", pendingMsgs.String()))
+	}
+
 	n.pendingProcessedData = append(n.pendingProcessedData, loadedProcessedData...)
 
 	kvProcessedData, err := n.RawKVProcessedData(n.pendingProcessedData, false)

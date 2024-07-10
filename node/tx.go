@@ -16,6 +16,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/types/tx/signing"
 	authsigning "github.com/cosmos/cosmos-sdk/x/auth/signing"
 	nodetypes "github.com/initia-labs/opinit-bots-go/node/types"
+	"go.uber.org/zap"
 )
 
 func (n *Node) txBroadcastLooper(ctx context.Context) error {
@@ -35,6 +36,7 @@ func (n *Node) txBroadcastLooper(ctx context.Context) error {
 				// TODO: handle error, may repeat sending tx
 				return fmt.Errorf("broadcast txs: %w", err)
 			}
+			n.logger.Debug("broadcast tx", zap.String("tx_hash", TxHash(txBytes)), zap.Uint64("sequence", sequence))
 
 			if data.Timestamp != 0 {
 				err = n.deleteProcessedMsgs(data.Timestamp)
