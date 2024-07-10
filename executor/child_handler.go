@@ -15,7 +15,7 @@ import (
 func (ch *child) beginBlockHandler(args nodetypes.BeginBlockArgs) error {
 	// just to make sure that childMsgQueue is empty
 	if args.BlockHeight == args.LatestHeight && len(ch.msgQueue) != 0 && len(ch.processedMsgs) != 0 {
-		panic("must not happen, hostMsgQueue should be empty")
+		panic("must not happen, msgQueue should be empty")
 	}
 	return nil
 }
@@ -166,5 +166,6 @@ func (ch *child) initiateWithdrawalHandler(args nodetypes.EventHandlerArgs) erro
 }
 
 func (ch *child) handleInitiateWithdrawal(l2Sequence uint64, from string, to string, amount sdk.Coin) (sdk.Msg, error) {
+
 	return nil, nil
 }

@@ -19,7 +19,7 @@ import (
 func (h *host) beginBlockHandler(args nodetypes.BeginBlockArgs) error {
 	// just to make sure that childMsgQueue is empty
 	if args.BlockHeight == args.LatestHeight && len(h.msgQueue) != 0 && len(h.processedMsgs) != 0 {
-		panic("must not happen, hostMsgQueue should be empty")
+		panic("must not happen, msgQueue should be empty")
 	}
 	return nil
 }

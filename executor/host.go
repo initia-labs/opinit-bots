@@ -1,6 +1,8 @@
 package executor
 
 import (
+	"context"
+
 	"cosmossdk.io/core/address"
 	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
 	nodetypes "github.com/initia-labs/opinit-bots-go/node/types"
@@ -22,48 +24,57 @@ type childNode interface {
 }
 
 type host struct {
-	*Executor
-
 	node  *node.Node
 	child childNode
 
 	bridgeId int64
 
-	cfg nodetypes.NodeConfig
-	cdc codec.Codec
-	ac  address.Codec
+	cfg    nodetypes.NodeConfig
+	db     types.DB
+	logger *zap.Logger
+	cdc    codec.Codec
+	ac     address.Codec
 
 	processedMsgs []nodetypes.ProcessedMsgs
 	msgQueue      []sdk.Msg
 }
 
-func NewHost(executor *Executor, bridgeId int64, cfg nodetypes.NodeConfig, db types.DB, logger *zap.Logger, cdc codec.Codec, txConfig client.TxConfig) *host {
-	node, err := node.NewNode(nodetypes.HostNodeName, cfg, db.WithPrefix([]byte(nodetypes.HostNodeName)), logger.Named(nodetypes.HostNodeName), cdc, txConfig)
+func NewHost(bridgeId int64, cfg nodetypes.NodeConfig, db types.DB, logger *zap.Logger, cdc codec.Codec, txConfig client.TxConfig, child childNode) *host {
+	node, err := node.NewNode(nodetypes.HostNodeName, cfg, db, logger, cdc, txConfig)
 	if err != nil {
 		panic(err)
 	}
 
-	return &host{
-		Executor: executor,
-
-		node: node,
+	h := &host{
+		node:  node,
+		child: child,
 
 		bridgeId: bridgeId,
 
-		cfg: cfg,
+		cfg:    cfg,
+		db:     db,
+		logger: logger,
+
 		cdc: cdc,
 		ac:  cdc.InterfaceRegistry().SigningContext().AddressCodec(),
 
 		processedMsgs: make([]nodetypes.ProcessedMsgs, 0),
 		msgQueue:      make([]sdk.Msg, 0),
 	}
+
+	h.registerHandlers()
+	return h
 }
 
-func (h *host) registerChildNode(node childNode) {
-	h.child = node
+func (h *host) Start(ctx context.Context) {
+	h.node.Start(ctx)
 }
 
-func (h host) registerHostHandlers() {
+func (h *host) registerChildNode(child childNode) {
+	h.child = child
+}
+
+func (h host) registerHandlers() {
 	h.node.RegisterBeginBlockHandler(h.beginBlockHandler)
 	h.node.RegisterTxHandler(h.txHandler)
 	h.node.RegisterEventHandler(ophosttypes.EventTypeInitiateTokenDeposit, h.initiateDepositHandler)

@@ -24,14 +24,15 @@ type hostNode interface {
 }
 
 type child struct {
-	*Executor
-
 	node *node.Node
 	host hostNode
 
 	bridgeId int64
 
-	cfg nodetypes.NodeConfig
+	cfg    nodetypes.NodeConfig
+	db     types.DB
+	logger *zap.Logger
+
 	cdc codec.Codec
 	ac  address.Codec
 
@@ -39,37 +40,42 @@ type child struct {
 	msgQueue      []sdk.Msg
 }
 
-func NewChild(executor *Executor, bridgeId int64, cfg nodetypes.NodeConfig, db types.DB, logger *zap.Logger, cdc codec.Codec, txConfig client.TxConfig) *child {
-	node, err := node.NewNode(nodetypes.ChildNodeName, cfg, db.WithPrefix([]byte(nodetypes.ChildNodeName)), logger.Named(nodetypes.ChildNodeName), cdc, txConfig)
+func NewChild(bridgeId int64, cfg nodetypes.NodeConfig, db types.DB, logger *zap.Logger, cdc codec.Codec, txConfig client.TxConfig, host hostNode) *child {
+	node, err := node.NewNode(nodetypes.ChildNodeName, cfg, db, logger, cdc, txConfig)
 	if err != nil {
 		panic(err)
 	}
 
-	return &child{
-		Executor: executor,
-
+	ch := &child{
 		node: node,
+		host: host,
 
 		bridgeId: bridgeId,
 
-		cfg: cfg,
+		cfg:    cfg,
+		db:     db,
+		logger: logger,
+
 		cdc: cdc,
 		ac:  cdc.InterfaceRegistry().SigningContext().AddressCodec(),
 
 		processedMsgs: make([]nodetypes.ProcessedMsgs, 0),
 		msgQueue:      make([]sdk.Msg, 0),
 	}
+
+	ch.registerHandlers()
+	return ch
 }
 
 func (ch *child) Start(ctx context.Context) {
 	ch.node.Start(ctx)
 }
 
-func (ch *child) registerHostNode(node hostNode) {
-	ch.host = node
+func (ch *child) registerHostNode(host hostNode) {
+	ch.host = host
 }
 
-func (ch *child) registerHostHandlers() {
+func (ch *child) registerHandlers() {
 	ch.node.RegisterEventHandler(opchildtypes.EventTypeFinalizeTokenDeposit, ch.finalizeDepositHandler)
 	ch.node.RegisterEventHandler(opchildtypes.EventTypeUpdateOracle, ch.updateOracleHandler)
 	ch.node.RegisterEndBlockHandler(ch.endBlockHandler)

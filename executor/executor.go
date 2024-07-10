@@ -25,22 +25,24 @@ type Executor struct {
 }
 
 func NewExecutor(cfg *executortypes.Config, db types.DB, logger *zap.Logger, cdc codec.Codec, txConfig client.TxConfig) *Executor {
+	host := &host{}
+	child := &child{}
+
 	executor := &Executor{
+		host:  host,
+		child: child,
+
 		cfg:    cfg,
 		db:     db,
 		logger: logger,
 	}
 
-	executor.host = NewHost(executor, cfg.BridgeId, cfg.HostNode, db.WithPrefix([]byte(nodetypes.HostNodeName)), logger.Named(nodetypes.HostNodeName), cdc, txConfig)
-	executor.child = NewChild(executor, cfg.BridgeId, cfg.ChildNode, db.WithPrefix([]byte(nodetypes.ChildNodeName)), logger.Named(nodetypes.ChildNodeName), cdc, txConfig)
-
-	executor.host.registerChildNode(executor.child)
-	executor.child.registerHostNode(executor.host)
-
+	*host = *NewHost(cfg.BridgeId, cfg.HostNode, db.WithPrefix([]byte(nodetypes.HostNodeName)), logger.Named(nodetypes.HostNodeName), cdc, txConfig, child)
+	*child = *NewChild(cfg.BridgeId, cfg.ChildNode, db.WithPrefix([]byte(nodetypes.ChildNodeName)), logger.Named(nodetypes.ChildNodeName), cdc, txConfig, host)
 	return executor
 }
 
-func (ex Executor) Start(cmdCtx context.Context) error {
+func (ex *Executor) Start(cmdCtx context.Context) error {
 	hostCtx, hostDone := context.WithCancel(cmdCtx)
 	childCtx, childDone := context.WithCancel(cmdCtx)
 	ex.host.Start(hostCtx)
