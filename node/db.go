@@ -1,11 +1,10 @@
 package node
 
 import (
-	"encoding/json"
-
 	"github.com/initia-labs/opinit-bots-go/db"
 	nodetypes "github.com/initia-labs/opinit-bots-go/node/types"
 	"github.com/initia-labs/opinit-bots-go/types"
+	"go.uber.org/zap"
 )
 
 func (n *Node) SaveSyncInfo() error {
@@ -27,6 +26,7 @@ func (n *Node) loadSyncInfo() error {
 		return err
 	}
 	n.lastProcessedBlockHeight = db.ToInt64(data)
+	n.logger.Info("load sync info", zap.Int64("last_processed_height", n.lastProcessedBlockHeight))
 	return nil
 }
 
@@ -57,6 +57,7 @@ func (n *Node) loadPendingTxs() (txs []nodetypes.PendingTxInfo, err error) {
 	if iterErr != nil {
 		return nil, iterErr
 	}
+	n.logger.Info("load pending txs", zap.Int("count", len(txs)))
 	return txs, err
 }
 
@@ -84,38 +85,57 @@ func (n *Node) RawKVPendingTxs(txInfos []nodetypes.PendingTxInfo, delete bool) (
 	return kvs, nil
 }
 
-func (n *Node) RawKVProcessedMsgs(processedData nodetypes.ProcessedData) (types.KV, error) {
-	var data []byte
-	var err error
-	if len(processedData) > 0 {
-		data, err = json.Marshal(processedData)
-		if err != nil {
-			return types.KV{}, err
+func (n *Node) RawKVProcessedData(processedData []nodetypes.ProcessedMsgs, delete bool) ([]types.KV, error) {
+	kvs := make([]types.KV, 0, len(processedData))
+	for _, processedMsgs := range processedData {
+		if !processedMsgs.Save {
+			continue
 		}
-	}
 
-	return types.KV{
-		Key:   n.db.PrefixedKey(nodetypes.ProcessedDataKey),
-		Value: data,
-	}, nil
+		var data []byte
+		var err error
+
+		if !delete {
+			data, err = processedMsgs.Marshal()
+			if err != nil {
+				return nil, err
+			}
+		}
+		kvs = append(kvs, types.KV{
+			Key:   n.db.PrefixedKey(nodetypes.PrefixedProcessedMsgs(processedMsgs.Timestamp)),
+			Value: data,
+		})
+	}
+	return kvs, nil
 }
 
-func (n *Node) SaveProcessedMsgs(processedData nodetypes.ProcessedData) error {
-	data, err := json.Marshal(processedData)
+func (n *Node) saveProcessedMsgs(processedMsgs nodetypes.ProcessedMsgs) error {
+	data, err := processedMsgs.Marshal()
 	if err != nil {
 		return err
 	}
-	return n.db.Set(nodetypes.ProcessedDataKey, data)
+	return n.db.Set(nodetypes.PrefixedProcessedMsgs(processedMsgs.Timestamp), data)
 }
 
-func (n *Node) loadProcessedMsgs() (processedData nodetypes.ProcessedData, err error) {
-	data, err := n.db.Get(nodetypes.ProcessedDataKey)
-	if err == db.ErrNotFound {
-		return nil, nil
-	} else if err != nil {
-		return nil, err
-	}
+func (n *Node) loadProcessedData() (processedData []nodetypes.ProcessedMsgs, err error) {
+	lastBytes := append(nodetypes.PrefixProcessedMsgs, 0xFF)
+	iterErr := n.db.Iterate(nodetypes.PrefixProcessedMsgs, lastBytes, func(key, value []byte) (stop bool) {
+		processedMsgs := nodetypes.ProcessedMsgs{}
+		err = processedMsgs.Unmarshal(value)
+		if err != nil {
+			return true
+		}
+		processedData = append(processedData, processedMsgs)
+		return false
+	})
 
-	err = json.Unmarshal(data, &processedData)
+	if iterErr != nil {
+		return nil, iterErr
+	}
+	n.logger.Info("load pending processed msgs", zap.Int("count", len(processedData)))
 	return processedData, nil
+}
+
+func (n *Node) deleteProcessedMsgs(timestamp int64) error {
+	return n.db.Delete(nodetypes.PrefixedProcessedMsgs(timestamp))
 }

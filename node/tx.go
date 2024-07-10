@@ -6,6 +6,7 @@ import (
 	"math"
 
 	abci "github.com/cometbft/cometbft/abci/types"
+	comettypes "github.com/cometbft/cometbft/types"
 	"github.com/cosmos/cosmos-sdk/client/tx"
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
@@ -17,38 +18,53 @@ import (
 	nodetypes "github.com/initia-labs/opinit-bots-go/node/types"
 )
 
-func (n *Node) BroadcastMsgs(processedMsgs nodetypes.ProcessedMsgs) error {
-	ctx := context.Background()
+func (n *Node) txBroadcastLooper(ctx context.Context) error {
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		case data := <-n.txChannel:
+			sequence := n.txf.Sequence()
+			txBytes, err := n.buildMessages(ctx, data.Msgs)
+			if err != nil {
+				return err
+			}
 
-	sequence := n.txf.Sequence()
-	txBytes, err := n.BuildMessages(ctx, processedMsgs.Msgs)
-	if err != nil {
-		return err
-	}
+			_, err = n.BroadcastTxSync(ctx, txBytes)
+			if err != nil {
+				// TODO: handle error, may repeat sending tx
+				return fmt.Errorf("broadcast txs: %w", err)
+			}
 
-	res, err := n.BroadcastTxSync(ctx, txBytes)
-	if err != nil {
-		fmt.Println(res, err)
-		// TODO: handle error, may repeat sending tx
-		return fmt.Errorf("broadcast txs: %w", err)
+			if data.Timestamp != 0 {
+				err = n.deleteProcessedMsgs(data.Timestamp)
+				if err != nil {
+					return err
+				}
+			}
+			n.txf = n.txf.WithSequence(n.txf.Sequence() + 1)
+			pendingTx := nodetypes.PendingTxInfo{
+				ProcessedHeight: n.GetHeight(),
+				Sequence:        sequence,
+				Tx:              txBytes,
+				TxHash:          TxHash(txBytes),
+				Timestamp:       data.Timestamp,
+				Save:            data.Save,
+			}
+			err = n.savePendingTx(sequence, pendingTx)
+			if err != nil {
+				return err
+			}
+			n.appendLocalPendingTx(pendingTx)
+		}
 	}
-
-	n.txf = n.txf.WithSequence(n.txf.Sequence() + 1)
-	pendingTx := nodetypes.PendingTxInfo{
-		ProcessedHeight: n.GetHeight(),
-		Sequence:        sequence,
-		Tx:              txBytes,
-		Save:            processedMsgs.Save,
-	}
-	err = n.savePendingTx(sequence, pendingTx)
-	if err != nil {
-		return err
-	}
-	n.appendLocalPendingTx(pendingTx)
-	return nil
 }
 
-func (n Node) BuildMessages(
+func (n *Node) BroadcastMsgs(msgs nodetypes.ProcessedMsgs) {
+	n.txChannel <- msgs
+}
+
+func (n *Node) buildMessages(
 	ctx context.Context,
 	msgs []sdk.Msg,
 ) (
@@ -56,15 +72,11 @@ func (n Node) BuildMessages(
 	err error,
 ) {
 	txf := n.txf
-
-	_, adjusted, err := n.CalculateGas(ctx, txf, msgs...)
+	_, adjusted, err := n.calculateGas(ctx, txf, msgs...)
 	if err != nil {
 		return nil, err
 	}
 
-	// not use simulation for now to handle account's sequence locally
-	// TODO: use simulation
-	// n.txf = n.txf.WithGas(uint64(1_000_000 + nodetypes.PER_MSG_GAS_LIMIT*len(msgs)))
 	txf = txf.WithGas(adjusted)
 	txb, err := txf.BuildUnsignedTx(msgs...)
 	if err != nil {
@@ -84,13 +96,13 @@ func (n Node) BuildMessages(
 }
 
 // CalculateGas simulates a tx to generate the appropriate gas settings before broadcasting a tx.
-func (n Node) CalculateGas(ctx context.Context, txf tx.Factory, msgs ...sdk.Msg) (txtypes.SimulateResponse, uint64, error) {
+func (n *Node) calculateGas(ctx context.Context, txf tx.Factory, msgs ...sdk.Msg) (txtypes.SimulateResponse, uint64, error) {
 	keyInfo, err := n.keyBase.Key(nodetypes.KEY_NAME)
 	if err != nil {
 		return txtypes.SimulateResponse{}, 0, err
 	}
 
-	txBytes, err := BuildSimTx(keyInfo, txf, msgs...)
+	txBytes, err := buildSimTx(keyInfo, txf, msgs...)
 	if err != nil {
 		return txtypes.SimulateResponse{}, 0, err
 	}
@@ -110,14 +122,14 @@ func (n Node) CalculateGas(ctx context.Context, txf tx.Factory, msgs ...sdk.Msg)
 		return txtypes.SimulateResponse{}, 0, err
 	}
 
-	gas, err := n.AdjustEstimatedGas(simRes.GasInfo.GasUsed)
+	gas, err := n.adjustEstimatedGas(simRes.GasInfo.GasUsed)
 	return simRes, gas, err
 }
 
 // AdjustEstimatedGas adjusts the estimated gas usage by multiplying it by the gas adjustment factor
 // and return estimated gas is higher than max gas error. If the gas usage is zero, the adjusted gas
 // is also zero.
-func (n Node) AdjustEstimatedGas(gasUsed uint64) (uint64, error) {
+func (n *Node) adjustEstimatedGas(gasUsed uint64) (uint64, error) {
 	if gasUsed == 0 {
 		return gasUsed, nil
 	}
@@ -131,7 +143,7 @@ func (n Node) AdjustEstimatedGas(gasUsed uint64) (uint64, error) {
 
 // BuildSimTx creates an unsigned tx with an empty single signature and returns
 // the encoded transaction or an error if the unsigned transaction cannot be built.
-func BuildSimTx(info *keyring.Record, txf tx.Factory, msgs ...sdk.Msg) ([]byte, error) {
+func buildSimTx(info *keyring.Record, txf tx.Factory, msgs ...sdk.Msg) ([]byte, error) {
 	txb, err := txf.BuildUnsignedTx(msgs...)
 	if err != nil {
 		return nil, err
@@ -214,4 +226,8 @@ func (n *Node) DecodeTx(txBytes []byte) (authsigning.Tx, error) {
 		return nil, err
 	}
 	return tx.(authsigning.Tx), nil
+}
+
+func TxHash(txBytes []byte) string {
+	return fmt.Sprintf("%X", comettypes.Tx(txBytes).Hash())
 }

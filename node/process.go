@@ -1,14 +1,12 @@
 package node
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"time"
 
 	abcitypes "github.com/cometbft/cometbft/abci/types"
 	rpccoretypes "github.com/cometbft/cometbft/rpc/core/types"
-	comettypes "github.com/cometbft/cometbft/types"
 	nodetypes "github.com/initia-labs/opinit-bots-go/node/types"
 	"go.uber.org/zap"
 )
@@ -76,8 +74,8 @@ func (n *Node) handleNewBlock(block *rpccoretypes.ResultBlock, blockResult *rpcc
 	for _, tx := range block.Block.Txs {
 		if n.localPendingTxLength() == 0 {
 			break
-		} else if pendingTx := n.getLocalPendingTx(); bytes.Equal(tx, pendingTx.Tx) {
-			n.logger.Debug("tx inserted", zap.Int64("height", block.Block.Height), zap.Uint64("sequence", pendingTx.Sequence), zap.String("txHash", fmt.Sprintf("%X", comettypes.Tx(tx).Hash())))
+		} else if pendingTx := n.getLocalPendingTx(); TxHash(tx) == pendingTx.TxHash {
+			n.logger.Debug("tx inserted", zap.Int64("height", block.Block.Height), zap.Uint64("sequence", pendingTx.Sequence), zap.String("txHash", pendingTx.TxHash))
 			err := n.deletePendingTx(pendingTx.Sequence)
 			if err != nil {
 				return err
@@ -86,8 +84,8 @@ func (n *Node) handleNewBlock(block *rpccoretypes.ResultBlock, blockResult *rpcc
 		}
 	}
 
-	if n.localPendingTxLength() > 0 {
-		n.logger.Debug("remaining pending txs", zap.Int64("height", block.Block.Height), zap.Int("count", len(n.pendingTxs)))
+	if length := n.localPendingTxLength(); length > 0 {
+		n.logger.Debug("remaining pending txs", zap.Int64("height", block.Block.Height), zap.Int("count", length))
 		pendingTxHeight := n.getLocalPendingTx().ProcessedHeight
 		if block.Block.Height-pendingTxHeight > nodetypes.TIMEOUT_HEIGHT {
 			panic(fmt.Errorf("something wrong, pending txs are not processed for a long time; current height: %d, pending tx processing height: %d", block.Block.Height, pendingTxHeight))

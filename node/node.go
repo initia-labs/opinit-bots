@@ -41,7 +41,9 @@ type Node struct {
 	pendingTxMu              *sync.Mutex
 	pendingTxs               []nodetypes.PendingTxInfo
 
-	pendingProcessedData nodetypes.ProcessedData
+	pendingProcessedData []nodetypes.ProcessedMsgs
+
+	txChannel chan nodetypes.ProcessedMsgs
 }
 
 func NewNode(name string, cfg nodetypes.NodeConfig, db types.DB, logger *zap.Logger, cdc codec.Codec, txConfig client.TxConfig) (*Node, error) {
@@ -72,7 +74,9 @@ func NewNode(name string, cfg nodetypes.NodeConfig, db types.DB, logger *zap.Log
 		pendingTxMu: &sync.Mutex{},
 		pendingTxs:  make([]nodetypes.PendingTxInfo, 0),
 
-		pendingProcessedData: make(nodetypes.ProcessedData, 0),
+		pendingProcessedData: make([]nodetypes.ProcessedMsgs, 0),
+
+		txChannel: make(chan nodetypes.ProcessedMsgs),
 	}
 
 	err = n.loadSyncInfo()
@@ -90,6 +94,12 @@ func NewNode(name string, cfg nodetypes.NodeConfig, db types.DB, logger *zap.Log
 }
 
 func (n Node) Start(ctx context.Context) {
+	go n.txBroadcastLooper(ctx)
+
+	// broadcast pending msgs first before executing block process looper
+	for _, processedMsg := range n.pendingProcessedData {
+		n.BroadcastMsgs(processedMsg)
+	}
 	go n.blockProcessLooper(ctx)
 }
 
@@ -166,39 +176,22 @@ func (n *Node) prepareBroadcaster() error {
 		}
 	}
 
-	loadedProcessedData, err := n.loadProcessedMsgs()
+	loadedProcessedData, err := n.loadProcessedData()
 	if err != nil {
 		return err
 	}
+	n.pendingProcessedData = append(n.pendingProcessedData, loadedProcessedData...)
 
-	// append existing pending msgs
-	if len(loadedProcessedData) > 0 {
-		for _, processedMsg := range loadedProcessedData {
-			n.pendingProcessedData = append(n.pendingProcessedData, processedMsg)
-		}
-	}
-
-	kvProcessedMsgs, err := n.RawKVProcessedMsgs(n.pendingProcessedData)
+	kvProcessedData, err := n.RawKVProcessedData(n.pendingProcessedData, false)
 	if err != nil {
 		return err
 	}
-	dbBatchKVs = append(dbBatchKVs, kvProcessedMsgs)
+	dbBatchKVs = append(dbBatchKVs, kvProcessedData...)
 
 	// save all pending msgs first, then broadcast them
 	err = n.db.RawBatchSet(dbBatchKVs...)
 	if err != nil {
 		return err
-	}
-
-	for i, processedMsg := range n.pendingProcessedData {
-		err := n.BroadcastMsgs(processedMsg)
-		if err != nil {
-			return err
-		}
-		err = n.SaveProcessedMsgs(n.pendingProcessedData[i+1:])
-		if err != nil {
-			return err
-		}
 	}
 	return nil
 }

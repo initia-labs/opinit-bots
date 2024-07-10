@@ -11,7 +11,7 @@ var (
 
 	LastProcessedBlockHeight = []byte("last_processed_block_height")
 	PrefixPendingTxs         = []byte("pending_txs")
-	ProcessedDataKey         = []byte("processed_data")
+	PrefixProcessedMsgs      = []byte("processed_msgs")
 )
 
 const POLLING_INTERVAL = 1 * time.Second
@@ -25,4 +25,8 @@ const PER_MSG_GAS_LIMIT = 500_000
 
 func PrefixedPendingTx(sequence uint64) []byte {
 	return []byte(fmt.Sprintf("%s/%d", string(PrefixPendingTxs), sequence))
+}
+
+func PrefixedProcessedMsgs(timestamp int64) []byte {
+	return []byte(fmt.Sprintf("%s/%d", string(PrefixProcessedMsgs), timestamp))
 }

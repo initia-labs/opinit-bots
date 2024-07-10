@@ -36,7 +36,6 @@ type Executor struct {
 
 	hostProcessedMsgs           []nodetypes.ProcessedMsgs
 	childMsgQueue               []sdk.Msg
-	childPendingTxs             []nodetypes.PendingTxInfo
 	childAllPendingTxsProcessed chan struct{}
 }
 
@@ -64,7 +63,6 @@ func NewExecutor(cfg *executortypes.Config, db types.DB, logger *zap.Logger, cdc
 
 		hostProcessedMsgs:           make([]nodetypes.ProcessedMsgs, 0),
 		childMsgQueue:               make([]sdk.Msg, 0),
-		childPendingTxs:             make([]nodetypes.PendingTxInfo, 0),
 		childAllPendingTxsProcessed: make(chan struct{}),
 	}
 

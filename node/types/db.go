@@ -10,6 +10,8 @@ type PendingTxInfo struct {
 	ProcessedHeight int64  `json:"height"`
 	Sequence        uint64 `json:"sequence"`
 	Tx              []byte `json:"tx"`
+	TxHash          string `json:"tx_hash"`
+	Timestamp       int64  `json:"timestamp"`
 	Save            bool   `json:"save"`
 }
 
@@ -21,11 +23,10 @@ func (p *PendingTxInfo) Unmarshal(data []byte) error {
 	return json.Unmarshal(data, p)
 }
 
-type ProcessedData []ProcessedMsgs
-
 type ProcessedMsgs struct {
-	Msgs []sdk.Msg `json:"msgs"`
-	Save bool      `json:"save"`
+	Msgs      []sdk.Msg `json:"msgs"`
+	Timestamp int64     `json:"timestamp"`
+	Save      bool      `json:"save"`
 }
 
 func (p ProcessedMsgs) Marshal() ([]byte, error) {

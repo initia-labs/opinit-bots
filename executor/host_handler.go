@@ -17,7 +17,7 @@ import (
 
 func (ex *Executor) hostBeginBlockHandler(args nodetypes.BeginBlockArgs) error {
 	// just to make sure that childMsgQueue is empty
-	if args.BlockHeight == args.LatestHeight && len(ex.childMsgQueue) != 0 && len(ex.childPendingTxs) != 0 {
+	if args.BlockHeight == args.LatestHeight && len(ex.childMsgQueue) != 0 && len(ex.hostProcessedMsgs) != 0 {
 		panic("must not happen, hostMsgQueue should be empty")
 	}
 	return nil
@@ -39,26 +39,18 @@ func (ex *Executor) hostEndBlockHandler(args nodetypes.EndBlockArgs) error {
 
 	// TODO: save msgs to db first with host block height sync info
 	kv := ex.hostNode.RawKVSyncInfo(args.BlockHeight)
-	msgkv, err := ex.childNode.RawKVProcessedMsgs(ex.hostProcessedMsgs)
+	msgkvs, err := ex.childNode.RawKVProcessedData(ex.hostProcessedMsgs, false)
 	if err != nil {
 		return err
 	}
 
-	err = ex.db.RawBatchSet(kv, msgkv)
+	err = ex.db.RawBatchSet(append(msgkvs, kv)...)
 	if err != nil {
 		return err
 	}
 
-	for i, processedMsg := range ex.hostProcessedMsgs {
-		err := ex.childNode.BroadcastMsgs(processedMsg)
-		if err != nil {
-			//TODO: handle error
-			return err
-		}
-		err = ex.childNode.SaveProcessedMsgs(ex.hostProcessedMsgs[i+1:])
-		if err != nil {
-			return err
-		}
+	for _, processedMsg := range ex.hostProcessedMsgs {
+		ex.childNode.BroadcastMsgs(processedMsg)
 	}
 
 	ex.deleteChildMsgQueue()
