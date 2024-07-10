@@ -16,58 +16,58 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 )
 
-func (ex *Executor) hostBeginBlockHandler(args nodetypes.BeginBlockArgs) error {
+func (h *host) beginBlockHandler(args nodetypes.BeginBlockArgs) error {
 	// just to make sure that childMsgQueue is empty
-	if args.BlockHeight == args.LatestHeight && len(ex.childMsgQueue) != 0 && len(ex.hostProcessedMsgs) != 0 {
+	if args.BlockHeight == args.LatestHeight && len(h.msgQueue) != 0 && len(h.processedMsgs) != 0 {
 		panic("must not happen, hostMsgQueue should be empty")
 	}
 	return nil
 }
 
-func (ex *Executor) hostEndBlockHandler(args nodetypes.EndBlockArgs) error {
+func (h *host) endBlockHandler(args nodetypes.EndBlockArgs) error {
 	// temporary 50 limit for msg queue
 	// collect more msgs if block height is not latest
-	if args.BlockHeight != args.LatestHeight && len(ex.childMsgQueue) <= 50 {
+	if args.BlockHeight != args.LatestHeight && len(h.msgQueue) <= 50 {
 		return nil
 	}
 
-	if len(ex.childMsgQueue) != 0 {
-		ex.hostProcessedMsgs = append(ex.hostProcessedMsgs, nodetypes.ProcessedMsgs{
-			Msgs:      ex.childMsgQueue,
+	if len(h.msgQueue) != 0 {
+		h.processedMsgs = append(h.processedMsgs, nodetypes.ProcessedMsgs{
+			Msgs:      h.msgQueue,
 			Timestamp: time.Now().UnixNano(),
 			Save:      true,
 		})
 	}
 
 	// TODO: save msgs to db first with host block height sync info
-	kv := ex.hostNode.RawKVSyncInfo(args.BlockHeight)
-	msgkvs, err := ex.childNode.RawKVProcessedData(ex.hostProcessedMsgs, false)
+	kv := h.node.RawKVSyncInfo(args.BlockHeight)
+	msgkvs, err := h.child.RawKVProcessedData(h.processedMsgs, false)
 	if err != nil {
 		return err
 	}
 
-	err = ex.db.RawBatchSet(append(msgkvs, kv)...)
+	err = h.db.RawBatchSet(append(msgkvs, kv)...)
 	if err != nil {
 		return err
 	}
 
-	for _, processedMsg := range ex.hostProcessedMsgs {
-		ex.childNode.BroadcastMsgs(processedMsg)
+	for _, processedMsg := range h.processedMsgs {
+		h.child.BroadcastMsgs(processedMsg)
 	}
 
-	ex.deleteChildMsgQueue()
-	ex.deleteHostProcessedMsgs()
+	h.msgQueue = h.msgQueue[:0]
+	h.processedMsgs = h.processedMsgs[:0]
 	return nil
 }
 
-func (ex *Executor) hostTxHandler(args nodetypes.TxHandlerArgs) error {
+func (h *host) txHandler(args nodetypes.TxHandlerArgs) error {
 	if args.BlockHeight == args.LatestHeight && args.TxIndex == 0 {
-		msg, err := ex.oracleTxHandler(args.BlockHeight, args.Tx)
+		msg, err := h.oracleTxHandler(args.BlockHeight, args.Tx)
 		if err != nil {
 			return err
 		}
 
-		ex.hostProcessedMsgs = append(ex.hostProcessedMsgs, nodetypes.ProcessedMsgs{
+		h.processedMsgs = append(h.processedMsgs, nodetypes.ProcessedMsgs{
 			Msgs:      []sdk.Msg{msg},
 			Timestamp: time.Now().UnixNano(),
 			Save:      false,
@@ -76,8 +76,8 @@ func (ex *Executor) hostTxHandler(args nodetypes.TxHandlerArgs) error {
 	return nil
 }
 
-func (ex *Executor) oracleTxHandler(blockHeight int64, tx comettypes.Tx) (sdk.Msg, error) {
-	sender, err := ex.ac.BytesToString(ex.childNode.GetAddress())
+func (h *host) oracleTxHandler(blockHeight int64, tx comettypes.Tx) (sdk.Msg, error) {
+	sender, err := h.ac.BytesToString(h.child.GetAddress())
 	if err != nil {
 		return nil, err
 	}
@@ -87,14 +87,14 @@ func (ex *Executor) oracleTxHandler(blockHeight int64, tx comettypes.Tx) (sdk.Ms
 		uint64(blockHeight),
 		tx,
 	)
-	err = msg.Validate(ex.ac)
+	err = msg.Validate(h.ac)
 	if err != nil {
 		return nil, err
 	}
 	return msg, nil
 }
 
-func (ex *Executor) initiateDepositHandler(args nodetypes.EventHandlerArgs) error {
+func (h *host) initiateDepositHandler(args nodetypes.EventHandlerArgs) error {
 	var bridgeId int64
 	var l1Sequence uint64
 	var from, to, l1Denom, l2Denom, amount string
@@ -108,7 +108,7 @@ func (ex *Executor) initiateDepositHandler(args nodetypes.EventHandlerArgs) erro
 			if err != nil {
 				return err
 			}
-			if bridgeId != ex.cfg.BridgeId {
+			if bridgeId != h.bridgeId {
 				return errors.New("bridge ID mismatch")
 			}
 		case ophosttypes.AttributeKeyL1Sequence:
@@ -134,7 +134,7 @@ func (ex *Executor) initiateDepositHandler(args nodetypes.EventHandlerArgs) erro
 		}
 	}
 
-	msg, err := ex.handleInitiateDeposit(
+	msg, err := h.handleInitiateDeposit(
 		l1Sequence,
 		uint64(args.BlockHeight),
 		from,
@@ -148,11 +148,11 @@ func (ex *Executor) initiateDepositHandler(args nodetypes.EventHandlerArgs) erro
 		return err
 	}
 
-	ex.childMsgQueue = append(ex.childMsgQueue, msg)
+	h.msgQueue = append(h.msgQueue, msg)
 	return nil
 }
 
-func (ex *Executor) handleInitiateDeposit(
+func (h *host) handleInitiateDeposit(
 	l1Sequence uint64,
 	blockHeight uint64,
 	from string,
@@ -162,7 +162,7 @@ func (ex *Executor) handleInitiateDeposit(
 	amount string,
 	data []byte,
 ) (sdk.Msg, error) {
-	sender, err := ex.ac.BytesToString(ex.childNode.GetAddress())
+	sender, err := h.ac.BytesToString(h.child.GetAddress())
 	if err != nil {
 		return nil, err
 	}
@@ -182,7 +182,7 @@ func (ex *Executor) handleInitiateDeposit(
 		l1Denom,
 		data,
 	)
-	err = msg.Validate(ex.ac)
+	err = msg.Validate(h.ac)
 	if err != nil {
 		return nil, err
 	}
