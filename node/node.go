@@ -26,7 +26,6 @@ type Node struct {
 	logger *zap.Logger
 
 	eventHandlers     map[string]nodetypes.EventHandlerFn
-	knownMsgErrors    map[sdk.Msg]nodetypes.KnownErrors
 	txHandler         nodetypes.TxHandlerFn
 	beginBlockHandler nodetypes.BeginBlockHandlerFn
 	endBlockHandler   nodetypes.EndBlockHandlerFn
@@ -64,8 +63,7 @@ func NewNode(name string, cfg nodetypes.NodeConfig, db types.DB, logger *zap.Log
 		db:     db,
 		logger: logger,
 
-		eventHandlers:  make(map[string]nodetypes.EventHandlerFn),
-		knownMsgErrors: make(map[sdk.Msg]nodetypes.KnownErrors),
+		eventHandlers: make(map[string]nodetypes.EventHandlerFn),
 
 		cdc:      cdc,
 		txConfig: txConfig,
@@ -151,7 +149,7 @@ func (n *Node) prepareBroadcaster() error {
 	// TODO: handle mismatched sequence & pending txs
 	if len(loadedPendingTxs) > 0 {
 		lastSavedSequence := loadedPendingTxs[len(loadedPendingTxs)-1].Sequence
-		if loadedPendingTxs[0].ProcessedHeight-n.lastProcessedBlockHeight >= nodetypes.TIMEOUT_HEIGHT {
+		if n.lastProcessedBlockHeight-loadedPendingTxs[0].ProcessedHeight >= nodetypes.TIMEOUT_HEIGHT {
 			// delete existing pending txs
 			pendingKVs, err := n.RawKVPendingTxs(loadedPendingTxs, true)
 			if err != nil {
@@ -165,10 +163,12 @@ func (n *Node) prepareBroadcaster() error {
 				if err != nil {
 					return err
 				}
-				n.pendingProcessedData = append(n.pendingProcessedData, nodetypes.ProcessedMsgs{
-					Msgs: tx.GetMsgs(),
-					Save: txInfo.Save,
-				})
+				if txInfo.Save {
+					n.pendingProcessedData = append(n.pendingProcessedData, nodetypes.ProcessedMsgs{
+						Msgs: tx.GetMsgs(),
+						Save: txInfo.Save,
+					})
+				}
 			}
 		} else {
 			n.pendingTxs = loadedPendingTxs
@@ -230,8 +230,4 @@ func (n *Node) RegisterBeginBlockHandler(fn nodetypes.BeginBlockHandlerFn) {
 
 func (n *Node) RegisterEndBlockHandler(fn nodetypes.EndBlockHandlerFn) {
 	n.endBlockHandler = fn
-}
-
-func (n *Node) RegisterErrors(msg sdk.Msg, knownErrors nodetypes.KnownErrors) {
-	n.knownMsgErrors[msg] = knownErrors
 }

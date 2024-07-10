@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"regexp"
 
 	abci "github.com/cometbft/cometbft/abci/types"
 	comettypes "github.com/cometbft/cometbft/types"
@@ -19,47 +20,67 @@ import (
 	"go.uber.org/zap"
 )
 
+var accountSeqRegex = regexp.MustCompile("account sequence mismatch, expected ([0-9]+), got ([0-9]+)")
+
 func (n *Node) txBroadcastLooper(ctx context.Context) error {
 	for {
 		select {
 		case <-ctx.Done():
 			return nil
 		case data := <-n.txChannel:
-			sequence := n.txf.Sequence()
-			txBytes, err := n.buildMessages(ctx, data.Msgs)
+			err := n.handleProcessedMsgs(ctx, data)
 			if err != nil {
-				return err
-			}
-
-			_, err = n.BroadcastTxSync(ctx, txBytes)
-			if err != nil {
-				// TODO: handle error, may repeat sending tx
-				return fmt.Errorf("broadcast txs: %w", err)
-			}
-			n.logger.Debug("broadcast tx", zap.String("tx_hash", TxHash(txBytes)), zap.Uint64("sequence", sequence))
-
-			if data.Timestamp != 0 {
-				err = n.deleteProcessedMsgs(data.Timestamp)
-				if err != nil {
-					return err
+				if accountSeqRegex.FindStringSubmatch(err.Error()) != nil {
+					// account sequence mismatched
+					// TODO: not panic, but handle mismatched sequence
+					panic(err)
 				}
+
+				n.logger.Error("failed to handle processed msgs", zap.Error(err))
 			}
-			n.txf = n.txf.WithSequence(n.txf.Sequence() + 1)
-			pendingTx := nodetypes.PendingTxInfo{
-				ProcessedHeight: n.GetHeight(),
-				Sequence:        sequence,
-				Tx:              txBytes,
-				TxHash:          TxHash(txBytes),
-				Timestamp:       data.Timestamp,
-				Save:            data.Save,
-			}
-			err = n.savePendingTx(sequence, pendingTx)
-			if err != nil {
-				return err
-			}
-			n.appendLocalPendingTx(pendingTx)
 		}
 	}
+}
+
+func (n *Node) handleProcessedMsgs(ctx context.Context, data nodetypes.ProcessedMsgs) error {
+	sequence := n.txf.Sequence()
+	txBytes, err := n.buildMessages(ctx, data.Msgs)
+	if err != nil {
+		return err
+	}
+
+	res, err := n.BroadcastTxSync(ctx, txBytes)
+	if err != nil {
+		// TODO: handle error, may repeat sending tx
+		return fmt.Errorf("broadcast txs: %w", err)
+	}
+	if res.Code != 0 {
+		return fmt.Errorf("broadcast txs: %s", res.Log)
+	}
+
+	n.logger.Debug("broadcast tx", zap.String("tx_hash", TxHash(txBytes)), zap.Uint64("sequence", sequence))
+
+	if data.Timestamp != 0 {
+		err = n.deleteProcessedMsgs(data.Timestamp)
+		if err != nil {
+			return err
+		}
+	}
+	n.txf = n.txf.WithSequence(n.txf.Sequence() + 1)
+	pendingTx := nodetypes.PendingTxInfo{
+		ProcessedHeight: n.GetHeight(),
+		Sequence:        sequence,
+		Tx:              txBytes,
+		TxHash:          TxHash(txBytes),
+		Timestamp:       data.Timestamp,
+		Save:            data.Save,
+	}
+	err = n.savePendingTx(sequence, pendingTx)
+	if err != nil {
+		return err
+	}
+	n.appendLocalPendingTx(pendingTx)
+	return nil
 }
 
 func (n *Node) BroadcastMsgs(msgs nodetypes.ProcessedMsgs) {

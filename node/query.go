@@ -176,7 +176,7 @@ func (n *Node) QueryABCI(ctx context.Context, req abci.RequestQuery) (abci.Respo
 	}
 
 	if !result.Response.IsOK() {
-		return abci.ResponseQuery{}, fmt.Errorf("ABCI query failed: %s", result.Response.String())
+		return abci.ResponseQuery{}, sdkerrors.ABCIError(result.Response.Codespace, result.Response.Code, result.Response.Log)
 	}
 
 	return result.Response, nil

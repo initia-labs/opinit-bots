@@ -2,6 +2,7 @@ package executor
 
 import (
 	"context"
+	"fmt"
 
 	"cosmossdk.io/core/address"
 	bottypes "github.com/initia-labs/opinit-bots-go/bot/types"
@@ -42,11 +43,13 @@ type Executor struct {
 func NewExecutor(cfg *executortypes.Config, db types.DB, logger *zap.Logger, cdc codec.Codec, txConfig client.TxConfig) *Executor {
 	hostNode, err := node.NewNode(nodetypes.HostNodeName, cfg.HostNode, db.WithPrefix([]byte(nodetypes.HostNodeName)), logger.Named(nodetypes.HostNodeName), cdc, txConfig)
 	if err != nil {
+		fmt.Println(err)
 		panic(err)
 	}
 
 	childNode, err := node.NewNode(nodetypes.ChildNodeName, cfg.ChildNode, db.WithPrefix([]byte(nodetypes.ChildNodeName)), logger.Named(nodetypes.ChildNodeName), cdc, txConfig)
 	if err != nil {
+		fmt.Println(err)
 		panic(err)
 	}
 
