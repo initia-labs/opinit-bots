@@ -55,7 +55,7 @@ func (h *Host) initiateDepositHandler(args nodetypes.EventHandlerArgs) error {
 
 	msg, err := h.handleInitiateDeposit(
 		l1Sequence,
-		uint64(args.BlockHeight),
+		args.BlockHeight,
 		from,
 		to,
 		l1Denom,

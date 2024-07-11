@@ -36,7 +36,7 @@ type Node struct {
 	keyAddress sdk.AccAddress
 	txf        tx.Factory
 
-	lastProcessedBlockHeight int64
+	lastProcessedBlockHeight uint64
 	pendingTxMu              *sync.Mutex
 	pendingTxs               []nodetypes.PendingTxInfo
 
@@ -204,7 +204,7 @@ func (n *Node) prepareBroadcaster() error {
 	return nil
 }
 
-func (n Node) GetHeight() int64 {
+func (n Node) GetHeight() uint64 {
 	return n.lastProcessedBlockHeight + 1
 }
 

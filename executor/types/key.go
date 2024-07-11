@@ -9,5 +9,5 @@ var (
 )
 
 func PrefixedWithdrawalsKey(height uint64) []byte {
-	return append(append(WithdrawalsKey, dbtypes.Splitter), dbtypes.FromUInt64Key(height)...)
+	return append(append(WithdrawalsKey, dbtypes.Splitter), dbtypes.FromUint64Key(height)...)
 }

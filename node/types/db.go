@@ -9,7 +9,7 @@ import (
 )
 
 type PendingTxInfo struct {
-	ProcessedHeight int64  `json:"height"`
+	ProcessedHeight uint64 `json:"height"`
 	Sequence        uint64 `json:"sequence"`
 	Tx              []byte `json:"tx"`
 	TxHash          string `json:"tx_hash"`

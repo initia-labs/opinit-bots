@@ -17,9 +17,9 @@ var (
 )
 
 func PrefixedPendingTx(sequence uint64) []byte {
-	return append(append(PendingTxsKey, dbtypes.Splitter), dbtypes.FromUInt64Key(sequence)...)
+	return append(append(PendingTxsKey, dbtypes.Splitter), dbtypes.FromUint64Key(sequence)...)
 }
 
 func PrefixedProcessedMsgs(timestamp uint64) []byte {
-	return append(append(ProcessedMsgsKey, dbtypes.Splitter), dbtypes.FromUInt64Key(timestamp)...)
+	return append(append(ProcessedMsgsKey, dbtypes.Splitter), dbtypes.FromUint64Key(timestamp)...)
 }

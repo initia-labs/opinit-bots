@@ -6,33 +6,33 @@ import (
 )
 
 type EventHandlerArgs struct {
-	BlockHeight     int64
-	LatestHeight    int64
-	TxIndex         int64
+	BlockHeight     uint64
+	LatestHeight    uint64
+	TxIndex         uint64
 	EventAttributes []abcitypes.EventAttribute
 }
 
 type EventHandlerFn func(EventHandlerArgs) error
 
 type TxHandlerArgs struct {
-	BlockHeight  int64
-	LatestHeight int64
-	TxIndex      int64
+	BlockHeight  uint64
+	LatestHeight uint64
+	TxIndex      uint64
 	Tx           comettypes.Tx
 }
 
 type TxHandlerFn func(TxHandlerArgs) error
 
 type BeginBlockArgs struct {
-	BlockHeight  int64
-	LatestHeight int64
+	BlockHeight  uint64
+	LatestHeight uint64
 }
 
 type BeginBlockHandlerFn func(BeginBlockArgs) error
 
 type EndBlockArgs struct {
-	BlockHeight  int64
-	LatestHeight int64
+	BlockHeight  uint64
+	LatestHeight uint64
 }
 
 type EndBlockHandlerFn func(EndBlockArgs) error

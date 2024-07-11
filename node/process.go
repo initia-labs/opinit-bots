@@ -27,14 +27,14 @@ func (n *Node) blockProcessLooper(ctx context.Context) error {
 			continue
 		}
 
-		latestChainHeight := status.SyncInfo.LatestBlockHeight
+		latestChainHeight := uint64(status.SyncInfo.LatestBlockHeight)
 		if n.lastProcessedBlockHeight >= latestChainHeight {
 			continue
 		}
 
 		// TODO: may fetch blocks in batch
 		for queryHeight := n.lastProcessedBlockHeight + 1; queryHeight <= latestChainHeight; queryHeight++ {
-			block, blockResult, err := n.fetchNewBlock(ctx, queryHeight)
+			block, blockResult, err := n.fetchNewBlock(ctx, int64(queryHeight))
 			if err != nil {
 				// TODO: handle error
 				n.logger.Error("failed to fetch new block", zap.Error(err))
@@ -68,7 +68,7 @@ func (n *Node) fetchNewBlock(ctx context.Context, height int64) (block *rpccoret
 	return block, blockResult, nil
 }
 
-func (n *Node) handleNewBlock(block *rpccoretypes.ResultBlock, blockResult *rpccoretypes.ResultBlockResults, latestChainHeight int64) error {
+func (n *Node) handleNewBlock(block *rpccoretypes.ResultBlock, blockResult *rpccoretypes.ResultBlockResults, latestChainHeight uint64) error {
 	// check pending txs first
 	// TODO: may handle pending txs with same level of other handlers
 	for _, tx := range block.Block.Txs {
@@ -87,14 +87,14 @@ func (n *Node) handleNewBlock(block *rpccoretypes.ResultBlock, blockResult *rpcc
 	if length := n.localPendingTxLength(); length > 0 {
 		n.logger.Debug("remaining pending txs", zap.Int64("height", block.Block.Height), zap.Int("count", length))
 		pendingTxHeight := n.getLocalPendingTx().ProcessedHeight
-		if block.Block.Height-pendingTxHeight > nodetypes.TIMEOUT_HEIGHT {
+		if uint64(block.Block.Height)-pendingTxHeight > nodetypes.TIMEOUT_HEIGHT {
 			panic(fmt.Errorf("something wrong, pending txs are not processed for a long time; current height: %d, pending tx processing height: %d", block.Block.Height, pendingTxHeight))
 		}
 	}
 
 	if n.beginBlockHandler != nil {
 		err := n.beginBlockHandler(nodetypes.BeginBlockArgs{
-			BlockHeight:  block.Block.Height,
+			BlockHeight:  uint64(block.Block.Height),
 			LatestHeight: latestChainHeight,
 		})
 		if err != nil {
@@ -105,9 +105,9 @@ func (n *Node) handleNewBlock(block *rpccoretypes.ResultBlock, blockResult *rpcc
 	for txIndex, tx := range block.Block.Txs {
 		if n.txHandler != nil {
 			err := n.txHandler(nodetypes.TxHandlerArgs{
-				BlockHeight:  block.Block.Height,
+				BlockHeight:  uint64(block.Block.Height),
 				LatestHeight: latestChainHeight,
-				TxIndex:      int64(txIndex),
+				TxIndex:      uint64(txIndex),
 				Tx:           tx,
 			})
 			if err != nil {
@@ -119,7 +119,7 @@ func (n *Node) handleNewBlock(block *rpccoretypes.ResultBlock, blockResult *rpcc
 		if len(n.eventHandlers) != 0 {
 			events := blockResult.TxsResults[txIndex].GetEvents()
 			for eventIndex, event := range events {
-				err := n.handleEvent(block.Block.Height, latestChainHeight, int64(txIndex), event)
+				err := n.handleEvent(uint64(block.Block.Height), latestChainHeight, uint64(txIndex), event)
 				if err != nil {
 					// TODO: handle error
 					return fmt.Errorf("failed to handle event: tx_index: %d, event_index: %d; %w", txIndex, eventIndex, err)
@@ -130,7 +130,7 @@ func (n *Node) handleNewBlock(block *rpccoretypes.ResultBlock, blockResult *rpcc
 
 	if n.endBlockHandler != nil {
 		err := n.endBlockHandler(nodetypes.EndBlockArgs{
-			BlockHeight:  block.Block.Height,
+			BlockHeight:  uint64(block.Block.Height),
 			LatestHeight: latestChainHeight,
 		})
 		if err != nil {
@@ -140,11 +140,11 @@ func (n *Node) handleNewBlock(block *rpccoretypes.ResultBlock, blockResult *rpcc
 	return nil
 }
 
-func (n *Node) handleEvent(blockHeight int64, latestHeight int64, txIndex int64, event abcitypes.Event) error {
+func (n *Node) handleEvent(blockHeight uint64, latestHeight uint64, txIndex uint64, event abcitypes.Event) error {
 	if n.eventHandlers[event.GetType()] == nil {
 		return nil
 	}
-	n.logger.Debug("handle event", zap.String("name", n.name), zap.Int64("height", blockHeight), zap.String("type", event.GetType()))
+	n.logger.Debug("handle event", zap.String("name", n.name), zap.Uint64("height", blockHeight), zap.String("type", event.GetType()))
 
 	err := n.eventHandlers[event.Type](nodetypes.EventHandlerArgs{
 		BlockHeight:     blockHeight,

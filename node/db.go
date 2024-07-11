@@ -8,13 +8,13 @@ import (
 )
 
 func (n *Node) SaveSyncInfo() error {
-	return n.db.Set(nodetypes.LastProcessedBlockHeightKey, dbtypes.FromInt64(n.lastProcessedBlockHeight))
+	return n.db.Set(nodetypes.LastProcessedBlockHeightKey, dbtypes.FromUint64(n.lastProcessedBlockHeight))
 }
 
-func (n *Node) RawKVSyncInfo(height int64) types.KV {
+func (n *Node) RawKVSyncInfo(height uint64) types.KV {
 	return types.KV{
 		Key:   n.db.PrefixedKey(nodetypes.LastProcessedBlockHeightKey),
-		Value: dbtypes.FromInt64(height),
+		Value: dbtypes.FromUint64(height),
 	}
 }
 
@@ -25,8 +25,8 @@ func (n *Node) loadSyncInfo() error {
 	} else if err != nil {
 		return err
 	}
-	n.lastProcessedBlockHeight = dbtypes.ToInt64(data)
-	n.logger.Info("load sync info", zap.Int64("last_processed_height", n.lastProcessedBlockHeight))
+	n.lastProcessedBlockHeight = dbtypes.ToUint64(data)
+	n.logger.Info("load sync info", zap.Uint64("last_processed_height", n.lastProcessedBlockHeight))
 	return nil
 }
 

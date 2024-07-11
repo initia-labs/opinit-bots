@@ -51,9 +51,9 @@ func (ch *Child) handleInitiateWithdrawal(l2Sequence uint64, from string, to str
 	})
 }
 
-func (ch *Child) prepareWithdrawals(blockHeight int64) error {
+func (ch *Child) prepareWithdrawals(blockHeight uint64) error {
 	ch.blockWithdrawals = executortypes.Withdrawals{
-		Height: uint64(blockHeight),
+		Height: blockHeight,
 	}
 
 	if ch.nextSentOutputTime.IsZero() || time.Now().After(ch.nextSentOutputTime) {
@@ -67,7 +67,9 @@ func (ch *Child) prepareWithdrawals(blockHeight int64) error {
 	return nil
 }
 
-func (ch *Child) generateOutputRoot(blockHeight int64) error {
+func (ch *Child) generateOutputRoot(blockHeight uint64) error {
+	if time.Now().After(ch.nextSentOutputTime) || blockHeight-ch.lastSentOutputBlockHeight > executortypes.OutputIntervalHeight {
 
+	}
 	return nil
 }

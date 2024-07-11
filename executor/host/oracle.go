@@ -8,7 +8,7 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 )
 
-func (h *Host) oracleTxHandler(blockHeight int64, tx comettypes.Tx) (sdk.Msg, error) {
+func (h *Host) oracleTxHandler(blockHeight uint64, tx comettypes.Tx) (sdk.Msg, error) {
 	sender, err := h.ac.BytesToString(h.child.GetAddress())
 	if err != nil {
 		return nil, err
@@ -16,7 +16,7 @@ func (h *Host) oracleTxHandler(blockHeight int64, tx comettypes.Tx) (sdk.Msg, er
 
 	msg := opchildtypes.NewMsgUpdateOracle(
 		sender,
-		uint64(blockHeight),
+		blockHeight,
 		tx,
 	)
 	err = msg.Validate(h.ac)
