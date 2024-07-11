@@ -42,8 +42,9 @@ type Child struct {
 	cdc codec.Codec
 	ac  address.Codec
 
-	processedMsgs []nodetypes.ProcessedMsgs
-	msgQueue      []sdk.Msg
+	processedMsgs    []nodetypes.ProcessedMsgs
+	msgQueue         []sdk.Msg
+	blockWithdrawals executortypes.Withdrawals
 }
 
 func NewChild(bridgeId int64, cfg nodetypes.NodeConfig, db types.DB, logger *zap.Logger, cdc codec.Codec, txConfig client.TxConfig, host hostNode) *Child {
@@ -82,6 +83,7 @@ func (ch *Child) registerHostNode(host hostNode) {
 }
 
 func (ch *Child) registerHandlers() {
+	ch.node.RegisterBeginBlockHandler(ch.beginBlockHandler)
 	ch.node.RegisterEventHandler(opchildtypes.EventTypeFinalizeTokenDeposit, ch.finalizeDepositHandler)
 	ch.node.RegisterEventHandler(opchildtypes.EventTypeUpdateOracle, ch.updateOracleHandler)
 	ch.node.RegisterEndBlockHandler(ch.endBlockHandler)
@@ -99,11 +101,27 @@ func (ch Child) RawKVProcessedData(msgs []nodetypes.ProcessedMsgs, delete bool) 
 	return ch.node.RawKVProcessedData(msgs, delete)
 }
 
-func (ch *Child) saveWithdrawal(sequence uint64, withdrawal [32]byte) error {
-	return ch.db.Set(executortypes.PrefixedWithdrawalKey(sequence), withdrawal[:])
+func (ch *Child) saveWithdrawals(withdrawals executortypes.Withdrawals) error {
+	value, err := withdrawals.Marshal()
+	if err != nil {
+		return err
+	}
+	return ch.db.Set(executortypes.PrefixedWithdrawalsKey(withdrawals.Height), value)
 }
 
-func (ch *Child) loadWithdrawals(startSequence uint64, endSequence uint64) ([][32]byte, error) {
-	// ch.db.Iterate(executortypes.PrefixedWithdrawalKey(startSequence), executortypes.PrefixedWithdrawalKey(endSequence), func(key, value []byte) bool {
+func (ch *Child) loadWithdrawals(startHeight uint64, endHeight uint64) (res []executortypes.Withdrawals, err error) {
+	iterErr := ch.db.Iterate(executortypes.PrefixedWithdrawalsKey(startHeight), executortypes.PrefixedWithdrawalsKey(endHeight+1), func(key, value []byte) bool {
+		var withdrawals executortypes.Withdrawals
+		err = withdrawals.Unmarshal(value)
+		if err != nil {
+			return true
+		}
+		res = append(res, withdrawals)
+		return false
+	})
+
+	if iterErr != nil {
+		return nil, iterErr
+	}
 	return nil, nil
 }

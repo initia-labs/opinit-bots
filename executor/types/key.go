@@ -5,9 +5,9 @@ import (
 )
 
 var (
-	WithdrawalKey = []byte("withdrawal")
+	WithdrawalsKey = []byte("withdrawals")
 )
 
-func PrefixedWithdrawalKey(sequence uint64) []byte {
-	return append(append(WithdrawalKey, dbtypes.Splitter), dbtypes.FromUInt64Key(sequence)...)
+func PrefixedWithdrawalsKey(height uint64) []byte {
+	return append(append(WithdrawalsKey, dbtypes.Splitter), dbtypes.FromUInt64Key(height)...)
 }
