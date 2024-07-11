@@ -8,8 +8,10 @@ import (
 	"cosmossdk.io/math"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	opchildtypes "github.com/initia-labs/OPinit/x/opchild/types"
+	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
 
 	nodetypes "github.com/initia-labs/opinit-bots-go/node/types"
+	"github.com/initia-labs/opinit-bots-go/types"
 	"go.uber.org/zap"
 )
 
@@ -18,6 +20,7 @@ func (ch *Child) beginBlockHandler(args nodetypes.BeginBlockArgs) error {
 	if args.BlockHeight == args.LatestHeight && len(ch.msgQueue) != 0 && len(ch.processedMsgs) != 0 {
 		panic("must not happen, msgQueue should be empty")
 	}
+
 	return nil
 }
 
@@ -28,22 +31,25 @@ func (ch *Child) endBlockHandler(args nodetypes.EndBlockArgs) error {
 		return nil
 	}
 
-	if len(ch.msgQueue) != 0 {
-		ch.processedMsgs = append(ch.processedMsgs, nodetypes.ProcessedMsgs{
-			Msgs:      ch.msgQueue,
-			Timestamp: time.Now().UnixNano(),
-			Save:      true,
-		})
+	batchKVs := []types.KV{
+		ch.node.RawKVSyncInfo(args.BlockHeight),
+	}
+	if ch.node.HasKey() {
+		if len(ch.msgQueue) != 0 {
+			ch.processedMsgs = append(ch.processedMsgs, nodetypes.ProcessedMsgs{
+				Msgs:      ch.msgQueue,
+				Timestamp: time.Now().UnixNano(),
+				Save:      true,
+			})
+		}
+		msgkvs, err := ch.host.RawKVProcessedData(ch.processedMsgs, false)
+		if err != nil {
+			return err
+		}
+		batchKVs = append(batchKVs, msgkvs...)
 	}
 
-	// TODO: save msgs to db first with host block height sync info
-	kv := ch.node.RawKVSyncInfo(args.BlockHeight)
-	msgkvs, err := ch.host.RawKVProcessedData(ch.processedMsgs, false)
-	if err != nil {
-		return err
-	}
-
-	err = ch.db.RawBatchSet(append(msgkvs, kv)...)
+	err := ch.db.RawBatchSet(batchKVs...)
 	if err != nil {
 		return err
 	}
@@ -159,17 +165,14 @@ func (ch *Child) initiateWithdrawalHandler(args nodetypes.EventHandlerArgs) erro
 			amount = coinAmount.Uint64()
 		}
 	}
-	msg, err := ch.handleInitiateWithdrawal(l2Sequence, from, to, baseDenom, amount)
+	err = ch.handleInitiateWithdrawal(l2Sequence, from, to, baseDenom, amount)
 	if err != nil {
 		return err
 	}
-
-	ch.msgQueue = append(ch.msgQueue, msg)
 	return nil
 }
 
-func (ch *Child) handleInitiateWithdrawal(l2Sequence uint64, from string, to string, baseDenom string, amount uint64) (sdk.Msg, error) {
-	// withdrawal := ophosttypes.GenerateWithdrawalHash(uint64(ch.bridgeId), l2Sequence, from, to, baseDenom, amount)
-
-	return nil, nil
+func (ch *Child) handleInitiateWithdrawal(l2Sequence uint64, from string, to string, baseDenom string, amount uint64) error {
+	withdrawal := ophosttypes.GenerateWithdrawalHash(uint64(ch.bridgeId), l2Sequence, from, to, baseDenom, amount)
+	return ch.saveWithdrawal(l2Sequence, withdrawal)
 }

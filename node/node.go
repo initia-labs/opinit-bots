@@ -82,7 +82,7 @@ func NewNode(name string, cfg nodetypes.NodeConfig, db types.DB, logger *zap.Log
 		return nil, err
 	}
 
-	if n.hasKey() {
+	if n.HasKey() {
 		err := n.prepareBroadcaster()
 		if err != nil {
 			return nil, err
@@ -101,7 +101,7 @@ func (n Node) Start(ctx context.Context) {
 	go n.blockProcessLooper(ctx)
 }
 
-func (n Node) hasKey() bool {
+func (n Node) HasKey() bool {
 	if n.cfg.Mnemonic == "" {
 		return false
 	}

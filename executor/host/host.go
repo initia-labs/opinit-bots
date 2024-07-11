@@ -35,6 +35,8 @@ type Host struct {
 	cdc    codec.Codec
 	ac     address.Codec
 
+	ophostQueryClient ophosttypes.QueryClient
+
 	processedMsgs []nodetypes.ProcessedMsgs
 	msgQueue      []sdk.Msg
 }
@@ -58,6 +60,8 @@ func NewHost(bridgeId int64, cfg nodetypes.NodeConfig, db types.DB, logger *zap.
 		cdc: cdc,
 		ac:  cdc.InterfaceRegistry().SigningContext().AddressCodec(),
 
+		ophostQueryClient: ophosttypes.NewQueryClient(node),
+
 		processedMsgs: make([]nodetypes.ProcessedMsgs, 0),
 		msgQueue:      make([]sdk.Msg, 0),
 	}
@@ -79,10 +83,6 @@ func (h Host) registerHandlers() {
 	h.node.RegisterTxHandler(h.txHandler)
 	h.node.RegisterEventHandler(ophosttypes.EventTypeInitiateTokenDeposit, h.initiateDepositHandler)
 	h.node.RegisterEndBlockHandler(h.endBlockHandler)
-}
-
-func (h Host) GetAddress() sdk.AccAddress {
-	return h.node.GetAddress()
 }
 
 func (h Host) BroadcastMsgs(msgs nodetypes.ProcessedMsgs) {

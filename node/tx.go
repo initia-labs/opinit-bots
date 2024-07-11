@@ -85,6 +85,9 @@ func (n *Node) handleProcessedMsgs(ctx context.Context, data nodetypes.Processed
 }
 
 func (n *Node) BroadcastMsgs(msgs nodetypes.ProcessedMsgs) {
+	if n.txChannel == nil || !n.HasKey() {
+		return
+	}
 	n.txChannel <- msgs
 }
 

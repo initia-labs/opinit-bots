@@ -10,6 +10,7 @@ import (
 	opchildtypes "github.com/initia-labs/OPinit/x/opchild/types"
 	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
 	nodetypes "github.com/initia-labs/opinit-bots-go/node/types"
+	"github.com/initia-labs/opinit-bots-go/types"
 
 	comettypes "github.com/cometbft/cometbft/types"
 
@@ -31,22 +32,26 @@ func (h *Host) endBlockHandler(args nodetypes.EndBlockArgs) error {
 		return nil
 	}
 
-	if len(h.msgQueue) != 0 {
-		h.processedMsgs = append(h.processedMsgs, nodetypes.ProcessedMsgs{
-			Msgs:      h.msgQueue,
-			Timestamp: time.Now().UnixNano(),
-			Save:      true,
-		})
+	batchKVs := []types.KV{
+		h.node.RawKVSyncInfo(args.BlockHeight),
+	}
+	if h.node.HasKey() {
+		if len(h.msgQueue) != 0 {
+			h.processedMsgs = append(h.processedMsgs, nodetypes.ProcessedMsgs{
+				Msgs:      h.msgQueue,
+				Timestamp: time.Now().UnixNano(),
+				Save:      true,
+			})
+		}
+
+		msgkvs, err := h.child.RawKVProcessedData(h.processedMsgs, false)
+		if err != nil {
+			return err
+		}
+		batchKVs = append(batchKVs, msgkvs...)
 	}
 
-	// TODO: save msgs to db first with host block height sync info
-	kv := h.node.RawKVSyncInfo(args.BlockHeight)
-	msgkvs, err := h.child.RawKVProcessedData(h.processedMsgs, false)
-	if err != nil {
-		return err
-	}
-
-	err = h.db.RawBatchSet(append(msgkvs, kv)...)
+	err := h.db.RawBatchSet(batchKVs...)
 	if err != nil {
 		return err
 	}
