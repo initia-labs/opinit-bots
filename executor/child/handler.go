@@ -1,4 +1,4 @@
-package executor
+package child
 
 import (
 	"errors"
@@ -8,11 +8,12 @@ import (
 	"cosmossdk.io/math"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	opchildtypes "github.com/initia-labs/OPinit/x/opchild/types"
+
 	nodetypes "github.com/initia-labs/opinit-bots-go/node/types"
 	"go.uber.org/zap"
 )
 
-func (ch *child) beginBlockHandler(args nodetypes.BeginBlockArgs) error {
+func (ch *Child) beginBlockHandler(args nodetypes.BeginBlockArgs) error {
 	// just to make sure that childMsgQueue is empty
 	if args.BlockHeight == args.LatestHeight && len(ch.msgQueue) != 0 && len(ch.processedMsgs) != 0 {
 		panic("must not happen, msgQueue should be empty")
@@ -20,7 +21,7 @@ func (ch *child) beginBlockHandler(args nodetypes.BeginBlockArgs) error {
 	return nil
 }
 
-func (ch *child) endBlockHandler(args nodetypes.EndBlockArgs) error {
+func (ch *Child) endBlockHandler(args nodetypes.EndBlockArgs) error {
 	// temporary 50 limit for msg queue
 	// collect more msgs if block height is not latest
 	if args.BlockHeight != args.LatestHeight && len(ch.msgQueue) <= 50 {
@@ -56,7 +57,7 @@ func (ch *child) endBlockHandler(args nodetypes.EndBlockArgs) error {
 	return nil
 }
 
-func (ch *child) updateOracleHandler(args nodetypes.EventHandlerArgs) error {
+func (ch *Child) updateOracleHandler(args nodetypes.EventHandlerArgs) error {
 	var l1BlockHeight uint64
 	var from string
 	var err error
@@ -76,16 +77,16 @@ func (ch *child) updateOracleHandler(args nodetypes.EventHandlerArgs) error {
 	return nil
 }
 
-func (ch *child) handleUpdateOracle(l1BlockHeight uint64, from string) {
+func (ch *Child) handleUpdateOracle(l1BlockHeight uint64, from string) {
 	ch.logger.Info("update oracle",
 		zap.Uint64("l1_blockHeight", l1BlockHeight),
 		zap.String("from", from),
 	)
 }
 
-func (ch *child) finalizeDepositHandler(args nodetypes.EventHandlerArgs) error {
+func (ch *Child) finalizeDepositHandler(args nodetypes.EventHandlerArgs) error {
 	var l1BlockHeight, l1Sequence uint64
-	var from, to string
+	var from, to, baseDenom string
 	var amount sdk.Coin
 	var err error
 
@@ -102,6 +103,8 @@ func (ch *child) finalizeDepositHandler(args nodetypes.EventHandlerArgs) error {
 			to = attr.Value
 		case opchildtypes.AttributeKeyDenom:
 			amount.Denom = attr.Value
+		case opchildtypes.AttributeKeyBaseDenom:
+			baseDenom = attr.Value
 		case opchildtypes.AttributeKeyAmount:
 			coinAmount, ok := math.NewIntFromString(attr.Value)
 			if !ok {
@@ -115,24 +118,24 @@ func (ch *child) finalizeDepositHandler(args nodetypes.EventHandlerArgs) error {
 			}
 		}
 	}
-	ch.handleFinalizeDeposit(l1BlockHeight, l1Sequence, from, to, amount)
+	ch.handleFinalizeDeposit(l1BlockHeight, l1Sequence, from, to, amount, baseDenom)
 	return nil
 }
 
-func (ch *child) handleFinalizeDeposit(l1BlockHeight uint64, l1Sequence uint64, from string, to string, amount sdk.Coin) {
+func (ch *Child) handleFinalizeDeposit(l1BlockHeight uint64, l1Sequence uint64, from string, to string, amount sdk.Coin, baseDenom string) {
 	ch.logger.Info("finalize token deposit",
 		zap.Uint64("l1_blockHeight", l1BlockHeight),
 		zap.Uint64("l1_sequence", l1Sequence),
 		zap.String("from", from),
 		zap.String("to", to),
 		zap.String("amount", amount.String()),
+		zap.String("base_denom", baseDenom),
 	)
 }
 
-func (ch *child) initiateWithdrawalHandler(args nodetypes.EventHandlerArgs) error {
-	var l2Sequence uint64
-	var from, to string
-	var amount sdk.Coin
+func (ch *Child) initiateWithdrawalHandler(args nodetypes.EventHandlerArgs) error {
+	var l2Sequence, amount uint64
+	var from, to, baseDenom string
 	var err error
 
 	for _, attr := range args.EventAttributes {
@@ -146,17 +149,17 @@ func (ch *child) initiateWithdrawalHandler(args nodetypes.EventHandlerArgs) erro
 			from = attr.Value
 		case opchildtypes.AttributeKeyTo:
 			to = attr.Value
-		case opchildtypes.AttributeKeyDenom:
-			amount.Denom = attr.Value
+		case opchildtypes.AttributeKeyBaseDenom:
+			baseDenom = attr.Value
 		case opchildtypes.AttributeKeyAmount:
 			coinAmount, ok := math.NewIntFromString(attr.Value)
 			if !ok {
 				return errors.New("invalid amount")
 			}
-			amount.Amount = coinAmount
+			amount = coinAmount.Uint64()
 		}
 	}
-	msg, err := ch.handleInitiateWithdrawal(l2Sequence, from, to, amount)
+	msg, err := ch.handleInitiateWithdrawal(l2Sequence, from, to, baseDenom, amount)
 	if err != nil {
 		return err
 	}
@@ -165,7 +168,8 @@ func (ch *child) initiateWithdrawalHandler(args nodetypes.EventHandlerArgs) erro
 	return nil
 }
 
-func (ch *child) handleInitiateWithdrawal(l2Sequence uint64, from string, to string, amount sdk.Coin) (sdk.Msg, error) {
+func (ch *Child) handleInitiateWithdrawal(l2Sequence uint64, from string, to string, baseDenom string, amount uint64) (sdk.Msg, error) {
+	// withdrawal := ophosttypes.GenerateWithdrawalHash(uint64(ch.bridgeId), l2Sequence, from, to, baseDenom, amount)
 
 	return nil, nil
 }

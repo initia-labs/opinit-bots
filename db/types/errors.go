@@ -1,4 +1,4 @@
-package db
+package types
 
 import "github.com/syndtr/goleveldb/leveldb"
 

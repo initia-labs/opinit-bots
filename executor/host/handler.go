@@ -1,4 +1,4 @@
-package executor
+package host
 
 import (
 	"encoding/hex"
@@ -16,7 +16,7 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 )
 
-func (h *host) beginBlockHandler(args nodetypes.BeginBlockArgs) error {
+func (h *Host) beginBlockHandler(args nodetypes.BeginBlockArgs) error {
 	// just to make sure that childMsgQueue is empty
 	if args.BlockHeight == args.LatestHeight && len(h.msgQueue) != 0 && len(h.processedMsgs) != 0 {
 		panic("must not happen, msgQueue should be empty")
@@ -24,7 +24,7 @@ func (h *host) beginBlockHandler(args nodetypes.BeginBlockArgs) error {
 	return nil
 }
 
-func (h *host) endBlockHandler(args nodetypes.EndBlockArgs) error {
+func (h *Host) endBlockHandler(args nodetypes.EndBlockArgs) error {
 	// temporary 50 limit for msg queue
 	// collect more msgs if block height is not latest
 	if args.BlockHeight != args.LatestHeight && len(h.msgQueue) <= 50 {
@@ -60,7 +60,7 @@ func (h *host) endBlockHandler(args nodetypes.EndBlockArgs) error {
 	return nil
 }
 
-func (h *host) txHandler(args nodetypes.TxHandlerArgs) error {
+func (h *Host) txHandler(args nodetypes.TxHandlerArgs) error {
 	if args.BlockHeight == args.LatestHeight && args.TxIndex == 0 {
 		msg, err := h.oracleTxHandler(args.BlockHeight, args.Tx)
 		if err != nil {
@@ -76,7 +76,7 @@ func (h *host) txHandler(args nodetypes.TxHandlerArgs) error {
 	return nil
 }
 
-func (h *host) oracleTxHandler(blockHeight int64, tx comettypes.Tx) (sdk.Msg, error) {
+func (h *Host) oracleTxHandler(blockHeight int64, tx comettypes.Tx) (sdk.Msg, error) {
 	sender, err := h.ac.BytesToString(h.child.GetAddress())
 	if err != nil {
 		return nil, err
@@ -94,7 +94,7 @@ func (h *host) oracleTxHandler(blockHeight int64, tx comettypes.Tx) (sdk.Msg, er
 	return msg, nil
 }
 
-func (h *host) initiateDepositHandler(args nodetypes.EventHandlerArgs) error {
+func (h *Host) initiateDepositHandler(args nodetypes.EventHandlerArgs) error {
 	var bridgeId int64
 	var l1Sequence uint64
 	var from, to, l1Denom, l2Denom, amount string
@@ -152,7 +152,7 @@ func (h *host) initiateDepositHandler(args nodetypes.EventHandlerArgs) error {
 	return nil
 }
 
-func (h *host) handleInitiateDeposit(
+func (h *Host) handleInitiateDeposit(
 	l1Sequence uint64,
 	blockHeight uint64,
 	from string,

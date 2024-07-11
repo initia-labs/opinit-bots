@@ -8,20 +8,6 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 )
 
-var (
-	LastProcessedBlockHeight = []byte("last_processed_block_height")
-	PrefixPendingTxs         = []byte("pending_txs")
-	PrefixProcessedMsgs      = []byte("processed_msgs")
-)
-
-func PrefixedPendingTx(sequence uint64) []byte {
-	return []byte(fmt.Sprintf("%s/%d", string(PrefixPendingTxs), sequence))
-}
-
-func PrefixedProcessedMsgs(timestamp int64) []byte {
-	return []byte(fmt.Sprintf("%s/%d", string(PrefixProcessedMsgs), timestamp))
-}
-
 type PendingTxInfo struct {
 	ProcessedHeight int64  `json:"height"`
 	Sequence        uint64 `json:"sequence"`

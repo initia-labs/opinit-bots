@@ -1,4 +1,4 @@
-package executor
+package host
 
 import (
 	"context"
@@ -23,7 +23,7 @@ type childNode interface {
 	RawKVProcessedData([]nodetypes.ProcessedMsgs, bool) ([]types.KV, error)
 }
 
-type host struct {
+type Host struct {
 	node  *node.Node
 	child childNode
 
@@ -39,13 +39,13 @@ type host struct {
 	msgQueue      []sdk.Msg
 }
 
-func NewHost(bridgeId int64, cfg nodetypes.NodeConfig, db types.DB, logger *zap.Logger, cdc codec.Codec, txConfig client.TxConfig, child childNode) *host {
+func NewHost(bridgeId int64, cfg nodetypes.NodeConfig, db types.DB, logger *zap.Logger, cdc codec.Codec, txConfig client.TxConfig, child childNode) *Host {
 	node, err := node.NewNode(nodetypes.HostNodeName, cfg, db, logger, cdc, txConfig)
 	if err != nil {
 		panic(err)
 	}
 
-	h := &host{
+	h := &Host{
 		node:  node,
 		child: child,
 
@@ -66,29 +66,29 @@ func NewHost(bridgeId int64, cfg nodetypes.NodeConfig, db types.DB, logger *zap.
 	return h
 }
 
-func (h *host) Start(ctx context.Context) {
+func (h *Host) Start(ctx context.Context) {
 	h.node.Start(ctx)
 }
 
-func (h *host) registerChildNode(child childNode) {
+func (h *Host) registerChildNode(child childNode) {
 	h.child = child
 }
 
-func (h host) registerHandlers() {
+func (h Host) registerHandlers() {
 	h.node.RegisterBeginBlockHandler(h.beginBlockHandler)
 	h.node.RegisterTxHandler(h.txHandler)
 	h.node.RegisterEventHandler(ophosttypes.EventTypeInitiateTokenDeposit, h.initiateDepositHandler)
 	h.node.RegisterEndBlockHandler(h.endBlockHandler)
 }
 
-func (h host) GetAddress() sdk.AccAddress {
+func (h Host) GetAddress() sdk.AccAddress {
 	return h.node.GetAddress()
 }
 
-func (h host) BroadcastMsgs(msgs nodetypes.ProcessedMsgs) {
+func (h Host) BroadcastMsgs(msgs nodetypes.ProcessedMsgs) {
 	h.node.BroadcastMsgs(msgs)
 }
 
-func (h host) RawKVProcessedData(msgs []nodetypes.ProcessedMsgs, delete bool) ([]types.KV, error) {
+func (h Host) RawKVProcessedData(msgs []nodetypes.ProcessedMsgs, delete bool) ([]types.KV, error) {
 	return h.node.RawKVProcessedData(msgs, delete)
 }

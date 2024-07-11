@@ -1,10 +1,11 @@
-package executor
+package child
 
 import (
 	"context"
 
 	"cosmossdk.io/core/address"
 	opchildtypes "github.com/initia-labs/OPinit/x/opchild/types"
+	executortypes "github.com/initia-labs/opinit-bots-go/executor/types"
 	nodetypes "github.com/initia-labs/opinit-bots-go/node/types"
 	"github.com/initia-labs/opinit-bots-go/types"
 	"go.uber.org/zap"
@@ -23,7 +24,7 @@ type hostNode interface {
 	RawKVProcessedData([]nodetypes.ProcessedMsgs, bool) ([]types.KV, error)
 }
 
-type child struct {
+type Child struct {
 	node *node.Node
 	host hostNode
 
@@ -40,13 +41,13 @@ type child struct {
 	msgQueue      []sdk.Msg
 }
 
-func NewChild(bridgeId int64, cfg nodetypes.NodeConfig, db types.DB, logger *zap.Logger, cdc codec.Codec, txConfig client.TxConfig, host hostNode) *child {
+func NewChild(bridgeId int64, cfg nodetypes.NodeConfig, db types.DB, logger *zap.Logger, cdc codec.Codec, txConfig client.TxConfig, host hostNode) *Child {
 	node, err := node.NewNode(nodetypes.ChildNodeName, cfg, db, logger, cdc, txConfig)
 	if err != nil {
 		panic(err)
 	}
 
-	ch := &child{
+	ch := &Child{
 		node: node,
 		host: host,
 
@@ -67,28 +68,37 @@ func NewChild(bridgeId int64, cfg nodetypes.NodeConfig, db types.DB, logger *zap
 	return ch
 }
 
-func (ch *child) Start(ctx context.Context) {
+func (ch *Child) Start(ctx context.Context) {
 	ch.node.Start(ctx)
 }
 
-func (ch *child) registerHostNode(host hostNode) {
+func (ch *Child) registerHostNode(host hostNode) {
 	ch.host = host
 }
 
-func (ch *child) registerHandlers() {
+func (ch *Child) registerHandlers() {
 	ch.node.RegisterEventHandler(opchildtypes.EventTypeFinalizeTokenDeposit, ch.finalizeDepositHandler)
 	ch.node.RegisterEventHandler(opchildtypes.EventTypeUpdateOracle, ch.updateOracleHandler)
 	ch.node.RegisterEndBlockHandler(ch.endBlockHandler)
 }
 
-func (ch child) GetAddress() sdk.AccAddress {
+func (ch Child) GetAddress() sdk.AccAddress {
 	return ch.node.GetAddress()
 }
 
-func (ch child) BroadcastMsgs(msgs nodetypes.ProcessedMsgs) {
+func (ch Child) BroadcastMsgs(msgs nodetypes.ProcessedMsgs) {
 	ch.node.BroadcastMsgs(msgs)
 }
 
-func (ch child) RawKVProcessedData(msgs []nodetypes.ProcessedMsgs, delete bool) ([]types.KV, error) {
+func (ch Child) RawKVProcessedData(msgs []nodetypes.ProcessedMsgs, delete bool) ([]types.KV, error) {
 	return ch.node.RawKVProcessedData(msgs, delete)
+}
+
+func (ch *Child) setWithdrawal(sequence uint64, withdrawal [32]byte) error {
+	return ch.db.Set(executortypes.PrefixedWithdrawalKey(sequence), withdrawal[:])
+}
+
+func (ch *Child) getWithdrawals(startSequence uint64, endSequence uint64) ([][32]byte, error) {
+	// ch.db.Iterate(executortypes.PrefixedWithdrawalKey(startSequence), executortypes.PrefixedWithdrawalKey(endSequence), func(key, value []byte) bool {
+	return nil, nil
 }

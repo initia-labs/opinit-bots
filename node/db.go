@@ -1,31 +1,31 @@
 package node
 
 import (
-	"github.com/initia-labs/opinit-bots-go/db"
+	dbtypes "github.com/initia-labs/opinit-bots-go/db/types"
 	nodetypes "github.com/initia-labs/opinit-bots-go/node/types"
 	"github.com/initia-labs/opinit-bots-go/types"
 	"go.uber.org/zap"
 )
 
 func (n *Node) SaveSyncInfo() error {
-	return n.db.Set(nodetypes.LastProcessedBlockHeight, db.FromInt64(n.lastProcessedBlockHeight))
+	return n.db.Set(nodetypes.LastProcessedBlockHeightKey, dbtypes.FromInt64(n.lastProcessedBlockHeight))
 }
 
 func (n *Node) RawKVSyncInfo(height int64) types.KV {
 	return types.KV{
-		Key:   n.db.PrefixedKey(nodetypes.LastProcessedBlockHeight),
-		Value: db.FromInt64(height),
+		Key:   n.db.PrefixedKey(nodetypes.LastProcessedBlockHeightKey),
+		Value: dbtypes.FromInt64(height),
 	}
 }
 
 func (n *Node) loadSyncInfo() error {
-	data, err := n.db.Get(nodetypes.LastProcessedBlockHeight)
-	if err == db.ErrNotFound {
+	data, err := n.db.Get(nodetypes.LastProcessedBlockHeightKey)
+	if err == dbtypes.ErrNotFound {
 		return nil
 	} else if err != nil {
 		return err
 	}
-	n.lastProcessedBlockHeight = db.ToInt64(data)
+	n.lastProcessedBlockHeight = dbtypes.ToInt64(data)
 	n.logger.Info("load sync info", zap.Int64("last_processed_height", n.lastProcessedBlockHeight))
 	return nil
 }
@@ -43,8 +43,7 @@ func (n Node) deletePendingTx(sequence uint64) error {
 }
 
 func (n *Node) loadPendingTxs() (txs []nodetypes.PendingTxInfo, err error) {
-	lastBytes := append(nodetypes.PrefixPendingTxs, 0xFF)
-	iterErr := n.db.Iterate(nodetypes.PrefixPendingTxs, lastBytes, func(key, value []byte) (stop bool) {
+	iterErr := n.db.Iterate(nodetypes.PendingTxsKey, nodetypes.LastPendingTxKey, func(key, value []byte) (stop bool) {
 		txInfo := nodetypes.PendingTxInfo{}
 		err = txInfo.Unmarshal(value)
 		if err != nil {
@@ -102,7 +101,7 @@ func (n *Node) RawKVProcessedData(processedData []nodetypes.ProcessedMsgs, delet
 			}
 		}
 		kvs = append(kvs, types.KV{
-			Key:   n.db.PrefixedKey(nodetypes.PrefixedProcessedMsgs(processedMsgs.Timestamp)),
+			Key:   n.db.PrefixedKey(nodetypes.PrefixedProcessedMsgs(uint64(processedMsgs.Timestamp))),
 			Value: data,
 		})
 	}
@@ -114,12 +113,11 @@ func (n *Node) saveProcessedMsgs(processedMsgs nodetypes.ProcessedMsgs) error {
 	if err != nil {
 		return err
 	}
-	return n.db.Set(nodetypes.PrefixedProcessedMsgs(processedMsgs.Timestamp), data)
+	return n.db.Set(nodetypes.PrefixedProcessedMsgs(uint64(processedMsgs.Timestamp)), data)
 }
 
 func (n *Node) loadProcessedData() (processedData []nodetypes.ProcessedMsgs, err error) {
-	lastBytes := append(nodetypes.PrefixProcessedMsgs, 0xFF)
-	iterErr := n.db.Iterate(nodetypes.PrefixProcessedMsgs, lastBytes, func(key, value []byte) (stop bool) {
+	iterErr := n.db.Iterate(nodetypes.ProcessedMsgsKey, nodetypes.LastProcessedMsgsKey, func(key, value []byte) (stop bool) {
 		processedMsgs := nodetypes.ProcessedMsgs{}
 		err = processedMsgs.Unmarshal(value)
 		if err != nil {
@@ -137,5 +135,5 @@ func (n *Node) loadProcessedData() (processedData []nodetypes.ProcessedMsgs, err
 }
 
 func (n *Node) deleteProcessedMsgs(timestamp int64) error {
-	return n.db.Delete(nodetypes.PrefixedProcessedMsgs(timestamp))
+	return n.db.Delete(nodetypes.PrefixedProcessedMsgs(uint64(timestamp)))
 }

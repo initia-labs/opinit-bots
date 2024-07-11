@@ -6,6 +6,7 @@ import (
 	"math"
 	"regexp"
 
+	"cosmossdk.io/errors"
 	abci "github.com/cometbft/cometbft/abci/types"
 	comettypes "github.com/cometbft/cometbft/types"
 	"github.com/cosmos/cosmos-sdk/client/tx"
@@ -46,7 +47,7 @@ func (n *Node) handleProcessedMsgs(ctx context.Context, data nodetypes.Processed
 	sequence := n.txf.Sequence()
 	txBytes, err := n.buildMessages(ctx, data.Msgs)
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "simulation failed")
 	}
 
 	res, err := n.BroadcastTxSync(ctx, txBytes)
