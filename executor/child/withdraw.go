@@ -104,7 +104,7 @@ func (ch *Child) proposeOutput(version uint8, blockId []byte, blockHeader comett
 		return nil, err
 	}
 
-	outputRoot := ophosttypes.GenerateOutputRoot([]byte{version}, blockHeader.AppHash, storageRoot, blockId)
+	outputRoot := ophosttypes.GenerateOutputRoot([]byte{version}, storageRoot, blockId)
 	msg := ophosttypes.NewMsgProposeOutput(
 		sender,
 		ch.BridgeId(),
