@@ -70,7 +70,6 @@ func NewHost(version uint8, cfg nodetypes.NodeConfig, db types.DB, logger *zap.L
 		msgQueue:      make([]sdk.Msg, 0),
 	}
 
-	h.registerHandlers()
 	return h
 }
 
@@ -78,11 +77,7 @@ func (h *Host) Start(ctx context.Context) {
 	h.node.Start(ctx)
 }
 
-func (h *Host) registerChildNode(child childNode) {
-	h.child = child
-}
-
-func (h Host) registerHandlers() {
+func (h *Host) RegisterHandlers() {
 	h.node.RegisterBeginBlockHandler(h.beginBlockHandler)
 	h.node.RegisterTxHandler(h.txHandler)
 	h.node.RegisterEventHandler(ophosttypes.EventTypeInitiateTokenDeposit, h.initiateDepositHandler)
@@ -97,7 +92,7 @@ func (h Host) RawKVProcessedData(msgs []nodetypes.ProcessedMsgs, delete bool) ([
 	return h.node.RawKVProcessedData(msgs, delete)
 }
 
-func (h Host) SetBridgeId(brigeId int64) {
+func (h *Host) SetBridgeId(brigeId int64) {
 	h.bridgeId = brigeId
 }
 

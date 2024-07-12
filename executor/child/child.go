@@ -50,9 +50,8 @@ type Child struct {
 
 	opchildQueryClient opchildtypes.QueryClient
 
-	processedMsgs    []nodetypes.ProcessedMsgs
-	msgQueue         []sdk.Msg
-	blockWithdrawals [][]byte
+	processedMsgs []nodetypes.ProcessedMsgs
+	msgQueue      []sdk.Msg
 }
 
 func NewChild(version uint8, cfg nodetypes.NodeConfig, db types.DB, logger *zap.Logger, cdc codec.Codec, txConfig client.TxConfig, host hostNode) *Child {
@@ -79,12 +78,10 @@ func NewChild(version uint8, cfg nodetypes.NodeConfig, db types.DB, logger *zap.
 
 		opchildQueryClient: opchildtypes.NewQueryClient(node),
 
-		processedMsgs:    make([]nodetypes.ProcessedMsgs, 0),
-		msgQueue:         make([]sdk.Msg, 0),
-		blockWithdrawals: make([][]byte, 0),
+		processedMsgs: make([]nodetypes.ProcessedMsgs, 0),
+		msgQueue:      make([]sdk.Msg, 0),
 	}
 
-	ch.registerHandlers()
 	return ch
 }
 
@@ -92,11 +89,7 @@ func (ch *Child) Start(ctx context.Context) {
 	ch.node.Start(ctx)
 }
 
-func (ch *Child) registerHostNode(host hostNode) {
-	ch.host = host
-}
-
-func (ch *Child) registerHandlers() {
+func (ch *Child) RegisterHandlers() {
 	ch.node.RegisterBeginBlockHandler(ch.beginBlockHandler)
 	ch.node.RegisterEventHandler(opchildtypes.EventTypeFinalizeTokenDeposit, ch.finalizeDepositHandler)
 	ch.node.RegisterEventHandler(opchildtypes.EventTypeUpdateOracle, ch.updateOracleHandler)
@@ -120,4 +113,8 @@ func (ch Child) AccountCodec() address.Codec {
 
 func (ch Child) HasKey() bool {
 	return ch.node.HasKey()
+}
+
+func (ch *Child) SetBridgeInfo(bridgeInfo opchildtypes.BridgeInfo) {
+	ch.bridgeInfo = bridgeInfo
 }

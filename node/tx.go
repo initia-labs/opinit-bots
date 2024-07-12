@@ -37,7 +37,7 @@ func (n *Node) txBroadcastLooper(ctx context.Context) error {
 					panic(err)
 				}
 
-				n.logger.Error("failed to handle processed msgs", zap.Error(err))
+				n.logger.Error("failed to handle processed msgs", zap.String("error", err.Error()))
 			}
 		}
 	}

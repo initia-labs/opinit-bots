@@ -3,6 +3,9 @@ package node
 import (
 	"context"
 	"sync"
+	"time"
+
+	"errors"
 
 	rpchttp "github.com/cometbft/cometbft/rpc/client/http"
 	"github.com/cosmos/cosmos-sdk/client"
@@ -80,8 +83,16 @@ func NewNode(cfg nodetypes.NodeConfig, db types.DB, logger *zap.Logger, cdc code
 		return nil, err
 	}
 
+	status, err := n.Status(context.Background())
+	if err != nil {
+		return nil, err
+	}
+	if status.SyncInfo.CatchingUp {
+		return nil, errors.New("node is catching up")
+	}
+
 	if n.HasKey() {
-		err := n.prepareBroadcaster()
+		err := n.prepareBroadcaster(uint64(status.SyncInfo.LatestBlockHeight), status.SyncInfo.LatestBlockTime)
 		if err != nil {
 			return nil, err
 		}
@@ -106,7 +117,7 @@ func (n Node) HasKey() bool {
 	return true
 }
 
-func (n *Node) prepareBroadcaster() error {
+func (n *Node) prepareBroadcaster(lastBlockHeight uint64, lastBlockTime time.Time) error {
 	_, err := n.keyBase.NewAccount(nodetypes.KEY_NAME, n.cfg.Mnemonic, "", hd.CreateHDPath(sdk.GetConfig().GetCoinType(), 0, 0).String(), hd.Secp256k1)
 	if err != nil {
 		return err
@@ -147,7 +158,9 @@ func (n *Node) prepareBroadcaster() error {
 	// TODO: handle mismatched sequence & pending txs
 	if len(loadedPendingTxs) > 0 {
 		lastSavedSequence := loadedPendingTxs[len(loadedPendingTxs)-1].Sequence
-		if n.lastProcessedBlockHeight-loadedPendingTxs[0].ProcessedHeight >= nodetypes.TIMEOUT_HEIGHT {
+
+		pendingTxTime := time.Unix(0, loadedPendingTxs[0].Timestamp)
+		if lastBlockTime.After(pendingTxTime.Add(nodetypes.TX_TIMEOUT)) {
 			// delete existing pending txs
 			pendingKVs, err := n.RawKVPendingTxs(loadedPendingTxs, true)
 			if err != nil {

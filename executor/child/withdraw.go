@@ -3,7 +3,6 @@ package child
 import (
 	"errors"
 	"strconv"
-	"sync"
 	"time"
 
 	"cosmossdk.io/math"
@@ -15,10 +14,6 @@ import (
 	nodetypes "github.com/initia-labs/opinit-bots-go/node/types"
 
 	comettpyes "github.com/cometbft/cometbft/types"
-)
-
-var (
-	treeLoader = sync.Once{}
 )
 
 func (ch *Child) initiateWithdrawalHandler(args nodetypes.EventHandlerArgs) error {
@@ -56,7 +51,7 @@ func (ch *Child) handleInitiateWithdrawal(l2Sequence uint64, from string, to str
 	ch.mk.InsertLeaf(withdrawal[:])
 }
 
-func (ch *Child) prepareWithdrawals(blockHeight uint64) error {
+func (ch *Child) prepareWithdrawals(blockHeight uint64, blockTime time.Time) error {
 	var output ophosttypes.QueryOutputProposalResponse
 
 	err := ch.mk.LoadWorkingTree(blockHeight - 1)
@@ -74,7 +69,7 @@ func (ch *Child) prepareWithdrawals(blockHeight uint64) error {
 		return err
 	}
 
-	if ch.nextOutputTime.IsZero() || time.Now().After(ch.nextOutputTime) {
+	if ch.nextOutputTime.IsZero() || blockTime.After(ch.nextOutputTime) {
 		if output.BridgeId == 0 {
 			output, err = ch.host.QueryLastOutput()
 			if err != nil {
@@ -90,7 +85,7 @@ func (ch *Child) prepareWithdrawals(blockHeight uint64) error {
 }
 
 func (ch *Child) proposeOutput(version uint8, blockId []byte, blockHeader comettpyes.Header) ([]types.KV, error) {
-	if time.Now().Before(ch.nextOutputTime) {
+	if blockHeader.Time.Before(ch.nextOutputTime) {
 		// skip
 		return nil, nil
 	}
@@ -104,7 +99,7 @@ func (ch *Child) proposeOutput(version uint8, blockId []byte, blockHeader comett
 		return nil, err
 	}
 
-	outputRoot := ophosttypes.GenerateOutputRoot([]byte{version}, storageRoot, blockId)
+	outputRoot := ophosttypes.GenerateOutputRoot(version, storageRoot, blockId)
 	msg := ophosttypes.NewMsgProposeOutput(
 		sender,
 		ch.BridgeId(),

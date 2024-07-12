@@ -1,17 +1,18 @@
 package child
 
 import (
-	sdk "github.com/cosmos/cosmos-sdk/types"
+	"errors"
+
 	opchildtypes "github.com/initia-labs/OPinit/x/opchild/types"
 	"github.com/initia-labs/opinit-bots-go/node"
 )
 
-func (ch Child) GetAddress() sdk.AccAddress {
-	return ch.node.GetAddress()
-}
-
 func (ch Child) GetAddressStr() (string, error) {
-	return ch.ac.BytesToString(ch.node.GetAddress())
+	addr := ch.node.GetAddress()
+	if addr == nil {
+		return "", errors.New("nil address")
+	}
+	return ch.ac.BytesToString(addr)
 }
 
 func (ch Child) QueryBridgeInfo() (opchildtypes.BridgeInfo, error) {

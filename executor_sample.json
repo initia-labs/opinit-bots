@@ -1,7 +1,9 @@
 {
     "host_node": {
         "rpc": "tcp://localhost:26657",
-        "chain_id": "localhost"
+        "chain_id": "localnet",
+        "mnemonic": "",
+        "gas_price": "0.15uinit"
     },
     "child_node": {
         "rpc": "tcp://localhost:27657",
@@ -9,5 +11,5 @@
         "mnemonic": "",
         "gas_price": "0.15umin"
     },
-    "bridge_id": 1
+    "version": 1
 }

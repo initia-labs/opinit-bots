@@ -1,7 +1,6 @@
 package host
 
 import (
-	"errors"
 	"time"
 
 	nodetypes "github.com/initia-labs/opinit-bots-go/node/types"
@@ -12,9 +11,6 @@ import (
 
 func (h *Host) beginBlockHandler(args nodetypes.BeginBlockArgs) error {
 	blockHeight := uint64(args.BlockHeader.Height)
-	if h.bridgeId == 0 {
-		return errors.New("bridge info is not set")
-	}
 	// just to make sure that childMsgQueue is empty
 	if blockHeight == args.LatestHeight && len(h.msgQueue) != 0 && len(h.processedMsgs) != 0 {
 		panic("must not happen, msgQueue should be empty")

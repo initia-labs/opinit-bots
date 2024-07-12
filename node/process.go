@@ -86,9 +86,9 @@ func (n *Node) handleNewBlock(block *rpccoretypes.ResultBlock, blockResult *rpcc
 
 	if length := n.localPendingTxLength(); length > 0 {
 		n.logger.Debug("remaining pending txs", zap.Int64("height", block.Block.Height), zap.Int("count", length))
-		pendingTxHeight := n.getLocalPendingTx().ProcessedHeight
-		if uint64(block.Block.Height)-pendingTxHeight > nodetypes.TIMEOUT_HEIGHT {
-			panic(fmt.Errorf("something wrong, pending txs are not processed for a long time; current height: %d, pending tx processing height: %d", block.Block.Height, pendingTxHeight))
+		pendingTxTime := time.Unix(0, n.getLocalPendingTx().Timestamp)
+		if block.Block.Time.After(pendingTxTime.Add(nodetypes.TX_TIMEOUT)) {
+			panic(fmt.Errorf("something wrong, pending txs are not processed for a long time; current block time: %s, pending tx processing time: %s", block.Block.Time.String(), pendingTxTime.String()))
 		}
 	}
 

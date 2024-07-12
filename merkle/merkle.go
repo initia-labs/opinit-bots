@@ -33,6 +33,9 @@ func (m *Merkle) SetNewWorkingTree(treeIndex uint64, startLeafIndex uint64) {
 }
 
 func (m *Merkle) FinalizeWorkingTree() ([]types.KV, []byte, error) {
+	if m.workingTree.LeafCount == 0 {
+		return nil, merkletypes.EmptyRootHash[:], nil
+	}
 	kvs, err := m.fillRestLeaves()
 	if err != nil {
 		return nil, nil, err
@@ -123,6 +126,7 @@ func (m *Merkle) fillRestLeaves() ([]types.KV, error) {
 	}
 	m.workingTree.LeafCount -= numRestLeaves
 	m.workingTree.Done = true
+
 	return kvs, nil
 }
 

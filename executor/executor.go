@@ -27,6 +27,11 @@ type Executor struct {
 }
 
 func NewExecutor(cfg *executortypes.Config, db types.DB, logger *zap.Logger, cdc codec.Codec, txConfig client.TxConfig) *Executor {
+	err := cfg.Validate()
+	if err != nil {
+		panic(err)
+	}
+
 	h := &host.Host{}
 	ch := &child.Child{}
 
@@ -41,6 +46,21 @@ func NewExecutor(cfg *executortypes.Config, db types.DB, logger *zap.Logger, cdc
 
 	*h = *host.NewHost(cfg.Version, cfg.HostNode, db.WithPrefix([]byte(executortypes.HostNodeName)), logger.Named(executortypes.HostNodeName), cdc, txConfig, ch)
 	*ch = *child.NewChild(cfg.Version, cfg.ChildNode, db.WithPrefix([]byte(executortypes.ChildNodeName)), logger.Named(executortypes.ChildNodeName), cdc, txConfig, h)
+
+	bridgeInfo, err := ch.QueryBridgeInfo()
+	if err != nil {
+		panic(err)
+	}
+	if bridgeInfo.BridgeId == 0 {
+		panic("bridge info is not set")
+	}
+	executor.logger.Info("bridge info", zap.Uint64("id", bridgeInfo.BridgeId))
+
+	ch.SetBridgeInfo(bridgeInfo)
+	h.SetBridgeId(int64(bridgeInfo.BridgeId))
+
+	ch.RegisterHandlers()
+	h.RegisterHandlers()
 	return executor
 }
 
