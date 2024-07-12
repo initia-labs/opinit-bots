@@ -81,6 +81,8 @@ func (h *Host) RegisterHandlers() {
 	h.node.RegisterBeginBlockHandler(h.beginBlockHandler)
 	h.node.RegisterTxHandler(h.txHandler)
 	h.node.RegisterEventHandler(ophosttypes.EventTypeInitiateTokenDeposit, h.initiateDepositHandler)
+	h.node.RegisterEventHandler(ophosttypes.EventTypeProposeOutput, h.proposeOutputHandler)
+	h.node.RegisterEventHandler(ophosttypes.EventTypeFinalizeTokenWithdrawal, h.finalizeWithdrawalHandler)
 	h.node.RegisterEndBlockHandler(h.endBlockHandler)
 }
 

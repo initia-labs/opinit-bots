@@ -93,6 +93,7 @@ func (ch *Child) RegisterHandlers() {
 	ch.node.RegisterBeginBlockHandler(ch.beginBlockHandler)
 	ch.node.RegisterEventHandler(opchildtypes.EventTypeFinalizeTokenDeposit, ch.finalizeDepositHandler)
 	ch.node.RegisterEventHandler(opchildtypes.EventTypeUpdateOracle, ch.updateOracleHandler)
+	ch.node.RegisterEventHandler(opchildtypes.EventTypeInitiateTokenWithdrawal, ch.initiateWithdrawalHandler)
 	ch.node.RegisterEndBlockHandler(ch.endBlockHandler)
 }
 
