@@ -3,14 +3,20 @@ package child
 import (
 	"errors"
 	"strconv"
+	"sync"
 	"time"
 
 	"cosmossdk.io/math"
 	opchildtypes "github.com/initia-labs/OPinit/x/opchild/types"
 	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
 	executortypes "github.com/initia-labs/opinit-bots-go/executor/types"
+	"github.com/initia-labs/opinit-bots-go/types"
 
 	nodetypes "github.com/initia-labs/opinit-bots-go/node/types"
+)
+
+var (
+	treeLoader = sync.Once{}
 )
 
 func (ch *Child) initiateWithdrawalHandler(args nodetypes.EventHandlerArgs) error {
@@ -45,17 +51,10 @@ func (ch *Child) initiateWithdrawalHandler(args nodetypes.EventHandlerArgs) erro
 
 func (ch *Child) handleInitiateWithdrawal(l2Sequence uint64, from string, to string, baseDenom string, amount uint64) {
 	withdrawal := ophosttypes.GenerateWithdrawalHash(uint64(ch.bridgeId), l2Sequence, from, to, baseDenom, amount)
-	ch.blockWithdrawals.Withdrawals = append(ch.blockWithdrawals.Withdrawals, executortypes.Withdrawal{
-		Sequence:       l2Sequence,
-		WithdrawalHash: withdrawal,
-	})
+	ch.blockWithdrawals = append(ch.blockWithdrawals, withdrawal[:])
 }
 
 func (ch *Child) prepareWithdrawals(blockHeight uint64) error {
-	ch.blockWithdrawals = executortypes.Withdrawals{
-		Height: blockHeight,
-	}
-
 	if ch.nextSentOutputTime.IsZero() || time.Now().After(ch.nextSentOutputTime) {
 		output, err := ch.host.QueryLastOutput()
 		if err != nil {
@@ -63,13 +62,24 @@ func (ch *Child) prepareWithdrawals(blockHeight uint64) error {
 		}
 		ch.nextSentOutputTime = output.OutputProposal.L1BlockTime.Add(executortypes.OutputInterval)
 		ch.lastSentOutputBlockHeight = output.OutputProposal.L2BlockNumber
+
+		treeLoader.Do(func() {
+			err = ch.mk.LoadWorkingTree(output.OutputIndex + 1)
+		})
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }
 
-func (ch *Child) generateOutputRoot(blockHeight uint64) error {
-	if time.Now().After(ch.nextSentOutputTime) || blockHeight-ch.lastSentOutputBlockHeight > executortypes.OutputIntervalHeight {
+func (ch *Child) handleBlockWithdrawals() ([]types.KV, error) {
+	return ch.mk.InsertLeaves(ch.blockWithdrawals)
+}
 
+func (ch *Child) generateOutputRoot(blockHeight uint64) ([]types.KV, error) {
+	if time.Now().After(ch.nextSentOutputTime) || blockHeight-ch.lastSentOutputBlockHeight > executortypes.OutputIntervalHeight {
+		return ch.mk.FinishWorkingTree()
 	}
-	return nil
+	return nil, nil
 }

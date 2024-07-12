@@ -20,7 +20,6 @@ import (
 type Node struct {
 	*rpchttp.HTTP
 
-	name   string
 	cfg    nodetypes.NodeConfig
 	db     types.DB
 	logger *zap.Logger
@@ -45,7 +44,7 @@ type Node struct {
 	txChannel chan nodetypes.ProcessedMsgs
 }
 
-func NewNode(name string, cfg nodetypes.NodeConfig, db types.DB, logger *zap.Logger, cdc codec.Codec, txConfig client.TxConfig) (*Node, error) {
+func NewNode(cfg nodetypes.NodeConfig, db types.DB, logger *zap.Logger, cdc codec.Codec, txConfig client.TxConfig) (*Node, error) {
 	client, err := client.NewClientFromNode(cfg.RPC)
 
 	// Use memory keyring for now
@@ -58,7 +57,6 @@ func NewNode(name string, cfg nodetypes.NodeConfig, db types.DB, logger *zap.Log
 	n := &Node{
 		HTTP: client,
 
-		name:   name,
 		cfg:    cfg,
 		db:     db,
 		logger: logger,

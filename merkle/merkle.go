@@ -25,6 +25,7 @@ func NewMerkle(db types.DB, nodeGeneratorFn func([]byte, []byte) [32]byte) *Merk
 
 func (m *Merkle) NextWorkingTree() error {
 	m.workingTree.Index++
+	m.workingTree.StartLeafIndex += m.workingTree.LeafCount
 	m.workingTree.LeafCount = 0
 	m.workingTree.LevelData = make(map[uint8][]byte)
 	return nil
@@ -36,10 +37,11 @@ func (m *Merkle) FinishWorkingTree() ([]types.KV, error) {
 		return nil, err
 	}
 
-	tree := merkletypes.FinalizedTree{
-		Index: m.workingTree.Index,
-		Depth: m.GetMaxLevel(),
-		Root:  m.workingTree.LevelData[m.GetMaxLevel()],
+	tree := merkletypes.FinalizedTreeInfo{
+		TreeIndex:      m.workingTree.Index,
+		Depth:          m.GetMaxLevel(),
+		Root:           m.workingTree.LevelData[m.GetMaxLevel()],
+		StartLeafIndex: m.workingTree.StartLeafIndex,
 	}
 
 	data, err := json.Marshal(tree)

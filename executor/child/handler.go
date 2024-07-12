@@ -7,13 +7,13 @@ import (
 	"github.com/initia-labs/opinit-bots-go/types"
 )
 
-func (ch *Child) beginBlockHandler(args nodetypes.BeginBlockArgs) error {
+func (ch *Child) beginBlockHandler(args nodetypes.BeginBlockArgs) (err error) {
 	// just to make sure that childMsgQueue is empty
 	if args.BlockHeight == args.LatestHeight && len(ch.msgQueue) != 0 && len(ch.processedMsgs) != 0 {
 		panic("must not happen, msgQueue should be empty")
 	}
 
-	err := ch.prepareWithdrawals(args.BlockHeight)
+	err = ch.prepareWithdrawals(args.BlockHeight)
 	if err != nil {
 		return err
 	}
@@ -27,14 +27,22 @@ func (ch *Child) endBlockHandler(args nodetypes.EndBlockArgs) error {
 		return nil
 	}
 
-	err := ch.generateOutputRoot(args.BlockHeight)
-	if err != nil {
-		return err
-	}
-
 	batchKVs := []types.KV{
 		ch.node.RawKVSyncInfo(args.BlockHeight),
 	}
+
+	withdrawalsKVs, err := ch.handleBlockWithdrawals()
+	if err != nil {
+		return err
+	}
+	batchKVs = append(batchKVs, withdrawalsKVs...)
+
+	outputkvs, err := ch.generateOutputRoot(args.BlockHeight)
+	if err != nil {
+		return err
+	}
+	batchKVs = append(batchKVs, outputkvs...)
+
 	if ch.node.HasKey() {
 		if len(ch.msgQueue) != 0 {
 			ch.processedMsgs = append(ch.processedMsgs, nodetypes.ProcessedMsgs{
@@ -61,5 +69,6 @@ func (ch *Child) endBlockHandler(args nodetypes.EndBlockArgs) error {
 
 	ch.msgQueue = ch.msgQueue[:0]
 	ch.processedMsgs = ch.processedMsgs[:0]
+	ch.blockWithdrawals = ch.blockWithdrawals[:0]
 	return nil
 }

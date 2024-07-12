@@ -8,7 +8,6 @@ import (
 
 	bottypes "github.com/initia-labs/opinit-bots-go/bot/types"
 	executortypes "github.com/initia-labs/opinit-bots-go/executor/types"
-	nodetypes "github.com/initia-labs/opinit-bots-go/node/types"
 	"github.com/initia-labs/opinit-bots-go/types"
 	"go.uber.org/zap"
 
@@ -40,8 +39,8 @@ func NewExecutor(cfg *executortypes.Config, db types.DB, logger *zap.Logger, cdc
 		logger: logger,
 	}
 
-	*h = *host.NewHost(cfg.BridgeId, cfg.HostNode, db.WithPrefix([]byte(nodetypes.HostNodeName)), logger.Named(nodetypes.HostNodeName), cdc, txConfig, ch)
-	*ch = *child.NewChild(cfg.BridgeId, cfg.ChildNode, db.WithPrefix([]byte(nodetypes.ChildNodeName)), logger.Named(nodetypes.ChildNodeName), cdc, txConfig, h)
+	*h = *host.NewHost(cfg.BridgeId, cfg.HostNode, db.WithPrefix([]byte(executortypes.HostNodeName)), logger.Named(executortypes.HostNodeName), cdc, txConfig, ch)
+	*ch = *child.NewChild(cfg.BridgeId, cfg.ChildNode, db.WithPrefix([]byte(executortypes.ChildNodeName)), logger.Named(executortypes.ChildNodeName), cdc, txConfig, h)
 	return executor
 }
 

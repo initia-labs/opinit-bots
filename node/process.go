@@ -144,7 +144,7 @@ func (n *Node) handleEvent(blockHeight uint64, latestHeight uint64, txIndex uint
 	if n.eventHandlers[event.GetType()] == nil {
 		return nil
 	}
-	n.logger.Debug("handle event", zap.String("name", n.name), zap.Uint64("height", blockHeight), zap.String("type", event.GetType()))
+	n.logger.Debug("handle event", zap.Uint64("height", blockHeight), zap.String("type", event.GetType()))
 
 	err := n.eventHandlers[event.Type](nodetypes.EventHandlerArgs{
 		BlockHeight:     blockHeight,

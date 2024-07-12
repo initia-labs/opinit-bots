@@ -8,6 +8,7 @@ import (
 	opchildtypes "github.com/initia-labs/OPinit/x/opchild/types"
 	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
 	executortypes "github.com/initia-labs/opinit-bots-go/executor/types"
+	"github.com/initia-labs/opinit-bots-go/merkle"
 	nodetypes "github.com/initia-labs/opinit-bots-go/node/types"
 	"github.com/initia-labs/opinit-bots-go/types"
 	"go.uber.org/zap"
@@ -30,6 +31,7 @@ type hostNode interface {
 type Child struct {
 	node *node.Node
 	host hostNode
+	mk   *merkle.Merkle
 
 	bridgeId                  int64
 	nextSentOutputTime        time.Time
@@ -44,18 +46,21 @@ type Child struct {
 
 	processedMsgs    []nodetypes.ProcessedMsgs
 	msgQueue         []sdk.Msg
-	blockWithdrawals executortypes.Withdrawals
+	blockWithdrawals [][]byte
 }
 
 func NewChild(bridgeId int64, cfg nodetypes.NodeConfig, db types.DB, logger *zap.Logger, cdc codec.Codec, txConfig client.TxConfig, host hostNode) *Child {
-	node, err := node.NewNode(nodetypes.ChildNodeName, cfg, db, logger, cdc, txConfig)
+	node, err := node.NewNode(cfg, db, logger, cdc, txConfig)
 	if err != nil {
 		panic(err)
 	}
 
+	mk := merkle.NewMerkle(db.WithPrefix([]byte(executortypes.MerkleName)), ophosttypes.GenerateNodeHash)
+
 	ch := &Child{
 		node: node,
 		host: host,
+		mk:   mk,
 
 		bridgeId: bridgeId,
 
@@ -66,8 +71,9 @@ func NewChild(bridgeId int64, cfg nodetypes.NodeConfig, db types.DB, logger *zap
 		cdc: cdc,
 		ac:  cdc.InterfaceRegistry().SigningContext().AddressCodec(),
 
-		processedMsgs: make([]nodetypes.ProcessedMsgs, 0),
-		msgQueue:      make([]sdk.Msg, 0),
+		processedMsgs:    make([]nodetypes.ProcessedMsgs, 0),
+		msgQueue:         make([]sdk.Msg, 0),
+		blockWithdrawals: make([][]byte, 0),
 	}
 
 	ch.registerHandlers()
@@ -99,29 +105,4 @@ func (ch Child) BroadcastMsgs(msgs nodetypes.ProcessedMsgs) {
 
 func (ch Child) RawKVProcessedData(msgs []nodetypes.ProcessedMsgs, delete bool) ([]types.KV, error) {
 	return ch.node.RawKVProcessedData(msgs, delete)
-}
-
-func (ch *Child) saveWithdrawals(withdrawals executortypes.Withdrawals) error {
-	value, err := withdrawals.Marshal()
-	if err != nil {
-		return err
-	}
-	return ch.db.Set(executortypes.PrefixedWithdrawalsKey(withdrawals.Height), value)
-}
-
-func (ch *Child) loadWithdrawals(startHeight uint64, endHeight uint64) (res []executortypes.Withdrawals, err error) {
-	iterErr := ch.db.Iterate(executortypes.PrefixedWithdrawalsKey(startHeight), executortypes.PrefixedWithdrawalsKey(endHeight+1), func(key, value []byte) bool {
-		var withdrawals executortypes.Withdrawals
-		err = withdrawals.Unmarshal(value)
-		if err != nil {
-			return true
-		}
-		res = append(res, withdrawals)
-		return false
-	})
-
-	if iterErr != nil {
-		return nil, iterErr
-	}
-	return nil, nil
 }
