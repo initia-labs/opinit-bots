@@ -3,13 +3,12 @@ package host
 import (
 	"context"
 
-	sdk "github.com/cosmos/cosmos-sdk/types"
 	query "github.com/cosmos/cosmos-sdk/types/query"
 	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
 )
 
-func (h Host) GetAddress() sdk.AccAddress {
-	return h.node.GetAddress()
+func (h Host) GetAddressStr() (string, error) {
+	return h.ac.BytesToString(h.node.GetAddress())
 }
 
 func (h Host) QueryLastOutput() (ophosttypes.QueryOutputProposalResponse, error) {
@@ -23,6 +22,9 @@ func (h Host) QueryLastOutput() (ophosttypes.QueryOutputProposalResponse, error)
 	res, err := h.ophostQueryClient.OutputProposals(context.Background(), req)
 	if err != nil {
 		return ophosttypes.QueryOutputProposalResponse{}, err
+	}
+	if res.OutputProposals == nil || len(res.OutputProposals) == 0 {
+		return ophosttypes.QueryOutputProposalResponse{}, nil
 	}
 	return res.OutputProposals[0], nil
 }

@@ -1,6 +1,7 @@
 package child
 
 import (
+	"errors"
 	"time"
 
 	nodetypes "github.com/initia-labs/opinit-bots-go/node/types"
@@ -8,12 +9,25 @@ import (
 )
 
 func (ch *Child) beginBlockHandler(args nodetypes.BeginBlockArgs) (err error) {
+	blockHeight := uint64(args.BlockHeader.Height)
+
+	if ch.BridgeId() == 0 {
+		bridgeInfo, err := ch.QueryBridgeInfo()
+		if err != nil {
+			return err
+		}
+		if bridgeInfo.BridgeId == 0 {
+			return errors.New("bridge info is not set")
+		}
+		ch.bridgeInfo = bridgeInfo
+	}
+
 	// just to make sure that childMsgQueue is empty
-	if args.BlockHeight == args.LatestHeight && len(ch.msgQueue) != 0 && len(ch.processedMsgs) != 0 {
+	if blockHeight == args.LatestHeight && len(ch.msgQueue) != 0 && len(ch.processedMsgs) != 0 {
 		panic("must not happen, msgQueue should be empty")
 	}
 
-	err = ch.prepareWithdrawals(args.BlockHeight)
+	err = ch.prepareWithdrawals(blockHeight)
 	if err != nil {
 		return err
 	}
@@ -23,12 +37,14 @@ func (ch *Child) beginBlockHandler(args nodetypes.BeginBlockArgs) (err error) {
 func (ch *Child) endBlockHandler(args nodetypes.EndBlockArgs) error {
 	// temporary 50 limit for msg queue
 	// collect more msgs if block height is not latest
-	if args.BlockHeight != args.LatestHeight && len(ch.msgQueue) <= 50 {
+	blockHeight := uint64(args.BlockHeader.Height)
+
+	if blockHeight != args.LatestHeight && len(ch.msgQueue) <= 50 {
 		return nil
 	}
 
 	batchKVs := []types.KV{
-		ch.node.RawKVSyncInfo(args.BlockHeight),
+		ch.node.RawKVSyncInfo(blockHeight),
 	}
 
 	withdrawalsKVs, err := ch.handleBlockWithdrawals()
@@ -37,13 +53,13 @@ func (ch *Child) endBlockHandler(args nodetypes.EndBlockArgs) error {
 	}
 	batchKVs = append(batchKVs, withdrawalsKVs...)
 
-	outputkvs, err := ch.generateOutputRoot(args.BlockHeight)
+	outputkvs, err := ch.generateOutputRoot(ch.version, args.BlockID, args.BlockHeader)
 	if err != nil {
 		return err
 	}
 	batchKVs = append(batchKVs, outputkvs...)
 
-	if ch.node.HasKey() {
+	if ch.host.HasKey() {
 		if len(ch.msgQueue) != 0 {
 			ch.processedMsgs = append(ch.processedMsgs, nodetypes.ProcessedMsgs{
 				Msgs:      ch.msgQueue,

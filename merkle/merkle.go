@@ -31,22 +31,24 @@ func (m *Merkle) NextWorkingTree() error {
 	return nil
 }
 
-func (m *Merkle) FinishWorkingTree() ([]types.KV, error) {
+func (m *Merkle) FinishWorkingTree() ([]types.KV, []byte, error) {
 	kvs, err := m.fillRestLeaves()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
+
+	treeRootHash := m.workingTree.LevelData[m.GetMaxLevel()]
 
 	tree := merkletypes.FinalizedTreeInfo{
 		TreeIndex:      m.workingTree.Index,
 		Depth:          m.GetMaxLevel(),
-		Root:           m.workingTree.LevelData[m.GetMaxLevel()],
+		Root:           treeRootHash,
 		StartLeafIndex: m.workingTree.StartLeafIndex,
 	}
 
 	data, err := json.Marshal(tree)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	kvs = append(kvs, types.KV{
@@ -54,7 +56,7 @@ func (m *Merkle) FinishWorkingTree() ([]types.KV, error) {
 		Value: data,
 	})
 
-	return kvs, err
+	return kvs, treeRootHash, err
 }
 
 func (m *Merkle) LoadWorkingTree(workingIndex uint64) error {

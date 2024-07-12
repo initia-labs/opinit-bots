@@ -1,6 +1,7 @@
 package host
 
 import (
+	"errors"
 	"time"
 
 	nodetypes "github.com/initia-labs/opinit-bots-go/node/types"
@@ -10,8 +11,12 @@ import (
 )
 
 func (h *Host) beginBlockHandler(args nodetypes.BeginBlockArgs) error {
+	blockHeight := uint64(args.BlockHeader.Height)
+	if h.bridgeId == 0 {
+		return errors.New("bridge info is not set")
+	}
 	// just to make sure that childMsgQueue is empty
-	if args.BlockHeight == args.LatestHeight && len(h.msgQueue) != 0 && len(h.processedMsgs) != 0 {
+	if blockHeight == args.LatestHeight && len(h.msgQueue) != 0 && len(h.processedMsgs) != 0 {
 		panic("must not happen, msgQueue should be empty")
 	}
 	return nil
@@ -20,12 +25,14 @@ func (h *Host) beginBlockHandler(args nodetypes.BeginBlockArgs) error {
 func (h *Host) endBlockHandler(args nodetypes.EndBlockArgs) error {
 	// temporary 50 limit for msg queue
 	// collect more msgs if block height is not latest
-	if args.BlockHeight != args.LatestHeight && len(h.msgQueue) <= 50 {
+	blockHeight := uint64(args.BlockHeader.Height)
+
+	if blockHeight != args.LatestHeight && len(h.msgQueue) <= 50 {
 		return nil
 	}
 
 	batchKVs := []types.KV{
-		h.node.RawKVSyncInfo(args.BlockHeight),
+		h.node.RawKVSyncInfo(blockHeight),
 	}
 	if h.node.HasKey() {
 		if len(h.msgQueue) != 0 {

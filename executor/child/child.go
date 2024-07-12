@@ -22,20 +22,24 @@ import (
 )
 
 type hostNode interface {
-	GetAddress() sdk.AccAddress
+	GetAddressStr() (string, error)
+	AccountCodec() address.Codec
+	HasKey() bool
 	BroadcastMsgs(nodetypes.ProcessedMsgs)
 	RawKVProcessedData([]nodetypes.ProcessedMsgs, bool) ([]types.KV, error)
 	QueryLastOutput() (ophosttypes.QueryOutputProposalResponse, error)
 }
 
 type Child struct {
+	version uint8
+
 	node *node.Node
 	host hostNode
 	mk   *merkle.Merkle
 
-	bridgeId                  int64
-	nextSentOutputTime        time.Time
-	lastSentOutputBlockHeight uint64
+	bridgeInfo opchildtypes.BridgeInfo
+
+	nextOutputTime time.Time
 
 	cfg    nodetypes.NodeConfig
 	db     types.DB
@@ -44,12 +48,14 @@ type Child struct {
 	cdc codec.Codec
 	ac  address.Codec
 
+	opchildQueryClient opchildtypes.QueryClient
+
 	processedMsgs    []nodetypes.ProcessedMsgs
 	msgQueue         []sdk.Msg
 	blockWithdrawals [][]byte
 }
 
-func NewChild(bridgeId int64, cfg nodetypes.NodeConfig, db types.DB, logger *zap.Logger, cdc codec.Codec, txConfig client.TxConfig, host hostNode) *Child {
+func NewChild(version uint8, cfg nodetypes.NodeConfig, db types.DB, logger *zap.Logger, cdc codec.Codec, txConfig client.TxConfig, host hostNode) *Child {
 	node, err := node.NewNode(cfg, db, logger, cdc, txConfig)
 	if err != nil {
 		panic(err)
@@ -58,11 +64,11 @@ func NewChild(bridgeId int64, cfg nodetypes.NodeConfig, db types.DB, logger *zap
 	mk := merkle.NewMerkle(db.WithPrefix([]byte(executortypes.MerkleName)), ophosttypes.GenerateNodeHash)
 
 	ch := &Child{
+		version: version,
+
 		node: node,
 		host: host,
 		mk:   mk,
-
-		bridgeId: bridgeId,
 
 		cfg:    cfg,
 		db:     db,
@@ -70,6 +76,8 @@ func NewChild(bridgeId int64, cfg nodetypes.NodeConfig, db types.DB, logger *zap
 
 		cdc: cdc,
 		ac:  cdc.InterfaceRegistry().SigningContext().AddressCodec(),
+
+		opchildQueryClient: opchildtypes.NewQueryClient(node),
 
 		processedMsgs:    make([]nodetypes.ProcessedMsgs, 0),
 		msgQueue:         make([]sdk.Msg, 0),
@@ -95,14 +103,21 @@ func (ch *Child) registerHandlers() {
 	ch.node.RegisterEndBlockHandler(ch.endBlockHandler)
 }
 
-func (ch Child) GetAddress() sdk.AccAddress {
-	return ch.node.GetAddress()
-}
-
 func (ch Child) BroadcastMsgs(msgs nodetypes.ProcessedMsgs) {
 	ch.node.BroadcastMsgs(msgs)
 }
 
 func (ch Child) RawKVProcessedData(msgs []nodetypes.ProcessedMsgs, delete bool) ([]types.KV, error) {
 	return ch.node.RawKVProcessedData(msgs, delete)
+}
+
+func (ch Child) BridgeId() uint64 {
+	return ch.bridgeInfo.BridgeId
+}
+func (ch Child) AccountCodec() address.Codec {
+	return ch.ac
+}
+
+func (ch Child) HasKey() bool {
+	return ch.node.HasKey()
 }

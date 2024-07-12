@@ -23,7 +23,7 @@ func (n *Node) blockProcessLooper(ctx context.Context) error {
 
 		status, err := n.Status(ctx)
 		if err != nil {
-			n.logger.Error("failed to get node status ", zap.Error(err))
+			n.logger.Error("failed to get node status ", zap.String("error", err.Error()))
 			continue
 		}
 
@@ -37,14 +37,14 @@ func (n *Node) blockProcessLooper(ctx context.Context) error {
 			block, blockResult, err := n.fetchNewBlock(ctx, int64(queryHeight))
 			if err != nil {
 				// TODO: handle error
-				n.logger.Error("failed to fetch new block", zap.Error(err))
+				n.logger.Error("failed to fetch new block", zap.String("error", err.Error()))
 				break
 			}
 
 			err = n.handleNewBlock(block, blockResult, latestChainHeight)
 			if err != nil {
 				// TODO: handle error
-				n.logger.Error("failed to handle new block", zap.Error(err))
+				n.logger.Error("failed to handle new block", zap.String("error", err.Error()))
 				break
 			}
 			n.lastProcessedBlockHeight = queryHeight
@@ -94,7 +94,8 @@ func (n *Node) handleNewBlock(block *rpccoretypes.ResultBlock, blockResult *rpcc
 
 	if n.beginBlockHandler != nil {
 		err := n.beginBlockHandler(nodetypes.BeginBlockArgs{
-			BlockHeight:  uint64(block.Block.Height),
+			BlockID:      block.BlockID.Hash,
+			BlockHeader:  block.Block.Header,
 			LatestHeight: latestChainHeight,
 		})
 		if err != nil {
@@ -111,7 +112,6 @@ func (n *Node) handleNewBlock(block *rpccoretypes.ResultBlock, blockResult *rpcc
 				Tx:           tx,
 			})
 			if err != nil {
-				// TODO: handle error
 				return fmt.Errorf("failed to handle tx: tx_index: %d; %w", txIndex, err)
 			}
 		}
@@ -121,7 +121,6 @@ func (n *Node) handleNewBlock(block *rpccoretypes.ResultBlock, blockResult *rpcc
 			for eventIndex, event := range events {
 				err := n.handleEvent(uint64(block.Block.Height), latestChainHeight, uint64(txIndex), event)
 				if err != nil {
-					// TODO: handle error
 					return fmt.Errorf("failed to handle event: tx_index: %d, event_index: %d; %w", txIndex, eventIndex, err)
 				}
 			}
@@ -130,7 +129,8 @@ func (n *Node) handleNewBlock(block *rpccoretypes.ResultBlock, blockResult *rpcc
 
 	if n.endBlockHandler != nil {
 		err := n.endBlockHandler(nodetypes.EndBlockArgs{
-			BlockHeight:  uint64(block.Block.Height),
+			BlockID:      block.BlockID.Hash,
+			BlockHeader:  block.Block.Header,
 			LatestHeight: latestChainHeight,
 		})
 		if err != nil {

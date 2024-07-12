@@ -24,14 +24,16 @@ type TxHandlerArgs struct {
 type TxHandlerFn func(TxHandlerArgs) error
 
 type BeginBlockArgs struct {
-	BlockHeight  uint64
+	BlockID      []byte
+	BlockHeader  comettypes.Header
 	LatestHeight uint64
 }
 
 type BeginBlockHandlerFn func(BeginBlockArgs) error
 
 type EndBlockArgs struct {
-	BlockHeight  uint64
+	BlockID      []byte
+	BlockHeader  comettypes.Header
 	LatestHeight uint64
 }
 

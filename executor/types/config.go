@@ -9,7 +9,7 @@ import (
 type Config struct {
 	HostNode  nodetypes.NodeConfig `json:"host_node"`
 	ChildNode nodetypes.NodeConfig `json:"child_node"`
-	BridgeId  int64                `json:"bridge_id"`
+	Version   uint8                `json:"version"`
 }
 
 func DefaultConfig() *Config {
@@ -24,7 +24,7 @@ func DefaultConfig() *Config {
 			Mnemonic: "",
 			GasPrice: "0.15umin",
 		},
-		BridgeId: 0,
+		Version: 1,
 	}
 }
 
@@ -45,7 +45,7 @@ func (cfg Config) Validate() error {
 		return errors.New("L2 RPC URL is required")
 	}
 
-	if cfg.BridgeId == 0 {
+	if cfg.Version == 0 {
 		return errors.New("Bridge ID is required")
 	}
 

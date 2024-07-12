@@ -9,7 +9,7 @@ import (
 )
 
 func (h *Host) oracleTxHandler(blockHeight uint64, tx comettypes.Tx) (sdk.Msg, error) {
-	sender, err := h.ac.BytesToString(h.child.GetAddress())
+	sender, err := h.child.GetAddressStr()
 	if err != nil {
 		return nil, err
 	}
@@ -19,7 +19,7 @@ func (h *Host) oracleTxHandler(blockHeight uint64, tx comettypes.Tx) (sdk.Msg, e
 		blockHeight,
 		tx,
 	)
-	err = msg.Validate(h.ac)
+	err = msg.Validate(h.child.AccountCodec())
 	if err != nil {
 		return nil, err
 	}

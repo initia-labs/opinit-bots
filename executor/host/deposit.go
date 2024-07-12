@@ -81,7 +81,7 @@ func (h *Host) handleInitiateDeposit(
 	amount string,
 	data []byte,
 ) (sdk.Msg, error) {
-	sender, err := h.ac.BytesToString(h.child.GetAddress())
+	sender, err := h.child.GetAddressStr()
 	if err != nil {
 		return nil, err
 	}
@@ -101,7 +101,7 @@ func (h *Host) handleInitiateDeposit(
 		l1Denom,
 		data,
 	)
-	err = msg.Validate(h.ac)
+	err = msg.Validate(h.child.AccountCodec())
 	if err != nil {
 		return nil, err
 	}

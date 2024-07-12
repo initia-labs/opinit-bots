@@ -9,10 +9,11 @@ import (
 	"cosmossdk.io/math"
 	opchildtypes "github.com/initia-labs/OPinit/x/opchild/types"
 	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
-	executortypes "github.com/initia-labs/opinit-bots-go/executor/types"
 	"github.com/initia-labs/opinit-bots-go/types"
 
 	nodetypes "github.com/initia-labs/opinit-bots-go/node/types"
+
+	comettpyes "github.com/cometbft/cometbft/types"
 )
 
 var (
@@ -50,21 +51,23 @@ func (ch *Child) initiateWithdrawalHandler(args nodetypes.EventHandlerArgs) erro
 }
 
 func (ch *Child) handleInitiateWithdrawal(l2Sequence uint64, from string, to string, baseDenom string, amount uint64) {
-	withdrawal := ophosttypes.GenerateWithdrawalHash(uint64(ch.bridgeId), l2Sequence, from, to, baseDenom, amount)
+	withdrawal := ophosttypes.GenerateWithdrawalHash(ch.BridgeId(), l2Sequence, from, to, baseDenom, amount)
 	ch.blockWithdrawals = append(ch.blockWithdrawals, withdrawal[:])
 }
 
 func (ch *Child) prepareWithdrawals(blockHeight uint64) error {
-	if ch.nextSentOutputTime.IsZero() || time.Now().After(ch.nextSentOutputTime) {
+	if ch.nextOutputTime.IsZero() || time.Now().After(ch.nextOutputTime) {
 		output, err := ch.host.QueryLastOutput()
 		if err != nil {
 			return err
 		}
-		ch.nextSentOutputTime = output.OutputProposal.L1BlockTime.Add(executortypes.OutputInterval)
-		ch.lastSentOutputBlockHeight = output.OutputProposal.L2BlockNumber
-
+		outputIndex := output.OutputIndex + 1
+		if outputIndex != 1 {
+			ch.nextOutputTime = output.OutputProposal.L1BlockTime.Add(ch.bridgeInfo.BridgeConfig.SubmissionInterval * 2 / 3)
+		}
+		// load once working tree
 		treeLoader.Do(func() {
-			err = ch.mk.LoadWorkingTree(output.OutputIndex + 1)
+			err = ch.mk.LoadWorkingTree(outputIndex)
 		})
 		if err != nil {
 			return err
@@ -77,9 +80,32 @@ func (ch *Child) handleBlockWithdrawals() ([]types.KV, error) {
 	return ch.mk.InsertLeaves(ch.blockWithdrawals)
 }
 
-func (ch *Child) generateOutputRoot(blockHeight uint64) ([]types.KV, error) {
-	if time.Now().After(ch.nextSentOutputTime) || blockHeight-ch.lastSentOutputBlockHeight > executortypes.OutputIntervalHeight {
-		return ch.mk.FinishWorkingTree()
+func (ch *Child) generateOutputRoot(version uint8, blockId []byte, blockHeader comettpyes.Header) ([]types.KV, error) {
+	if time.Now().Before(ch.nextOutputTime) {
+		// skip
+		return nil, nil
 	}
-	return nil, nil
+
+	kvs, storageRoot, err := ch.mk.FinishWorkingTree()
+	if err != nil {
+		return nil, err
+	}
+	sender, err := ch.host.GetAddressStr()
+	if err != nil {
+		return nil, err
+	}
+
+	outputRoot := ophosttypes.GenerateOutputRoot([]byte{version}, blockHeader.AppHash, storageRoot, blockId)
+	msg := ophosttypes.NewMsgProposeOutput(
+		sender,
+		ch.BridgeId(),
+		uint64(blockHeader.Height),
+		outputRoot[:],
+	)
+	err = msg.Validate(ch.host.AccountCodec())
+	if err != nil {
+		return nil, err
+	}
+	ch.msgQueue = append(ch.msgQueue, msg)
+	return kvs, nil
 }
