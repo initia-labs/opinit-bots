@@ -11,6 +11,7 @@ import (
 	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
 	"github.com/initia-labs/opinit-bots-go/types"
 
+	dbtypes "github.com/initia-labs/opinit-bots-go/db/types"
 	nodetypes "github.com/initia-labs/opinit-bots-go/node/types"
 
 	comettpyes "github.com/cometbft/cometbft/types"
@@ -52,41 +53,49 @@ func (ch *Child) initiateWithdrawalHandler(args nodetypes.EventHandlerArgs) erro
 
 func (ch *Child) handleInitiateWithdrawal(l2Sequence uint64, from string, to string, baseDenom string, amount uint64) {
 	withdrawal := ophosttypes.GenerateWithdrawalHash(ch.BridgeId(), l2Sequence, from, to, baseDenom, amount)
-	ch.blockWithdrawals = append(ch.blockWithdrawals, withdrawal[:])
+	ch.mk.InsertLeaf(withdrawal[:])
 }
 
 func (ch *Child) prepareWithdrawals(blockHeight uint64) error {
-	if ch.nextOutputTime.IsZero() || time.Now().After(ch.nextOutputTime) {
-		output, err := ch.host.QueryLastOutput()
+	var output ophosttypes.QueryOutputProposalResponse
+
+	err := ch.mk.LoadWorkingTree(blockHeight - 1)
+	if err == dbtypes.ErrNotFound {
+		output, err = ch.host.QueryLastOutput()
 		if err != nil {
 			return err
+		}
+		l2Sequence, err := ch.QueryNextL2Sequence(blockHeight - 1)
+		if err != nil {
+			return err
+		}
+		ch.mk.SetNewWorkingTree(output.OutputIndex+1, l2Sequence)
+	} else if err != nil {
+		return err
+	}
+
+	if ch.nextOutputTime.IsZero() || time.Now().After(ch.nextOutputTime) {
+		if output.BridgeId == 0 {
+			output, err = ch.host.QueryLastOutput()
+			if err != nil {
+				return err
+			}
 		}
 		outputIndex := output.OutputIndex + 1
 		if outputIndex != 1 {
 			ch.nextOutputTime = output.OutputProposal.L1BlockTime.Add(ch.bridgeInfo.BridgeConfig.SubmissionInterval * 2 / 3)
 		}
-		// load once working tree
-		treeLoader.Do(func() {
-			err = ch.mk.LoadWorkingTree(outputIndex)
-		})
-		if err != nil {
-			return err
-		}
 	}
 	return nil
 }
 
-func (ch *Child) handleBlockWithdrawals() ([]types.KV, error) {
-	return ch.mk.InsertLeaves(ch.blockWithdrawals)
-}
-
-func (ch *Child) generateOutputRoot(version uint8, blockId []byte, blockHeader comettpyes.Header) ([]types.KV, error) {
+func (ch *Child) proposeOutput(version uint8, blockId []byte, blockHeader comettpyes.Header) ([]types.KV, error) {
 	if time.Now().Before(ch.nextOutputTime) {
 		// skip
 		return nil, nil
 	}
 
-	kvs, storageRoot, err := ch.mk.FinishWorkingTree()
+	kvs, storageRoot, err := ch.mk.FinalizeWorkingTree()
 	if err != nil {
 		return nil, err
 	}

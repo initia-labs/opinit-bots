@@ -35,10 +35,14 @@ func (ch *Child) beginBlockHandler(args nodetypes.BeginBlockArgs) (err error) {
 }
 
 func (ch *Child) endBlockHandler(args nodetypes.EndBlockArgs) error {
+	err := ch.mk.SaveWorkingTree(uint64(args.BlockHeader.Height))
+	if err != nil {
+		return err
+	}
+
 	// temporary 50 limit for msg queue
 	// collect more msgs if block height is not latest
 	blockHeight := uint64(args.BlockHeader.Height)
-
 	if blockHeight != args.LatestHeight && len(ch.msgQueue) <= 50 {
 		return nil
 	}
@@ -47,13 +51,7 @@ func (ch *Child) endBlockHandler(args nodetypes.EndBlockArgs) error {
 		ch.node.RawKVSyncInfo(blockHeight),
 	}
 
-	withdrawalsKVs, err := ch.handleBlockWithdrawals()
-	if err != nil {
-		return err
-	}
-	batchKVs = append(batchKVs, withdrawalsKVs...)
-
-	outputkvs, err := ch.generateOutputRoot(ch.version, args.BlockID, args.BlockHeader)
+	outputkvs, err := ch.proposeOutput(ch.version, args.BlockID, args.BlockHeader)
 	if err != nil {
 		return err
 	}

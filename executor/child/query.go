@@ -1,10 +1,9 @@
 package child
 
 import (
-	"context"
-
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	opchildtypes "github.com/initia-labs/OPinit/x/opchild/types"
+	"github.com/initia-labs/opinit-bots-go/node"
 )
 
 func (ch Child) GetAddress() sdk.AccAddress {
@@ -17,9 +16,20 @@ func (ch Child) GetAddressStr() (string, error) {
 
 func (ch Child) QueryBridgeInfo() (opchildtypes.BridgeInfo, error) {
 	req := &opchildtypes.QueryBridgeInfoRequest{}
-	res, err := ch.opchildQueryClient.BridgeInfo(context.Background(), req)
+	ctx := node.GetQueryContext(0)
+	res, err := ch.opchildQueryClient.BridgeInfo(ctx, req)
 	if err != nil {
 		return opchildtypes.BridgeInfo{}, err
 	}
 	return res.BridgeInfo, nil
+}
+
+func (ch Child) QueryNextL2Sequence(height uint64) (uint64, error) {
+	req := &opchildtypes.QueryNextL2SequenceRequest{}
+	ctx := node.GetQueryContext(height)
+	res, err := ch.opchildQueryClient.NextL2Sequence(ctx, req)
+	if err != nil {
+		return 0, err
+	}
+	return res.NextL2Sequence, nil
 }

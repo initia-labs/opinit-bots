@@ -5,22 +5,19 @@ import (
 	"fmt"
 	"reflect"
 	"strconv"
+	"time"
 
 	sdkerrors "cosmossdk.io/errors"
 	abci "github.com/cometbft/cometbft/abci/types"
 	client2 "github.com/cometbft/cometbft/rpc/client"
 	"github.com/cosmos/cosmos-sdk/codec/types"
-	sdk "github.com/cosmos/cosmos-sdk/types"
 	legacyerrors "github.com/cosmos/cosmos-sdk/types/errors"
 	grpctypes "github.com/cosmos/cosmos-sdk/types/grpc"
-	"github.com/cosmos/cosmos-sdk/types/tx"
 	gogogrpc "github.com/cosmos/gogoproto/grpc"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/encoding"
 	"google.golang.org/grpc/encoding/proto"
 	"google.golang.org/grpc/metadata"
-	"google.golang.org/grpc/status"
 )
 
 var _ gogogrpc.ClientConn = &Node{}
@@ -29,34 +26,11 @@ var protoCodec = encoding.GetCodec(proto.Name)
 
 // Invoke implements the grpc ClientConn.Invoke method
 func (n *Node) Invoke(ctx context.Context, method string, req, reply interface{}, opts ...grpc.CallOption) (err error) {
-	// Two things can happen here:
-	// 1. either we're broadcasting a Tx, in which call we call Tendermint's broadcast endpoint directly,
-	// 2. or we are querying for state, in which case we call ABCI's Querier.
-
 	// In both cases, we don't allow empty request req (it will panic unexpectedly).
 	if reflect.ValueOf(req).IsNil() {
 		return sdkerrors.Wrap(legacyerrors.ErrInvalidRequest, "request cannot be nil")
 	}
 
-	// Case 1. Broadcasting a Tx.
-	if reqProto, ok := req.(*tx.BroadcastTxRequest); ok {
-		if !ok {
-			return sdkerrors.Wrapf(legacyerrors.ErrInvalidRequest, "expected %T, got %T", (*tx.BroadcastTxRequest)(nil), req)
-		}
-		resProto, ok := reply.(*tx.BroadcastTxResponse)
-		if !ok {
-			return sdkerrors.Wrapf(legacyerrors.ErrInvalidRequest, "expected %T, got %T", (*tx.BroadcastTxResponse)(nil), req)
-		}
-
-		broadcastRes, err := n.TxServiceBroadcast(ctx, reqProto)
-		if err != nil {
-			return err
-		}
-		*resProto = *broadcastRes
-		return err
-	}
-
-	// Case 2. Querying state.
 	inMd, _ := metadata.FromOutgoingContext(ctx)
 	abciRes, outMd, err := n.RunGRPCQuery(ctx, method, req, inMd)
 	if err != nil {
@@ -81,30 +55,6 @@ func (n *Node) Invoke(ctx context.Context, method string, req, reply interface{}
 	}
 
 	return nil
-}
-
-// TxServiceBroadcast is a helper function to broadcast a Tx with the correct gRPC types
-// from the tx service. Calls `clientCtx.BroadcastTx` under the hood.
-func (n *Node) TxServiceBroadcast(ctx context.Context, req *tx.BroadcastTxRequest) (*tx.BroadcastTxResponse, error) {
-	if req == nil || req.TxBytes == nil {
-		return nil, status.Error(codes.InvalidArgument, "invalid empty tx")
-	}
-
-	// TODO: use sync & wait tx until it is included in a block
-	res, err := n.BroadcastTxCommit(ctx, req.TxBytes)
-	if err != nil {
-		return nil, err
-	}
-
-	return &tx.BroadcastTxResponse{
-		TxResponse: &sdk.TxResponse{
-			Height:    res.Height,
-			TxHash:    res.Hash.String(),
-			Codespace: res.TxResult.Codespace,
-			Code:      res.TxResult.Code,
-			Data:      string(res.TxResult.Data),
-		},
-	}, nil
 }
 
 // NewStream implements the grpc ClientConn.NewStream method
@@ -188,4 +138,13 @@ func GetHeightFromMetadata(md metadata.MD) (int64, error) {
 		return strconv.ParseInt(height[0], 10, 64)
 	}
 	return 0, nil
+}
+
+func GetQueryContext(height uint64) context.Context {
+	// TODO: configurable timeout
+	timeout := 10 * time.Second
+	ctx, _ := context.WithTimeout(context.Background(), timeout)
+	strHeight := strconv.FormatUint(height, 10)
+	ctx = metadata.AppendToOutgoingContext(ctx, grpctypes.GRPCBlockHeightHeader, strHeight)
+	return ctx
 }

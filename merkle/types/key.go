@@ -27,3 +27,7 @@ func PrefixedNodeKey(treeIndex uint64, level uint8, levelIndex uint64) []byte {
 func PrefixedFinalizedTreeKey(treeIndex uint64) []byte {
 	return append(append(FinalizedTreeKey, dbtypes.Splitter), dbtypes.FromUint64Key(treeIndex)...)
 }
+
+func PrefixedWorkingTreeKey(version uint64) []byte {
+	return append(append(WorkingTreeKey, dbtypes.Splitter), dbtypes.FromUint64Key(version)...)
+}

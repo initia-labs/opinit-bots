@@ -1,10 +1,9 @@
 package host
 
 import (
-	"context"
-
 	query "github.com/cosmos/cosmos-sdk/types/query"
 	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
+	"github.com/initia-labs/opinit-bots-go/node"
 )
 
 func (h Host) GetAddressStr() (string, error) {
@@ -19,7 +18,8 @@ func (h Host) QueryLastOutput() (ophosttypes.QueryOutputProposalResponse, error)
 			Reverse: true,
 		},
 	}
-	res, err := h.ophostQueryClient.OutputProposals(context.Background(), req)
+	ctx := node.GetQueryContext(0)
+	res, err := h.ophostQueryClient.OutputProposals(ctx, req)
 	if err != nil {
 		return ophosttypes.QueryOutputProposalResponse{}, err
 	}
