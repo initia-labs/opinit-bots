@@ -10,12 +10,15 @@ import (
 	"github.com/cosmos/cosmos-sdk/std"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/x/auth"
+	"github.com/initia-labs/OPinit/x/opchild"
+	"github.com/initia-labs/OPinit/x/ophost"
 	initiaapp "github.com/initia-labs/initia/app"
 	"github.com/initia-labs/initia/app/params"
 	bottypes "github.com/initia-labs/opinit-bots-go/bot/types"
 	"github.com/initia-labs/opinit-bots-go/db"
 	"github.com/initia-labs/opinit-bots-go/executor"
 	executortypes "github.com/initia-labs/opinit-bots-go/executor/types"
+	"github.com/initia-labs/opinit-bots-go/server"
 	"go.uber.org/zap"
 )
 
@@ -47,7 +50,12 @@ func NewBot(name string, logger *zap.Logger, homePath string, configPath string)
 	std.RegisterInterfaces(encodingConfig.InterfaceRegistry)
 	std.RegisterLegacyAminoCodec(encodingConfig.Amino)
 	auth.AppModuleBasic{}.RegisterInterfaces(encodingConfig.InterfaceRegistry)
+	ophost.AppModuleBasic{}.RegisterInterfaces(encodingConfig.InterfaceRegistry)
+	opchild.AppModuleBasic{}.RegisterInterfaces(encodingConfig.InterfaceRegistry)
+
 	auth.AppModuleBasic{}.RegisterLegacyAminoCodec(encodingConfig.Amino)
+	ophost.AppModuleBasic{}.RegisterLegacyAminoCodec(encodingConfig.Amino)
+	opchild.AppModuleBasic{}.RegisterLegacyAminoCodec(encodingConfig.Amino)
 
 	switch name {
 	case bottypes.ExecutorName:
@@ -60,7 +68,8 @@ func NewBot(name string, logger *zap.Logger, homePath string, configPath string)
 		if err != nil {
 			return nil, err
 		}
-		return executor.NewExecutor(cfg, db, logger, appCodec, txConfig), nil
+		server := server.NewServer()
+		return executor.NewExecutor(cfg, db, server, logger, appCodec, txConfig), nil
 	}
 
 	return nil, errors.New("not providing bot name")
