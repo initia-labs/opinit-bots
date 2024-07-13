@@ -1,6 +1,8 @@
 package db
 
 import (
+	"bytes"
+
 	"github.com/initia-labs/opinit-bots-go/types"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/util"
@@ -80,6 +82,17 @@ func (db *LevelDB) Iterate(start, exclusiveEnd []byte, cb func(key, value []byte
 	}
 	iter.Release()
 	return iter.Error()
+}
+
+func (db *LevelDB) SeekPrevInclusiveKey(key []byte) (k []byte, v []byte, err error) {
+	iter := db.db.NewIterator(&util.Range{db.PrefixedKey(key), nil}, nil)
+	if bytes.Equal(iter.Key(), key) || iter.Prev() {
+		iter.Release()
+		k = db.UnprefixedKey(iter.Key())
+		v = iter.Value()
+	}
+	iter.Release()
+	return k, v, iter.Error()
 }
 
 func (db *LevelDB) WithPrefix(prefix []byte) types.DB {

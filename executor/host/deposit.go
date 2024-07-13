@@ -28,7 +28,8 @@ func (h *Host) initiateDepositHandler(args nodetypes.EventHandlerArgs) error {
 				return err
 			}
 			if bridgeId != h.bridgeId {
-				return errors.New("bridge ID mismatch")
+				// pass other bridge deposit event
+				return nil
 			}
 		case ophosttypes.AttributeKeyL1Sequence:
 			l1Sequence, err = strconv.ParseUint(attr.Value, 10, 64)

@@ -42,13 +42,12 @@ func (ch *Child) initiateWithdrawalHandler(args nodetypes.EventHandlerArgs) erro
 			amount = coinAmount.Uint64()
 		}
 	}
-	ch.handleInitiateWithdrawal(l2Sequence, from, to, baseDenom, amount)
-	return nil
+	return ch.handleInitiateWithdrawal(l2Sequence, from, to, baseDenom, amount)
 }
 
-func (ch *Child) handleInitiateWithdrawal(l2Sequence uint64, from string, to string, baseDenom string, amount uint64) {
+func (ch *Child) handleInitiateWithdrawal(l2Sequence uint64, from string, to string, baseDenom string, amount uint64) error {
 	withdrawal := ophosttypes.GenerateWithdrawalHash(ch.BridgeId(), l2Sequence, from, to, baseDenom, amount)
-	ch.mk.InsertLeaf(withdrawal[:])
+	return ch.mk.InsertLeaf(withdrawal[:])
 }
 
 func (ch *Child) prepareWithdrawals(blockHeight uint64, blockTime time.Time) error {
