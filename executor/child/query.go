@@ -35,6 +35,6 @@ func (ch Child) QueryNextL2Sequence(height uint64) (uint64, error) {
 	return res.NextL2Sequence, nil
 }
 
-func (ch Child) QueryProofs(sequence uint64) ([][]byte, error) {
+func (ch Child) QueryProofs(sequence uint64) ([][]byte, uint64, []byte, []byte, error) {
 	return ch.mk.GetProofs(sequence)
 }

@@ -87,7 +87,6 @@ func (db *LevelDB) Iterate(start, exclusiveEnd []byte, cb func(key, value []byte
 func (db *LevelDB) SeekPrevInclusiveKey(key []byte) (k []byte, v []byte, err error) {
 	iter := db.db.NewIterator(&util.Range{db.PrefixedKey(key), nil}, nil)
 	if bytes.Equal(iter.Key(), key) || iter.Prev() {
-		iter.Release()
 		k = db.UnprefixedKey(iter.Key())
 		v = iter.Value()
 	}

@@ -14,7 +14,11 @@ func (ch *Child) beginBlockHandler(args nodetypes.BeginBlockArgs) (err error) {
 		panic("must not happen, msgQueue should be empty")
 	}
 
-	err = ch.prepareWithdrawals(blockHeight, args.BlockHeader.Time)
+	err = ch.prepareTree(blockHeight)
+	if err != nil {
+		return err
+	}
+	err = ch.prepareOutput(blockHeight, args.BlockHeader.Time)
 	if err != nil {
 		return err
 	}
@@ -22,28 +26,27 @@ func (ch *Child) beginBlockHandler(args nodetypes.BeginBlockArgs) (err error) {
 }
 
 func (ch *Child) endBlockHandler(args nodetypes.EndBlockArgs) error {
-	err := ch.mk.SaveWorkingTree(uint64(args.BlockHeader.Height))
-	if err != nil {
-		return err
-	}
-
-	// temporary 50 limit for msg queue
-	// collect more msgs if block height is not latest
 	blockHeight := uint64(args.BlockHeader.Height)
-	if blockHeight != args.LatestHeight && len(ch.msgQueue) <= 50 {
-		return nil
-	}
-
 	batchKVs := []types.KV{
 		ch.node.RawKVSyncInfo(blockHeight),
 	}
 
-	if blockHeight == args.LatestHeight {
-		outputkvs, err := ch.proposeOutput(ch.version, args.BlockID, args.BlockHeader)
+	treeKVs, storageRoot, err := ch.handleTree(blockHeight, uint64(args.LatestHeight), args.BlockID, args.BlockHeader)
+	if err != nil {
+		return err
+	}
+	batchKVs = append(batchKVs, treeKVs...)
+
+	if storageRoot != nil {
+		err = ch.handleOutput(blockHeight, ch.version, args.BlockID, storageRoot)
 		if err != nil {
 			return err
 		}
-		batchKVs = append(batchKVs, outputkvs...)
+	}
+	// temporary 50 limit for msg queue
+	// collect more msgs if block height is not latest
+	if blockHeight != args.LatestHeight && len(ch.msgQueue) <= 50 {
+		return nil
 	}
 
 	if ch.host.HasKey() {

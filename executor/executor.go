@@ -2,9 +2,13 @@ package executor
 
 import (
 	"context"
+	"errors"
+	"strconv"
 
+	"github.com/gofiber/fiber/v2"
 	"github.com/initia-labs/opinit-bots-go/executor/child"
 	"github.com/initia-labs/opinit-bots-go/executor/host"
+	"github.com/initia-labs/opinit-bots-go/server"
 
 	bottypes "github.com/initia-labs/opinit-bots-go/bot/types"
 	executortypes "github.com/initia-labs/opinit-bots-go/executor/types"
@@ -23,10 +27,11 @@ type Executor struct {
 
 	cfg    *executortypes.Config
 	db     types.DB
+	server *server.Server
 	logger *zap.Logger
 }
 
-func NewExecutor(cfg *executortypes.Config, db types.DB, logger *zap.Logger, cdc codec.Codec, txConfig client.TxConfig) *Executor {
+func NewExecutor(cfg *executortypes.Config, db types.DB, sv *server.Server, logger *zap.Logger, cdc codec.Codec, txConfig client.TxConfig) *Executor {
 	err := cfg.Validate()
 	if err != nil {
 		panic(err)
@@ -41,6 +46,7 @@ func NewExecutor(cfg *executortypes.Config, db types.DB, logger *zap.Logger, cdc
 
 		cfg:    cfg,
 		db:     db,
+		server: sv,
 		logger: logger,
 	}
 
@@ -61,20 +67,53 @@ func NewExecutor(cfg *executortypes.Config, db types.DB, logger *zap.Logger, cdc
 
 	ch.RegisterHandlers()
 	h.RegisterHandlers()
+
+	executor.RegisterQuerier()
 	return executor
 }
 
 func (ex *Executor) Start(cmdCtx context.Context) error {
+	defer ex.db.Close()
+
+	err := ex.server.ShutdownWithContext(cmdCtx)
+	if err != nil {
+		return err
+	}
+
 	hostCtx, hostDone := context.WithCancel(cmdCtx)
 	childCtx, childDone := context.WithCancel(cmdCtx)
+
 	ex.host.Start(hostCtx)
 	ex.child.Start(childCtx)
 
-	<-cmdCtx.Done()
-
+	err = ex.server.Start()
 	// TODO: safely shut down
 	hostDone()
 	childDone()
+	return err
+}
 
-	return ex.db.Close()
+func (ex *Executor) RegisterQuerier() {
+	ex.server.RegisterQuerier("/proofs/:sequence", func(c *fiber.Ctx) error {
+		sequenceStr := c.Params("sequence")
+		if sequenceStr == "" {
+			return errors.New("sequence is required")
+		}
+		sequence, err := strconv.ParseUint(sequenceStr, 10, 64)
+		if err != nil {
+			return err
+		}
+
+		proofs, outputIndex, outputRoot, latestBlockHash, err := ex.child.QueryProofs(sequence)
+		if err != nil {
+			return err
+		}
+
+		return c.JSON(executortypes.QueryProofsResponse{
+			WithdrawalProofs: proofs,
+			OutputIndex:      outputIndex,
+			StorageRoot:      outputRoot,
+			LatestBlockHash:  latestBlockHash,
+		})
+	})
 }

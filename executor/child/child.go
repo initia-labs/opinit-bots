@@ -39,7 +39,8 @@ type Child struct {
 
 	bridgeInfo opchildtypes.BridgeInfo
 
-	nextOutputTime time.Time
+	nextOutputTime        time.Time
+	finalizingBlockHeight uint64
 
 	cfg    nodetypes.NodeConfig
 	db     types.DB
