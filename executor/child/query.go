@@ -50,10 +50,13 @@ func (ch Child) QueryProofs(sequence uint64) (executortypes.QueryProofsResponse,
 	}
 
 	return executortypes.QueryProofsResponse{
+		BridgeId:         ch.BridgeId(),
+		Sequence:         sequence,
+		Version:          []byte{ch.version},
 		WithdrawalProofs: proofs,
 		OutputIndex:      outputIndex,
 		StorageRoot:      outputRoot,
 		BlockNumber:      data.BlockNumber,
-		BlockHash:        data.BlockHash,
+		LatestBlockHash:  data.BlockHash,
 	}, nil
 }
