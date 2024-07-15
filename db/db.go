@@ -1,8 +1,7 @@
 package db
 
 import (
-	"bytes"
-
+	dbtypes "github.com/initia-labs/opinit-bots-go/db/types"
 	"github.com/initia-labs/opinit-bots-go/types"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/util"
@@ -72,8 +71,8 @@ func (db *LevelDB) Close() error {
 	return db.db.Close()
 }
 
-func (db *LevelDB) Iterate(start, exclusiveEnd []byte, cb func(key, value []byte) (stop bool)) error {
-	iter := db.db.NewIterator(&util.Range{db.PrefixedKey(start), db.PrefixedKey(exclusiveEnd)}, nil)
+func (db *LevelDB) PrefixedIterate(prefix []byte, cb func(key, value []byte) (stop bool)) error {
+	iter := db.db.NewIterator(util.BytesPrefix(db.PrefixedKey(prefix)), nil)
 	for iter.Next() {
 		key := db.UnprefixedKey(iter.Key())
 		if cb(key, iter.Value()) {
@@ -84,14 +83,19 @@ func (db *LevelDB) Iterate(start, exclusiveEnd []byte, cb func(key, value []byte
 	return iter.Error()
 }
 
-func (db *LevelDB) SeekPrevInclusiveKey(key []byte) (k []byte, v []byte, err error) {
-	iter := db.db.NewIterator(&util.Range{db.PrefixedKey(key), nil}, nil)
-	if bytes.Equal(iter.Key(), key) || iter.Prev() {
+func (db *LevelDB) SeekPrevInclusiveKey(prefix []byte, key []byte) (k []byte, v []byte, err error) {
+	iter := db.db.NewIterator(util.BytesPrefix(db.PrefixedKey(prefix)), nil)
+	if iter.Seek(db.PrefixedKey(key)) || iter.Valid() && iter.Prev() {
 		k = db.UnprefixedKey(iter.Key())
 		v = iter.Value()
+	} else {
+		err = dbtypes.ErrNotFound
 	}
 	iter.Release()
-	return k, v, iter.Error()
+	if iter.Error() != nil {
+		err = iter.Error()
+	}
+	return k, v, err
 }
 
 func (db *LevelDB) WithPrefix(prefix []byte) types.DB {

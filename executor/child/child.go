@@ -27,7 +27,8 @@ type hostNode interface {
 	HasKey() bool
 	BroadcastMsgs(nodetypes.ProcessedMsgs)
 	RawKVProcessedData([]nodetypes.ProcessedMsgs, bool) ([]types.KV, error)
-	QueryLastOutput() (ophosttypes.QueryOutputProposalResponse, error)
+	QueryLastOutput() (*ophosttypes.QueryOutputProposalResponse, error)
+	QueryOutput(uint64) (*ophosttypes.QueryOutputProposalResponse, error)
 }
 
 type Child struct {
@@ -55,7 +56,7 @@ type Child struct {
 	msgQueue      []sdk.Msg
 }
 
-func NewChild(version uint8, cfg nodetypes.NodeConfig, db types.DB, logger *zap.Logger, cdc codec.Codec, txConfig client.TxConfig, host hostNode) *Child {
+func NewChild(version uint8, cfg nodetypes.NodeConfig, db types.DB, logger *zap.Logger, cdc codec.Codec, txConfig client.TxConfig) *Child {
 	node, err := node.NewNode(cfg, db, logger, cdc, txConfig)
 	if err != nil {
 		panic(err)
@@ -67,7 +68,6 @@ func NewChild(version uint8, cfg nodetypes.NodeConfig, db types.DB, logger *zap.
 		version: version,
 
 		node: node,
-		host: host,
 		mk:   mk,
 
 		cfg:    cfg,
@@ -82,15 +82,21 @@ func NewChild(version uint8, cfg nodetypes.NodeConfig, db types.DB, logger *zap.
 		processedMsgs: make([]nodetypes.ProcessedMsgs, 0),
 		msgQueue:      make([]sdk.Msg, 0),
 	}
-
 	return ch
+}
+
+func (ch *Child) Initialize(host hostNode, bridgeInfo opchildtypes.BridgeInfo) {
+	ch.host = host
+	ch.bridgeInfo = bridgeInfo
+
+	ch.registerHandlers()
 }
 
 func (ch *Child) Start(ctx context.Context) {
 	ch.node.Start(ctx)
 }
 
-func (ch *Child) RegisterHandlers() {
+func (ch *Child) registerHandlers() {
 	ch.node.RegisterBeginBlockHandler(ch.beginBlockHandler)
 	ch.node.RegisterEventHandler(opchildtypes.EventTypeFinalizeTokenDeposit, ch.finalizeDepositHandler)
 	ch.node.RegisterEventHandler(opchildtypes.EventTypeUpdateOracle, ch.updateOracleHandler)

@@ -22,8 +22,7 @@ func (h *Host) endBlockHandler(args nodetypes.EndBlockArgs) error {
 	// temporary 50 limit for msg queue
 	// collect more msgs if block height is not latest
 	blockHeight := uint64(args.BlockHeader.Height)
-
-	if blockHeight != args.LatestHeight && len(h.msgQueue) <= 50 {
+	if blockHeight != args.LatestHeight && len(h.msgQueue) <= 10 {
 		return nil
 	}
 

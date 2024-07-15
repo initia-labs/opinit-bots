@@ -33,6 +33,7 @@ func (m *Merkle) SetNewWorkingTree(treeIndex uint64, startLeafIndex uint64) {
 }
 
 func (m *Merkle) FinalizeWorkingTree(extraData []byte) ([]types.KV, []byte, error) {
+	m.workingTree.Done = true
 	if m.workingTree.LeafCount == 0 {
 		return nil, merkletypes.EmptyRootHash[:], nil
 	}
@@ -40,7 +41,6 @@ func (m *Merkle) FinalizeWorkingTree(extraData []byte) ([]types.KV, []byte, erro
 	if err != nil {
 		return nil, nil, err
 	}
-	m.workingTree.Done = true
 
 	treeRootHash := m.workingTree.HeightData[m.Height()]
 	tree := merkletypes.FinalizedTreeInfo{
@@ -84,7 +84,7 @@ func (m *Merkle) LoadWorkingTree(version uint64) error {
 }
 
 func (m *Merkle) SaveWorkingTree(version uint64) error {
-	data, err := json.Marshal(m.workingTree)
+	data, err := json.Marshal(&m.workingTree)
 	if err != nil {
 		return err
 	}
@@ -92,7 +92,7 @@ func (m *Merkle) SaveWorkingTree(version uint64) error {
 }
 
 func (m *Merkle) GetKVWorkingTree() (types.KV, error) {
-	data, err := json.Marshal(m.workingTree)
+	data, err := json.Marshal(&m.workingTree)
 	if err != nil {
 		return types.KV{}, err
 	}
@@ -163,7 +163,7 @@ func (m *Merkle) InsertLeaf(data []byte, residue bool) error {
 }
 
 func (m *Merkle) GetProofs(leafIndex uint64) ([][]byte, uint64, []byte, []byte, error) {
-	_, value, err := m.db.SeekPrevInclusiveKey(merkletypes.PrefixedFinalizedTreeKey(leafIndex))
+	_, value, err := m.db.SeekPrevInclusiveKey(merkletypes.FinalizedTreeKey, merkletypes.PrefixedFinalizedTreeKey(leafIndex))
 	if err != nil {
 		return nil, 0, nil, nil, err
 	}

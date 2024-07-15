@@ -16,7 +16,7 @@ func (h Host) GetAddressStr() (string, error) {
 	return h.ac.BytesToString(addr)
 }
 
-func (h Host) QueryLastOutput() (ophosttypes.QueryOutputProposalResponse, error) {
+func (h Host) QueryLastOutput() (*ophosttypes.QueryOutputProposalResponse, error) {
 	req := &ophosttypes.QueryOutputProposalsRequest{
 		BridgeId: uint64(h.bridgeId),
 		Pagination: &query.PageRequest{
@@ -27,10 +27,19 @@ func (h Host) QueryLastOutput() (ophosttypes.QueryOutputProposalResponse, error)
 	ctx := node.GetQueryContext(0)
 	res, err := h.ophostQueryClient.OutputProposals(ctx, req)
 	if err != nil {
-		return ophosttypes.QueryOutputProposalResponse{}, err
+		return nil, err
 	}
 	if res.OutputProposals == nil || len(res.OutputProposals) == 0 {
-		return ophosttypes.QueryOutputProposalResponse{}, nil
+		return nil, nil
 	}
-	return res.OutputProposals[0], nil
+	return &res.OutputProposals[0], nil
+}
+
+func (h Host) QueryOutput(outputIndex uint64) (*ophosttypes.QueryOutputProposalResponse, error) {
+	req := &ophosttypes.QueryOutputProposalRequest{
+		BridgeId:    uint64(h.bridgeId),
+		OutputIndex: outputIndex,
+	}
+	ctx := node.GetQueryContext(0)
+	return h.ophostQueryClient.OutputProposal(ctx, req)
 }

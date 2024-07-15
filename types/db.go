@@ -12,8 +12,8 @@ type DB interface {
 	BatchSet(...KV) error
 	Delete([]byte) error
 	Close() error
-	Iterate([]byte, []byte, func([]byte, []byte) bool) error
-	SeekPrevInclusiveKey([]byte) ([]byte, []byte, error)
+	PrefixedIterate([]byte, func([]byte, []byte) bool) error
+	SeekPrevInclusiveKey([]byte, []byte) ([]byte, []byte, error)
 	WithPrefix([]byte) DB
 	PrefixedKey([]byte) []byte
 	UnprefixedKey([]byte) []byte

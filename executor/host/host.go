@@ -45,7 +45,7 @@ type Host struct {
 	msgQueue      []sdk.Msg
 }
 
-func NewHost(version uint8, cfg nodetypes.NodeConfig, db types.DB, logger *zap.Logger, cdc codec.Codec, txConfig client.TxConfig, child childNode) *Host {
+func NewHost(version uint8, cfg nodetypes.NodeConfig, db types.DB, logger *zap.Logger, cdc codec.Codec, txConfig client.TxConfig) *Host {
 	node, err := node.NewNode(cfg, db, logger, cdc, txConfig)
 	if err != nil {
 		panic(err)
@@ -54,8 +54,7 @@ func NewHost(version uint8, cfg nodetypes.NodeConfig, db types.DB, logger *zap.L
 	h := &Host{
 		version: version,
 
-		node:  node,
-		child: child,
+		node: node,
 
 		cfg:    cfg,
 		db:     db,
@@ -73,11 +72,18 @@ func NewHost(version uint8, cfg nodetypes.NodeConfig, db types.DB, logger *zap.L
 	return h
 }
 
+func (h *Host) Initialize(child childNode, bridgeId int64) {
+	h.child = child
+	h.bridgeId = bridgeId
+
+	h.registerHandlers()
+}
+
 func (h *Host) Start(ctx context.Context) {
 	h.node.Start(ctx)
 }
 
-func (h *Host) RegisterHandlers() {
+func (h *Host) registerHandlers() {
 	h.node.RegisterBeginBlockHandler(h.beginBlockHandler)
 	h.node.RegisterTxHandler(h.txHandler)
 	h.node.RegisterEventHandler(ophosttypes.EventTypeInitiateTokenDeposit, h.initiateDepositHandler)

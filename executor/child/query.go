@@ -1,9 +1,11 @@
 package child
 
 import (
+	"encoding/json"
 	"errors"
 
 	opchildtypes "github.com/initia-labs/OPinit/x/opchild/types"
+	executortypes "github.com/initia-labs/opinit-bots-go/executor/types"
 	"github.com/initia-labs/opinit-bots-go/node"
 )
 
@@ -35,6 +37,23 @@ func (ch Child) QueryNextL2Sequence(height uint64) (uint64, error) {
 	return res.NextL2Sequence, nil
 }
 
-func (ch Child) QueryProofs(sequence uint64) ([][]byte, uint64, []byte, []byte, error) {
-	return ch.mk.GetProofs(sequence)
+func (ch Child) QueryProofs(sequence uint64) (executortypes.QueryProofsResponse, error) {
+	proofs, outputIndex, outputRoot, extraData, err := ch.mk.GetProofs(sequence)
+	if err != nil {
+		return executortypes.QueryProofsResponse{}, err
+	}
+
+	data := executortypes.TreeExtraData{}
+	err = json.Unmarshal(extraData, &data)
+	if err != nil {
+		return executortypes.QueryProofsResponse{}, err
+	}
+
+	return executortypes.QueryProofsResponse{
+		WithdrawalProofs: proofs,
+		OutputIndex:      outputIndex,
+		StorageRoot:      outputRoot,
+		BlockNumber:      data.BlockNumber,
+		BlockHash:        data.BlockHash,
+	}, nil
 }

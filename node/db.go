@@ -43,7 +43,7 @@ func (n Node) deletePendingTx(sequence uint64) error {
 }
 
 func (n *Node) loadPendingTxs() (txs []nodetypes.PendingTxInfo, err error) {
-	iterErr := n.db.Iterate(nodetypes.PendingTxsKey, nodetypes.LastPendingTxKey, func(key, value []byte) (stop bool) {
+	iterErr := n.db.PrefixedIterate(nodetypes.PendingTxsKey, func(_, value []byte) (stop bool) {
 		txInfo := nodetypes.PendingTxInfo{}
 		err = txInfo.Unmarshal(value)
 		if err != nil {
@@ -117,7 +117,7 @@ func (n *Node) saveProcessedMsgs(processedMsgs nodetypes.ProcessedMsgs) error {
 }
 
 func (n *Node) loadProcessedData() (processedData []nodetypes.ProcessedMsgs, err error) {
-	iterErr := n.db.Iterate(nodetypes.ProcessedMsgsKey, nodetypes.LastProcessedMsgsKey, func(key, value []byte) (stop bool) {
+	iterErr := n.db.PrefixedIterate(nodetypes.ProcessedMsgsKey, func(_, value []byte) (stop bool) {
 		processedMsgs := nodetypes.ProcessedMsgs{}
 		err = processedMsgs.Unmarshal(value)
 		if err != nil {

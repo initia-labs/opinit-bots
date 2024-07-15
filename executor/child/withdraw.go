@@ -1,14 +1,18 @@
 package child
 
 import (
+	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	"cosmossdk.io/math"
 	opchildtypes "github.com/initia-labs/OPinit/x/opchild/types"
 	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
+	executortypes "github.com/initia-labs/opinit-bots-go/executor/types"
 	"github.com/initia-labs/opinit-bots-go/types"
 	"go.uber.org/zap"
 
@@ -64,24 +68,6 @@ func (ch *Child) handleInitiateWithdrawal(l2Sequence uint64, from string, to str
 	return nil
 }
 
-func (ch *Child) prepareOutput(blockHeight uint64, blockTime time.Time) error {
-	// we don't want query every block
-	if ch.nextOutputTime.IsZero() || blockTime.After(ch.nextOutputTime) {
-		output, err := ch.host.QueryLastOutput()
-		if err != nil {
-			return err
-		}
-
-		if ch.mk.GetWorkingTreeIndex() < output.OutputIndex+1 {
-			// we are on sync; need to sync tree
-			// store specific fianlizing height
-			ch.finalizingBlockHeight = output.OutputProposal.L2BlockNumber
-		}
-		ch.nextOutputTime = output.OutputProposal.L1BlockTime.Add(ch.bridgeInfo.BridgeConfig.SubmissionInterval * 2 / 3)
-	}
-	return nil
-}
-
 func (ch *Child) prepareTree(blockHeight uint64) error {
 	if blockHeight == 1 {
 		ch.mk.SetNewWorkingTree(1, 1)
@@ -99,12 +85,43 @@ func (ch *Child) prepareTree(blockHeight uint64) error {
 	return nil
 }
 
+func (ch *Child) prepareOutput(blockHeight uint64, blockTime time.Time) error {
+	workingOutputIndex := ch.mk.GetWorkingTreeIndex()
+	// initialize next output time
+	if ch.nextOutputTime.IsZero() && workingOutputIndex > 1 {
+		output, err := ch.host.QueryOutput(workingOutputIndex - 1)
+		if err != nil {
+			return err
+		}
+		ch.nextOutputTime = output.OutputProposal.L1BlockTime.Add(ch.bridgeInfo.BridgeConfig.SubmissionInterval * 2 / 3)
+	}
+
+	output, err := ch.host.QueryOutput(ch.mk.GetWorkingTreeIndex())
+	if err != nil {
+		if strings.Contains(err.Error(), "collections: not found") {
+			return nil
+		}
+		return err
+	} else {
+		// we are syncing
+		ch.finalizingBlockHeight = output.OutputProposal.L2BlockNumber
+	}
+	return nil
+}
+
 func (ch *Child) handleTree(blockHeight uint64, latestHeight uint64, blockId []byte, blockHeader comettpyes.Header) (kvs []types.KV, storageRoot []byte, err error) {
-	// finalize working tree if we are on sync or block time is over next output time
+	// finalize working tree if we are syncing or block time is over next output time
 	if ch.finalizingBlockHeight == blockHeight ||
 		(ch.finalizingBlockHeight == 0 && blockHeight == latestHeight && blockHeader.Time.After(ch.nextOutputTime)) {
-		// save blockId as extra data
-		kvs, storageRoot, err = ch.mk.FinalizeWorkingTree(blockId)
+		extraData := executortypes.TreeExtraData{
+			BlockNumber: blockHeight,
+			BlockHash:   blockId,
+		}
+		data, err := json.Marshal(extraData)
+		if err != nil {
+			return nil, nil, err
+		}
+		kvs, storageRoot, err = ch.mk.FinalizeWorkingTree(data)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -113,10 +130,11 @@ func (ch *Child) handleTree(blockHeight uint64, latestHeight uint64, blockId []b
 		if ch.finalizingBlockHeight == blockHeight {
 			storageRoot = nil
 		}
-		ch.finalizingBlockHeight = 0
-		ch.logger.Info("finalize tree", zap.Uint64("tree_index", ch.mk.GetWorkingTreeIndex()), zap.Uint64("height", blockHeight), zap.Uint64("num_leaves", ch.mk.GetWorkingTreeLeafCount()), zap.ByteString("root", storageRoot))
-	}
 
+		ch.nextOutputTime = blockHeader.Time.Add(ch.bridgeInfo.BridgeConfig.SubmissionInterval * 2 / 3)
+		ch.finalizingBlockHeight = 0
+		ch.logger.Info("finalize tree", zap.Uint64("tree_index", ch.mk.GetWorkingTreeIndex()), zap.Uint64("height", blockHeight), zap.Uint64("num_leaves", ch.mk.GetWorkingTreeLeafCount()), zap.String("storage_root", base64.StdEncoding.EncodeToString(storageRoot)))
+	}
 	err = ch.mk.SaveWorkingTree(blockHeight)
 	if err != nil {
 		return nil, nil, err

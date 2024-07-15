@@ -37,12 +37,9 @@ func NewExecutor(cfg *executortypes.Config, db types.DB, sv *server.Server, logg
 		panic(err)
 	}
 
-	h := &host.Host{}
-	ch := &child.Child{}
-
 	executor := &Executor{
-		host:  h,
-		child: ch,
+		host:  host.NewHost(cfg.Version, cfg.HostNode, db.WithPrefix([]byte(executortypes.HostNodeName)), logger.Named(executortypes.HostNodeName), cdc, txConfig),
+		child: child.NewChild(cfg.Version, cfg.ChildNode, db.WithPrefix([]byte(executortypes.ChildNodeName)), logger.Named(executortypes.ChildNodeName), cdc, txConfig),
 
 		cfg:    cfg,
 		db:     db,
@@ -50,24 +47,17 @@ func NewExecutor(cfg *executortypes.Config, db types.DB, sv *server.Server, logg
 		logger: logger,
 	}
 
-	*h = *host.NewHost(cfg.Version, cfg.HostNode, db.WithPrefix([]byte(executortypes.HostNodeName)), logger.Named(executortypes.HostNodeName), cdc, txConfig, ch)
-	*ch = *child.NewChild(cfg.Version, cfg.ChildNode, db.WithPrefix([]byte(executortypes.ChildNodeName)), logger.Named(executortypes.ChildNodeName), cdc, txConfig, h)
-
-	bridgeInfo, err := ch.QueryBridgeInfo()
+	bridgeInfo, err := executor.child.QueryBridgeInfo()
 	if err != nil {
 		panic(err)
 	}
 	if bridgeInfo.BridgeId == 0 {
 		panic("bridge info is not set")
 	}
-	executor.logger.Info("bridge info", zap.Uint64("id", bridgeInfo.BridgeId))
+	executor.logger.Info("bridge info", zap.Uint64("id", bridgeInfo.BridgeId), zap.Duration("submission_interval", bridgeInfo.BridgeConfig.SubmissionInterval))
 
-	ch.SetBridgeInfo(bridgeInfo)
-	h.SetBridgeId(int64(bridgeInfo.BridgeId))
-
-	ch.RegisterHandlers()
-	h.RegisterHandlers()
-
+	executor.child.Initialize(executor.host, bridgeInfo)
+	executor.host.Initialize(executor.child, int64(bridgeInfo.BridgeId))
 	executor.RegisterQuerier()
 	return executor
 }
@@ -103,17 +93,10 @@ func (ex *Executor) RegisterQuerier() {
 		if err != nil {
 			return err
 		}
-
-		proofs, outputIndex, outputRoot, latestBlockHash, err := ex.child.QueryProofs(sequence)
+		res, err := ex.child.QueryProofs(sequence)
 		if err != nil {
 			return err
 		}
-
-		return c.JSON(executortypes.QueryProofsResponse{
-			WithdrawalProofs: proofs,
-			OutputIndex:      outputIndex,
-			StorageRoot:      outputRoot,
-			LatestBlockHash:  latestBlockHash,
-		})
+		return c.JSON(res)
 	})
 }
