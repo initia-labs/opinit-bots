@@ -75,7 +75,7 @@ func (ch *Child) handleInitiateWithdrawal(l2Sequence uint64, from string, to str
 		zap.String("to", to),
 		zap.Uint64("amount", amount),
 		zap.String("base_denom", baseDenom),
-		zap.ByteString("withdrawal", withdrawalHash[:]),
+		zap.String("withdrawal", base64.StdEncoding.EncodeToString(withdrawalHash[:])),
 	)
 	return nil
 }
