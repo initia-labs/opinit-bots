@@ -84,7 +84,7 @@ func (ex *Executor) Start(cmdCtx context.Context) error {
 }
 
 func (ex *Executor) RegisterQuerier() {
-	ex.server.RegisterQuerier("/proofs/:sequence", func(c *fiber.Ctx) error {
+	ex.server.RegisterQuerier("/withdrawal/:sequence", func(c *fiber.Ctx) error {
 		sequenceStr := c.Params("sequence")
 		if sequenceStr == "" {
 			return errors.New("sequence is required")
@@ -93,7 +93,7 @@ func (ex *Executor) RegisterQuerier() {
 		if err != nil {
 			return err
 		}
-		res, err := ex.child.QueryProofs(sequence)
+		res, err := ex.child.QueryWithdrawal(sequence)
 		if err != nil {
 			return err
 		}

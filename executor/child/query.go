@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"errors"
 
+	"cosmossdk.io/math"
+	sdk "github.com/cosmos/cosmos-sdk/types"
 	opchildtypes "github.com/initia-labs/OPinit/x/opchild/types"
 	executortypes "github.com/initia-labs/opinit-bots-go/executor/types"
 	"github.com/initia-labs/opinit-bots-go/node"
@@ -37,26 +39,39 @@ func (ch Child) QueryNextL2Sequence(height uint64) (uint64, error) {
 	return res.NextL2Sequence, nil
 }
 
-func (ch Child) QueryProofs(sequence uint64) (executortypes.QueryProofsResponse, error) {
-	proofs, outputIndex, outputRoot, extraData, err := ch.mk.GetProofs(sequence)
+func (ch Child) QueryWithdrawal(sequence uint64) (executortypes.QueryWithdrawalResponse, error) {
+	withdrawalBytes, proofs, outputIndex, outputRoot, extraDataBytes, err := ch.mk.GetLeafWithProofs(sequence)
 	if err != nil {
-		return executortypes.QueryProofsResponse{}, err
+		return executortypes.QueryWithdrawalResponse{}, err
 	}
 
-	data := executortypes.TreeExtraData{}
-	err = json.Unmarshal(extraData, &data)
+	var withdrawal executortypes.WithdrawalData
+	err = json.Unmarshal(withdrawalBytes, &withdrawal)
 	if err != nil {
-		return executortypes.QueryProofsResponse{}, err
+		return executortypes.QueryWithdrawalResponse{}, err
 	}
 
-	return executortypes.QueryProofsResponse{
+	amount := sdk.NewCoin(withdrawal.BaseDenom, math.NewIntFromUint64(withdrawal.Amount))
+
+	treeExtraData := executortypes.TreeExtraData{}
+	err = json.Unmarshal(extraDataBytes, &treeExtraData)
+	if err != nil {
+		return executortypes.QueryWithdrawalResponse{}, err
+	}
+
+	return executortypes.QueryWithdrawalResponse{
 		BridgeId:         ch.BridgeId(),
-		Sequence:         sequence,
-		Version:          []byte{ch.version},
-		WithdrawalProofs: proofs,
 		OutputIndex:      outputIndex,
+		WithdrawalProofs: proofs,
+		Sender:           withdrawal.From,
+		Sequence:         sequence,
+		Amount:           amount.String(),
+		Version:          []byte{ch.version},
 		StorageRoot:      outputRoot,
-		BlockNumber:      data.BlockNumber,
-		LatestBlockHash:  data.BlockHash,
+		LatestBlockHash:  treeExtraData.BlockHash,
+
+		BlockNumber:    treeExtraData.BlockNumber,
+		Receiver:       withdrawal.To,
+		WithdrawalHash: withdrawal.WithdrawalHash,
 	}, nil
 }

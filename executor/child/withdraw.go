@@ -52,8 +52,21 @@ func (ch *Child) initiateWithdrawalHandler(args nodetypes.EventHandlerArgs) erro
 }
 
 func (ch *Child) handleInitiateWithdrawal(l2Sequence uint64, from string, to string, baseDenom string, amount uint64) error {
-	withdrawal := ophosttypes.GenerateWithdrawalHash(ch.BridgeId(), l2Sequence, from, to, baseDenom, amount)
-	err := ch.mk.InsertLeaf(withdrawal[:], false)
+	withdrawalHash := ophosttypes.GenerateWithdrawalHash(ch.BridgeId(), l2Sequence, from, to, baseDenom, amount)
+	data := executortypes.WithdrawalData{
+		Sequence:       l2Sequence,
+		From:           from,
+		To:             to,
+		Amount:         amount,
+		BaseDenom:      baseDenom,
+		WithdrawalHash: withdrawalHash[:],
+	}
+	dataBytes, err := json.Marshal(data)
+	if err != nil {
+		return err
+	}
+
+	err = ch.mk.InsertLeaf(dataBytes, false)
 	if err != nil {
 		return err
 	}
@@ -63,7 +76,7 @@ func (ch *Child) handleInitiateWithdrawal(l2Sequence uint64, from string, to str
 		zap.String("to", to),
 		zap.Uint64("amount", amount),
 		zap.String("base_denom", baseDenom),
-		zap.ByteString("withdrawal", withdrawal[:]),
+		zap.ByteString("withdrawal", withdrawalHash[:]),
 	)
 	return nil
 }
@@ -125,15 +138,14 @@ func (ch *Child) handleTree(blockHeight uint64, latestHeight uint64, blockId []b
 		if err != nil {
 			return nil, nil, err
 		}
+		ch.nextOutputTime = blockHeader.Time.Add(ch.bridgeInfo.BridgeConfig.SubmissionInterval * 2 / 3)
+		ch.finalizingBlockHeight = 0
+		ch.logger.Info("finalize tree", zap.Uint64("tree_index", ch.mk.GetWorkingTreeIndex()), zap.Uint64("height", blockHeight), zap.Uint64("num_leaves", ch.mk.GetWorkingTreeLeafCount()), zap.String("storage_root", base64.StdEncoding.EncodeToString(storageRoot)))
 
 		// does not submit output since it already submitted
 		if ch.finalizingBlockHeight == blockHeight {
 			storageRoot = nil
 		}
-
-		ch.nextOutputTime = blockHeader.Time.Add(ch.bridgeInfo.BridgeConfig.SubmissionInterval * 2 / 3)
-		ch.finalizingBlockHeight = 0
-		ch.logger.Info("finalize tree", zap.Uint64("tree_index", ch.mk.GetWorkingTreeIndex()), zap.Uint64("height", blockHeight), zap.Uint64("num_leaves", ch.mk.GetWorkingTreeLeafCount()), zap.String("storage_root", base64.StdEncoding.EncodeToString(storageRoot)))
 	}
 	err = ch.mk.SaveWorkingTree(blockHeight)
 	if err != nil {
