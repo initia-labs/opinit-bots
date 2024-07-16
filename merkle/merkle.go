@@ -2,6 +2,7 @@ package merkle
 
 import (
 	"encoding/json"
+	"errors"
 	"math/bits"
 
 	merkletypes "github.com/initia-labs/opinit-bots-go/merkle/types"
@@ -179,6 +180,9 @@ func (m *Merkle) GetProofs(leafIndex uint64) ([][]byte, uint64, []byte, []byte, 
 
 	proofs := make([][]byte, 0)
 	height := uint8(0)
+	if leafIndex < treeInfo.StartLeafIndex || leafIndex-treeInfo.StartLeafIndex >= treeInfo.LeafCount {
+		return nil, 0, nil, nil, errors.New("not found")
+	}
 	localIndex := leafIndex - treeInfo.StartLeafIndex
 
 	for height < treeInfo.TreeHeight {

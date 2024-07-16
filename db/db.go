@@ -85,7 +85,7 @@ func (db *LevelDB) PrefixedIterate(prefix []byte, cb func(key, value []byte) (st
 
 func (db *LevelDB) SeekPrevInclusiveKey(prefix []byte, key []byte) (k []byte, v []byte, err error) {
 	iter := db.db.NewIterator(util.BytesPrefix(db.PrefixedKey(prefix)), nil)
-	if iter.Seek(db.PrefixedKey(key)) || iter.Valid() && iter.Prev() {
+	if iter.Seek(db.PrefixedKey(key)) || iter.Valid() && iter.Prev() || iter.Last() && iter.Valid() {
 		k = db.UnprefixedKey(iter.Key())
 		v = iter.Value()
 	} else {
