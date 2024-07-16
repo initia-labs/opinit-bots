@@ -35,7 +35,7 @@ func (ch *Child) endBlockHandler(args nodetypes.EndBlockArgs) error {
 	batchKVs = append(batchKVs, treeKVs...)
 
 	if storageRoot != nil {
-		err = ch.handleOutput(blockHeight, ch.version, args.BlockID, storageRoot)
+		err = ch.handleOutput(blockHeight, ch.version, args.BlockID, ch.mk.GetWorkingTreeIndex(), storageRoot)
 		if err != nil {
 			return err
 		}

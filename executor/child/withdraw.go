@@ -154,7 +154,7 @@ func (ch *Child) handleTree(blockHeight uint64, latestHeight uint64, blockId []b
 	return kvs, storageRoot, nil
 }
 
-func (ch *Child) handleOutput(blockHeight uint64, version uint8, blockId []byte, storageRoot []byte) error {
+func (ch *Child) handleOutput(blockHeight uint64, version uint8, blockId []byte, outputIndex uint64, storageRoot []byte) error {
 	sender, err := ch.host.GetAddressStr()
 	if err != nil {
 		return err
@@ -164,6 +164,7 @@ func (ch *Child) handleOutput(blockHeight uint64, version uint8, blockId []byte,
 	msg := ophosttypes.NewMsgProposeOutput(
 		sender,
 		ch.BridgeId(),
+		outputIndex,
 		blockHeight,
 		outputRoot[:],
 	)
