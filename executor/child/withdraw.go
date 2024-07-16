@@ -61,12 +61,11 @@ func (ch *Child) handleInitiateWithdrawal(l2Sequence uint64, from string, to str
 		BaseDenom:      baseDenom,
 		WithdrawalHash: withdrawalHash[:],
 	}
-	dataBytes, err := json.Marshal(data)
+	err := ch.SetWithdrawal(l2Sequence, data)
 	if err != nil {
 		return err
 	}
-
-	err = ch.mk.InsertLeaf(dataBytes, false)
+	err = ch.mk.InsertLeaf(withdrawalHash[:], false)
 	if err != nil {
 		return err
 	}
@@ -175,4 +174,23 @@ func (ch *Child) handleOutput(blockHeight uint64, version uint8, blockId []byte,
 	}
 	ch.msgQueue = append(ch.msgQueue, msg)
 	return nil
+}
+
+func (ch *Child) GetWithdrawal(sequence uint64) (executortypes.WithdrawalData, error) {
+	dataBytes, err := ch.db.Get(executortypes.PrefixedWithdrawalKey(sequence))
+	if err != nil {
+		return executortypes.WithdrawalData{}, err
+	}
+	var data executortypes.WithdrawalData
+	err = json.Unmarshal(dataBytes, &data)
+	return data, err
+}
+
+func (ch *Child) SetWithdrawal(sequence uint64, data executortypes.WithdrawalData) error {
+	dataBytes, err := json.Marshal(&data)
+	if err != nil {
+		return err
+	}
+
+	return ch.db.Set(executortypes.PrefixedWithdrawalKey(sequence), dataBytes)
 }

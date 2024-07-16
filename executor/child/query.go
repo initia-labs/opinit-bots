@@ -50,17 +50,15 @@ func (ch Child) QueryNextL2Sequence(height uint64) (uint64, error) {
 }
 
 func (ch Child) QueryWithdrawal(sequence uint64) (executortypes.QueryWithdrawalResponse, error) {
-	withdrawalBytes, proofs, outputIndex, outputRoot, extraDataBytes, err := ch.mk.GetLeafWithProofs(sequence)
+	withdrawal, err := ch.GetWithdrawal(sequence)
 	if err != nil {
 		return executortypes.QueryWithdrawalResponse{}, err
 	}
 
-	var withdrawal executortypes.WithdrawalData
-	err = json.Unmarshal(withdrawalBytes, &withdrawal)
+	proofs, outputIndex, outputRoot, extraDataBytes, err := ch.mk.GetProofs(sequence)
 	if err != nil {
 		return executortypes.QueryWithdrawalResponse{}, err
 	}
-
 	amount := sdk.NewCoin(withdrawal.BaseDenom, math.NewIntFromUint64(withdrawal.Amount))
 
 	treeExtraData := executortypes.TreeExtraData{}
