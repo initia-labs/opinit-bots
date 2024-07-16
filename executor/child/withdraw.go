@@ -104,7 +104,8 @@ func (ch *Child) prepareOutput(blockHeight uint64, blockTime time.Time) error {
 	if ch.nextOutputTime.IsZero() && workingOutputIndex > 1 {
 		output, err := ch.host.QueryOutput(workingOutputIndex - 1)
 		if err != nil {
-			return err
+			// TODO: maybe not panic here and roll back
+			panic(fmt.Errorf("output does not exist at index: %d", workingOutputIndex-1))
 		}
 		ch.nextOutputTime = output.OutputProposal.L1BlockTime.Add(ch.bridgeInfo.BridgeConfig.SubmissionInterval * 2 / 3)
 	}
@@ -138,14 +139,14 @@ func (ch *Child) handleTree(blockHeight uint64, latestHeight uint64, blockId []b
 		if err != nil {
 			return nil, nil, err
 		}
-		ch.nextOutputTime = blockHeader.Time.Add(ch.bridgeInfo.BridgeConfig.SubmissionInterval * 2 / 3)
-		ch.finalizingBlockHeight = 0
 		ch.logger.Info("finalize tree", zap.Uint64("tree_index", ch.mk.GetWorkingTreeIndex()), zap.Uint64("height", blockHeight), zap.Uint64("num_leaves", ch.mk.GetWorkingTreeLeafCount()), zap.String("storage_root", base64.StdEncoding.EncodeToString(storageRoot)))
 
 		// does not submit output since it already submitted
 		if ch.finalizingBlockHeight == blockHeight {
 			storageRoot = nil
 		}
+		ch.finalizingBlockHeight = 0
+		ch.nextOutputTime = blockHeader.Time.Add(ch.bridgeInfo.BridgeConfig.SubmissionInterval * 2 / 3)
 	}
 	err = ch.mk.SaveWorkingTree(blockHeight)
 	if err != nil {

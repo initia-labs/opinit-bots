@@ -105,6 +105,9 @@ func (ch *Child) registerHandlers() {
 }
 
 func (ch Child) BroadcastMsgs(msgs nodetypes.ProcessedMsgs) {
+	if !ch.node.HasKey() {
+		return
+	}
 	ch.node.BroadcastMsgs(msgs)
 }
 

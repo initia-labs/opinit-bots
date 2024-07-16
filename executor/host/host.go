@@ -23,6 +23,7 @@ type childNode interface {
 	HasKey() bool
 	BroadcastMsgs(nodetypes.ProcessedMsgs)
 	RawKVProcessedData([]nodetypes.ProcessedMsgs, bool) ([]types.KV, error)
+	QueryNextL1Sequence() (uint64, error)
 }
 
 type Host struct {
@@ -31,7 +32,8 @@ type Host struct {
 	node  *node.Node
 	child childNode
 
-	bridgeId int64
+	bridgeId          int64
+	initialL1Sequence uint64
 
 	cfg    nodetypes.NodeConfig
 	db     types.DB
@@ -72,11 +74,17 @@ func NewHost(version uint8, cfg nodetypes.NodeConfig, db types.DB, logger *zap.L
 	return h
 }
 
-func (h *Host) Initialize(child childNode, bridgeId int64) {
+func (h *Host) Initialize(child childNode, bridgeId int64) (err error) {
 	h.child = child
 	h.bridgeId = bridgeId
 
+	h.initialL1Sequence, err = h.child.QueryNextL1Sequence()
+	if err != nil {
+		return err
+	}
+
 	h.registerHandlers()
+	return nil
 }
 
 func (h *Host) Start(ctx context.Context) {
@@ -93,6 +101,9 @@ func (h *Host) registerHandlers() {
 }
 
 func (h Host) BroadcastMsgs(msgs nodetypes.ProcessedMsgs) {
+	if !h.node.HasKey() {
+		return
+	}
 	h.node.BroadcastMsgs(msgs)
 }
 

@@ -53,6 +53,10 @@ func (h *Host) initiateDepositHandler(args nodetypes.EventHandlerArgs) error {
 			}
 		}
 	}
+	if l1Sequence < h.initialL1Sequence {
+		// pass old deposit event
+		return nil
+	}
 
 	msg, err := h.handleInitiateDeposit(
 		l1Sequence,

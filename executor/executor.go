@@ -57,7 +57,10 @@ func NewExecutor(cfg *executortypes.Config, db types.DB, sv *server.Server, logg
 	executor.logger.Info("bridge info", zap.Uint64("id", bridgeInfo.BridgeId), zap.Duration("submission_interval", bridgeInfo.BridgeConfig.SubmissionInterval))
 
 	executor.child.Initialize(executor.host, bridgeInfo)
-	executor.host.Initialize(executor.child, int64(bridgeInfo.BridgeId))
+	err = executor.host.Initialize(executor.child, int64(bridgeInfo.BridgeId))
+	if err != nil {
+		panic(err)
+	}
 	executor.RegisterQuerier()
 	return executor
 }

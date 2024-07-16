@@ -42,7 +42,7 @@ func (ch *Child) endBlockHandler(args nodetypes.EndBlockArgs) error {
 	}
 	// temporary 50 limit for msg queue
 	// collect more msgs if block height is not latest
-	if blockHeight != args.LatestHeight && len(ch.msgQueue) <= 10 {
+	if blockHeight != args.LatestHeight && len(ch.msgQueue) > 0 && len(ch.msgQueue) <= 10 {
 		return ch.db.RawBatchSet(batchKVs...)
 	}
 

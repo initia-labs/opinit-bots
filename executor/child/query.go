@@ -29,6 +29,16 @@ func (ch Child) QueryBridgeInfo() (opchildtypes.BridgeInfo, error) {
 	return res.BridgeInfo, nil
 }
 
+func (ch Child) QueryNextL1Sequence() (uint64, error) {
+	req := &opchildtypes.QueryNextL1SequenceRequest{}
+	ctx := node.GetQueryContext(0)
+	res, err := ch.opchildQueryClient.NextL1Sequence(ctx, req)
+	if err != nil {
+		return 0, err
+	}
+	return res.NextL1Sequence, nil
+}
+
 func (ch Child) QueryNextL2Sequence(height uint64) (uint64, error) {
 	req := &opchildtypes.QueryNextL2SequenceRequest{}
 	ctx := node.GetQueryContext(height)

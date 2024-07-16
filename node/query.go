@@ -2,6 +2,7 @@ package node
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"reflect"
 	"strconv"
@@ -126,7 +127,7 @@ func (n *Node) QueryABCI(ctx context.Context, req abci.RequestQuery) (abci.Respo
 	}
 
 	if !result.Response.IsOK() {
-		return abci.ResponseQuery{}, sdkerrors.ABCIError(result.Response.Codespace, result.Response.Code, result.Response.Log)
+		return abci.ResponseQuery{}, errors.New(result.Response.Log)
 	}
 
 	return result.Response, nil

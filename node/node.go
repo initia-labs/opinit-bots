@@ -157,33 +157,34 @@ func (n *Node) prepareBroadcaster(lastBlockHeight uint64, lastBlockTime time.Tim
 	}
 	// TODO: handle mismatched sequence & pending txs
 	if len(loadedPendingTxs) > 0 {
-		lastSavedSequence := loadedPendingTxs[len(loadedPendingTxs)-1].Sequence
-
 		pendingTxTime := time.Unix(0, loadedPendingTxs[0].Timestamp)
-		if lastBlockTime.After(pendingTxTime.Add(nodetypes.TX_TIMEOUT)) {
-			// delete existing pending txs
-			pendingKVs, err := n.RawKVPendingTxs(loadedPendingTxs, true)
+
+		// if we have pending txs, wait until timeout
+		if lastBlockTime.Before(pendingTxTime.Add(nodetypes.TX_TIMEOUT)) {
+			timer := time.NewTimer(pendingTxTime.Add(nodetypes.TX_TIMEOUT).Sub(lastBlockTime))
+			<-timer.C
+		}
+
+		// delete existing pending txs
+		pendingKVs, err := n.RawKVPendingTxs(loadedPendingTxs, true)
+		if err != nil {
+			return err
+		}
+		dbBatchKVs = append(dbBatchKVs, pendingKVs...)
+
+		// convert pending txs to pending msgs
+		for _, txInfo := range loadedPendingTxs {
+			tx, err := n.DecodeTx(txInfo.Tx)
 			if err != nil {
 				return err
 			}
-			dbBatchKVs = append(dbBatchKVs, pendingKVs...)
-
-			// convert pending txs to pending msgs
-			for _, txInfo := range loadedPendingTxs {
-				tx, err := n.DecodeTx(txInfo.Tx)
-				if err != nil {
-					return err
-				}
-				if txInfo.Save {
-					n.pendingProcessedData = append(n.pendingProcessedData, nodetypes.ProcessedMsgs{
-						Msgs: tx.GetMsgs(),
-						Save: txInfo.Save,
-					})
-				}
+			if txInfo.Save {
+				n.pendingProcessedData = append(n.pendingProcessedData, nodetypes.ProcessedMsgs{
+					Msgs:      tx.GetMsgs(),
+					Timestamp: time.Now().UnixNano(),
+					Save:      txInfo.Save,
+				})
 			}
-		} else {
-			n.pendingTxs = loadedPendingTxs
-			n.txf = n.txf.WithSequence(lastSavedSequence + 1)
 		}
 
 		for i, pendingTx := range loadedPendingTxs {
@@ -195,13 +196,20 @@ func (n *Node) prepareBroadcaster(lastBlockHeight uint64, lastBlockTime time.Tim
 	if err != nil {
 		return err
 	}
+	kvProcessedData, err := n.RawKVProcessedData(loadedProcessedData, true)
+	if err != nil {
+		return err
+	}
+	dbBatchKVs = append(dbBatchKVs, kvProcessedData...)
+
 	for i, pendingMsgs := range loadedProcessedData {
+		loadedProcessedData[i].Timestamp = time.Now().UnixNano()
 		n.logger.Debug("pending msgs", zap.Int("index", i), zap.String("msgs", pendingMsgs.String()))
 	}
 
 	n.pendingProcessedData = append(n.pendingProcessedData, loadedProcessedData...)
 
-	kvProcessedData, err := n.RawKVProcessedData(n.pendingProcessedData, false)
+	kvProcessedData, err = n.RawKVProcessedData(n.pendingProcessedData, false)
 	if err != nil {
 		return err
 	}

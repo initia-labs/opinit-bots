@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"math"
 	"regexp"
+	"strconv"
+	"strings"
 
-	"cosmossdk.io/errors"
+	sdkerrors "cosmossdk.io/errors"
 	abci "github.com/cometbft/cometbft/abci/types"
 	comettypes "github.com/cometbft/cometbft/types"
 	"github.com/cosmos/cosmos-sdk/client/tx"
@@ -19,9 +21,18 @@ import (
 	authsigning "github.com/cosmos/cosmos-sdk/x/auth/signing"
 	nodetypes "github.com/initia-labs/opinit-bots-go/node/types"
 	"go.uber.org/zap"
+
+	opchildtypes "github.com/initia-labs/OPinit/x/opchild/types"
 )
 
+var ignoringErrors = []error{
+	opchildtypes.ErrOracleTimestampNotExists,
+	opchildtypes.ErrOracleValidatorsNotRegistered,
+	opchildtypes.ErrInvalidOracleHeight,
+	opchildtypes.ErrInvalidOracleTimestamp,
+}
 var accountSeqRegex = regexp.MustCompile("account sequence mismatch, expected ([0-9]+), got ([0-9]+)")
+var outputIndexRegex = regexp.MustCompile("expected ([0-9]+), got ([0-9]+): invalid output index")
 
 func (n *Node) txBroadcastLooper(ctx context.Context) error {
 	for {
@@ -30,24 +41,53 @@ func (n *Node) txBroadcastLooper(ctx context.Context) error {
 			return nil
 		case data := <-n.txChannel:
 			err := n.handleProcessedMsgs(ctx, data)
-			if err != nil {
-				if accountSeqRegex.FindStringSubmatch(err.Error()) != nil {
-					// account sequence mismatched
-					// TODO: not panic, but handle mismatched sequence
-					panic(err)
-				}
-
-				n.logger.Error("failed to handle processed msgs", zap.String("error", err.Error()))
+			if err != nil && n.handleMsgError(err) != nil {
+				return err
 			}
 		}
 	}
+}
+
+func (n *Node) handleMsgError(err error) error {
+	if accountSeqRegex.FindStringSubmatch(err.Error()) != nil {
+		// account sequence mismatched
+		// TODO: not panic, but handle mismatched sequence
+		panic(err)
+	}
+
+	if strs := outputIndexRegex.FindStringSubmatch(err.Error()); strs != nil {
+		expected, parseErr := strconv.ParseInt(strs[0], 10, 64)
+		if parseErr != nil {
+			return parseErr
+		}
+		got, parseErr := strconv.ParseInt(strs[1], 10, 64)
+		if parseErr != nil {
+			return parseErr
+		}
+
+		if expected > got {
+			n.logger.Warn("ignoring error", zap.String("error", err.Error()))
+			return nil
+		}
+		panic(err)
+	}
+
+	for _, e := range ignoringErrors {
+		if strings.Contains(err.Error(), e.Error()) {
+			n.logger.Warn("ignoring error", zap.String("error", e.Error()))
+			return nil
+		}
+	}
+	// n.logger.Error("failed to handle processed msgs", zap.String("error", err.Error()))
+	// TODO: not panic, handle error
+	panic(err)
 }
 
 func (n *Node) handleProcessedMsgs(ctx context.Context, data nodetypes.ProcessedMsgs) error {
 	sequence := n.txf.Sequence()
 	txBytes, err := n.buildMessages(ctx, data.Msgs)
 	if err != nil {
-		return errors.Wrapf(err, "simulation failed")
+		return sdkerrors.Wrapf(err, "simulation failed")
 	}
 
 	res, err := n.BroadcastTxSync(ctx, txBytes)
