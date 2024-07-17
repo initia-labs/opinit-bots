@@ -52,7 +52,7 @@ func (n *Node) GetAccountWithHeight(_ client.Context, addr sdk.AccAddress) (clie
 		return nil, 0, fmt.Errorf("failed to parse block height: %w", err)
 	}
 
-	var acc authtypes.AccountI
+	var acc authtypes.AccountI //nolint:staticcheck
 	if err := n.cdc.UnpackAny(res.Account, &acc); err != nil {
 		return nil, 0, err
 	}

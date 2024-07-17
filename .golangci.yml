@@ -1,0 +1,47 @@
+linters:
+  enable:
+    - asciicheck
+    - bodyclose
+    - dogsled
+    - dupl
+    - errcheck
+    - exportloopref
+    - goconst
+    - gofmt
+    - goimports
+    - gosec
+    - gosimple
+    - govet
+    - ineffassign
+    - misspell
+    # - nakedret
+    - nolintlint
+    # - prealloc
+    - staticcheck
+    # - structcheck // to be fixed by golangci-lint
+    - stylecheck
+    - typecheck
+    - unconvert
+    - unused
+
+issues:
+  exclude-rules:
+    - path: _test\.go
+      linters:
+        - gosec
+    - linters:
+        - stylecheck
+      text: "ST1003:"
+  max-same-issues: 50
+
+linters-settings:
+  dogsled:
+    max-blank-identifiers: 3
+  #golint:
+  #  min-confidence: 0
+  goconst:
+    ignore-tests: true
+  #maligned:
+  #  suggest-new: true
+  misspell:
+    locale: US

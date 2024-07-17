@@ -51,6 +51,9 @@ type Node struct {
 
 func NewNode(name string, cfg NodeConfig, logger *zap.Logger, cdc codec.Codec, txConfig client.TxConfig) (*Node, error) {
 	client, err := client.NewClientFromNode(cfg.RPC)
+	if err != nil {
+		return nil, err
+	}
 
 	// Use memory keyring for now
 	// TODO: may use os keyring later

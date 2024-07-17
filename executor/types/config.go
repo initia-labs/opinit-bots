@@ -46,7 +46,7 @@ func (cfg Config) Validate() error {
 	}
 
 	if cfg.BridgeId == 0 {
-		return errors.New("Bridge ID is required")
+		return errors.New("Bridge ID is required") //nolint:stylecheck
 	}
 
 	return nil

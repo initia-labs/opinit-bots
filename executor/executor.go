@@ -60,10 +60,21 @@ func NewExecutor(cfg *types.Config, logger *zap.Logger, cdc codec.Codec, txConfi
 
 func (ex Executor) Start(cmdCtx context.Context) error {
 	hostCtx, hostDone := context.WithCancel(cmdCtx)
-	go ex.hostNode.BlockProcessLooper(hostCtx)
+	go func() {
+		err := ex.hostNode.BlockProcessLooper(hostCtx)
+		if err != nil {
+			panic(err)
+		}
+	}()
 	go ex.hostNode.TxBroadCastLooper(hostCtx)
+
 	childCtx, childDone := context.WithCancel(cmdCtx)
-	go ex.childNode.BlockProcessLooper(childCtx)
+	go func() {
+		err := ex.childNode.BlockProcessLooper(childCtx)
+		if err != nil {
+			panic(err)
+		}
+	}()
 	go ex.childNode.TxBroadCastLooper(childCtx)
 
 	<-cmdCtx.Done()
