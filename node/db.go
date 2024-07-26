@@ -63,14 +63,10 @@ func (n *Node) loadPendingTxs() (txs []nodetypes.PendingTxInfo, err error) {
 func (n *Node) RawKVPendingTxs(txInfos []nodetypes.PendingTxInfo, delete bool) ([]types.KV, error) {
 	kvs := make([]types.KV, 0, len(txInfos))
 	for _, txInfo := range txInfos {
-		if !txInfo.Save {
-			continue
-		}
-
 		var data []byte
 		var err error
 
-		if !delete {
+		if !delete && txInfo.Save {
 			data, err = txInfo.Marshal()
 			if err != nil {
 				return nil, err
@@ -87,14 +83,10 @@ func (n *Node) RawKVPendingTxs(txInfos []nodetypes.PendingTxInfo, delete bool) (
 func (n *Node) RawKVProcessedData(processedData []nodetypes.ProcessedMsgs, delete bool) ([]types.KV, error) {
 	kvs := make([]types.KV, 0, len(processedData))
 	for _, processedMsgs := range processedData {
-		if !processedMsgs.Save {
-			continue
-		}
-
 		var data []byte
 		var err error
 
-		if !delete {
+		if !delete && processedMsgs.Save {
 			data, err = processedMsgs.Marshal()
 			if err != nil {
 				return nil, err
