@@ -7,7 +7,6 @@ import (
 
 	"errors"
 
-	rpchttp "github.com/cometbft/cometbft/rpc/client/http"
 	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/client/tx"
 	"github.com/cosmos/cosmos-sdk/codec"
@@ -15,13 +14,14 @@ import (
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/tx/signing"
+	clienthttp "github.com/initia-labs/opinit-bots-go/client"
 	nodetypes "github.com/initia-labs/opinit-bots-go/node/types"
 	"github.com/initia-labs/opinit-bots-go/types"
 	"go.uber.org/zap"
 )
 
 type Node struct {
-	*rpchttp.HTTP
+	*clienthttp.HTTP
 
 	cfg    nodetypes.NodeConfig
 	db     types.DB
@@ -48,8 +48,10 @@ type Node struct {
 }
 
 func NewNode(cfg nodetypes.NodeConfig, db types.DB, logger *zap.Logger, cdc codec.Codec, txConfig client.TxConfig) (*Node, error) {
-	client, err := client.NewClientFromNode(cfg.RPC)
-
+	client, err := clienthttp.New(cfg.RPC, "/websocket")
+	if err != nil {
+		return nil, err
+	}
 	// Use memory keyring for now
 	// TODO: may use os keyring later
 	keyBase, err := keyring.New(cfg.ChainID, "memory", "", nil, cdc)
@@ -92,7 +94,7 @@ func NewNode(cfg nodetypes.NodeConfig, db types.DB, logger *zap.Logger, cdc code
 	}
 
 	if n.HasKey() {
-		err := n.prepareBroadcaster(uint64(status.SyncInfo.LatestBlockHeight), status.SyncInfo.LatestBlockTime)
+		err := n.prepareBroadcaster(status.SyncInfo.LatestBlockTime)
 		if err != nil {
 			return nil, err
 		}
@@ -117,7 +119,7 @@ func (n Node) HasKey() bool {
 	return true
 }
 
-func (n *Node) prepareBroadcaster(lastBlockHeight uint64, lastBlockTime time.Time) error {
+func (n *Node) prepareBroadcaster(lastBlockTime time.Time) error {
 	_, err := n.keyBase.NewAccount(nodetypes.KEY_NAME, n.cfg.Mnemonic, "", hd.CreateHDPath(sdk.GetConfig().GetCoinType(), 0, 0).String(), hd.Secp256k1)
 	if err != nil {
 		return err

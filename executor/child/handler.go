@@ -8,9 +8,9 @@ import (
 )
 
 func (ch *Child) beginBlockHandler(args nodetypes.BeginBlockArgs) (err error) {
-	blockHeight := uint64(args.BlockHeader.Height)
+	blockHeight := uint64(args.Block.Header.Height)
 	// just to make sure that childMsgQueue is empty
-	if blockHeight == args.LatestHeight && len(ch.msgQueue) != 0 && len(ch.processedMsgs) != 0 {
+	if blockHeight == args.LatestHeight && len(ch.msgQueue) != 0 && len(ch.processedMsgs) != 0 && len(ch.batchProcessedMsgs) != 0 {
 		panic("must not happen, msgQueue should be empty")
 	}
 
@@ -18,7 +18,11 @@ func (ch *Child) beginBlockHandler(args nodetypes.BeginBlockArgs) (err error) {
 	if err != nil {
 		return err
 	}
-	err = ch.prepareOutput(blockHeight, args.BlockHeader.Time)
+	err = ch.prepareOutput()
+	if err != nil {
+		return err
+	}
+	err = ch.prepareBatch(blockHeight)
 	if err != nil {
 		return err
 	}
@@ -26,21 +30,29 @@ func (ch *Child) beginBlockHandler(args nodetypes.BeginBlockArgs) (err error) {
 }
 
 func (ch *Child) endBlockHandler(args nodetypes.EndBlockArgs) error {
-	blockHeight := uint64(args.BlockHeader.Height)
+	blockHeight := uint64(args.Block.Header.Height)
 	batchKVs := make([]types.KV, 0)
-	treeKVs, storageRoot, err := ch.handleTree(blockHeight, uint64(args.LatestHeight), args.BlockID, args.BlockHeader)
+	treeKVs, storageRoot, err := ch.handleTree(blockHeight, uint64(args.LatestHeight), args.BlockID, args.Block.Header)
 	if err != nil {
 		return err
 	}
 	batchKVs = append(batchKVs, treeKVs...)
+
+	err = ch.handleBatch(&args.Block)
+	if err != nil {
+		return err
+	}
 
 	if storageRoot != nil {
 		err = ch.handleOutput(blockHeight, ch.version, args.BlockID, ch.mk.GetWorkingTreeIndex(), storageRoot)
 		if err != nil {
 			return err
 		}
+		err = ch.finalizeBatch(blockHeight)
+		if err != nil {
+			return err
+		}
 	}
-	// temporary 50 limit for msg queue
 	// collect more msgs if block height is not latest
 	if blockHeight != args.LatestHeight && len(ch.msgQueue) > 0 && len(ch.msgQueue) <= 10 {
 		return ch.db.RawBatchSet(batchKVs...)
@@ -63,6 +75,12 @@ func (ch *Child) endBlockHandler(args nodetypes.EndBlockArgs) error {
 		batchKVs = append(batchKVs, msgkvs...)
 	}
 
+	batchMsgkvs, err := ch.da.RawKVProcessedData(ch.batchProcessedMsgs, false)
+	if err != nil {
+		return err
+	}
+	batchKVs = append(batchKVs, batchMsgkvs...)
+
 	err = ch.db.RawBatchSet(batchKVs...)
 	if err != nil {
 		return err
@@ -74,5 +92,6 @@ func (ch *Child) endBlockHandler(args nodetypes.EndBlockArgs) error {
 
 	ch.msgQueue = ch.msgQueue[:0]
 	ch.processedMsgs = ch.processedMsgs[:0]
+	ch.batchProcessedMsgs = ch.batchProcessedMsgs[:0]
 	return nil
 }

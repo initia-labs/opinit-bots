@@ -7,13 +7,15 @@ import (
 )
 
 type Config struct {
+	Version   uint8                `json:"version"`
 	HostNode  nodetypes.NodeConfig `json:"host_node"`
 	ChildNode nodetypes.NodeConfig `json:"child_node"`
-	Version   uint8                `json:"version"`
+	Batch     BatchConfig          `json:"batch"`
 }
 
 func DefaultConfig() *Config {
 	return &Config{
+		Version: 1,
 		HostNode: nodetypes.NodeConfig{
 			RPC:     "tcp://localhost:26657",
 			ChainID: "localhost",
@@ -24,7 +26,6 @@ func DefaultConfig() *Config {
 			Mnemonic: "",
 			GasPrice: "0.15umin",
 		},
-		Version: 1,
 	}
 }
 
@@ -48,6 +49,10 @@ func (cfg Config) Validate() error {
 	if cfg.Version == 0 {
 		return errors.New("Bridge ID is required")
 	}
-
 	return nil
+}
+
+type BatchConfig struct {
+	DANode       nodetypes.NodeConfig `json:"da_node"`
+	MaxBatchSize int64                `json:"max_batch_size"`
 }

@@ -149,3 +149,8 @@ func GetQueryContext(height uint64) context.Context {
 	ctx = metadata.AppendToOutgoingContext(ctx, grpctypes.GRPCBlockHeightHeader, strHeight)
 	return ctx
 }
+
+func (n *Node) QueryRawCommit(height int64) ([]byte, error) {
+	ctx := GetQueryContext(uint64(height))
+	return n.RawCommit(ctx, &height)
+}

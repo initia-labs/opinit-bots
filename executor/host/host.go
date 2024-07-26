@@ -5,6 +5,7 @@ import (
 
 	"cosmossdk.io/core/address"
 	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
+	executortypes "github.com/initia-labs/opinit-bots-go/executor/types"
 	nodetypes "github.com/initia-labs/opinit-bots-go/node/types"
 	"github.com/initia-labs/opinit-bots-go/types"
 	"go.uber.org/zap"
@@ -25,6 +26,8 @@ type childNode interface {
 	RawKVProcessedData([]nodetypes.ProcessedMsgs, bool) ([]types.KV, error)
 	QueryNextL1Sequence() (uint64, error)
 }
+
+var _ executortypes.DANode = &Host{}
 
 type Host struct {
 	version uint8

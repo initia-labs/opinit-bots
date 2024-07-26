@@ -2,6 +2,7 @@ package types
 
 import (
 	abcitypes "github.com/cometbft/cometbft/abci/types"
+	cmtproto "github.com/cometbft/cometbft/proto/tendermint/types"
 	comettypes "github.com/cometbft/cometbft/types"
 )
 
@@ -25,7 +26,7 @@ type TxHandlerFn func(TxHandlerArgs) error
 
 type BeginBlockArgs struct {
 	BlockID      []byte
-	BlockHeader  comettypes.Header
+	Block        cmtproto.Block
 	LatestHeight uint64
 }
 
@@ -33,7 +34,7 @@ type BeginBlockHandlerFn func(BeginBlockArgs) error
 
 type EndBlockArgs struct {
 	BlockID      []byte
-	BlockHeader  comettypes.Header
+	Block        cmtproto.Block
 	LatestHeight uint64
 }
 

@@ -32,8 +32,8 @@ func (n *Node) blockProcessLooper(ctx context.Context) error {
 			continue
 		}
 
-		// TODO: may fetch blocks in batch
-		for queryHeight := n.lastProcessedBlockHeight + 1; queryHeight <= latestChainHeight; queryHeight++ {
+		for queryHeight := n.lastProcessedBlockHeight + 1; queryHeight <= latestChainHeight; {
+			// TODO: may fetch blocks in batch
 			block, blockResult, err := n.fetchNewBlock(ctx, int64(queryHeight))
 			if err != nil {
 				// TODO: handle error
@@ -47,6 +47,7 @@ func (n *Node) blockProcessLooper(ctx context.Context) error {
 				n.logger.Error("failed to handle new block", zap.String("error", err.Error()))
 				break
 			}
+			queryHeight++
 			n.lastProcessedBlockHeight = queryHeight
 		}
 	}
@@ -69,6 +70,10 @@ func (n *Node) fetchNewBlock(ctx context.Context, height int64) (block *rpccoret
 }
 
 func (n *Node) handleNewBlock(block *rpccoretypes.ResultBlock, blockResult *rpccoretypes.ResultBlockResults, latestChainHeight uint64) error {
+	protoBlock, err := block.Block.ToProto()
+	if err != nil {
+		return err
+	}
 	// check pending txs first
 	// TODO: may handle pending txs with same level of other handlers
 	for _, tx := range block.Block.Txs {
@@ -95,7 +100,7 @@ func (n *Node) handleNewBlock(block *rpccoretypes.ResultBlock, blockResult *rpcc
 	if n.beginBlockHandler != nil {
 		err := n.beginBlockHandler(nodetypes.BeginBlockArgs{
 			BlockID:      block.BlockID.Hash,
-			BlockHeader:  block.Block.Header,
+			Block:        *protoBlock,
 			LatestHeight: latestChainHeight,
 		})
 		if err != nil {
@@ -130,7 +135,7 @@ func (n *Node) handleNewBlock(block *rpccoretypes.ResultBlock, blockResult *rpcc
 	if n.endBlockHandler != nil {
 		err := n.endBlockHandler(nodetypes.EndBlockArgs{
 			BlockID:      block.BlockID.Hash,
-			BlockHeader:  block.Block.Header,
+			Block:        *protoBlock,
 			LatestHeight: latestChainHeight,
 		})
 		if err != nil {

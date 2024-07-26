@@ -43,3 +43,11 @@ func (h Host) QueryOutput(outputIndex uint64) (*ophosttypes.QueryOutputProposalR
 	ctx := node.GetQueryContext(0)
 	return h.ophostQueryClient.OutputProposal(ctx, req)
 }
+
+func (h Host) QueryBatchInfos() (*ophosttypes.QueryBatchInfosResponse, error) {
+	req := &ophosttypes.QueryBatchInfosRequest{
+		BridgeId: uint64(h.bridgeId),
+	}
+	ctx := node.GetQueryContext(0)
+	return h.ophostQueryClient.BatchInfos(ctx, req)
+}

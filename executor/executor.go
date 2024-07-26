@@ -39,7 +39,7 @@ func NewExecutor(cfg *executortypes.Config, db types.DB, sv *server.Server, logg
 
 	executor := &Executor{
 		host:  host.NewHost(cfg.Version, cfg.HostNode, db.WithPrefix([]byte(executortypes.HostNodeName)), logger.Named(executortypes.HostNodeName), cdc, txConfig),
-		child: child.NewChild(cfg.Version, cfg.ChildNode, db.WithPrefix([]byte(executortypes.ChildNodeName)), logger.Named(executortypes.ChildNodeName), cdc, txConfig),
+		child: child.NewChild(cfg.Version, cfg.ChildNode, cfg.Batch, db.WithPrefix([]byte(executortypes.ChildNodeName)), logger.Named(executortypes.ChildNodeName), cdc, txConfig),
 
 		cfg:    cfg,
 		db:     db,
@@ -56,7 +56,18 @@ func NewExecutor(cfg *executortypes.Config, db types.DB, sv *server.Server, logg
 	}
 	executor.logger.Info("bridge info", zap.Uint64("id", bridgeInfo.BridgeId), zap.Duration("submission_interval", bridgeInfo.BridgeConfig.SubmissionInterval))
 
-	executor.child.Initialize(executor.host, bridgeInfo)
+	da := executor.host
+	// if cfg.Batch.DANode.ChainID != cfg.HostNode.ChainID {
+	// 	switch cfg.Batch.DANode.ChainID {
+	// 	case "celestia":
+	// 		da = celestia.NewCelestia()
+	// 	}
+	// }
+
+	err = executor.child.Initialize(executor.host, da, bridgeInfo)
+	if err != nil {
+		panic(err)
+	}
 	err = executor.host.Initialize(executor.child, int64(bridgeInfo.BridgeId))
 	if err != nil {
 		panic(err)
