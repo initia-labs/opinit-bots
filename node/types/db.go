@@ -14,7 +14,11 @@ type PendingTxInfo struct {
 	Tx              []byte `json:"tx"`
 	TxHash          string `json:"tx_hash"`
 	Timestamp       int64  `json:"timestamp"`
-	Save            bool   `json:"save"`
+
+	// Save is true if the pending tx should be saved until processed.
+	// Save is false if the pending tx can be discarded even if it is not processed
+	// like oracle tx.
+	Save bool `json:"save"`
 }
 
 func (p PendingTxInfo) Marshal() ([]byte, error) {
@@ -33,7 +37,11 @@ func (p PendingTxInfo) String() string {
 type ProcessedMsgs struct {
 	Msgs      []sdk.Msg `json:"msgs"`
 	Timestamp int64     `json:"timestamp"`
-	Save      bool      `json:"save"`
+
+	// Save is true if the processed msgs should be saved until processed.
+	// Save is false if the processed msgs can be discarded even if they are not processed
+	// like oracle msgs.
+	Save bool `json:"save"`
 }
 
 func (p ProcessedMsgs) Marshal() ([]byte, error) {

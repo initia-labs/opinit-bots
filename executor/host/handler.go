@@ -27,7 +27,7 @@ func (h *Host) endBlockHandler(args nodetypes.EndBlockArgs) error {
 	}
 
 	batchKVs := []types.KV{
-		h.node.RawKVSyncInfo(blockHeight),
+		h.node.SyncInfoToRawKV(blockHeight),
 	}
 	if h.node.HasKey() {
 		if len(h.msgQueue) != 0 {
@@ -38,7 +38,7 @@ func (h *Host) endBlockHandler(args nodetypes.EndBlockArgs) error {
 			})
 		}
 
-		msgkvs, err := h.child.RawKVProcessedData(h.processedMsgs, false)
+		msgkvs, err := h.child.ProcessedMsgsToRawKV(h.processedMsgs, false)
 		if err != nil {
 			return err
 		}

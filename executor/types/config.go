@@ -10,6 +10,7 @@ type Config struct {
 	HostNode  nodetypes.NodeConfig `json:"host_node"`
 	ChildNode nodetypes.NodeConfig `json:"child_node"`
 	Version   uint8                `json:"version"`
+	Address   string               `json:"address"`
 }
 
 func DefaultConfig() *Config {
@@ -25,6 +26,7 @@ func DefaultConfig() *Config {
 			GasPrice: "0.15umin",
 		},
 		Version: 1,
+		Address: "127.0.0.1:3000",
 	}
 }
 
@@ -46,7 +48,11 @@ func (cfg Config) Validate() error {
 	}
 
 	if cfg.Version == 0 {
-		return errors.New("Bridge ID is required")
+		return errors.New("version is required")
+	}
+
+	if cfg.Address == "" {
+		return errors.New("address is required")
 	}
 
 	return nil

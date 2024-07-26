@@ -22,7 +22,7 @@ type childNode interface {
 	AccountCodec() address.Codec
 	HasKey() bool
 	BroadcastMsgs(nodetypes.ProcessedMsgs)
-	RawKVProcessedData([]nodetypes.ProcessedMsgs, bool) ([]types.KV, error)
+	ProcessedMsgsToRawKV([]nodetypes.ProcessedMsgs, bool) ([]types.KV, error)
 	QueryNextL1Sequence() (uint64, error)
 }
 
@@ -87,8 +87,8 @@ func (h *Host) Initialize(child childNode, bridgeId int64) (err error) {
 	return nil
 }
 
-func (h *Host) Start(ctx context.Context) {
-	h.node.Start(ctx)
+func (h *Host) Start(ctx context.Context, errCh chan error) {
+	h.node.Start(ctx, errCh)
 }
 
 func (h *Host) registerHandlers() {
@@ -104,11 +104,12 @@ func (h Host) BroadcastMsgs(msgs nodetypes.ProcessedMsgs) {
 	if !h.node.HasKey() {
 		return
 	}
+
 	h.node.BroadcastMsgs(msgs)
 }
 
-func (h Host) RawKVProcessedData(msgs []nodetypes.ProcessedMsgs, delete bool) ([]types.KV, error) {
-	return h.node.RawKVProcessedData(msgs, delete)
+func (h Host) ProcessedMsgsToRawKV(msgs []nodetypes.ProcessedMsgs, delete bool) ([]types.KV, error) {
+	return h.node.ProcessedMsgsToRawKV(msgs, delete)
 }
 
 func (h *Host) SetBridgeId(brigeId int64) {

@@ -24,7 +24,9 @@ func (h Host) QueryLastOutput() (*ophosttypes.QueryOutputProposalResponse, error
 			Reverse: true,
 		},
 	}
-	ctx := node.GetQueryContext(0)
+	ctx, cancel := node.GetQueryContext(0)
+	defer cancel()
+
 	res, err := h.ophostQueryClient.OutputProposals(ctx, req)
 	if err != nil {
 		return nil, err
@@ -40,6 +42,8 @@ func (h Host) QueryOutput(outputIndex uint64) (*ophosttypes.QueryOutputProposalR
 		BridgeId:    uint64(h.bridgeId),
 		OutputIndex: outputIndex,
 	}
-	ctx := node.GetQueryContext(0)
+	ctx, cancel := node.GetQueryContext(0)
+	defer cancel()
+
 	return h.ophostQueryClient.OutputProposal(ctx, req)
 }

@@ -80,6 +80,7 @@ func (m *Merkle) LoadWorkingTree(version uint64) error {
 		m.SetNewWorkingTree(workingTree.Index+1, workingTree.StartLeafIndex+workingTree.LeafCount)
 		return nil
 	}
+
 	m.workingTree = workingTree
 	return nil
 }
@@ -90,17 +91,6 @@ func (m *Merkle) SaveWorkingTree(version uint64) error {
 		return err
 	}
 	return m.db.Set(merkletypes.PrefixedWorkingTreeKey(version), data)
-}
-
-func (m *Merkle) GetKVWorkingTree() (types.KV, error) {
-	data, err := json.Marshal(&m.workingTree)
-	if err != nil {
-		return types.KV{}, err
-	}
-	return types.KV{
-		Key:   merkletypes.WorkingTreeKey,
-		Value: data,
-	}, nil
 }
 
 func (m *Merkle) Height() uint8 {
@@ -131,6 +121,8 @@ func (m *Merkle) fillRestLeaves() ([]types.KV, error) {
 	leaf := m.workingTree.HeightData[0]
 
 	numRestLeaves := 1<<(m.Height()) - m.workingTree.LeafCount
+
+	//nolint:typecheck
 	for range numRestLeaves {
 		err := m.InsertLeaf(leaf, true)
 		if err != nil {
@@ -163,6 +155,7 @@ func (m *Merkle) InsertLeaf(data []byte, residue bool) error {
 	if !residue {
 		m.workingTree.LeafCount++
 	}
+
 	return nil
 }
 

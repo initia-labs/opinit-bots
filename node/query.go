@@ -141,11 +141,14 @@ func GetHeightFromMetadata(md metadata.MD) (int64, error) {
 	return 0, nil
 }
 
-func GetQueryContext(height uint64) context.Context {
+// Canceling this context releases resources associated with it, so code should
+// call cancel as soon as the operations running in this [Context] complete:
+func GetQueryContext(height uint64) (context.Context, context.CancelFunc) {
 	// TODO: configurable timeout
 	timeout := 10 * time.Second
-	ctx, _ := context.WithTimeout(context.Background(), timeout)
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+
 	strHeight := strconv.FormatUint(height, 10)
 	ctx = metadata.AppendToOutgoingContext(ctx, grpctypes.GRPCBlockHeightHeader, strHeight)
-	return ctx
+	return ctx, cancel
 }

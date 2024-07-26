@@ -12,8 +12,8 @@ func NewServer() *Server {
 	}
 }
 
-func (s *Server) Start() error {
-	return s.Listen(":3000")
+func (s *Server) Start(address string) error {
+	return s.Listen(address)
 }
 
 func (s *Server) RegisterQuerier(path string, fn func(c *fiber.Ctx) error) {

@@ -16,7 +16,7 @@ import (
 var _ client.AccountRetriever = &Node{}
 
 func (n *Node) loadAccount() error {
-	account, _, err := n.GetAccountWithHeight(n.getClientCtx(), n.keyAddress)
+	account, err := n.GetAccount(n.getClientCtx(), n.keyAddress)
 	if err != nil {
 		return err
 	}
@@ -62,6 +62,7 @@ func (n *Node) GetAccountWithHeight(_ client.Context, addr sdk.AccAddress) (clie
 		return nil, 0, fmt.Errorf("failed to parse block height: %w", err)
 	}
 
+	//nolint:staticcheck
 	var acc authtypes.AccountI
 	if err := n.cdc.UnpackAny(res.Account, &acc); err != nil {
 		return nil, 0, err

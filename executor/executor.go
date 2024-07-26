@@ -21,6 +21,9 @@ import (
 
 var _ bottypes.Bot = &Executor{}
 
+// Executor charges the execution of the bridge between the host and the child chain
+// - relay l1 deposit messages to l2
+// - generate l2 output root and submit to l1
 type Executor struct {
 	host  *host.Host
 	child *child.Child
@@ -76,14 +79,40 @@ func (ex *Executor) Start(cmdCtx context.Context) error {
 	hostCtx, hostDone := context.WithCancel(cmdCtx)
 	childCtx, childDone := context.WithCancel(cmdCtx)
 
-	ex.host.Start(hostCtx)
-	ex.child.Start(childCtx)
+	errCh := make(chan error, 3)
+	ex.host.Start(hostCtx, errCh)
+	ex.child.Start(childCtx, errCh)
 
-	err = ex.server.Start()
-	// TODO: safely shut down
-	hostDone()
-	childDone()
-	return err
+	go func() {
+		err := ex.server.Start(ex.cfg.Address)
+		if err != nil {
+			errCh <- err
+		}
+	}()
+
+	shutdown := func(err error) error {
+		ex.logger.Info("executor shutdown", zap.String("state", "requested"))
+
+		ex.logger.Debug("executor shutdown", zap.String("state", "wait"), zap.String("target", "api"))
+		ex.server.Shutdown()
+
+		ex.logger.Debug("executor shutdown", zap.String("state", "wait"), zap.String("target", "host"))
+		hostDone()
+
+		ex.logger.Debug("executor shutdown", zap.String("state", "wait"), zap.String("target", "child"))
+		childDone()
+
+		ex.logger.Info("executor shutdown completed")
+		return err
+	}
+
+	select {
+	case err := <-errCh:
+		ex.logger.Error("executor error", zap.String("error", err.Error()))
+		return shutdown(err)
+	case <-cmdCtx.Done():
+		return shutdown(nil)
+	}
 }
 
 func (ex *Executor) RegisterQuerier() {

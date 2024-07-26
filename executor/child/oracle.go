@@ -25,7 +25,9 @@ func (ch *Child) updateOracleHandler(args nodetypes.EventHandlerArgs) error {
 			from = attr.Value
 		}
 	}
+
 	ch.handleUpdateOracle(l1BlockHeight, from)
+
 	return nil
 }
 

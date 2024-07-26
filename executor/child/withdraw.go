@@ -3,11 +3,9 @@ package child
 import (
 	"encoding/base64"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"strconv"
 	"strings"
-	"time"
 
 	"cosmossdk.io/math"
 	opchildtypes "github.com/initia-labs/OPinit/x/opchild/types"
@@ -43,11 +41,13 @@ func (ch *Child) initiateWithdrawalHandler(args nodetypes.EventHandlerArgs) erro
 		case opchildtypes.AttributeKeyAmount:
 			coinAmount, ok := math.NewIntFromString(attr.Value)
 			if !ok {
-				return errors.New("invalid amount")
+				return fmt.Errorf("invalid amount %s", attr.Value)
 			}
+
 			amount = coinAmount.Uint64()
 		}
 	}
+
 	return ch.handleInitiateWithdrawal(l2Sequence, from, to, baseDenom, amount)
 }
 
@@ -61,14 +61,19 @@ func (ch *Child) handleInitiateWithdrawal(l2Sequence uint64, from string, to str
 		BaseDenom:      baseDenom,
 		WithdrawalHash: withdrawalHash[:],
 	}
+
+	// store to database
 	err := ch.SetWithdrawal(l2Sequence, data)
 	if err != nil {
 		return err
 	}
+
+	// generate merkle tree
 	err = ch.mk.InsertLeaf(withdrawalHash[:], false)
 	if err != nil {
 		return err
 	}
+
 	ch.logger.Info("initiate token withdrawal",
 		zap.Uint64("l2_sequence", l2Sequence),
 		zap.String("from", from),
@@ -77,6 +82,7 @@ func (ch *Child) handleInitiateWithdrawal(l2Sequence uint64, from string, to str
 		zap.String("base_denom", baseDenom),
 		zap.String("withdrawal", base64.StdEncoding.EncodeToString(withdrawalHash[:])),
 	)
+
 	return nil
 }
 
@@ -88,24 +94,27 @@ func (ch *Child) prepareTree(blockHeight uint64) error {
 
 	err := ch.mk.LoadWorkingTree(blockHeight - 1)
 	if err == dbtypes.ErrNotFound {
-		// must not happend
+		// must not happened
 		// TOOD: if user want to start from a specific height, we need to provide a way to do so
 		panic(fmt.Errorf("working tree not found at height: %d, current: %d", blockHeight-1, blockHeight))
 	} else if err != nil {
 		return err
 	}
+
 	return nil
 }
 
-func (ch *Child) prepareOutput(blockHeight uint64, blockTime time.Time) error {
+func (ch *Child) prepareOutput() error {
 	workingOutputIndex := ch.mk.GetWorkingTreeIndex()
+
 	// initialize next output time
 	if ch.nextOutputTime.IsZero() && workingOutputIndex > 1 {
 		output, err := ch.host.QueryOutput(workingOutputIndex - 1)
 		if err != nil {
-			// TODO: maybe not panic here and roll back
-			panic(fmt.Errorf("output does not exist at index: %d", workingOutputIndex-1))
+			// TODO: maybe not return error here and roll back
+			return fmt.Errorf("output does not exist at index: %d", workingOutputIndex-1)
 		}
+
 		ch.nextOutputTime = output.OutputProposal.L1BlockTime.Add(ch.bridgeInfo.BridgeConfig.SubmissionInterval * 2 / 3)
 	}
 
@@ -176,6 +185,7 @@ func (ch *Child) handleOutput(blockHeight uint64, version uint8, blockId []byte,
 	return nil
 }
 
+// GetWithdrawal returns the withdrawal data for the given sequence from the database
 func (ch *Child) GetWithdrawal(sequence uint64) (executortypes.WithdrawalData, error) {
 	dataBytes, err := ch.db.Get(executortypes.PrefixedWithdrawalKey(sequence))
 	if err != nil {
@@ -186,6 +196,7 @@ func (ch *Child) GetWithdrawal(sequence uint64) (executortypes.WithdrawalData, e
 	return data, err
 }
 
+// SetWithdrawal store the withdrawal data for the given sequence to the database
 func (ch *Child) SetWithdrawal(sequence uint64, data executortypes.WithdrawalData) error {
 	dataBytes, err := json.Marshal(&data)
 	if err != nil {

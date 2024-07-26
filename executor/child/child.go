@@ -26,7 +26,7 @@ type hostNode interface {
 	AccountCodec() address.Codec
 	HasKey() bool
 	BroadcastMsgs(nodetypes.ProcessedMsgs)
-	RawKVProcessedData([]nodetypes.ProcessedMsgs, bool) ([]types.KV, error)
+	ProcessedMsgsToRawKV([]nodetypes.ProcessedMsgs, bool) ([]types.KV, error)
 	QueryLastOutput() (*ophosttypes.QueryOutputProposalResponse, error)
 	QueryOutput(uint64) (*ophosttypes.QueryOutputProposalResponse, error)
 }
@@ -92,8 +92,8 @@ func (ch *Child) Initialize(host hostNode, bridgeInfo opchildtypes.BridgeInfo) {
 	ch.registerHandlers()
 }
 
-func (ch *Child) Start(ctx context.Context) {
-	ch.node.Start(ctx)
+func (ch *Child) Start(ctx context.Context, errCh chan error) {
+	ch.node.Start(ctx, errCh)
 }
 
 func (ch *Child) registerHandlers() {
@@ -108,11 +108,12 @@ func (ch Child) BroadcastMsgs(msgs nodetypes.ProcessedMsgs) {
 	if !ch.node.HasKey() {
 		return
 	}
+
 	ch.node.BroadcastMsgs(msgs)
 }
 
-func (ch Child) RawKVProcessedData(msgs []nodetypes.ProcessedMsgs, delete bool) ([]types.KV, error) {
-	return ch.node.RawKVProcessedData(msgs, delete)
+func (ch Child) ProcessedMsgsToRawKV(msgs []nodetypes.ProcessedMsgs, delete bool) ([]types.KV, error) {
+	return ch.node.ProcessedMsgsToRawKV(msgs, delete)
 }
 
 func (ch Child) BridgeId() uint64 {
