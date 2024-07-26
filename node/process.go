@@ -47,8 +47,8 @@ func (n *Node) blockProcessLooper(ctx context.Context) error {
 				n.logger.Error("failed to handle new block", zap.String("error", err.Error()))
 				break
 			}
-			queryHeight++
 			n.lastProcessedBlockHeight = queryHeight
+			queryHeight++
 		}
 	}
 }
