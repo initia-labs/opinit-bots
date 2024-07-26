@@ -22,7 +22,7 @@ func (ch *Child) beginBlockHandler(args nodetypes.BeginBlockArgs) (err error) {
 	if err != nil {
 		return err
 	}
-	err = ch.prepareBatch(blockHeight)
+	err = ch.prepareBatch(&args.Block)
 	if err != nil {
 		return err
 	}
@@ -48,10 +48,7 @@ func (ch *Child) endBlockHandler(args nodetypes.EndBlockArgs) error {
 		if err != nil {
 			return err
 		}
-		err = ch.finalizeBatch(blockHeight)
-		if err != nil {
-			return err
-		}
+		ch.batchHeader.End = blockHeight
 	}
 	// collect more msgs if block height is not latest
 	if blockHeight != args.LatestHeight && len(ch.msgQueue) > 0 && len(ch.msgQueue) <= 10 {
@@ -88,6 +85,10 @@ func (ch *Child) endBlockHandler(args nodetypes.EndBlockArgs) error {
 
 	for _, processedMsg := range ch.processedMsgs {
 		ch.host.BroadcastMsgs(processedMsg)
+	}
+
+	for _, processedMsg := range ch.batchProcessedMsgs {
+		ch.da.BroadcastMsgs(processedMsg)
 	}
 
 	ch.msgQueue = ch.msgQueue[:0]

@@ -14,7 +14,7 @@ import (
 )
 
 func (h *Host) initiateDepositHandler(args nodetypes.EventHandlerArgs) error {
-	var bridgeId int64
+	var bridgeId uint64
 	var l1Sequence uint64
 	var from, to, l1Denom, l2Denom, amount string
 	var data []byte
@@ -23,11 +23,11 @@ func (h *Host) initiateDepositHandler(args nodetypes.EventHandlerArgs) error {
 	for _, attr := range args.EventAttributes {
 		switch attr.Key {
 		case ophosttypes.AttributeKeyBridgeId:
-			bridgeId, err = strconv.ParseInt(attr.Value, 10, 64)
+			bridgeId, err = strconv.ParseUint(attr.Value, 10, 64)
 			if err != nil {
 				return err
 			}
-			if bridgeId != h.bridgeId {
+			if bridgeId != uint64(h.bridgeId) {
 				// pass other bridge deposit event
 				return nil
 			}

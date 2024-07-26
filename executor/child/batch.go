@@ -6,7 +6,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"io"
-	"os"
 	"time"
 
 	cmtproto "github.com/cometbft/cometbft/proto/tendermint/types"
@@ -17,24 +16,26 @@ import (
 	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
 )
 
-func (ch *Child) prepareBatch(blockHeight uint64) error {
-	if ch.batchWriter != nil {
-		return nil
+func (ch *Child) prepareBatch(block *cmtproto.Block) error {
+	// query last submitted batch & batch info
+	// TODO: When syncing, batches already submitted are passed
+	if ch.batchHeader != nil {
+		if ch.batchHeader.End == 0 {
+			return nil
+		}
+		err := ch.finalizeBatch(block)
+		if err != nil {
+			return err
+		}
+	}
+	ch.batchHeader = &executortypes.BatchHeader{
+		Start: uint64(block.Header.Height),
 	}
 	var err error
-
-	ch.batchFile, err = os.OpenFile("batch", os.O_CREATE|os.O_RDWR, 0666)
-	if err != nil {
-		return err
-	}
-
 	// linux command gzip use level 6 as default
 	ch.batchWriter, err = gzip.NewWriterLevel(ch.batchFile, 6)
 	if err != nil {
 		return err
-	}
-	ch.batchHeader = executortypes.BatchHeader{
-		Start: blockHeight,
 	}
 	return nil
 }
@@ -57,13 +58,8 @@ func (ch *Child) handleBatch(block *cmtproto.Block) error {
 	return nil
 }
 
-func (ch *Child) finalizeBatch(blockHeight uint64) error {
-	// we are syncing
-	if ch.batchHeader.End != 0 {
-		return nil
-	}
-
-	rawCommit, err := ch.node.QueryRawCommit(int64(blockHeight))
+func (ch *Child) finalizeBatch(block *cmtproto.Block) error {
+	rawCommit, err := block.LastCommit.Marshal()
 	if err != nil {
 		return err
 	}
@@ -78,50 +74,48 @@ func (ch *Child) finalizeBatch(blockHeight uint64) error {
 	}
 
 	batchBuffer := make([]byte, ch.batchCfg.MaxBatchSize)
-	readLength := 0
-
 	checksums := make([][]byte, 0)
 	// room for batch header
-	ch.processedMsgs = append(ch.processedMsgs, nodetypes.ProcessedMsgs{
+	ch.batchProcessedMsgs = append(ch.batchProcessedMsgs, nodetypes.ProcessedMsgs{
 		Timestamp: time.Now().UnixNano(),
 		Save:      true,
 	})
 
-	for offset := int64(0); int64(readLength) == ch.batchCfg.MaxBatchSize; offset += int64(ch.batchCfg.MaxBatchSize) {
+	for offset := int64(0); ; offset += int64(ch.batchCfg.MaxBatchSize) {
 		readLength, err := ch.batchFile.ReadAt(batchBuffer, offset)
-		if err == io.EOF || readLength == 0 {
-			break
-		} else if err != nil {
+		if err != nil && err != io.EOF {
 			return err
+		} else if readLength == 0 {
+			break
 		}
 		batchBuffer = batchBuffer[:readLength]
-
 		msg, err := ch.createBatchMsg(batchBuffer)
 		if err != nil {
 			return err
 		}
-
-		ch.processedMsgs = append(ch.processedMsgs, nodetypes.ProcessedMsgs{
+		ch.batchProcessedMsgs = append(ch.batchProcessedMsgs, nodetypes.ProcessedMsgs{
 			Msgs:      []sdk.Msg{msg},
 			Timestamp: time.Now().UnixNano(),
 			Save:      true,
 		})
 		checksum := sha256.Sum256(batchBuffer)
 		checksums = append(checksums, checksum[:])
+		if int64(readLength) < ch.batchCfg.MaxBatchSize {
+			break
+		}
 	}
 
-	ch.batchHeader.End = blockHeight
+	ch.batchHeader.End = uint64(block.Header.Height)
 	ch.batchHeader.Chunks = checksums
 	headerBytes, err := json.Marshal(ch.batchHeader)
 	if err != nil {
 		return err
 	}
-
 	msg, err := ch.createBatchMsg(headerBytes)
 	if err != nil {
 		return err
 	}
-	ch.processedMsgs[0].Msgs = []sdk.Msg{msg}
+	ch.batchProcessedMsgs[0].Msgs = []sdk.Msg{msg}
 	return nil
 }
 

@@ -69,6 +69,10 @@ func (h *Host) finalizeWithdrawalHandler(args nodetypes.EventHandlerArgs) error 
 			if err != nil {
 				return err
 			}
+			if bridgeId != uint64(h.bridgeId) {
+				// pass other bridge deposit event
+				return nil
+			}
 		case ophosttypes.AttributeKeyOutputIndex:
 			outputIndex, err = strconv.ParseUint(attr.Value, 10, 64)
 			if err != nil {

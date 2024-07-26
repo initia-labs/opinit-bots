@@ -3,6 +3,7 @@ package child
 import (
 	"context"
 	"errors"
+	"io"
 	"os"
 	"time"
 
@@ -36,6 +37,7 @@ type hostNode interface {
 
 type compressionFunc interface {
 	Write([]byte) (int, error)
+	Reset(io.Writer)
 	Close() error
 }
 
@@ -65,7 +67,7 @@ type Child struct {
 	batchInfos  []ophosttypes.BatchInfoWithOutput
 	batchWriter compressionFunc
 	batchFile   *os.File
-	batchHeader executortypes.BatchHeader
+	batchHeader *executortypes.BatchHeader
 
 	processedMsgs      []nodetypes.ProcessedMsgs
 	msgQueue           []sdk.Msg
@@ -118,6 +120,12 @@ func (ch *Child) Initialize(host hostNode, da executortypes.DANode, bridgeInfo o
 	if !ch.da.HasKey() {
 		return errors.New("da has no key")
 	}
+
+	ch.batchFile, err = os.OpenFile("batch", os.O_CREATE|os.O_RDWR, 0666)
+	if err != nil {
+		return err
+	}
+
 	ch.registerHandlers()
 	return nil
 }
