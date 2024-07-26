@@ -72,9 +72,11 @@ type Child struct {
 	processedMsgs      []nodetypes.ProcessedMsgs
 	msgQueue           []sdk.Msg
 	batchProcessedMsgs []nodetypes.ProcessedMsgs
+
+	homePath string
 }
 
-func NewChild(version uint8, cfg nodetypes.NodeConfig, batchCfg executortypes.BatchConfig, db types.DB, logger *zap.Logger, cdc codec.Codec, txConfig client.TxConfig) *Child {
+func NewChild(version uint8, cfg nodetypes.NodeConfig, batchCfg executortypes.BatchConfig, db types.DB, logger *zap.Logger, cdc codec.Codec, txConfig client.TxConfig, homePath string) *Child {
 	node, err := node.NewNode(cfg, db, logger, cdc, txConfig)
 	if err != nil {
 		panic(err)
@@ -102,6 +104,7 @@ func NewChild(version uint8, cfg nodetypes.NodeConfig, batchCfg executortypes.Ba
 		msgQueue:      make([]sdk.Msg, 0),
 
 		batchProcessedMsgs: make([]nodetypes.ProcessedMsgs, 0),
+		homePath:           homePath,
 	}
 	return ch
 }
@@ -121,7 +124,7 @@ func (ch *Child) Initialize(host hostNode, da executortypes.DANode, bridgeInfo o
 		return errors.New("da has no key")
 	}
 
-	ch.batchFile, err = os.OpenFile(ch.db.GetPath(), os.O_CREATE|os.O_RDWR, 0666)
+	ch.batchFile, err = os.OpenFile(ch.homePath+"/batch", os.O_CREATE|os.O_RDWR, 0666)
 	if err != nil {
 		return err
 	}
