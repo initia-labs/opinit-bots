@@ -121,7 +121,7 @@ func (ch *Child) Initialize(host hostNode, da executortypes.DANode, bridgeInfo o
 		return errors.New("da has no key")
 	}
 
-	ch.batchFile, err = os.OpenFile("batch", os.O_CREATE|os.O_RDWR, 0666)
+	ch.batchFile, err = os.OpenFile(ch.db.GetPath(), os.O_CREATE|os.O_RDWR, 0666)
 	if err != nil {
 		return err
 	}

@@ -1,4 +1,5 @@
 {
+    "version": 1,
     "host_node": {
         "rpc": "tcp://localhost:26657",
         "chain_id": "localnet",
@@ -11,5 +12,10 @@
         "mnemonic": "",
         "gas_price": "0.15umin"
     },
-    "version": 1
+    "batch": {
+        "batch_node": {
+            "chain_id": "localnet"
+        },
+        "max_batch_size": 300000
+    }
 }
