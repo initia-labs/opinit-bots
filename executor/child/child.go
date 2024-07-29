@@ -26,7 +26,7 @@ type hostNode interface {
 	AccountCodec() address.Codec
 	HasKey() bool
 	BroadcastMsgs(nodetypes.ProcessedMsgs)
-	ProcessedMsgsToRawKV([]nodetypes.ProcessedMsgs, bool) ([]types.KV, error)
+	ProcessedMsgsToRawKV([]nodetypes.ProcessedMsgs, bool) ([]types.RawKV, error)
 	QueryLastOutput() (*ophosttypes.QueryOutputProposalResponse, error)
 	QueryOutput(uint64) (*ophosttypes.QueryOutputProposalResponse, error)
 }
@@ -115,7 +115,7 @@ func (ch Child) BroadcastMsgs(msgs nodetypes.ProcessedMsgs) {
 	ch.node.BroadcastMsgs(msgs)
 }
 
-func (ch Child) ProcessedMsgsToRawKV(msgs []nodetypes.ProcessedMsgs, delete bool) ([]types.KV, error) {
+func (ch Child) ProcessedMsgsToRawKV(msgs []nodetypes.ProcessedMsgs, delete bool) ([]types.RawKV, error) {
 	return ch.node.ProcessedMsgsToRawKV(msgs, delete)
 }
 

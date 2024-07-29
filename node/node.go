@@ -164,7 +164,7 @@ func (n *Node) prepareBroadcaster(_ /*lastBlockHeight*/ uint64, lastBlockTime ti
 		return err
 	}
 
-	dbBatchKVs := make([]types.KV, 0)
+	dbBatchKVs := make([]types.RawKV, 0)
 
 	loadedPendingTxs, err := n.loadPendingTxs()
 	if err != nil {

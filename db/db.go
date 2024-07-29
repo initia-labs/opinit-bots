@@ -31,7 +31,7 @@ func NewDB(path string) (types.DB, error) {
 // RawBatchSet sets the key-value pairs in the database without prefixing the keys.
 //
 // @dev: `LevelDB.prefix“ is not used as the prefix for the keys.
-func (db *LevelDB) RawBatchSet(kvs ...types.KV) error {
+func (db *LevelDB) RawBatchSet(kvs ...types.RawKV) error {
 	if len(kvs) == 0 {
 		return nil
 	}

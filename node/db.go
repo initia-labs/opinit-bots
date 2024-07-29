@@ -15,8 +15,8 @@ func (n *Node) SaveSyncInfo() error {
 	return n.db.Set(nodetypes.LastProcessedBlockHeightKey, dbtypes.FromUint64(n.lastProcessedBlockHeight))
 }
 
-func (n *Node) SyncInfoToRawKV(height uint64) types.KV {
-	return types.KV{
+func (n *Node) SyncInfoToRawKV(height uint64) types.RawKV {
+	return types.RawKV{
 		Key:   n.db.PrefixedKey(nodetypes.LastProcessedBlockHeightKey),
 		Value: dbtypes.FromUint64(height),
 	}
@@ -70,8 +70,8 @@ func (n *Node) loadPendingTxs() (txs []nodetypes.PendingTxInfo, err error) {
 
 // PendingTxsToRawKV converts pending txs to raw kv pairs.
 // If delete is true, it will return kv pairs for deletion (empty value).
-func (n *Node) PendingTxsToRawKV(txInfos []nodetypes.PendingTxInfo, delete bool) ([]types.KV, error) {
-	kvs := make([]types.KV, 0, len(txInfos))
+func (n *Node) PendingTxsToRawKV(txInfos []nodetypes.PendingTxInfo, delete bool) ([]types.RawKV, error) {
+	kvs := make([]types.RawKV, 0, len(txInfos))
 	for _, txInfo := range txInfos {
 		if !txInfo.Save {
 			continue
@@ -86,7 +86,7 @@ func (n *Node) PendingTxsToRawKV(txInfos []nodetypes.PendingTxInfo, delete bool)
 				return nil, err
 			}
 		}
-		kvs = append(kvs, types.KV{
+		kvs = append(kvs, types.RawKV{
 			Key:   n.db.PrefixedKey(nodetypes.PrefixedPendingTx(txInfo.Sequence)),
 			Value: data,
 		})
@@ -103,8 +103,8 @@ func (n *Node) PendingTxsToRawKV(txInfos []nodetypes.PendingTxInfo, delete bool)
 
 // ProcessedMsgsToRawKV converts processed data to raw kv pairs.
 // If delete is true, it will return kv pairs for deletion (empty value).
-func (n *Node) ProcessedMsgsToRawKV(ProcessedMsgs []nodetypes.ProcessedMsgs, delete bool) ([]types.KV, error) {
-	kvs := make([]types.KV, 0, len(ProcessedMsgs))
+func (n *Node) ProcessedMsgsToRawKV(ProcessedMsgs []nodetypes.ProcessedMsgs, delete bool) ([]types.RawKV, error) {
+	kvs := make([]types.RawKV, 0, len(ProcessedMsgs))
 	for _, processedMsgs := range ProcessedMsgs {
 		if !processedMsgs.Save {
 			continue
@@ -119,7 +119,7 @@ func (n *Node) ProcessedMsgsToRawKV(ProcessedMsgs []nodetypes.ProcessedMsgs, del
 				return nil, err
 			}
 		}
-		kvs = append(kvs, types.KV{
+		kvs = append(kvs, types.RawKV{
 			Key:   n.db.PrefixedKey(nodetypes.PrefixedProcessedMsgs(uint64(processedMsgs.Timestamp))),
 			Value: data,
 		})

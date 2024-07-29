@@ -22,7 +22,7 @@ type childNode interface {
 	AccountCodec() address.Codec
 	HasKey() bool
 	BroadcastMsgs(nodetypes.ProcessedMsgs)
-	ProcessedMsgsToRawKV([]nodetypes.ProcessedMsgs, bool) ([]types.KV, error)
+	ProcessedMsgsToRawKV([]nodetypes.ProcessedMsgs, bool) ([]types.RawKV, error)
 	QueryNextL1Sequence() (uint64, error)
 }
 
@@ -108,7 +108,7 @@ func (h Host) BroadcastMsgs(msgs nodetypes.ProcessedMsgs) {
 	h.node.BroadcastMsgs(msgs)
 }
 
-func (h Host) ProcessedMsgsToRawKV(msgs []nodetypes.ProcessedMsgs, delete bool) ([]types.KV, error) {
+func (h Host) ProcessedMsgsToRawKV(msgs []nodetypes.ProcessedMsgs, delete bool) ([]types.RawKV, error) {
 	return h.node.ProcessedMsgsToRawKV(msgs, delete)
 }
 

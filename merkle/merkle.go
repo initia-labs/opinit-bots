@@ -20,7 +20,7 @@ type NodeGeneratorFn func([]byte, []byte) [32]byte
 // of each level(height) to minimize the memory usage.
 type Merkle struct {
 	db              types.DB
-	workingTree     merkletypes.TreeInfo
+	workingTree     *merkletypes.TreeInfo
 	nodeGeneratorFn NodeGeneratorFn
 }
 
@@ -53,19 +53,29 @@ func NewMerkle(db types.DB, nodeGeneratorFn NodeGeneratorFn) (*Merkle, error) {
 	}, nil
 }
 
-// ResetWorkingTree resets the working tree with the given tree index and start leaf index.
-func (m *Merkle) ResetWorkingTree(treeIndex uint64, startLeafIndex uint64) {
-	m.workingTree = merkletypes.TreeInfo{
+// InitializeWorkingTree resets the working tree with the given tree index and start leaf index.
+func (m *Merkle) InitializeWorkingTree(treeIndex uint64, startLeafIndex uint64) error {
+	if m.workingTree != nil && !m.workingTree.Done {
+		return fmt.Errorf("failed to initialize working tree (`%d`); working tree is not finalized", treeIndex)
+	}
+
+	if treeIndex < 1 || startLeafIndex < 1 {
+		return fmt.Errorf("failed to initialize working tree (`%d`, `%d`); invalid index", treeIndex, startLeafIndex)
+	}
+
+	m.workingTree = &merkletypes.TreeInfo{
 		Index:          treeIndex,
 		StartLeafIndex: startLeafIndex,
 		LeafCount:      0,
 		LastSiblings:   make(map[uint8][]byte),
 		Done:           false,
 	}
+
+	return nil
 }
 
 // FinalizeWorkingTree finalizes the working tree and returns the finalized tree info.
-func (m *Merkle) FinalizeWorkingTree(extraData []byte) ([]types.KV, []byte /* root */, error) {
+func (m *Merkle) FinalizeWorkingTree(extraData []byte) ([]types.RawKV, []byte /* root */, error) {
 	m.workingTree.Done = true
 	if m.workingTree.LeafCount == 0 {
 		return nil, merkletypes.EmptyRootHash[:], nil
@@ -86,14 +96,14 @@ func (m *Merkle) FinalizeWorkingTree(extraData []byte) ([]types.KV, []byte /* ro
 		ExtraData:      extraData,
 	}
 
-	data, err := finalizedTreeInfo.MarshalJSON()
+	data, err := json.Marshal(finalizedTreeInfo)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	// Save the finalized tree info with the start leaf index as the key,
 	// when we need to get the proofs for the leaf, we can get the tree info with the start leaf index.
-	kvs := []types.KV{{
+	kvs := []types.RawKV{{
 		Key:   m.db.PrefixedKey(finalizedTreeInfo.Key()),
 		Value: data,
 	}}
@@ -117,12 +127,10 @@ func (m *Merkle) LoadWorkingTree(version uint64) error {
 	} else if workingTree.Done {
 		nextTreeIndex := workingTree.Index + 1
 		nextStartLeafIndex := workingTree.StartLeafIndex + workingTree.LeafCount
-		m.ResetWorkingTree(nextTreeIndex, nextStartLeafIndex)
-
-		return nil
+		return m.InitializeWorkingTree(nextTreeIndex, nextStartLeafIndex)
 	}
 
-	m.workingTree = workingTree
+	m.workingTree = &workingTree
 	return nil
 }
 
@@ -142,6 +150,7 @@ func (m *Merkle) Height() uint8 {
 	if m.workingTree.LeafCount <= 1 {
 		return uint8(m.workingTree.LeafCount)
 	}
+
 	return uint8(bits.Len64(m.workingTree.LeafCount - 1))
 }
 
@@ -225,7 +234,7 @@ func (m *Merkle) GetProofs(leafIndex uint64) (proofs [][]byte, treeIndex uint64,
 	}
 
 	var treeInfo merkletypes.FinalizedTreeInfo
-	if err := treeInfo.UnmarshalJSON(value); err != nil {
+	if err := json.Unmarshal(value, &treeInfo); err != nil {
 		return nil, 0, nil, nil, err
 	}
 

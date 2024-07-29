@@ -1,7 +1,5 @@
 package types
 
-import "encoding/json"
-
 type TreeInfo struct {
 	// Index of the tree used as prefix for the keys
 	Index uint64 `json:"index"`
@@ -34,12 +32,4 @@ type FinalizedTreeInfo struct {
 
 func (f FinalizedTreeInfo) Key() []byte {
 	return PrefixedFinalizedTreeKey(f.StartLeafIndex)
-}
-
-func (f FinalizedTreeInfo) MarshalJSON() ([]byte, error) {
-	return json.Marshal(f)
-}
-
-func (f *FinalizedTreeInfo) UnmarshalJSON(data []byte) error {
-	return json.Unmarshal(data, f)
 }

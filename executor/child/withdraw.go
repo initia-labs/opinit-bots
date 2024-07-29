@@ -88,8 +88,7 @@ func (ch *Child) handleInitiateWithdrawal(l2Sequence uint64, from string, to str
 
 func (ch *Child) prepareTree(blockHeight uint64) error {
 	if blockHeight == 1 {
-		ch.mk.ResetWorkingTree(1, 1)
-		return nil
+		return ch.mk.InitializeWorkingTree(1, 1)
 	}
 
 	err := ch.mk.LoadWorkingTree(blockHeight - 1)
@@ -131,35 +130,47 @@ func (ch *Child) prepareOutput() error {
 	return nil
 }
 
-func (ch *Child) handleTree(blockHeight uint64, latestHeight uint64, blockId []byte, blockHeader comettpyes.Header) (kvs []types.KV, storageRoot []byte, err error) {
-	// finalize working tree if we are syncing or block time is over next output time
+func (ch *Child) handleTree(blockHeight uint64, latestHeight uint64, blockId []byte, blockHeader comettpyes.Header) (kvs []types.RawKV, storageRoot []byte, err error) {
+	// finalize working tree if we are fully synced or block time is over next output time
 	if ch.finalizingBlockHeight == blockHeight ||
-		(ch.finalizingBlockHeight == 0 && blockHeight == latestHeight && blockHeader.Time.After(ch.nextOutputTime)) {
-		extraData := executortypes.TreeExtraData{
+		(ch.finalizingBlockHeight == 0 &&
+			blockHeight == latestHeight &&
+			blockHeader.Time.After(ch.nextOutputTime)) {
+
+		data, err := json.Marshal(executortypes.TreeExtraData{
 			BlockNumber: blockHeight,
 			BlockHash:   blockId,
-		}
-		data, err := json.Marshal(extraData)
+		})
 		if err != nil {
 			return nil, nil, err
 		}
+
 		kvs, storageRoot, err = ch.mk.FinalizeWorkingTree(data)
 		if err != nil {
 			return nil, nil, err
 		}
-		ch.logger.Info("finalize tree", zap.Uint64("tree_index", ch.mk.GetWorkingTreeIndex()), zap.Uint64("height", blockHeight), zap.Uint64("num_leaves", ch.mk.GetWorkingTreeLeafCount()), zap.String("storage_root", base64.StdEncoding.EncodeToString(storageRoot)))
 
-		// does not submit output since it already submitted
+		ch.logger.Info("finalize working tree",
+			zap.Uint64("tree_index", ch.mk.GetWorkingTreeIndex()),
+			zap.Uint64("height", blockHeight),
+			zap.Uint64("num_leaves", ch.mk.GetWorkingTreeLeafCount()),
+			zap.String("storage_root", base64.StdEncoding.EncodeToString(storageRoot)),
+		)
+
+		// skip output submission when it is already submitted
 		if ch.finalizingBlockHeight == blockHeight {
 			storageRoot = nil
 		}
+
 		ch.finalizingBlockHeight = 0
 		ch.nextOutputTime = blockHeader.Time.Add(ch.bridgeInfo.BridgeConfig.SubmissionInterval * 2 / 3)
 	}
+
 	err = ch.mk.SaveWorkingTree(blockHeight)
 	if err != nil {
 		return nil, nil, err
 	}
+
 	return kvs, storageRoot, nil
 }
 

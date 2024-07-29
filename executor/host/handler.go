@@ -26,7 +26,7 @@ func (h *Host) endBlockHandler(args nodetypes.EndBlockArgs) error {
 		return nil
 	}
 
-	batchKVs := []types.KV{
+	batchKVs := []types.RawKV{
 		h.node.SyncInfoToRawKV(blockHeight),
 	}
 	if h.node.HasKey() {
