@@ -133,3 +133,7 @@ func (ch Child) HasKey() bool {
 func (ch *Child) SetBridgeInfo(bridgeInfo opchildtypes.BridgeInfo) {
 	ch.bridgeInfo = bridgeInfo
 }
+
+func (ch Child) GetHeight() uint64 {
+	return ch.node.GetHeight()
+}

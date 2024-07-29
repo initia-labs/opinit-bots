@@ -130,3 +130,7 @@ func (h Host) AccountCodec() address.Codec {
 func (h Host) HasKey() bool {
 	return h.node.HasKey()
 }
+
+func (ch Host) GetHeight() uint64 {
+	return ch.node.GetHeight()
+}
