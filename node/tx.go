@@ -44,13 +44,15 @@ func (n *Node) txBroadcastLooper(ctx context.Context) error {
 			var err error
 			for retry := 0; retry < 5; retry++ {
 				err = n.handleProcessedMsgs(ctx, data)
-				if err != nil && n.handleMsgError(err) != nil {
-					n.logger.Warn("retry ", zap.String("error", err.Error()))
-					time.Sleep(2 * time.Second)
-					continue
-				} else {
+				if err == nil {
+					break
+				} else if err = n.handleMsgError(err); err == nil {
 					break
 				}
+
+				n.logger.Warn("retry ", zap.String("error", err.Error()))
+				time.Sleep(2 * time.Second)
+				continue
 			}
 
 			if err != nil {
