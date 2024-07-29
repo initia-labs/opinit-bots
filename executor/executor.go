@@ -41,8 +41,16 @@ func NewExecutor(cfg *executortypes.Config, db types.DB, sv *server.Server, logg
 	}
 
 	executor := &Executor{
-		host:  host.NewHost(cfg.Version, cfg.HostNode, db.WithPrefix([]byte(executortypes.HostNodeName)), logger.Named(executortypes.HostNodeName), cdc, txConfig),
-		child: child.NewChild(cfg.Version, cfg.ChildNode, db.WithPrefix([]byte(executortypes.ChildNodeName)), logger.Named(executortypes.ChildNodeName), cdc, txConfig),
+		host: host.NewHost(
+			cfg.Version, cfg.RelayOracle, cfg.L1NodeConfig(),
+			db.WithPrefix([]byte(executortypes.HostNodeName)),
+			logger.Named(executortypes.HostNodeName), cdc, txConfig,
+		),
+		child: child.NewChild(
+			cfg.Version, cfg.L2NodeConfig(),
+			db.WithPrefix([]byte(executortypes.ChildNodeName)),
+			logger.Named(executortypes.ChildNodeName), cdc, txConfig,
+		),
 
 		cfg:    cfg,
 		db:     db,
@@ -84,7 +92,7 @@ func (ex *Executor) Start(cmdCtx context.Context) error {
 	ex.child.Start(childCtx, errCh)
 
 	go func() {
-		err := ex.server.Start(ex.cfg.Address)
+		err := ex.server.Start(ex.cfg.ListenAddress)
 		if err != nil {
 			errCh <- err
 		}

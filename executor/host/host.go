@@ -6,7 +6,6 @@ import (
 	"go.uber.org/zap"
 
 	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
-	executortypes "github.com/initia-labs/opinit-bots-go/executor/types"
 	"github.com/initia-labs/opinit-bots-go/node"
 	nodetypes "github.com/initia-labs/opinit-bots-go/node/types"
 	"github.com/initia-labs/opinit-bots-go/types"
@@ -29,7 +28,8 @@ type childNode interface {
 }
 
 type Host struct {
-	version uint8
+	version     uint8
+	relayOracle bool
 
 	node  *node.Node
 	child childNode
@@ -37,7 +37,7 @@ type Host struct {
 	bridgeId          int64
 	initialL1Sequence uint64
 
-	cfg    executortypes.HostConfig
+	cfg    nodetypes.NodeConfig
 	db     types.DB
 	logger *zap.Logger
 	cdc    codec.Codec
@@ -50,14 +50,18 @@ type Host struct {
 	msgQueue      []sdk.Msg
 }
 
-func NewHost(version uint8, cfg executortypes.HostConfig, db types.DB, logger *zap.Logger, cdc codec.Codec, txConfig client.TxConfig) *Host {
-	node, err := node.NewNode(cfg.NodeConfig, db, logger, cdc, txConfig)
+func NewHost(
+	version uint8, relayOracle bool, cfg nodetypes.NodeConfig,
+	db types.DB, logger *zap.Logger, cdc codec.Codec, txConfig client.TxConfig,
+) *Host {
+	node, err := node.NewNode(cfg, db, logger, cdc, txConfig)
 	if err != nil {
 		panic(err)
 	}
 
 	h := &Host{
-		version: version,
+		version:     version,
+		relayOracle: relayOracle,
 
 		node: node,
 

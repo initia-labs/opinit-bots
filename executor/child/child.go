@@ -56,7 +56,10 @@ type Child struct {
 	msgQueue      []sdk.Msg
 }
 
-func NewChild(version uint8, cfg nodetypes.NodeConfig, db types.DB, logger *zap.Logger, cdc codec.Codec, txConfig client.TxConfig) *Child {
+func NewChild(
+	version uint8, cfg nodetypes.NodeConfig,
+	db types.DB, logger *zap.Logger, cdc codec.Codec, txConfig client.TxConfig,
+) *Child {
 	node, err := node.NewNode(cfg, db, logger, cdc, txConfig)
 	if err != nil {
 		panic(err)
