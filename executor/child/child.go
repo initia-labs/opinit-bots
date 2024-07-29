@@ -62,7 +62,10 @@ func NewChild(version uint8, cfg nodetypes.NodeConfig, db types.DB, logger *zap.
 		panic(err)
 	}
 
-	mk := merkle.NewMerkle(db.WithPrefix([]byte(executortypes.MerkleName)), ophosttypes.GenerateNodeHash)
+	mk, err := merkle.NewMerkle(db.WithPrefix([]byte(executortypes.MerkleName)), ophosttypes.GenerateNodeHash)
+	if err != nil {
+		panic(err)
+	}
 
 	ch := &Child{
 		version: version,

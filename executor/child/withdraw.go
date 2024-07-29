@@ -69,7 +69,7 @@ func (ch *Child) handleInitiateWithdrawal(l2Sequence uint64, from string, to str
 	}
 
 	// generate merkle tree
-	err = ch.mk.InsertLeaf(withdrawalHash[:], false)
+	err = ch.mk.InsertLeaf(withdrawalHash[:])
 	if err != nil {
 		return err
 	}
@@ -88,7 +88,7 @@ func (ch *Child) handleInitiateWithdrawal(l2Sequence uint64, from string, to str
 
 func (ch *Child) prepareTree(blockHeight uint64) error {
 	if blockHeight == 1 {
-		ch.mk.SetNewWorkingTree(1, 1)
+		ch.mk.ResetWorkingTree(1, 1)
 		return nil
 	}
 

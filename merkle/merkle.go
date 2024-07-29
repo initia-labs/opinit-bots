@@ -1,50 +1,83 @@
 package merkle
 
 import (
+	"crypto/rand"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"math/bits"
 
 	merkletypes "github.com/initia-labs/opinit-bots-go/merkle/types"
 	types "github.com/initia-labs/opinit-bots-go/types"
 )
 
-type Merkle struct {
-	db          types.DB
-	workingTree merkletypes.TreeInfo
+// NodeGeneratorFn is a function type that generates parent node from two child nodes.
+//
+// CONTRACT: It should generate return same result for same inputs even the order of inputs are swapped.
+type NodeGeneratorFn func([]byte, []byte) [32]byte
 
-	nodeGeneratorFn func([]byte, []byte) [32]byte
+// Merkle is a struct that manages the merkle tree which only holds the last sibling
+// of each level(height) to minimize the memory usage.
+type Merkle struct {
+	db              types.DB
+	workingTree     merkletypes.TreeInfo
+	nodeGeneratorFn NodeGeneratorFn
 }
 
-func NewMerkle(db types.DB, nodeGeneratorFn func([]byte, []byte) [32]byte) *Merkle {
+// Check if the node generator function is commutative
+func validateNodeGeneratorFn(fn NodeGeneratorFn) error {
+	randInput1 := make([]byte, 32)
+	randInput2 := make([]byte, 32)
+	rand.Read(randInput1)
+	rand.Read(randInput2)
+
+	node1 := fn(randInput1, randInput2)
+	node2 := fn(randInput2, randInput1)
+
+	if node1 != node2 {
+		return errors.New("node generator function is not commutative")
+	}
+
+	return nil
+}
+
+func NewMerkle(db types.DB, nodeGeneratorFn NodeGeneratorFn) (*Merkle, error) {
+	err := validateNodeGeneratorFn(nodeGeneratorFn)
+	if err != nil {
+		return nil, err
+	}
+
 	return &Merkle{
 		db:              db,
 		nodeGeneratorFn: nodeGeneratorFn,
-	}
+	}, nil
 }
 
-func (m *Merkle) SetNewWorkingTree(treeIndex uint64, startLeafIndex uint64) {
+// ResetWorkingTree resets the working tree with the given tree index and start leaf index.
+func (m *Merkle) ResetWorkingTree(treeIndex uint64, startLeafIndex uint64) {
 	m.workingTree = merkletypes.TreeInfo{
 		Index:          treeIndex,
 		StartLeafIndex: startLeafIndex,
 		LeafCount:      0,
-		HeightData:     make(map[uint8][]byte),
+		LastSiblings:   make(map[uint8][]byte),
 		Done:           false,
 	}
 }
 
-func (m *Merkle) FinalizeWorkingTree(extraData []byte) ([]types.KV, []byte, error) {
+// FinalizeWorkingTree finalizes the working tree and returns the finalized tree info.
+func (m *Merkle) FinalizeWorkingTree(extraData []byte) ([]types.KV, []byte /* root */, error) {
 	m.workingTree.Done = true
 	if m.workingTree.LeafCount == 0 {
 		return nil, merkletypes.EmptyRootHash[:], nil
 	}
-	kvs, err := m.fillRestLeaves()
+
+	err := m.fillLeaves()
 	if err != nil {
 		return nil, nil, err
 	}
 
-	treeRootHash := m.workingTree.HeightData[m.Height()]
-	tree := merkletypes.FinalizedTreeInfo{
+	treeRootHash := m.workingTree.LastSiblings[m.Height()]
+	finalizedTreeInfo := merkletypes.FinalizedTreeInfo{
 		TreeIndex:      m.workingTree.Index,
 		TreeHeight:     m.Height(),
 		Root:           treeRootHash,
@@ -53,19 +86,24 @@ func (m *Merkle) FinalizeWorkingTree(extraData []byte) ([]types.KV, []byte, erro
 		ExtraData:      extraData,
 	}
 
-	data, err := json.Marshal(tree)
+	data, err := finalizedTreeInfo.MarshalJSON()
 	if err != nil {
 		return nil, nil, err
 	}
 
-	kvs = append(kvs, types.KV{
-		Key:   m.db.PrefixedKey(merkletypes.PrefixedFinalizedTreeKey(tree.StartLeafIndex)),
+	// Save the finalized tree info with the start leaf index as the key,
+	// when we need to get the proofs for the leaf, we can get the tree info with the start leaf index.
+	kvs := []types.KV{{
+		Key:   m.db.PrefixedKey(finalizedTreeInfo.Key()),
 		Value: data,
-	})
+	}}
 
 	return kvs, treeRootHash, err
 }
 
+// LoadWorkingTree loads the working tree from the database.
+//
+// It is used to load the working tree to handle the case where the bot is stopped.
 func (m *Merkle) LoadWorkingTree(version uint64) error {
 	data, err := m.db.Get(merkletypes.PrefixedWorkingTreeKey(version))
 	if err != nil {
@@ -77,7 +115,10 @@ func (m *Merkle) LoadWorkingTree(version uint64) error {
 	if err != nil {
 		return err
 	} else if workingTree.Done {
-		m.SetNewWorkingTree(workingTree.Index+1, workingTree.StartLeafIndex+workingTree.LeafCount)
+		nextTreeIndex := workingTree.Index + 1
+		nextStartLeafIndex := workingTree.StartLeafIndex + workingTree.LeafCount
+		m.ResetWorkingTree(nextTreeIndex, nextStartLeafIndex)
+
 		return nil
 	}
 
@@ -85,6 +126,9 @@ func (m *Merkle) LoadWorkingTree(version uint64) error {
 	return nil
 }
 
+// SaveWorkingTree saves the working tree to the database.
+//
+// It is used to save the working tree to handle the case where the bot is stopped.
 func (m *Merkle) SaveWorkingTree(version uint64) error {
 	data, err := json.Marshal(&m.workingTree)
 	if err != nil {
@@ -93,6 +137,7 @@ func (m *Merkle) SaveWorkingTree(version uint64) error {
 	return m.db.Set(merkletypes.PrefixedWorkingTreeKey(version), data)
 }
 
+// Height returns the height of the working tree.
 func (m *Merkle) Height() uint8 {
 	if m.workingTree.LeafCount <= 1 {
 		return uint8(m.workingTree.LeafCount)
@@ -100,92 +145,111 @@ func (m *Merkle) Height() uint8 {
 	return uint8(bits.Len64(m.workingTree.LeafCount - 1))
 }
 
+// GetWorkingTreeIndex returns the index of the working tree.
 func (m *Merkle) GetWorkingTreeIndex() uint64 {
 	return m.workingTree.Index
 }
 
+// GetWorkingTreeLeafCount returns the leaf count of the working tree.
 func (m *Merkle) GetWorkingTreeLeafCount() uint64 {
 	return m.workingTree.LeafCount
 }
 
-func (m *Merkle) saveNode(height uint8, heightIndex uint64, data []byte) error {
-	return m.db.Set(merkletypes.PrefixedNodeKey(m.GetWorkingTreeIndex(), height, heightIndex), data)
+func (m *Merkle) saveNode(level uint8, localLeafIndex uint64, data []byte) error {
+	return m.db.Set(merkletypes.PrefixedNodeKey(m.GetWorkingTreeIndex(), level, localLeafIndex), data)
 }
 
-func (m *Merkle) getNode(treeIndex uint64, height uint8, heightIndex uint64) ([]byte, error) {
-	return m.db.Get(merkletypes.PrefixedNodeKey(treeIndex, height, heightIndex))
+func (m *Merkle) getNode(treeIndex uint64, level uint8, localLeafIndex uint64) ([]byte, error) {
+	return m.db.Get(merkletypes.PrefixedNodeKey(treeIndex, level, localLeafIndex))
 }
 
-func (m *Merkle) fillRestLeaves() ([]types.KV, error) {
-	kvs := make([]types.KV, 0)
-	leaf := m.workingTree.HeightData[0]
-
+// fillLeaves fills the rest of the leaves with the last leaf.
+func (m *Merkle) fillLeaves() error {
 	numRestLeaves := 1<<(m.Height()) - m.workingTree.LeafCount
+	if numRestLeaves == 0 {
+		return nil
+	}
 
 	//nolint:typecheck
 	for range numRestLeaves {
-		err := m.InsertLeaf(leaf, true)
-		if err != nil {
-			return nil, err
-		}
-	}
-	return kvs, nil
-}
-
-func (m *Merkle) InsertLeaf(data []byte, residue bool) error {
-	height := uint8(0)
-	heightIndex := m.workingTree.LeafCount
-
-	for {
-		err := m.saveNode(height, heightIndex, data)
-		if err != nil {
+		lastLeaf := m.workingTree.LastSiblings[0]
+		if err := m.InsertLeaf(lastLeaf); err != nil {
 			return err
 		}
-		sibling := m.workingTree.HeightData[height]
-		m.workingTree.HeightData[height] = data
-		if heightIndex%2 == 0 {
-			break
-		}
-		nodeHash := m.nodeGeneratorFn(sibling, data)
-		data = nodeHash[:]
-		heightIndex = heightIndex / 2
-		height++
 	}
 
-	if !residue {
-		m.workingTree.LeafCount++
-	}
+	// leaf count increased with dummy values during the fill
+	// process, so decrease it back to keep l2 withdrawal sequence mapping.
+	m.workingTree.LeafCount -= numRestLeaves
 
 	return nil
 }
 
-func (m *Merkle) GetProofs(leafIndex uint64) ([][]byte, uint64, []byte, []byte, error) {
+// InsertLeaf inserts a leaf to the working tree.
+//
+// It updates the last sibling of each level until the root.
+func (m *Merkle) InsertLeaf(data []byte) error {
+	level := uint8(0)
+	localLeafIndex := m.workingTree.LeafCount
+
+	for {
+		// save the node with the given level and localLeafIndex
+		err := m.saveNode(level, localLeafIndex, data)
+		if err != nil {
+			return err
+		}
+
+		sibling := m.workingTree.LastSiblings[level]
+		m.workingTree.LastSiblings[level] = data
+		if localLeafIndex%2 == 0 {
+			break
+		}
+
+		// if localLeafIndex is odd, calculate parent node
+		nodeHash := m.nodeGeneratorFn(sibling, data)
+		data = nodeHash[:]
+		localLeafIndex = localLeafIndex / 2
+		level++
+	}
+
+	m.workingTree.LeafCount++
+
+	return nil
+}
+
+// GetProofs returns the proofs for the leaf with the given index.
+func (m *Merkle) GetProofs(leafIndex uint64) (proofs [][]byte, treeIndex uint64, rootData []byte, extraData []byte, err error) {
 	_, value, err := m.db.SeekPrevInclusiveKey(merkletypes.FinalizedTreeKey, merkletypes.PrefixedFinalizedTreeKey(leafIndex))
 	if err != nil {
 		return nil, 0, nil, nil, err
 	}
 
 	var treeInfo merkletypes.FinalizedTreeInfo
-	err = json.Unmarshal(value, &treeInfo)
-	if err != nil {
+	if err := treeInfo.UnmarshalJSON(value); err != nil {
 		return nil, 0, nil, nil, err
 	}
 
-	proofs := make([][]byte, 0)
-	height := uint8(0)
+	// Check if the leaf index is in the tree
 	if leafIndex < treeInfo.StartLeafIndex || leafIndex-treeInfo.StartLeafIndex >= treeInfo.LeafCount {
-		return nil, 0, nil, nil, errors.New("not found")
+		return nil, 0, nil, nil, fmt.Errorf("leaf (`%d`) is not found in tree (`%d`)", leafIndex, treeInfo.TreeIndex)
 	}
-	localIndex := leafIndex - treeInfo.StartLeafIndex
 
-	for height < treeInfo.TreeHeight {
-		sibling, err := m.getNode(treeInfo.TreeIndex, height, localIndex^1)
+	level := uint8(0)
+	localLeafIndex := leafIndex - treeInfo.StartLeafIndex
+	for level < treeInfo.TreeHeight {
+		siblingIndex := localLeafIndex ^ 1 // flip the last bit to find the sibling
+		sibling, err := m.getNode(treeInfo.TreeIndex, level, siblingIndex)
 		if err != nil {
 			return nil, 0, nil, nil, err
 		}
+
+		// append the sibling to the proofs
 		proofs = append(proofs, sibling)
-		height++
-		localIndex = localIndex / 2
+
+		// update iteration variables
+		level++
+		localLeafIndex = localLeafIndex / 2
 	}
+
 	return proofs, treeInfo.TreeIndex, treeInfo.Root, treeInfo.ExtraData, nil
 }
