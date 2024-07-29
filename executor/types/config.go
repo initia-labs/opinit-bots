@@ -53,6 +53,8 @@ func (cfg Config) Validate() error {
 }
 
 type BatchConfig struct {
-	DANode       nodetypes.NodeConfig `json:"da_node"`
-	MaxBatchSize int64                `json:"max_batch_size"`
+	DANode            nodetypes.NodeConfig `json:"da_node"`
+	MaxChunks         int64                `json:"max_chunks"`
+	MaxChunkSize      int64                `json:"max_chunk_size"`
+	MaxSubmissionTime int64                `json:"max_submission_time"` // seconds
 }

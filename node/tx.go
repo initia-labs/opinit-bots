@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	sdkerrors "cosmossdk.io/errors"
 	abci "github.com/cometbft/cometbft/abci/types"
@@ -40,9 +41,20 @@ func (n *Node) txBroadcastLooper(ctx context.Context) error {
 		case <-ctx.Done():
 			return nil
 		case data := <-n.txChannel:
-			err := n.handleProcessedMsgs(ctx, data)
-			if err != nil && n.handleMsgError(err) != nil {
-				return err
+			var err error
+			for retry := 0; retry < 5; retry++ {
+				err = n.handleProcessedMsgs(ctx, data)
+				if err != nil && n.handleMsgError(err) != nil {
+					n.logger.Warn("retry ", zap.String("error", err.Error()))
+					time.Sleep(2 * time.Second)
+					continue
+				} else {
+					break
+				}
+			}
+
+			if err != nil {
+				panic(err)
 			}
 		}
 	}
@@ -52,7 +64,8 @@ func (n *Node) handleMsgError(err error) error {
 	if accountSeqRegex.FindStringSubmatch(err.Error()) != nil {
 		// account sequence mismatched
 		// TODO: not panic, but handle mismatched sequence
-		panic(err)
+		// panic(err)
+		return err
 	}
 
 	if strs := outputIndexRegex.FindStringSubmatch(err.Error()); strs != nil {

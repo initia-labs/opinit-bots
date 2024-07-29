@@ -7,8 +7,13 @@ import (
 	"go.uber.org/zap"
 )
 
-func (n *Node) SaveSyncInfo() error {
-	return n.db.Set(nodetypes.LastProcessedBlockHeightKey, dbtypes.FromUint64(n.lastProcessedBlockHeight))
+// should use safely
+func (n *Node) SetSyncInfo(height uint64) {
+	n.lastProcessedBlockHeight = height
+}
+
+func (n *Node) SaveSyncInfo(height uint64) error {
+	return n.db.Set(nodetypes.LastProcessedBlockHeightKey, dbtypes.FromUint64(height))
 }
 
 func (n *Node) RawKVSyncInfo(height uint64) types.KV {

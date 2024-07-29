@@ -2,9 +2,7 @@ package child
 
 import (
 	"context"
-	"errors"
 	"io"
-	"os"
 	"time"
 
 	"cosmossdk.io/core/address"
@@ -32,7 +30,6 @@ type hostNode interface {
 	RawKVProcessedData([]nodetypes.ProcessedMsgs, bool) ([]types.KV, error)
 	QueryLastOutput() (*ophosttypes.QueryOutputProposalResponse, error)
 	QueryOutput(uint64) (*ophosttypes.QueryOutputProposalResponse, error)
-	QueryBatchInfos() (*ophosttypes.QueryBatchInfosResponse, error)
 }
 
 type compressionFunc interface {
@@ -46,7 +43,6 @@ type Child struct {
 
 	node *node.Node
 	host hostNode
-	da   executortypes.DANode
 	mk   *merkle.Merkle
 
 	bridgeInfo opchildtypes.BridgeInfo
@@ -54,29 +50,20 @@ type Child struct {
 	nextOutputTime        time.Time
 	finalizingBlockHeight uint64
 
-	cfg      nodetypes.NodeConfig
-	batchCfg executortypes.BatchConfig
-	db       types.DB
-	logger   *zap.Logger
+	cfg    nodetypes.NodeConfig
+	db     types.DB
+	logger *zap.Logger
 
 	cdc codec.Codec
 	ac  address.Codec
 
 	opchildQueryClient opchildtypes.QueryClient
 
-	batchInfos  []ophosttypes.BatchInfoWithOutput
-	batchWriter compressionFunc
-	batchFile   *os.File
-	batchHeader *executortypes.BatchHeader
-
-	processedMsgs      []nodetypes.ProcessedMsgs
-	msgQueue           []sdk.Msg
-	batchProcessedMsgs []nodetypes.ProcessedMsgs
-
-	homePath string
+	processedMsgs []nodetypes.ProcessedMsgs
+	msgQueue      []sdk.Msg
 }
 
-func NewChild(version uint8, cfg nodetypes.NodeConfig, batchCfg executortypes.BatchConfig, db types.DB, logger *zap.Logger, cdc codec.Codec, txConfig client.TxConfig, homePath string) *Child {
+func NewChild(version uint8, cfg nodetypes.NodeConfig, db types.DB, logger *zap.Logger, cdc codec.Codec, txConfig client.TxConfig) *Child {
 	node, err := node.NewNode(cfg, db, logger, cdc, txConfig)
 	if err != nil {
 		panic(err)
@@ -90,10 +77,9 @@ func NewChild(version uint8, cfg nodetypes.NodeConfig, batchCfg executortypes.Ba
 		node: node,
 		mk:   mk,
 
-		cfg:      cfg,
-		batchCfg: batchCfg,
-		db:       db,
-		logger:   logger,
+		cfg:    cfg,
+		db:     db,
+		logger: logger,
 
 		cdc: cdc,
 		ac:  cdc.InterfaceRegistry().SigningContext().AddressCodec(),
@@ -102,39 +88,20 @@ func NewChild(version uint8, cfg nodetypes.NodeConfig, batchCfg executortypes.Ba
 
 		processedMsgs: make([]nodetypes.ProcessedMsgs, 0),
 		msgQueue:      make([]sdk.Msg, 0),
-
-		batchProcessedMsgs: make([]nodetypes.ProcessedMsgs, 0),
-		homePath:           homePath,
 	}
 	return ch
 }
 
-func (ch *Child) Initialize(host hostNode, da executortypes.DANode, bridgeInfo opchildtypes.BridgeInfo) error {
+func (ch *Child) Initialize(host hostNode, bridgeInfo opchildtypes.BridgeInfo) error {
 	ch.host = host
 	ch.bridgeInfo = bridgeInfo
-
-	res, err := ch.host.QueryBatchInfos()
-	if err != nil {
-		return err
-	}
-	ch.batchInfos = res.BatchInfos
-
-	ch.da = da
-	if !ch.da.HasKey() {
-		return errors.New("da has no key")
-	}
-
-	ch.batchFile, err = os.OpenFile(ch.homePath+"/batch", os.O_CREATE|os.O_RDWR, 0666)
-	if err != nil {
-		return err
-	}
 
 	ch.registerHandlers()
 	return nil
 }
 
 func (ch *Child) Start(ctx context.Context) {
-	ch.node.Start(ctx)
+	ch.node.Start(ctx, nodetypes.PROCESS_TYPE_DEFAULT)
 }
 
 func (ch *Child) registerHandlers() {

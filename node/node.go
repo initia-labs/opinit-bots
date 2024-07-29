@@ -31,6 +31,7 @@ type Node struct {
 	txHandler         nodetypes.TxHandlerFn
 	beginBlockHandler nodetypes.BeginBlockHandlerFn
 	endBlockHandler   nodetypes.EndBlockHandlerFn
+	rawBlockHandler   nodetypes.RawBlockHandlerFn
 
 	cdc        codec.Codec
 	txConfig   client.TxConfig
@@ -102,14 +103,14 @@ func NewNode(cfg nodetypes.NodeConfig, db types.DB, logger *zap.Logger, cdc code
 	return n, nil
 }
 
-func (n Node) Start(ctx context.Context) {
+func (n Node) Start(ctx context.Context, processType nodetypes.BlockProcessType) {
 	go n.txBroadcastLooper(ctx)
 
 	// broadcast pending msgs first before executing block process looper
 	for _, processedMsg := range n.pendingProcessedData {
 		n.BroadcastMsgs(processedMsg)
 	}
-	go n.blockProcessLooper(ctx)
+	go n.blockProcessLooper(ctx, processType)
 }
 
 func (n Node) HasKey() bool {
@@ -251,4 +252,8 @@ func (n *Node) RegisterBeginBlockHandler(fn nodetypes.BeginBlockHandlerFn) {
 
 func (n *Node) RegisterEndBlockHandler(fn nodetypes.EndBlockHandlerFn) {
 	n.endBlockHandler = fn
+}
+
+func (n *Node) RegisterRawBlockHandler(fn nodetypes.RawBlockHandlerFn) {
+	n.rawBlockHandler = fn
 }

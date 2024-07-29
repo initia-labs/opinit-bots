@@ -39,3 +39,10 @@ type EndBlockArgs struct {
 }
 
 type EndBlockHandlerFn func(EndBlockArgs) error
+
+type RawBlockArgs struct {
+	BlockHeight uint64
+	BlockBytes  []byte
+}
+
+type RawBlockHandlerFn func(RawBlockArgs) error

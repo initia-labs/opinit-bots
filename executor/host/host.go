@@ -27,6 +27,10 @@ type childNode interface {
 	QueryNextL1Sequence() (uint64, error)
 }
 
+type batchNode interface {
+	UpdateBatchInfo(chain string, submitter string, outputIndex uint64, l2BlockNumber uint64)
+}
+
 var _ executortypes.DANode = &Host{}
 
 type Host struct {
@@ -34,6 +38,7 @@ type Host struct {
 
 	node  *node.Node
 	child childNode
+	batch batchNode
 
 	bridgeId          int64
 	initialL1Sequence uint64
@@ -77,8 +82,9 @@ func NewHost(version uint8, cfg nodetypes.NodeConfig, db types.DB, logger *zap.L
 	return h
 }
 
-func (h *Host) Initialize(child childNode, bridgeId int64) (err error) {
+func (h *Host) Initialize(child childNode, batch batchNode, bridgeId int64) (err error) {
 	h.child = child
+	h.batch = batch
 	h.bridgeId = bridgeId
 
 	h.initialL1Sequence, err = h.child.QueryNextL1Sequence()
@@ -91,7 +97,7 @@ func (h *Host) Initialize(child childNode, bridgeId int64) (err error) {
 }
 
 func (h *Host) Start(ctx context.Context) {
-	h.node.Start(ctx)
+	h.node.Start(ctx, nodetypes.PROCESS_TYPE_DEFAULT)
 }
 
 func (h *Host) registerHandlers() {

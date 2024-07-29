@@ -10,7 +10,7 @@ import (
 func (ch *Child) beginBlockHandler(args nodetypes.BeginBlockArgs) (err error) {
 	blockHeight := uint64(args.Block.Header.Height)
 	// just to make sure that childMsgQueue is empty
-	if blockHeight == args.LatestHeight && len(ch.msgQueue) != 0 && len(ch.processedMsgs) != 0 && len(ch.batchProcessedMsgs) != 0 {
+	if blockHeight == args.LatestHeight && len(ch.msgQueue) != 0 && len(ch.processedMsgs) != 0 {
 		panic("must not happen, msgQueue should be empty")
 	}
 
@@ -19,10 +19,6 @@ func (ch *Child) beginBlockHandler(args nodetypes.BeginBlockArgs) (err error) {
 		return err
 	}
 	err = ch.prepareOutput()
-	if err != nil {
-		return err
-	}
-	err = ch.prepareBatch(&args.Block)
 	if err != nil {
 		return err
 	}
@@ -38,17 +34,11 @@ func (ch *Child) endBlockHandler(args nodetypes.EndBlockArgs) error {
 	}
 	batchKVs = append(batchKVs, treeKVs...)
 
-	err = ch.handleBatch(&args.Block)
-	if err != nil {
-		return err
-	}
-
 	if storageRoot != nil {
 		err = ch.handleOutput(blockHeight, ch.version, args.BlockID, ch.mk.GetWorkingTreeIndex(), storageRoot)
 		if err != nil {
 			return err
 		}
-		ch.batchHeader.End = blockHeight
 	}
 	// collect more msgs if block height is not latest
 	if blockHeight != args.LatestHeight && len(ch.msgQueue) > 0 && len(ch.msgQueue) <= 10 {
@@ -72,12 +62,6 @@ func (ch *Child) endBlockHandler(args nodetypes.EndBlockArgs) error {
 		batchKVs = append(batchKVs, msgkvs...)
 	}
 
-	batchMsgkvs, err := ch.da.RawKVProcessedData(ch.batchProcessedMsgs, false)
-	if err != nil {
-		return err
-	}
-	batchKVs = append(batchKVs, batchMsgkvs...)
-
 	err = ch.db.RawBatchSet(batchKVs...)
 	if err != nil {
 		return err
@@ -87,12 +71,8 @@ func (ch *Child) endBlockHandler(args nodetypes.EndBlockArgs) error {
 		ch.host.BroadcastMsgs(processedMsg)
 	}
 
-	for _, processedMsg := range ch.batchProcessedMsgs {
-		ch.da.BroadcastMsgs(processedMsg)
-	}
-
 	ch.msgQueue = ch.msgQueue[:0]
 	ch.processedMsgs = ch.processedMsgs[:0]
-	ch.batchProcessedMsgs = ch.batchProcessedMsgs[:0]
+
 	return nil
 }

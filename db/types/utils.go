@@ -8,6 +8,19 @@ import (
 
 const Splitter = '/'
 
+func FromInt64(v int64) []byte {
+	return []byte(fmt.Sprintf("%d", v))
+}
+
+func ToInt64(v []byte) int64 {
+	data, err := strconv.ParseInt(string(v), 10, 64)
+	if err != nil {
+		// must not happen
+		panic(err)
+	}
+	return data
+}
+
 func FromUint64(v uint64) []byte {
 	return []byte(fmt.Sprintf("%d", v))
 }

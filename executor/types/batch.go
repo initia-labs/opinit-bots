@@ -13,7 +13,6 @@ type DANode interface {
 }
 
 type BatchHeader struct {
-	Start  uint64   `json:"start"`
 	End    uint64   `json:"end"`
 	Chunks [][]byte `json:"chunks"`
 }

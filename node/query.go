@@ -154,3 +154,8 @@ func (n *Node) QueryRawCommit(height int64) ([]byte, error) {
 	ctx := GetQueryContext(uint64(height))
 	return n.RawCommit(ctx, &height)
 }
+
+func (n *Node) QueryBlockBulk(start uint64, end uint64) ([][]byte, error) {
+	ctx := GetQueryContext(0)
+	return n.BlockBulk(ctx, &start, &end)
+}

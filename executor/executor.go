@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/initia-labs/opinit-bots-go/executor/batch"
 	"github.com/initia-labs/opinit-bots-go/executor/child"
 	"github.com/initia-labs/opinit-bots-go/executor/host"
 	"github.com/initia-labs/opinit-bots-go/server"
@@ -24,6 +25,7 @@ var _ bottypes.Bot = &Executor{}
 type Executor struct {
 	host  *host.Host
 	child *child.Child
+	batch *batch.BatchSubmitter
 
 	cfg    *executortypes.Config
 	db     types.DB
@@ -39,7 +41,8 @@ func NewExecutor(cfg *executortypes.Config, db types.DB, sv *server.Server, logg
 
 	executor := &Executor{
 		host:  host.NewHost(cfg.Version, cfg.HostNode, db.WithPrefix([]byte(executortypes.HostNodeName)), logger.Named(executortypes.HostNodeName), cdc, txConfig),
-		child: child.NewChild(cfg.Version, cfg.ChildNode, cfg.Batch, db.WithPrefix([]byte(executortypes.ChildNodeName)), logger.Named(executortypes.ChildNodeName), cdc, txConfig, homePath),
+		child: child.NewChild(cfg.Version, cfg.ChildNode, db.WithPrefix([]byte(executortypes.ChildNodeName)), logger.Named(executortypes.ChildNodeName), cdc, txConfig),
+		batch: batch.NewBatchSubmitter(cfg.Version, cfg.ChildNode, cfg.Batch, db.WithPrefix([]byte(executortypes.BatchNodeName)), logger.Named(executortypes.BatchNodeName), cdc, txConfig, homePath),
 
 		cfg:    cfg,
 		db:     db,
@@ -64,11 +67,15 @@ func NewExecutor(cfg *executortypes.Config, db types.DB, sv *server.Server, logg
 	// 	}
 	// }
 
-	err = executor.child.Initialize(executor.host, da, bridgeInfo)
+	err = executor.host.Initialize(executor.child, executor.batch, int64(bridgeInfo.BridgeId))
 	if err != nil {
 		panic(err)
 	}
-	err = executor.host.Initialize(executor.child, int64(bridgeInfo.BridgeId))
+	err = executor.child.Initialize(executor.host, bridgeInfo)
+	if err != nil {
+		panic(err)
+	}
+	err = executor.batch.Initialize(executor.host, da, bridgeInfo)
 	if err != nil {
 		panic(err)
 	}
@@ -86,14 +93,17 @@ func (ex *Executor) Start(cmdCtx context.Context) error {
 
 	hostCtx, hostDone := context.WithCancel(cmdCtx)
 	childCtx, childDone := context.WithCancel(cmdCtx)
+	batchCtx, batchDone := context.WithCancel(cmdCtx)
 
 	ex.host.Start(hostCtx)
 	ex.child.Start(childCtx)
+	ex.batch.Start(batchCtx)
 
 	err = ex.server.Start()
 	// TODO: safely shut down
 	hostDone()
 	childDone()
+	batchDone()
 	return err
 }
 
