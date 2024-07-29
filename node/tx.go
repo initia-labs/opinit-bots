@@ -179,14 +179,20 @@ func (n *Node) calculateGas(ctx context.Context, txf tx.Factory, msgs ...sdk.Msg
 		return txtypes.SimulateResponse{}, 0, err
 	}
 
-	txBytes, err := buildSimTx(keyInfo, txf, msgs...)
+	txBytes, err := n.buildSimTx(keyInfo, txf, msgs...)
+	if err != nil {
+		return txtypes.SimulateResponse{}, 0, err
+	}
+
+	simReq := txtypes.SimulateRequest{TxBytes: txBytes}
+	reqBytes, err := simReq.Marshal()
 	if err != nil {
 		return txtypes.SimulateResponse{}, 0, err
 	}
 
 	simQuery := abci.RequestQuery{
 		Path: "/cosmos.tx.v1beta1.Service/Simulate",
-		Data: txBytes,
+		Data: reqBytes,
 	}
 
 	res, err := n.QueryABCI(ctx, simQuery)
@@ -220,7 +226,7 @@ func (n *Node) adjustEstimatedGas(gasUsed uint64) (uint64, error) {
 
 // BuildSimTx creates an unsigned tx with an empty single signature and returns
 // the encoded transaction or an error if the unsigned transaction cannot be built.
-func buildSimTx(info *keyring.Record, txf tx.Factory, msgs ...sdk.Msg) ([]byte, error) {
+func (n Node) buildSimTx(info *keyring.Record, txf tx.Factory, msgs ...sdk.Msg) ([]byte, error) {
 	txb, err := txf.BuildUnsignedTx(msgs...)
 	if err != nil {
 		return nil, err
@@ -245,19 +251,7 @@ func buildSimTx(info *keyring.Record, txf tx.Factory, msgs ...sdk.Msg) ([]byte, 
 		return nil, err
 	}
 
-	protoProvider, ok := txb.(protoTxProvider)
-	if !ok {
-		return nil, fmt.Errorf("cannot simulate amino tx")
-	}
-
-	simReq := txtypes.SimulateRequest{Tx: protoProvider.GetProtoTx()}
-	return simReq.Marshal()
-}
-
-// protoTxProvider is a type which can provide a proto transaction. It is a
-// workaround to get access to the wrapper TxBuilder's method GetProtoTx().
-type protoTxProvider interface {
-	GetProtoTx() *txtypes.Tx
+	return n.EncodeTx(txb.GetTx())
 }
 
 func (n *Node) enqueueLocalPendingTx(tx nodetypes.PendingTxInfo) {

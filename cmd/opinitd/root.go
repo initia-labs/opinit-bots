@@ -1,16 +1,14 @@
-package cmd
+package main
 
 import (
-	"os"
-	"path/filepath"
-
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
-)
 
-var defaultHome = filepath.Join(os.Getenv("HOME"), ".opinit")
+	"github.com/initia-labs/opinit-bots-go/version"
+)
 
 func NewRootCmd() *cobra.Command {
 	ctx := &cmdContext{
@@ -46,7 +44,9 @@ func NewRootCmd() *cobra.Command {
 	rootCmd.AddCommand(
 		initCmd(ctx),
 		startCmd(ctx),
+		version.NewVersionCommand(),
 	)
+
 	return rootCmd
 }
 

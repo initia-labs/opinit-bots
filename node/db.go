@@ -97,9 +97,6 @@ func (n *Node) PendingTxsToRawKV(txInfos []nodetypes.PendingTxInfo, delete bool)
 ///////////////////
 // ProcessedMsgs //
 ///////////////////
-//
-// @sh-cha: should we change ProcessedMsgs => ProcessedMsgs?
-//
 
 // ProcessedMsgsToRawKV converts processed data to raw kv pairs.
 // If delete is true, it will return kv pairs for deletion (empty value).
@@ -114,7 +111,7 @@ func (n *Node) ProcessedMsgsToRawKV(ProcessedMsgs []nodetypes.ProcessedMsgs, del
 		var err error
 
 		if !delete {
-			data, err = processedMsgs.Marshal()
+			data, err = processedMsgs.MarshalInterfaceJSON(n.cdc)
 			if err != nil {
 				return nil, err
 			}
@@ -138,8 +135,8 @@ func (n *Node) ProcessedMsgsToRawKV(ProcessedMsgs []nodetypes.ProcessedMsgs, del
 
 func (n *Node) loadProcessedMsgs() (ProcessedMsgs []nodetypes.ProcessedMsgs, err error) {
 	iterErr := n.db.PrefixedIterate(nodetypes.ProcessedMsgsKey, func(_, value []byte) (stop bool, err error) {
-		processedMsgs := nodetypes.ProcessedMsgs{}
-		err = processedMsgs.Unmarshal(value)
+		var processedMsgs nodetypes.ProcessedMsgs
+		err = processedMsgs.UnmarshalInterfaceJSON(n.cdc, value)
 		if err != nil {
 			return true, err
 		}

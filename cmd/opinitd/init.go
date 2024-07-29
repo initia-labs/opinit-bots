@@ -1,4 +1,4 @@
-package cmd
+package main
 
 import (
 	"encoding/json"
@@ -18,6 +18,7 @@ func initCmd(ctx *cmdContext) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		Short: "Initialize a bot's configuration files.",
 		Long: `Initialize a bot's configuration files.
+
 Currently supported bots are: executor
 `,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -34,6 +35,10 @@ Currently supported bots are: executor
 			botType := bottypes.BotTypeFromString(args[0])
 			switch botType {
 			case bottypes.BotTypeExecutor:
+				if err := os.MkdirAll(ctx.homePath, os.ModePerm); err != nil {
+					return err
+				}
+
 				f, err := os.Create(configPath)
 				if err != nil {
 					return err

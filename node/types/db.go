@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/cosmos/cosmos-sdk/codec"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 )
 
@@ -44,12 +45,49 @@ type ProcessedMsgs struct {
 	Save bool `json:"save"`
 }
 
-func (p ProcessedMsgs) Marshal() ([]byte, error) {
-	return json.Marshal(&p)
+// processedMsgsJSON is a helper struct to JSON encode ProcessedMsgs
+type processedMsgsJSON struct {
+	Msgs      []string `json:"msgs"`
+	Timestamp int64    `json:"timestamp"`
+	Save      bool     `json:"save"`
 }
 
-func (p *ProcessedMsgs) Unmarshal(data []byte) error {
-	return json.Unmarshal(data, p)
+func (p ProcessedMsgs) MarshalInterfaceJSON(cdc codec.Codec) ([]byte, error) {
+	pms := processedMsgsJSON{
+		Msgs:      make([]string, len(p.Msgs)),
+		Timestamp: p.Timestamp,
+		Save:      p.Save,
+	}
+
+	for i, msg := range p.Msgs {
+		bz, err := cdc.MarshalInterfaceJSON(msg)
+		if err != nil {
+			return nil, err
+		}
+
+		pms.Msgs[i] = string(bz)
+	}
+
+	return json.Marshal(&pms)
+}
+
+func (p *ProcessedMsgs) UnmarshalInterfaceJSON(cdc codec.Codec, data []byte) error {
+	var pms processedMsgsJSON
+	if err := json.Unmarshal(data, &pms); err != nil {
+		return err
+	}
+
+	p.Timestamp = pms.Timestamp
+	p.Save = pms.Save
+
+	p.Msgs = make([]sdk.Msg, len(pms.Msgs))
+	for i, msgStr := range pms.Msgs {
+		if err := cdc.UnmarshalInterfaceJSON([]byte(msgStr), &p.Msgs[i]); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (p ProcessedMsgs) String() string {

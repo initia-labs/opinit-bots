@@ -7,23 +7,30 @@ import (
 )
 
 type Config struct {
-	HostNode  nodetypes.NodeConfig `json:"host_node"`
+	HostNode  HostConfig           `json:"host_node"`
 	ChildNode nodetypes.NodeConfig `json:"child_node"`
 	Version   uint8                `json:"version"`
 	Address   string               `json:"address"`
 }
 
+type HostConfig struct {
+	nodetypes.NodeConfig
+	RelayOracle bool `json:"relay_oracle"`
+}
+
 func DefaultConfig() *Config {
 	return &Config{
-		HostNode: nodetypes.NodeConfig{
-			RPC:     "tcp://localhost:26657",
-			ChainID: "localhost",
-		},
+		HostNode: HostConfig{nodetypes.NodeConfig{
+			RPC:      "tcp://localhost:26657",
+			ChainID:  "localhost",
+			Mnemonic: "",
+			GasPrice: "0.15uinit",
+		}, false},
 		ChildNode: nodetypes.NodeConfig{
 			RPC:      "tcp://localhost:27657",
 			ChainID:  "l2",
 			Mnemonic: "",
-			GasPrice: "0.15umin",
+			GasPrice: "",
 		},
 		Version: 1,
 		Address: "127.0.0.1:3000",

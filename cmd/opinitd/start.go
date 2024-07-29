@@ -1,4 +1,4 @@
-package cmd
+package main
 
 import (
 	"context"
@@ -18,7 +18,9 @@ func startCmd(ctx *cmdContext) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		Short: "Start a bot with the given name",
 		Long: `Start a bot with the given name. 
-Currently supported bots are: executor
+
+Currently supported bots: 
+- executor
 `,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			configName, err := cmd.Flags().GetString(flagConfigName)

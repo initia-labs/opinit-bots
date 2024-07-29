@@ -52,7 +52,7 @@ func (ch *Child) endBlockHandler(args nodetypes.EndBlockArgs) error {
 	// update the sync info
 	batchKVs = append(batchKVs, ch.node.SyncInfoToRawKV(blockHeight))
 
-	// @sh-cha: what is the case this is needed?
+	// if has key, then process the messages
 	if ch.host.HasKey() {
 		if len(ch.msgQueue) != 0 {
 			ch.processedMsgs = append(ch.processedMsgs, nodetypes.ProcessedMsgs{

@@ -3,18 +3,20 @@ package host
 import (
 	"context"
 
-	"cosmossdk.io/core/address"
-	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
-	nodetypes "github.com/initia-labs/opinit-bots-go/node/types"
-	"github.com/initia-labs/opinit-bots-go/types"
 	"go.uber.org/zap"
 
+	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
+	executortypes "github.com/initia-labs/opinit-bots-go/executor/types"
 	"github.com/initia-labs/opinit-bots-go/node"
+	nodetypes "github.com/initia-labs/opinit-bots-go/node/types"
+	"github.com/initia-labs/opinit-bots-go/types"
 
+	"cosmossdk.io/core/address"
 	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/codec"
-
 	sdk "github.com/cosmos/cosmos-sdk/types"
+
+	slinkycodec "github.com/skip-mev/slinky/abci/strategies/codec"
 )
 
 type childNode interface {
@@ -35,20 +37,21 @@ type Host struct {
 	bridgeId          int64
 	initialL1Sequence uint64
 
-	cfg    nodetypes.NodeConfig
+	cfg    executortypes.HostConfig
 	db     types.DB
 	logger *zap.Logger
 	cdc    codec.Codec
 	ac     address.Codec
 
-	ophostQueryClient ophosttypes.QueryClient
+	ophostQueryClient   ophosttypes.QueryClient
+	extendedCommitCodec slinkycodec.ExtendedCommitCodec
 
 	processedMsgs []nodetypes.ProcessedMsgs
 	msgQueue      []sdk.Msg
 }
 
-func NewHost(version uint8, cfg nodetypes.NodeConfig, db types.DB, logger *zap.Logger, cdc codec.Codec, txConfig client.TxConfig) *Host {
-	node, err := node.NewNode(cfg, db, logger, cdc, txConfig)
+func NewHost(version uint8, cfg executortypes.HostConfig, db types.DB, logger *zap.Logger, cdc codec.Codec, txConfig client.TxConfig) *Host {
+	node, err := node.NewNode(cfg.NodeConfig, db, logger, cdc, txConfig)
 	if err != nil {
 		panic(err)
 	}
@@ -66,6 +69,10 @@ func NewHost(version uint8, cfg nodetypes.NodeConfig, db types.DB, logger *zap.L
 		ac:  cdc.InterfaceRegistry().SigningContext().AddressCodec(),
 
 		ophostQueryClient: ophosttypes.NewQueryClient(node),
+		extendedCommitCodec: slinkycodec.NewCompressionExtendedCommitCodec(
+			slinkycodec.NewDefaultExtendedCommitCodec(),
+			slinkycodec.NewZStdCompressor(),
+		),
 
 		processedMsgs: make([]nodetypes.ProcessedMsgs, 0),
 		msgQueue:      make([]sdk.Msg, 0),
