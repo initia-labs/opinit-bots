@@ -76,6 +76,12 @@ func DefaultConfig() *Config {
 		OutputSubmitterMnemonic: "",
 		BridgeExecutorMnemonic:  "",
 		BatchSubmitterMnemonic:  "",
+
+		RelayOracle: true,
+
+		MaxChunks:         5000,
+		MaxChunkSize:      300000,  // 300KB
+		MaxSubmissionTime: 60 * 60, // 1 hour
 	}
 }
 
