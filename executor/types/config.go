@@ -59,7 +59,7 @@ type HostConfig struct {
 func DefaultConfig() *Config {
 	return &Config{
 		Version:       1,
-		ListenAddress: "tcp://localhost:3000",
+		ListenAddress: "localhost:3000",
 
 		L1RPCAddress: "tcp://localhost:26657",
 		L2RPCAddress: "tcp://localhost:27657",
@@ -119,6 +119,7 @@ func (cfg Config) L1NodeConfig() nodetypes.NodeConfig {
 	return nodetypes.NodeConfig{
 		RPC:      cfg.L1RPCAddress,
 		ChainID:  cfg.L1ChainID,
+		GasPrice: cfg.L1GasPrice,
 		Mnemonic: cfg.OutputSubmitterMnemonic,
 	}
 }
@@ -127,6 +128,7 @@ func (cfg Config) L2NodeConfig() nodetypes.NodeConfig {
 	return nodetypes.NodeConfig{
 		RPC:      cfg.L2RPCAddress,
 		ChainID:  cfg.L2ChainID,
+		GasPrice: cfg.L2GasPrice,
 		Mnemonic: cfg.BridgeExecutorMnemonic,
 	}
 }
@@ -135,6 +137,7 @@ func (cfg Config) DANodeConfig() nodetypes.NodeConfig {
 	return nodetypes.NodeConfig{
 		RPC:      cfg.DARPCAddress,
 		ChainID:  cfg.DAChainID,
+		GasPrice: cfg.DAGasPrice,
 		Mnemonic: cfg.BatchSubmitterMnemonic,
 	}
 }

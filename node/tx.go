@@ -39,9 +39,15 @@ func (n *Node) txBroadcastLooper(ctx context.Context) error {
 		select {
 		case <-ctx.Done():
 			return nil
+
 		case data := <-n.txChannel:
 			var err error
 			for retry := 0; retry < 5; retry++ {
+				select {
+				case <-ctx.Done():
+					return nil
+				default:
+				}
 				err = n.handleProcessedMsgs(ctx, data)
 				if err == nil {
 					break
@@ -55,7 +61,7 @@ func (n *Node) txBroadcastLooper(ctx context.Context) error {
 			}
 
 			if err != nil {
-				panic(err)
+				return err
 			}
 		}
 	}
