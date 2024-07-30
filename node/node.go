@@ -212,14 +212,11 @@ func (n *Node) prepareBroadcaster(_ /*lastBlockHeight*/ uint64, lastBlockTime ti
 		return err
 	}
 
-	// @sh-cha: in L233, we are saving processed data to db with updated timestamp
-	//          seems we can remove this part.
-	//
-	// kvProcessedMsgs, err := n.ProcessedMsgsToRawKV(loadedProcessedMsgs, true)
-	// if err != nil {
-	// 	return err
-	// }
-	// dbBatchKVs = append(dbBatchKVs, kvProcessedMsgs...)
+	kvProcessedMsgs, err := n.ProcessedMsgsToRawKV(loadedProcessedMsgs, true)
+	if err != nil {
+		return err
+	}
+	dbBatchKVs = append(dbBatchKVs, kvProcessedMsgs...)
 
 	for i, pendingMsgs := range loadedProcessedMsgs {
 		loadedProcessedMsgs[i].Timestamp = time.Now().UnixNano()
@@ -227,7 +224,7 @@ func (n *Node) prepareBroadcaster(_ /*lastBlockHeight*/ uint64, lastBlockTime ti
 	}
 
 	n.pendingProcessedMsgs = append(n.pendingProcessedMsgs, loadedProcessedMsgs...)
-	kvProcessedMsgs, err := n.ProcessedMsgsToRawKV(n.pendingProcessedMsgs, false)
+	kvProcessedMsgs, err = n.ProcessedMsgsToRawKV(n.pendingProcessedMsgs, false)
 	if err != nil {
 		return err
 	}
