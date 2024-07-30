@@ -37,6 +37,10 @@ type Config struct {
 	// If you don't want to use the bridge executor feature, you can leave it empty.
 	BridgeExecutorMnemonic string `json:"bridge_executor_mnemonic"`
 
+	// BatchSubmitterMnemonic is the mnemonic phrase for the batch submitter,
+	// which is used to relay the batch of blocks from l2 to da.
+	//
+	// If you don't want to use the batch submitter feature, you can leave it empty.
 	BatchSubmitterMnemonic string `json:"batch_submitter_mnemonic"`
 
 	// RelayOracle is the flag to enable the oracle relay feature.
@@ -59,15 +63,19 @@ func DefaultConfig() *Config {
 
 		L1RPCAddress: "tcp://localhost:26657",
 		L2RPCAddress: "tcp://localhost:27657",
+		DARPCAddress: "tcp://localhost:28657",
 
 		L1GasPrice: "0.15uinit",
 		L2GasPrice: "",
+		DAGasPrice: "",
 
 		L1ChainID: "testnet-l1-1",
 		L2ChainID: "testnet-l2-1",
+		DAChainID: "testnet-l3-1",
 
 		OutputSubmitterMnemonic: "",
 		BridgeExecutorMnemonic:  "",
+		BatchSubmitterMnemonic:  "",
 	}
 }
 
@@ -125,8 +133,15 @@ func (cfg Config) DANodeConfig() nodetypes.NodeConfig {
 	}
 }
 
+func (cfg Config) BatchConfig() BatchConfig {
+	return BatchConfig{
+		MaxChunks:         cfg.MaxChunks,
+		MaxChunkSize:      cfg.MaxChunkSize,
+		MaxSubmissionTime: cfg.MaxSubmissionTime,
+	}
+}
+
 type BatchConfig struct {
-	nodetypes.NodeConfig
 	MaxChunks         int64 `json:"max_chunks"`
 	MaxChunkSize      int64 `json:"max_chunk_size"`
 	MaxSubmissionTime int64 `json:"max_submission_time"` // seconds

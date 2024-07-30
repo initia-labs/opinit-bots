@@ -44,15 +44,15 @@ func (bs *BatchSubmitter) rawBlockHandler(args nodetypes.RawBlockArgs) error {
 		return err
 	}
 
-	batchKVs := make([]types.KV, 0)
-	batchKVs = append(batchKVs, bs.node.RawKVSyncInfo(args.BlockHeight))
-	batchMsgkvs, err := bs.da.RawKVProcessedData(bs.processedMsgs, false)
+	batchKVs := make([]types.RawKV, 0)
+	batchKVs = append(batchKVs, bs.node.SyncInfoToRawKV(args.BlockHeight))
+	batchMsgkvs, err := bs.da.ProcessedMsgsToRawKV(bs.processedMsgs, false)
 	if err != nil {
 		return err
 	}
 	batchKVs = append(batchKVs, batchMsgkvs...)
 	if len(batchMsgkvs) > 0 {
-		batchKVs = append(batchKVs, bs.RawKVSubmissionInfo(pbb.Header.Time.UnixNano()))
+		batchKVs = append(batchKVs, bs.SubmissionInfoToRawKV(pbb.Header.Time.UnixNano()))
 	}
 	err = bs.db.RawBatchSet(batchKVs...)
 	if err != nil {

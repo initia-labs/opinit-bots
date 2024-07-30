@@ -3,6 +3,7 @@ package batch
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"sync"
@@ -136,8 +137,15 @@ func (bs *BatchSubmitter) Initialize(host hostNode, da executortypes.DANode, bri
 	return nil
 }
 
-func (bs *BatchSubmitter) Start(ctx context.Context) {
-	bs.node.Start(ctx, nodetypes.PROCESS_TYPE_RAW)
+func (bs *BatchSubmitter) Start(ctx context.Context, errCh chan error) {
+	defer func() {
+		if r := recover(); r != nil {
+			bs.logger.Error("batch panic", zap.Any("recover", r))
+			errCh <- fmt.Errorf("batch panic: %v", r)
+		}
+	}()
+
+	bs.node.Start(ctx, errCh, nodetypes.PROCESS_TYPE_RAW)
 }
 
 func (bs *BatchSubmitter) SetBridgeInfo(bridgeInfo opchildtypes.BridgeInfo) {
@@ -156,8 +164,8 @@ func (bs *BatchSubmitter) LoadSubmissionInfo() error {
 	return nil
 }
 
-func (bs *BatchSubmitter) RawKVSubmissionInfo(timestamp int64) types.KV {
-	return types.KV{
+func (bs *BatchSubmitter) SubmissionInfoToRawKV(timestamp int64) types.RawKV {
+	return types.RawKV{
 		Key:   bs.db.PrefixedKey(SubmissionKey),
 		Value: dbtypes.FromInt64(timestamp),
 	}

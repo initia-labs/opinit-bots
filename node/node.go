@@ -51,7 +51,7 @@ type Node struct {
 }
 
 func NewNode(cfg nodetypes.NodeConfig, db types.DB, logger *zap.Logger, cdc codec.Codec, txConfig client.TxConfig) (*Node, error) {
-	client, err := client.NewClientFromNode(cfg.RPC)
+	client, err := clienthttp.New(cfg.RPC, "/websocket")
 	if err != nil {
 		return nil, err
 	}
@@ -98,7 +98,7 @@ func NewNode(cfg nodetypes.NodeConfig, db types.DB, logger *zap.Logger, cdc code
 	}
 
 	if n.HasKey() {
-		err := n.prepareBroadcaster(status.SyncInfo.LatestBlockTime)
+		err := n.prepareBroadcaster(uint64(status.SyncInfo.LatestBlockHeight), status.SyncInfo.LatestBlockTime)
 		if err != nil {
 			return nil, err
 		}

@@ -7,25 +7,12 @@ import (
 	"go.uber.org/zap"
 )
 
-<<<<<<< HEAD
-// should use safely
 func (n *Node) SetSyncInfo(height uint64) {
 	n.lastProcessedBlockHeight = height
 }
 
 func (n *Node) SaveSyncInfo(height uint64) error {
 	return n.db.Set(nodetypes.LastProcessedBlockHeightKey, dbtypes.FromUint64(height))
-||||||| 222d087
-func (n *Node) SaveSyncInfo() error {
-	return n.db.Set(nodetypes.LastProcessedBlockHeightKey, dbtypes.FromUint64(n.lastProcessedBlockHeight))
-=======
-//////////////
-// SyncInfo //
-//////////////
-
-func (n *Node) SaveSyncInfo() error {
-	return n.db.Set(nodetypes.LastProcessedBlockHeightKey, dbtypes.FromUint64(n.lastProcessedBlockHeight))
->>>>>>> feat/executor
 }
 
 func (n *Node) SyncInfoToRawKV(height uint64) types.RawKV {
@@ -108,19 +95,6 @@ func (n *Node) PendingTxsToRawKV(txInfos []nodetypes.PendingTxInfo, delete bool)
 	return kvs, nil
 }
 
-<<<<<<< HEAD
-func (n *Node) RawKVProcessedData(processedData []nodetypes.ProcessedMsgs, delete bool) ([]types.KV, error) {
-	kvs := make([]types.KV, 0, len(processedData))
-	for _, processedMsgs := range processedData {
-||||||| 222d087
-func (n *Node) RawKVProcessedData(processedData []nodetypes.ProcessedMsgs, delete bool) ([]types.KV, error) {
-	kvs := make([]types.KV, 0, len(processedData))
-	for _, processedMsgs := range processedData {
-		if !processedMsgs.Save {
-			continue
-		}
-
-=======
 ///////////////////
 // ProcessedMsgs //
 ///////////////////
@@ -130,24 +104,11 @@ func (n *Node) RawKVProcessedData(processedData []nodetypes.ProcessedMsgs, delet
 func (n *Node) ProcessedMsgsToRawKV(ProcessedMsgs []nodetypes.ProcessedMsgs, delete bool) ([]types.RawKV, error) {
 	kvs := make([]types.RawKV, 0, len(ProcessedMsgs))
 	for _, processedMsgs := range ProcessedMsgs {
-		if !processedMsgs.Save {
-			continue
-		}
-
->>>>>>> feat/executor
 		var data []byte
 		var err error
 
-<<<<<<< HEAD
 		if !delete && processedMsgs.Save {
-			data, err = processedMsgs.Marshal()
-||||||| 222d087
-		if !delete {
-			data, err = processedMsgs.Marshal()
-=======
-		if !delete {
 			data, err = processedMsgs.MarshalInterfaceJSON(n.cdc)
->>>>>>> feat/executor
 			if err != nil {
 				return nil, err
 			}

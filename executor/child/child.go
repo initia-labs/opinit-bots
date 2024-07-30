@@ -115,7 +115,7 @@ func (ch *Child) Start(ctx context.Context, errCh chan error) {
 		}
 	}()
 
-	ch.node.Start(ctx, errCh)
+	ch.node.Start(ctx, errCh, nodetypes.PROCESS_TYPE_DEFAULT)
 }
 
 func (ch *Child) registerHandlers() {

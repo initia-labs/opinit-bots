@@ -154,11 +154,13 @@ func GetQueryContext(height uint64) (context.Context, context.CancelFunc) {
 }
 
 func (n *Node) QueryRawCommit(height int64) ([]byte, error) {
-	ctx := GetQueryContext(uint64(height))
+	ctx, cancel := GetQueryContext(uint64(height))
+	defer cancel()
 	return n.RawCommit(ctx, &height)
 }
 
 func (n *Node) QueryBlockBulk(start uint64, end uint64) ([][]byte, error) {
-	ctx := GetQueryContext(0)
+	ctx, cancel := GetQueryContext(0)
+	defer cancel()
 	return n.BlockBulk(ctx, &start, &end)
 }
