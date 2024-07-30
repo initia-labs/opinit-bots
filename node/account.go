@@ -7,6 +7,7 @@ import (
 
 	"github.com/cosmos/cosmos-sdk/client"
 	sdk "github.com/cosmos/cosmos-sdk/types"
+	"github.com/cosmos/cosmos-sdk/types/bech32"
 	grpctypes "github.com/cosmos/cosmos-sdk/types/grpc"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	"google.golang.org/grpc"
@@ -27,6 +28,10 @@ func (n *Node) loadAccount() error {
 
 func (n Node) GetAddress() sdk.AccAddress {
 	return n.keyAddress
+}
+
+func (n Node) GetAddressString() (string, error) {
+	return n.EncodeBech32AccAddr(n.keyAddress)
 }
 
 // GetAccount queries for an account given an address and a block height. An
@@ -90,9 +95,10 @@ func (n *Node) GetAccountNumberSequence(clientCtx client.Context, addr sdk.AccAd
 }
 
 func (n *Node) EncodeBech32AccAddr(addr sdk.AccAddress) (string, error) {
-	return n.cdc.InterfaceRegistry().SigningContext().AddressCodec().BytesToString(addr)
+	return bech32.ConvertAndEncode(n.bech32Prefix, addr)
 }
 
 func (n *Node) DecodeBech32AccAddr(addr string) (sdk.AccAddress, error) {
-	return n.cdc.InterfaceRegistry().SigningContext().AddressCodec().StringToBytes(addr)
+	_, bz, err := bech32.DecodeAndConvert(addr)
+	return bz, err
 }

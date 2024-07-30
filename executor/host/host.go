@@ -12,19 +12,29 @@ import (
 	nodetypes "github.com/initia-labs/opinit-bots-go/node/types"
 	"github.com/initia-labs/opinit-bots-go/types"
 
-	"cosmossdk.io/core/address"
 	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/codec"
+	"github.com/cosmos/cosmos-sdk/std"
 	sdk "github.com/cosmos/cosmos-sdk/types"
+	"github.com/cosmos/cosmos-sdk/x/auth"
+
+	"github.com/initia-labs/OPinit/x/ophost"
+	initiaapp "github.com/initia-labs/initia/app"
+	"github.com/initia-labs/initia/app/params"
 )
 
 type childNode interface {
 	GetAddressStr() (string, error)
-	AccountCodec() address.Codec
 	HasKey() bool
 	BroadcastMsgs(nodetypes.ProcessedMsgs)
 	ProcessedMsgsToRawKV([]nodetypes.ProcessedMsgs, bool) ([]types.RawKV, error)
 	QueryNextL1Sequence() (uint64, error)
+
+	GetMsgFinalizeTokenDeposit(string, string, sdk.Coin, uint64, uint64, string, []byte) (sdk.Msg, error)
+	GetMsgUpdateOracle(
+		height uint64,
+		data []byte,
+	) (sdk.Msg, error)
 }
 
 type batchNode interface {
@@ -47,8 +57,6 @@ type Host struct {
 	cfg    nodetypes.NodeConfig
 	db     types.DB
 	logger *zap.Logger
-	cdc    codec.Codec
-	ac     address.Codec
 
 	ophostQueryClient ophosttypes.QueryClient
 
@@ -58,9 +66,10 @@ type Host struct {
 
 func NewHost(
 	version uint8, relayOracle bool, cfg nodetypes.NodeConfig,
-	db types.DB, logger *zap.Logger, cdc codec.Codec, txConfig client.TxConfig,
+	db types.DB, logger *zap.Logger,
 ) *Host {
-	node, err := node.NewNode(cfg, db, logger, cdc, txConfig)
+	appCodec, txConfig, bech32Prefix := getCodec()
+	node, err := node.NewNode(cfg, db, logger, appCodec, txConfig, bech32Prefix)
 	if err != nil {
 		panic(err)
 	}
@@ -75,9 +84,6 @@ func NewHost(
 		db:     db,
 		logger: logger,
 
-		cdc: cdc,
-		ac:  cdc.InterfaceRegistry().SigningContext().AddressCodec(),
-
 		ophostQueryClient: ophosttypes.NewQueryClient(node),
 
 		processedMsgs: make([]nodetypes.ProcessedMsgs, 0),
@@ -85,6 +91,21 @@ func NewHost(
 	}
 
 	return h
+}
+
+func getCodec() (codec.Codec, client.TxConfig, string) {
+	encodingConfig := params.MakeEncodingConfig()
+	appCodec := encodingConfig.Codec
+	txConfig := encodingConfig.TxConfig
+
+	std.RegisterInterfaces(encodingConfig.InterfaceRegistry)
+	std.RegisterLegacyAminoCodec(encodingConfig.Amino)
+	auth.AppModuleBasic{}.RegisterInterfaces(encodingConfig.InterfaceRegistry)
+	ophost.AppModuleBasic{}.RegisterInterfaces(encodingConfig.InterfaceRegistry)
+
+	auth.AppModuleBasic{}.RegisterLegacyAminoCodec(encodingConfig.Amino)
+	ophost.AppModuleBasic{}.RegisterLegacyAminoCodec(encodingConfig.Amino)
+	return appCodec, txConfig, initiaapp.AccountAddressPrefix
 }
 
 func (h *Host) Initialize(child childNode, batch batchNode, bridgeId int64) (err error) {
@@ -137,10 +158,6 @@ func (h Host) ProcessedMsgsToRawKV(msgs []nodetypes.ProcessedMsgs, delete bool) 
 
 func (h *Host) SetBridgeId(brigeId int64) {
 	h.bridgeId = brigeId
-}
-
-func (h Host) AccountCodec() address.Codec {
-	return h.ac
 }
 
 func (h Host) HasKey() bool {

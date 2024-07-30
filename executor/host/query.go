@@ -1,19 +1,13 @@
 package host
 
 import (
-	"errors"
-
 	query "github.com/cosmos/cosmos-sdk/types/query"
 	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
 	"github.com/initia-labs/opinit-bots-go/node"
 )
 
 func (h Host) GetAddressStr() (string, error) {
-	addr := h.node.GetAddress()
-	if addr == nil {
-		return "", errors.New("nil address")
-	}
-	return h.ac.BytesToString(addr)
+	return h.node.GetAddressString()
 }
 
 func (h Host) QueryLastOutput() (*ophosttypes.QueryOutputProposalResponse, error) {

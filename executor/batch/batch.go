@@ -9,19 +9,14 @@ import (
 	"sync"
 	"time"
 
-	"cosmossdk.io/core/address"
 	opchildtypes "github.com/initia-labs/OPinit/x/opchild/types"
 	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
 	executortypes "github.com/initia-labs/opinit-bots-go/executor/types"
-	"github.com/initia-labs/opinit-bots-go/merkle"
 	nodetypes "github.com/initia-labs/opinit-bots-go/node/types"
 	"github.com/initia-labs/opinit-bots-go/types"
 	"go.uber.org/zap"
 
 	"github.com/initia-labs/opinit-bots-go/node"
-
-	"github.com/cosmos/cosmos-sdk/client"
-	"github.com/cosmos/cosmos-sdk/codec"
 
 	dbtypes "github.com/initia-labs/opinit-bots-go/db/types"
 )
@@ -44,7 +39,6 @@ type BatchSubmitter struct {
 	node *node.Node
 	host hostNode
 	da   executortypes.DANode
-	mk   *merkle.Merkle
 
 	bridgeInfo opchildtypes.BridgeInfo
 
@@ -52,9 +46,6 @@ type BatchSubmitter struct {
 	batchCfg executortypes.BatchConfig
 	db       types.DB
 	logger   *zap.Logger
-
-	cdc codec.Codec
-	ac  address.Codec
 
 	opchildQueryClient opchildtypes.QueryClient
 
@@ -70,8 +61,8 @@ type BatchSubmitter struct {
 	lastSubmissionTime time.Time
 }
 
-func NewBatchSubmitter(version uint8, cfg nodetypes.NodeConfig, batchCfg executortypes.BatchConfig, db types.DB, logger *zap.Logger, cdc codec.Codec, txConfig client.TxConfig, homePath string) *BatchSubmitter {
-	node, err := node.NewNode(cfg, db, logger, cdc, txConfig)
+func NewBatchSubmitter(version uint8, cfg nodetypes.NodeConfig, batchCfg executortypes.BatchConfig, db types.DB, logger *zap.Logger, homePath string) *BatchSubmitter {
+	node, err := node.NewNode(cfg, db, logger, nil, nil, "")
 	if err != nil {
 		panic(err)
 	}
@@ -85,9 +76,6 @@ func NewBatchSubmitter(version uint8, cfg nodetypes.NodeConfig, batchCfg executo
 		batchCfg: batchCfg,
 		db:       db,
 		logger:   logger,
-
-		cdc: cdc,
-		ac:  cdc.InterfaceRegistry().SigningContext().AddressCodec(),
 
 		opchildQueryClient: opchildtypes.NewQueryClient(node),
 

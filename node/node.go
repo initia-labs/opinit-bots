@@ -7,6 +7,7 @@ import (
 
 	"errors"
 
+	"cosmossdk.io/core/address"
 	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/client/tx"
 	"github.com/cosmos/cosmos-sdk/codec"
@@ -47,10 +48,11 @@ type Node struct {
 
 	pendingProcessedMsgs []nodetypes.ProcessedMsgs
 
-	txChannel chan nodetypes.ProcessedMsgs
+	txChannel    chan nodetypes.ProcessedMsgs
+	bech32Prefix string
 }
 
-func NewNode(cfg nodetypes.NodeConfig, db types.DB, logger *zap.Logger, cdc codec.Codec, txConfig client.TxConfig) (*Node, error) {
+func NewNode(cfg nodetypes.NodeConfig, db types.DB, logger *zap.Logger, cdc codec.Codec, txConfig client.TxConfig, bech32Prefix string) (*Node, error) {
 	client, err := clienthttp.New(cfg.RPC, "/websocket")
 	if err != nil {
 		return nil, err
@@ -58,7 +60,7 @@ func NewNode(cfg nodetypes.NodeConfig, db types.DB, logger *zap.Logger, cdc code
 
 	// Use memory keyring for now
 	// TODO: may use os keyring later
-	keyBase, err := keyring.New(cfg.ChainID, "memory", "", nil, cdc)
+	keyBase, err := keyring.New(cfg.ChainID, "os", "", nil, cdc)
 	if err != nil {
 		return nil, err
 	}
@@ -81,7 +83,8 @@ func NewNode(cfg nodetypes.NodeConfig, db types.DB, logger *zap.Logger, cdc code
 
 		pendingProcessedMsgs: make([]nodetypes.ProcessedMsgs, 0),
 
-		txChannel: make(chan nodetypes.ProcessedMsgs),
+		txChannel:    make(chan nodetypes.ProcessedMsgs),
+		bech32Prefix: bech32Prefix,
 	}
 
 	err = n.loadSyncInfo()
@@ -242,6 +245,10 @@ func (n *Node) prepareBroadcaster(_ /*lastBlockHeight*/ uint64, lastBlockTime ti
 	}
 
 	return nil
+}
+
+func (n Node) AccountCodec() address.Codec {
+	return n.cdc.InterfaceRegistry().SigningContext().AddressCodec()
 }
 
 func (n Node) GetHeight() uint64 {

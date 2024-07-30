@@ -2,7 +2,6 @@ package child
 
 import (
 	"encoding/json"
-	"errors"
 
 	"cosmossdk.io/math"
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -12,11 +11,7 @@ import (
 )
 
 func (ch Child) GetAddressStr() (string, error) {
-	addr := ch.node.GetAddress()
-	if addr == nil {
-		return "", errors.New("nil address")
-	}
-	return ch.ac.BytesToString(addr)
+	return ch.node.GetAddressString()
 }
 
 func (ch Child) QueryBridgeInfo() (opchildtypes.BridgeInfo, error) {

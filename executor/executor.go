@@ -15,9 +15,6 @@ import (
 	executortypes "github.com/initia-labs/opinit-bots-go/executor/types"
 	"github.com/initia-labs/opinit-bots-go/types"
 	"go.uber.org/zap"
-
-	"github.com/cosmos/cosmos-sdk/client"
-	"github.com/cosmos/cosmos-sdk/codec"
 )
 
 var _ bottypes.Bot = &Executor{}
@@ -36,7 +33,7 @@ type Executor struct {
 	logger *zap.Logger
 }
 
-func NewExecutor(cfg *executortypes.Config, db types.DB, sv *server.Server, logger *zap.Logger, cdc codec.Codec, txConfig client.TxConfig, homePath string) *Executor {
+func NewExecutor(cfg *executortypes.Config, db types.DB, sv *server.Server, logger *zap.Logger, homePath string) *Executor {
 	err := cfg.Validate()
 	if err != nil {
 		panic(err)
@@ -46,14 +43,14 @@ func NewExecutor(cfg *executortypes.Config, db types.DB, sv *server.Server, logg
 		host: host.NewHost(
 			cfg.Version, cfg.RelayOracle, cfg.L1NodeConfig(),
 			db.WithPrefix([]byte(executortypes.HostNodeName)),
-			logger.Named(executortypes.HostNodeName), cdc, txConfig,
+			logger.Named(executortypes.HostNodeName),
 		),
 		child: child.NewChild(
 			cfg.Version, cfg.L2NodeConfig(),
 			db.WithPrefix([]byte(executortypes.ChildNodeName)),
-			logger.Named(executortypes.ChildNodeName), cdc, txConfig,
+			logger.Named(executortypes.ChildNodeName),
 		),
-		batch: batch.NewBatchSubmitter(cfg.Version, cfg.L2NodeConfig(), cfg.BatchConfig(), db.WithPrefix([]byte(executortypes.BatchNodeName)), logger.Named(executortypes.BatchNodeName), cdc, txConfig, homePath),
+		batch: batch.NewBatchSubmitter(cfg.Version, cfg.L2NodeConfig(), cfg.BatchConfig(), db.WithPrefix([]byte(executortypes.BatchNodeName)), logger.Named(executortypes.BatchNodeName), homePath),
 
 		cfg:    cfg,
 		db:     db,

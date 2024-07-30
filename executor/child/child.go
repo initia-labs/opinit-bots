@@ -3,10 +3,8 @@ package child
 import (
 	"context"
 	"fmt"
-	"io"
 	"time"
 
-	"cosmossdk.io/core/address"
 	opchildtypes "github.com/initia-labs/OPinit/x/opchild/types"
 	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
 	executortypes "github.com/initia-labs/opinit-bots-go/executor/types"
@@ -20,23 +18,29 @@ import (
 	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/codec"
 
+	"github.com/cosmos/cosmos-sdk/std"
 	sdk "github.com/cosmos/cosmos-sdk/types"
+	"github.com/cosmos/cosmos-sdk/x/auth"
+	initiaapp "github.com/initia-labs/initia/app"
+
+	"github.com/initia-labs/OPinit/x/opchild"
+	"github.com/initia-labs/initia/app/params"
 )
 
 type hostNode interface {
 	GetAddressStr() (string, error)
-	AccountCodec() address.Codec
 	HasKey() bool
 	BroadcastMsgs(nodetypes.ProcessedMsgs)
 	ProcessedMsgsToRawKV([]nodetypes.ProcessedMsgs, bool) ([]types.RawKV, error)
 	QueryLastOutput() (*ophosttypes.QueryOutputProposalResponse, error)
 	QueryOutput(uint64) (*ophosttypes.QueryOutputProposalResponse, error)
-}
 
-type compressionFunc interface {
-	Write([]byte) (int, error)
-	Reset(io.Writer)
-	Close() error
+	GetMsgProposeOutput(
+		bridgeId uint64,
+		outputIndex uint64,
+		l2BlockNumber uint64,
+		outputRoot []byte,
+	) (sdk.Msg, error)
 }
 
 type Child struct {
@@ -55,9 +59,6 @@ type Child struct {
 	db     types.DB
 	logger *zap.Logger
 
-	cdc codec.Codec
-	ac  address.Codec
-
 	opchildQueryClient opchildtypes.QueryClient
 
 	processedMsgs []nodetypes.ProcessedMsgs
@@ -66,9 +67,13 @@ type Child struct {
 
 func NewChild(
 	version uint8, cfg nodetypes.NodeConfig,
-	db types.DB, logger *zap.Logger, cdc codec.Codec, txConfig client.TxConfig,
+	db types.DB, logger *zap.Logger,
 ) *Child {
-	node, err := node.NewNode(cfg, db, logger, cdc, txConfig)
+	appCodec, txConfig, bech32Prefix, err := getCodec(cfg.ChainID)
+	if err != nil {
+		panic(err)
+	}
+	node, err := node.NewNode(cfg, db, logger, appCodec, txConfig, bech32Prefix)
 	if err != nil {
 		panic(err)
 	}
@@ -88,15 +93,32 @@ func NewChild(
 		db:     db,
 		logger: logger,
 
-		cdc: cdc,
-		ac:  cdc.InterfaceRegistry().SigningContext().AddressCodec(),
-
 		opchildQueryClient: opchildtypes.NewQueryClient(node),
 
 		processedMsgs: make([]nodetypes.ProcessedMsgs, 0),
 		msgQueue:      make([]sdk.Msg, 0),
 	}
 	return ch
+}
+
+func getCodec(chainID string) (codec.Codec, client.TxConfig, string, error) {
+	switch chainID {
+	case "minimove-1", "miniwasm-1":
+		encodingConfig := params.MakeEncodingConfig()
+		appCodec := encodingConfig.Codec
+		txConfig := encodingConfig.TxConfig
+
+		std.RegisterInterfaces(encodingConfig.InterfaceRegistry)
+		std.RegisterLegacyAminoCodec(encodingConfig.Amino)
+		auth.AppModuleBasic{}.RegisterInterfaces(encodingConfig.InterfaceRegistry)
+		opchild.AppModuleBasic{}.RegisterInterfaces(encodingConfig.InterfaceRegistry)
+
+		auth.AppModuleBasic{}.RegisterLegacyAminoCodec(encodingConfig.Amino)
+		opchild.AppModuleBasic{}.RegisterLegacyAminoCodec(encodingConfig.Amino)
+		return appCodec, txConfig, initiaapp.AccountAddressPrefix, nil
+	}
+
+	return nil, nil, "", fmt.Errorf("unsupported chain id: %s", chainID)
 }
 
 func (ch *Child) Initialize(host hostNode, bridgeInfo opchildtypes.BridgeInfo) error {
@@ -140,9 +162,6 @@ func (ch Child) ProcessedMsgsToRawKV(msgs []nodetypes.ProcessedMsgs, delete bool
 
 func (ch Child) BridgeId() uint64 {
 	return ch.bridgeInfo.BridgeId
-}
-func (ch Child) AccountCodec() address.Codec {
-	return ch.ac
 }
 
 func (ch Child) HasKey() bool {
