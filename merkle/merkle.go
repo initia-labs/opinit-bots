@@ -164,12 +164,12 @@ func (m *Merkle) GetWorkingTreeLeafCount() uint64 {
 	return m.workingTree.LeafCount
 }
 
-func (m *Merkle) saveNode(level uint8, localLeafIndex uint64, data []byte) error {
-	return m.db.Set(merkletypes.PrefixedNodeKey(m.GetWorkingTreeIndex(), level, localLeafIndex), data)
+func (m *Merkle) saveNode(height uint8, localNodeIndex uint64, data []byte) error {
+	return m.db.Set(merkletypes.PrefixedNodeKey(m.GetWorkingTreeIndex(), height, localNodeIndex), data)
 }
 
-func (m *Merkle) getNode(treeIndex uint64, level uint8, localLeafIndex uint64) ([]byte, error) {
-	return m.db.Get(merkletypes.PrefixedNodeKey(treeIndex, level, localLeafIndex))
+func (m *Merkle) getNode(treeIndex uint64, height uint8, localNodeIndex uint64) ([]byte, error) {
+	return m.db.Get(merkletypes.PrefixedNodeKey(treeIndex, height, localNodeIndex))
 }
 
 // fillLeaves fills the rest of the leaves with the last leaf.
@@ -179,9 +179,9 @@ func (m *Merkle) fillLeaves() error {
 		return nil
 	}
 
+	lastLeaf := m.workingTree.LastSiblings[0]
 	//nolint:typecheck
 	for range numRestLeaves {
-		lastLeaf := m.workingTree.LastSiblings[0]
 		if err := m.InsertLeaf(lastLeaf); err != nil {
 			return err
 		}
@@ -198,27 +198,27 @@ func (m *Merkle) fillLeaves() error {
 //
 // It updates the last sibling of each level until the root.
 func (m *Merkle) InsertLeaf(data []byte) error {
-	level := uint8(0)
-	localLeafIndex := m.workingTree.LeafCount
+	height := uint8(0)
+	localNodeIndex := m.workingTree.LeafCount
 
 	for {
 		// save the node with the given level and localLeafIndex
-		err := m.saveNode(level, localLeafIndex, data)
+		err := m.saveNode(height, localNodeIndex, data)
 		if err != nil {
 			return err
 		}
 
-		sibling := m.workingTree.LastSiblings[level]
-		m.workingTree.LastSiblings[level] = data
-		if localLeafIndex%2 == 0 {
+		sibling := m.workingTree.LastSiblings[height]
+		m.workingTree.LastSiblings[height] = data
+		if localNodeIndex%2 == 0 {
 			break
 		}
 
 		// if localLeafIndex is odd, calculate parent node
 		nodeHash := m.nodeGeneratorFn(sibling, data)
 		data = nodeHash[:]
-		localLeafIndex = localLeafIndex / 2
-		level++
+		localNodeIndex = localNodeIndex / 2
+		height++
 	}
 
 	m.workingTree.LeafCount++
@@ -243,11 +243,11 @@ func (m *Merkle) GetProofs(leafIndex uint64) (proofs [][]byte, treeIndex uint64,
 		return nil, 0, nil, nil, fmt.Errorf("leaf (`%d`) is not found in tree (`%d`)", leafIndex, treeInfo.TreeIndex)
 	}
 
-	level := uint8(0)
-	localLeafIndex := leafIndex - treeInfo.StartLeafIndex
-	for level < treeInfo.TreeHeight {
-		siblingIndex := localLeafIndex ^ 1 // flip the last bit to find the sibling
-		sibling, err := m.getNode(treeInfo.TreeIndex, level, siblingIndex)
+	height := uint8(0)
+	localNodeIndex := leafIndex - treeInfo.StartLeafIndex
+	for height < treeInfo.TreeHeight {
+		siblingIndex := localNodeIndex ^ 1 // flip the last bit to find the sibling
+		sibling, err := m.getNode(treeInfo.TreeIndex, height, siblingIndex)
 		if err != nil {
 			return nil, 0, nil, nil, err
 		}
@@ -256,8 +256,8 @@ func (m *Merkle) GetProofs(leafIndex uint64) (proofs [][]byte, treeIndex uint64,
 		proofs = append(proofs, sibling)
 
 		// update iteration variables
-		level++
-		localLeafIndex = localLeafIndex / 2
+		height++
+		localNodeIndex = localNodeIndex / 2
 	}
 
 	return proofs, treeInfo.TreeIndex, treeInfo.Root, treeInfo.ExtraData, nil

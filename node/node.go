@@ -220,13 +220,15 @@ func (n *Node) prepareBroadcaster(_ /*lastBlockHeight*/ uint64, lastBlockTime ti
 	}
 	dbBatchKVs = append(dbBatchKVs, kvProcessedMsgs...)
 
+	// update timestamp of loaded processed msgs
 	for i, pendingMsgs := range loadedProcessedMsgs {
 		loadedProcessedMsgs[i].Timestamp = time.Now().UnixNano()
 		n.logger.Debug("pending msgs", zap.Int("index", i), zap.String("msgs", pendingMsgs.String()))
 	}
 
+	// save all pending msgs with updated timestamp to db
 	n.pendingProcessedMsgs = append(n.pendingProcessedMsgs, loadedProcessedMsgs...)
-	kvProcessedMsgs, err := n.ProcessedMsgsToRawKV(n.pendingProcessedMsgs, false)
+	kvProcessedMsgs, err = n.ProcessedMsgsToRawKV(n.pendingProcessedMsgs, false)
 	if err != nil {
 		return err
 	}
