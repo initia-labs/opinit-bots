@@ -127,11 +127,11 @@ func (db *LevelDB) WithPrefix(prefix []byte) types.DB {
 
 // PrefixedKey prefixes the key with the LevelDB.prefix.
 func (db LevelDB) PrefixedKey(key []byte) []byte {
-	return append(append(db.prefix, []byte("/")...), key...)
+	return append(append(db.prefix, dbtypes.Splitter), key...)
 }
 
 // UnprefixedKey remove the prefix from the key, only
 // if the key has the prefix.
 func (db LevelDB) UnprefixedKey(key []byte) []byte {
-	return bytes.TrimPrefix(key, db.prefix)
+	return bytes.TrimPrefix(key, append(db.prefix, dbtypes.Splitter))
 }
