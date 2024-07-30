@@ -6,8 +6,8 @@ require (
 	github.com/cometbft/cometbft v0.38.9
 	github.com/cosmos/cosmos-sdk v0.50.8
 	github.com/gofiber/fiber/v2 v2.52.5
-	github.com/initia-labs/OPinit v0.3.3-0.20240701023931-9e96e2798ae1
-	github.com/initia-labs/initia v0.3.3
+	github.com/initia-labs/OPinit v0.4.0
+	github.com/initia-labs/initia v0.4.0
 	github.com/skip-mev/slinky v0.4.3
 	github.com/spf13/cobra v1.8.0
 	github.com/spf13/viper v1.18.2
@@ -62,7 +62,7 @@ require (
 	github.com/huandu/skiplist v1.2.0 // indirect
 	github.com/iancoleman/orderedmap v0.3.0 // indirect
 	github.com/improbable-eng/grpc-web v0.15.0 // indirect
-	github.com/initia-labs/OPinit/api v0.3.1 // indirect
+	github.com/initia-labs/OPinit/api v0.4.0 // indirect
 	github.com/initia-labs/movevm v0.3.4 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/lib/pq v1.10.9 // indirect
@@ -223,9 +223,4 @@ require (
 	sigs.k8s.io/yaml v1.4.0 // indirect
 )
 
-replace (
-	github.com/gogo/protobuf => github.com/regen-network/protobuf v1.3.3-alpha.regen.1
-
-	github.com/initia-labs/OPinit => ../OPinit
-	github.com/initia-labs/initia => ../initia
-)
+replace github.com/gogo/protobuf => github.com/regen-network/protobuf v1.3.3-alpha.regen.1
