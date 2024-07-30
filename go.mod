@@ -8,7 +8,6 @@ require (
 	github.com/gofiber/fiber/v2 v2.52.5
 	github.com/initia-labs/OPinit v0.4.0
 	github.com/initia-labs/initia v0.4.0
-	github.com/skip-mev/slinky v0.4.3
 	github.com/spf13/cobra v1.8.0
 	github.com/spf13/viper v1.18.2
 	gopkg.in/yaml.v2 v2.4.0
@@ -77,6 +76,7 @@ require (
 	github.com/rivo/uniseg v0.2.0 // indirect
 	github.com/rs/cors v1.8.3 // indirect
 	github.com/skip-mev/block-sdk/v2 v2.1.2 // indirect
+	github.com/skip-mev/slinky v0.4.3 // indirect
 	github.com/ugorji/go/codec v1.2.12 // indirect
 	github.com/ulikunitz/xz v0.5.11 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
