@@ -105,22 +105,26 @@ func (n *Node) handleNewBlock(block *rpccoretypes.ResultBlock, blockResult *rpcc
 	// check pending txs first
 	// TODO: may handle pending txs with same level of other handlers
 	for _, tx := range block.Block.Txs {
-		if n.localPendingTxLength() == 0 {
+		if n.lenLocalPendingTx() == 0 {
 			break
-		} else if pendingTx := n.getLocalPendingTx(); TxHash(tx) == pendingTx.TxHash {
+		}
+
+		// check if the first pending tx is included in the block
+		if pendingTx := n.peekLocalPendingTx(); TxHash(tx) == pendingTx.TxHash {
 			n.logger.Debug("tx inserted", zap.Int64("height", block.Block.Height), zap.Uint64("sequence", pendingTx.Sequence), zap.String("txHash", pendingTx.TxHash))
 			err := n.deletePendingTx(pendingTx.Sequence)
 			if err != nil {
 				return err
 			}
-			n.deleteLocalPendingTx()
+			n.dequeueLocalPendingTx()
 		}
 	}
 
-	if length := n.localPendingTxLength(); length > 0 {
+	if length := n.lenLocalPendingTx(); length > 0 {
 		n.logger.Debug("remaining pending txs", zap.Int64("height", block.Block.Height), zap.Int("count", length))
-		pendingTxTime := time.Unix(0, n.getLocalPendingTx().Timestamp)
+		pendingTxTime := time.Unix(0, n.peekLocalPendingTx().Timestamp)
 		if block.Block.Time.After(pendingTxTime.Add(nodetypes.TX_TIMEOUT)) {
+			// @sh-cha: should we rebroadcast pending txs? or rasing monitoring alert?
 			panic(fmt.Errorf("something wrong, pending txs are not processed for a long time; current block time: %s, pending tx processing time: %s", block.Block.Time.String(), pendingTxTime.String()))
 		}
 	}
@@ -184,12 +188,11 @@ func (n *Node) handleEvent(blockHeight uint64, latestHeight uint64, event abcity
 	if n.eventHandlers[event.GetType()] == nil {
 		return nil
 	}
-	n.logger.Debug("handle event", zap.Uint64("height", blockHeight), zap.String("type", event.GetType()))
 
-	err := n.eventHandlers[event.Type](nodetypes.EventHandlerArgs{
+	n.logger.Debug("handle event", zap.Uint64("height", blockHeight), zap.String("type", event.GetType()))
+	return n.eventHandlers[event.Type](nodetypes.EventHandlerArgs{
 		BlockHeight:     blockHeight,
 		LatestHeight:    latestHeight,
 		EventAttributes: event.GetAttributes(),
 	})
-	return err
 }

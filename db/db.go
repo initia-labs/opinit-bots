@@ -1,10 +1,13 @@
 package db
 
 import (
-	dbtypes "github.com/initia-labs/opinit-bots-go/db/types"
-	"github.com/initia-labs/opinit-bots-go/types"
+	"bytes"
+
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/util"
+
+	dbtypes "github.com/initia-labs/opinit-bots-go/db/types"
+	"github.com/initia-labs/opinit-bots-go/types"
 )
 
 var _ types.DB = (*LevelDB)(nil)
@@ -27,7 +30,10 @@ func NewDB(path string) (types.DB, error) {
 	}, nil
 }
 
-func (db *LevelDB) RawBatchSet(kvs ...types.KV) error {
+// RawBatchSet sets the key-value pairs in the database without prefixing the keys.
+//
+// @dev: `LevelDB.prefix“ is not used as the prefix for the keys.
+func (db *LevelDB) RawBatchSet(kvs ...types.RawKV) error {
 	if len(kvs) == 0 {
 		return nil
 	}
@@ -42,6 +48,7 @@ func (db *LevelDB) RawBatchSet(kvs ...types.KV) error {
 	return db.db.Write(batch, nil)
 }
 
+// BatchSet sets the key-value pairs in the database with prefixing the keys.
 func (db *LevelDB) BatchSet(kvs ...types.KV) error {
 	if len(kvs) == 0 {
 		return nil
@@ -57,27 +64,36 @@ func (db *LevelDB) BatchSet(kvs ...types.KV) error {
 	return db.db.Write(batch, nil)
 }
 
+// Set sets the key-value pair in the database with prefixing the key.
 func (db *LevelDB) Set(key []byte, value []byte) error {
 	return db.db.Put(db.PrefixedKey(key), value, nil)
 }
 
+// Get gets the value of the key in the database with prefixing the key.
 func (db *LevelDB) Get(key []byte) ([]byte, error) {
 	return db.db.Get(db.PrefixedKey(key), nil)
 }
 
+// Delete deletes the key in the database with prefixing the key.
 func (db *LevelDB) Delete(key []byte) error {
 	return db.db.Delete(db.PrefixedKey(key), nil)
 }
 
+// Close closes the database.
 func (db *LevelDB) Close() error {
 	return db.db.Close()
 }
 
-func (db *LevelDB) PrefixedIterate(prefix []byte, cb func(key, value []byte) (stop bool)) error {
+// PrefixedIterate iterates over the key-value pairs in the database with prefixing the keys.
+//
+// @dev: `LevelDB.prefix + prefix` is used as the prefix for the iteration.
+func (db *LevelDB) PrefixedIterate(prefix []byte, cb func(key, value []byte) (stop bool, err error)) error {
 	iter := db.db.NewIterator(util.BytesPrefix(db.PrefixedKey(prefix)), nil)
 	for iter.Next() {
 		key := db.UnprefixedKey(iter.Key())
-		if cb(key, iter.Value()) {
+		if stop, err := cb(key, iter.Value()); err != nil {
+			return err
+		} else if stop {
 			break
 		}
 	}
@@ -85,6 +101,9 @@ func (db *LevelDB) PrefixedIterate(prefix []byte, cb func(key, value []byte) (st
 	return iter.Error()
 }
 
+// SeekPrevInclusiveKey seeks the previous key-value pair in the database with prefixing the keys.
+//
+// @dev: `LevelDB.prefix + prefix` is used as the prefix for the iteration.
 func (db *LevelDB) SeekPrevInclusiveKey(prefix []byte, key []byte) (k []byte, v []byte, err error) {
 	iter := db.db.NewIterator(util.BytesPrefix(db.PrefixedKey(prefix)), nil)
 	if iter.Seek(db.PrefixedKey(key)) || iter.Valid() && iter.Prev() || iter.Last() && iter.Valid() {
@@ -100,6 +119,7 @@ func (db *LevelDB) SeekPrevInclusiveKey(prefix []byte, key []byte) (k []byte, v 
 	return k, v, err
 }
 
+// WithPrefix returns a new LevelDB with the given prefix.
 func (db *LevelDB) WithPrefix(prefix []byte) types.DB {
 	return &LevelDB{
 		db:     db.db,
@@ -107,12 +127,15 @@ func (db *LevelDB) WithPrefix(prefix []byte) types.DB {
 	}
 }
 
+// PrefixedKey prefixes the key with the LevelDB.prefix.
 func (db LevelDB) PrefixedKey(key []byte) []byte {
-	return append(append(db.prefix, []byte("/")...), key...)
+	return append(append(db.prefix, dbtypes.Splitter), key...)
 }
 
+// UnprefixedKey remove the prefix from the key, only
+// if the key has the prefix.
 func (db LevelDB) UnprefixedKey(key []byte) []byte {
-	return key[len(db.prefix)+1:]
+	return bytes.TrimPrefix(key, append(db.prefix, dbtypes.Splitter))
 }
 
 func (db LevelDB) GetPath() string {

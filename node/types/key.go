@@ -5,15 +5,10 @@ import (
 )
 
 var (
+	// Keys
 	LastProcessedBlockHeightKey = []byte("last_processed_block_height")
-
-	PendingTxsKey = []byte("pending_txs")
-	// be used to iterate all pending txs
-	LastPendingTxKey = append(PendingTxsKey, dbtypes.Splitter+1)
-
-	ProcessedMsgsKey = []byte("processed_msgs")
-	// be used to iterate all processed msgs
-	LastProcessedMsgsKey = append(ProcessedMsgsKey, dbtypes.Splitter+1)
+	PendingTxsKey               = []byte("pending_txs")
+	ProcessedMsgsKey            = []byte("processed_msgs")
 )
 
 func PrefixedPendingTx(sequence uint64) []byte {

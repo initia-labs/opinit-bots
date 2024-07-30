@@ -25,13 +25,13 @@ func FromUint64(v uint64) []byte {
 	return []byte(fmt.Sprintf("%d", v))
 }
 
-func ToUint64(v []byte) uint64 {
+func ToUint64(v []byte) (uint64, error) {
 	data, err := strconv.ParseUint(string(v), 10, 64)
 	if err != nil {
-		// must not happen
-		panic(err)
+		return 0, fmt.Errorf("failed to parse uint64 from %s: %w", string(v), err)
 	}
-	return data
+
+	return data, nil
 }
 
 func FromUint64Key(v uint64) []byte {

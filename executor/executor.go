@@ -22,6 +22,9 @@ import (
 
 var _ bottypes.Bot = &Executor{}
 
+// Executor charges the execution of the bridge between the host and the child chain
+// - relay l1 deposit messages to l2
+// - generate l2 output root and submit to l1
 type Executor struct {
 	host  *host.Host
 	child *child.Child
@@ -40,9 +43,17 @@ func NewExecutor(cfg *executortypes.Config, db types.DB, sv *server.Server, logg
 	}
 
 	executor := &Executor{
-		host:  host.NewHost(cfg.Version, cfg.HostNode, db.WithPrefix([]byte(executortypes.HostNodeName)), logger.Named(executortypes.HostNodeName), cdc, txConfig),
-		child: child.NewChild(cfg.Version, cfg.ChildNode, db.WithPrefix([]byte(executortypes.ChildNodeName)), logger.Named(executortypes.ChildNodeName), cdc, txConfig),
-		batch: batch.NewBatchSubmitter(cfg.Version, cfg.ChildNode, cfg.Batch, db.WithPrefix([]byte(executortypes.BatchNodeName)), logger.Named(executortypes.BatchNodeName), cdc, txConfig, homePath),
+		host: host.NewHost(
+			cfg.Version, cfg.RelayOracle, cfg.L1NodeConfig(),
+			db.WithPrefix([]byte(executortypes.HostNodeName)),
+			logger.Named(executortypes.HostNodeName), cdc, txConfig,
+		),
+		child: child.NewChild(
+			cfg.Version, cfg.L2NodeConfig(),
+			db.WithPrefix([]byte(executortypes.ChildNodeName)),
+			logger.Named(executortypes.ChildNodeName), cdc, txConfig,
+		),
+		batch: batch.NewBatchSubmitter(cfg.Version, cfg.DANodeConfig(), cfg.DANodeConfig(), db.WithPrefix([]byte(executortypes.BatchNodeName)), logger.Named(executortypes.BatchNodeName), cdc, txConfig, homePath),
 
 		cfg:    cfg,
 		db:     db,
@@ -57,7 +68,12 @@ func NewExecutor(cfg *executortypes.Config, db types.DB, sv *server.Server, logg
 	if bridgeInfo.BridgeId == 0 {
 		panic("bridge info is not set")
 	}
-	executor.logger.Info("bridge info", zap.Uint64("id", bridgeInfo.BridgeId), zap.Duration("submission_interval", bridgeInfo.BridgeConfig.SubmissionInterval))
+
+	executor.logger.Info(
+		"bridge info",
+		zap.Uint64("id", bridgeInfo.BridgeId),
+		zap.Duration("submission_interval", bridgeInfo.BridgeConfig.SubmissionInterval),
+	)
 
 	da := executor.host
 	// if cfg.Batch.DANode.ChainID != cfg.HostNode.ChainID {
@@ -95,16 +111,44 @@ func (ex *Executor) Start(cmdCtx context.Context) error {
 	childCtx, childDone := context.WithCancel(cmdCtx)
 	batchCtx, batchDone := context.WithCancel(cmdCtx)
 
-	ex.host.Start(hostCtx)
-	ex.child.Start(childCtx)
-	ex.batch.Start(batchCtx)
+	errCh := make(chan error, 3)
+	ex.host.Start(hostCtx, errCh)
+	ex.child.Start(childCtx, errCh)
+	ex.batch.Start(batchCtx, errCh)
 
-	err = ex.server.Start()
-	// TODO: safely shut down
-	hostDone()
-	childDone()
-	batchDone()
-	return err
+	go func() {
+		err := ex.server.Start(ex.cfg.ListenAddress)
+		if err != nil {
+			errCh <- err
+		}
+	}()
+
+	shutdown := func(err error) error {
+		ex.logger.Info("executor shutdown", zap.String("state", "requested"))
+
+		ex.logger.Debug("executor shutdown", zap.String("state", "wait"), zap.String("target", "api"))
+		ex.server.Shutdown()
+
+		ex.logger.Debug("executor shutdown", zap.String("state", "wait"), zap.String("target", "host"))
+		hostDone()
+
+		ex.logger.Debug("executor shutdown", zap.String("state", "wait"), zap.String("target", "child"))
+		childDone()
+
+		ex.logger.Debug("executor shutdown", zap.String("state", "wait"), zap.String("target", "batch"))
+		batchDone()
+
+		ex.logger.Info("executor shutdown completed")
+		return err
+	}
+
+	select {
+	case err := <-errCh:
+		ex.logger.Error("executor error", zap.String("error", err.Error()))
+		return shutdown(err)
+	case <-cmdCtx.Done():
+		return shutdown(nil)
+	}
 }
 
 func (ex *Executor) RegisterQuerier() {
@@ -121,6 +165,17 @@ func (ex *Executor) RegisterQuerier() {
 		if err != nil {
 			return err
 		}
+		return c.JSON(res)
+	})
+
+	ex.server.RegisterQuerier("/status", func(c *fiber.Ctx) error {
+		childHeight := ex.child.GetHeight()
+		hostHeight := ex.host.GetHeight()
+		res := map[string]uint64{
+			"child": childHeight,
+			"host":  hostHeight,
+		}
+
 		return c.JSON(res)
 	})
 }

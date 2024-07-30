@@ -18,6 +18,7 @@ func (ch *Child) beginBlockHandler(args nodetypes.BeginBlockArgs) (err error) {
 	if err != nil {
 		return err
 	}
+
 	err = ch.prepareOutput()
 	if err != nil {
 		return err
@@ -27,11 +28,12 @@ func (ch *Child) beginBlockHandler(args nodetypes.BeginBlockArgs) (err error) {
 
 func (ch *Child) endBlockHandler(args nodetypes.EndBlockArgs) error {
 	blockHeight := uint64(args.Block.Header.Height)
-	batchKVs := make([]types.KV, 0)
+	batchKVs := make([]types.RawKV, 0)
 	treeKVs, storageRoot, err := ch.handleTree(blockHeight, uint64(args.LatestHeight), args.BlockID, args.Block.Header)
 	if err != nil {
 		return err
 	}
+
 	batchKVs = append(batchKVs, treeKVs...)
 
 	if storageRoot != nil {
@@ -40,13 +42,17 @@ func (ch *Child) endBlockHandler(args nodetypes.EndBlockArgs) error {
 			return err
 		}
 	}
-	// collect more msgs if block height is not latest
-	if blockHeight != args.LatestHeight && len(ch.msgQueue) > 0 && len(ch.msgQueue) <= 10 {
+
+	// if we are in sync and we have a small number of messages, less than 10,
+	// then store the current updates in the database and process the next block.
+	if blockHeight < args.LatestHeight && len(ch.msgQueue) > 0 && len(ch.msgQueue) <= 10 {
 		return ch.db.RawBatchSet(batchKVs...)
 	}
 
-	batchKVs = append(batchKVs, ch.node.RawKVSyncInfo(blockHeight))
+	// update the sync info
+	batchKVs = append(batchKVs, ch.node.SyncInfoToRawKV(blockHeight))
 
+	// if has key, then process the messages
 	if ch.host.HasKey() {
 		if len(ch.msgQueue) != 0 {
 			ch.processedMsgs = append(ch.processedMsgs, nodetypes.ProcessedMsgs{
@@ -55,11 +61,11 @@ func (ch *Child) endBlockHandler(args nodetypes.EndBlockArgs) error {
 				Save:      true,
 			})
 		}
-		msgkvs, err := ch.host.RawKVProcessedData(ch.processedMsgs, false)
+		msgKVs, err := ch.host.ProcessedMsgsToRawKV(ch.processedMsgs, false)
 		if err != nil {
 			return err
 		}
-		batchKVs = append(batchKVs, msgkvs...)
+		batchKVs = append(batchKVs, msgKVs...)
 	}
 
 	err = ch.db.RawBatchSet(batchKVs...)

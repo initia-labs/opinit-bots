@@ -26,8 +26,8 @@ func (h *Host) endBlockHandler(args nodetypes.EndBlockArgs) error {
 		return nil
 	}
 
-	batchKVs := []types.KV{
-		h.node.RawKVSyncInfo(blockHeight),
+	batchKVs := []types.RawKV{
+		h.node.SyncInfoToRawKV(blockHeight),
 	}
 	if h.node.HasKey() {
 		if len(h.msgQueue) != 0 {
@@ -38,7 +38,7 @@ func (h *Host) endBlockHandler(args nodetypes.EndBlockArgs) error {
 			})
 		}
 
-		msgkvs, err := h.child.RawKVProcessedData(h.processedMsgs, false)
+		msgkvs, err := h.child.ProcessedMsgsToRawKV(h.processedMsgs, false)
 		if err != nil {
 			return err
 		}
@@ -61,16 +61,15 @@ func (h *Host) endBlockHandler(args nodetypes.EndBlockArgs) error {
 
 func (h *Host) txHandler(args nodetypes.TxHandlerArgs) error {
 	if args.BlockHeight == args.LatestHeight && args.TxIndex == 0 {
-		msg, err := h.oracleTxHandler(args.BlockHeight, args.Tx)
-		if err != nil {
+		if msg, err := h.oracleTxHandler(args.BlockHeight, args.Tx); err != nil {
 			return err
+		} else if msg != nil {
+			h.processedMsgs = append(h.processedMsgs, nodetypes.ProcessedMsgs{
+				Msgs:      []sdk.Msg{msg},
+				Timestamp: time.Now().UnixNano(),
+				Save:      false,
+			})
 		}
-
-		h.processedMsgs = append(h.processedMsgs, nodetypes.ProcessedMsgs{
-			Msgs:      []sdk.Msg{msg},
-			Timestamp: time.Now().UnixNano(),
-			Save:      false,
-		})
 	}
 	return nil
 }

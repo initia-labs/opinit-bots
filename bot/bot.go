@@ -6,10 +6,14 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path"
+
+	"go.uber.org/zap"
 
 	"github.com/cosmos/cosmos-sdk/std"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/x/auth"
+
 	"github.com/initia-labs/OPinit/x/opchild"
 	"github.com/initia-labs/OPinit/x/ophost"
 	initiaapp "github.com/initia-labs/initia/app"
@@ -19,7 +23,6 @@ import (
 	"github.com/initia-labs/opinit-bots-go/executor"
 	executortypes "github.com/initia-labs/opinit-bots-go/executor/types"
 	"github.com/initia-labs/opinit-bots-go/server"
-	"go.uber.org/zap"
 )
 
 func LoadJsonConfig(path string, config bottypes.Config) error {
@@ -40,7 +43,7 @@ func LoadJsonConfig(path string, config bottypes.Config) error {
 	return nil
 }
 
-func NewBot(name string, logger *zap.Logger, homePath string, configPath string) (bottypes.Bot, error) {
+func NewBot(name bottypes.BotType, logger *zap.Logger, homePath string, configName string) (bottypes.Bot, error) {
 	SetSDKConfig()
 
 	encodingConfig := params.MakeEncodingConfig()
@@ -58,8 +61,10 @@ func NewBot(name string, logger *zap.Logger, homePath string, configPath string)
 	opchild.AppModuleBasic{}.RegisterLegacyAminoCodec(encodingConfig.Amino)
 
 	switch name {
-	case bottypes.ExecutorName:
+	case bottypes.BotTypeExecutor:
 		cfg := &executortypes.Config{}
+
+		configPath := path.Join(homePath, configName)
 		err := LoadJsonConfig(configPath, cfg)
 		if err != nil {
 			return nil, err
@@ -92,6 +97,6 @@ func SetSDKConfig() {
 	sdkConfig.Seal()
 }
 
-func getDBPath(homePath string, botName string) string {
+func getDBPath(homePath string, botName bottypes.BotType) string {
 	return fmt.Sprintf(homePath+"/%s.db", botName)
 }

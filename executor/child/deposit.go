@@ -1,7 +1,7 @@
 package child
 
 import (
-	"errors"
+	"fmt"
 	"strconv"
 
 	"cosmossdk.io/math"
@@ -36,8 +36,9 @@ func (ch *Child) finalizeDepositHandler(args nodetypes.EventHandlerArgs) error {
 		case opchildtypes.AttributeKeyAmount:
 			coinAmount, ok := math.NewIntFromString(attr.Value)
 			if !ok {
-				return errors.New("invalid amount")
+				return fmt.Errorf("invalid amount %s", attr.Value)
 			}
+
 			amount.Amount = coinAmount
 		case opchildtypes.AttributeKeyFinalizeHeight:
 			l1BlockHeight, err = strconv.ParseUint(attr.Value, 10, 64)
