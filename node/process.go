@@ -35,6 +35,11 @@ func (n *Node) blockProcessLooper(ctx context.Context, processType nodetypes.Blo
 		switch processType {
 		case nodetypes.PROCESS_TYPE_DEFAULT:
 			for queryHeight := n.lastProcessedBlockHeight + 1; queryHeight <= latestChainHeight; {
+				select {
+				case <-ctx.Done():
+					return nil
+				default:
+				}
 				// TODO: may fetch blocks in batch
 				block, blockResult, err := n.fetchNewBlock(ctx, int64(queryHeight))
 				if err != nil {
@@ -67,6 +72,11 @@ func (n *Node) blockProcessLooper(ctx context.Context, processType nodetypes.Blo
 			}
 
 			for i := start; i <= end; i++ {
+				select {
+				case <-ctx.Done():
+					return nil
+				default:
+				}
 				err := n.rawBlockHandler(nodetypes.RawBlockArgs{
 					BlockHeight: i,
 					BlockBytes:  blockBulk[i-start],
