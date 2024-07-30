@@ -8,7 +8,6 @@ require (
 	github.com/gofiber/fiber/v2 v2.52.5
 	github.com/initia-labs/OPinit v0.3.3-0.20240701023931-9e96e2798ae1
 	github.com/initia-labs/initia v0.3.3
-	github.com/skip-mev/slinky v0.4.3
 	github.com/spf13/cobra v1.8.0
 	github.com/spf13/viper v1.18.2
 	gopkg.in/yaml.v2 v2.4.0
@@ -62,7 +61,7 @@ require (
 	github.com/huandu/skiplist v1.2.0 // indirect
 	github.com/iancoleman/orderedmap v0.3.0 // indirect
 	github.com/improbable-eng/grpc-web v0.15.0 // indirect
-	github.com/initia-labs/OPinit/api v0.3.1 // indirect
+	github.com/initia-labs/OPinit/api v0.4.0 // indirect
 	github.com/initia-labs/movevm v0.3.4 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/lib/pq v1.10.9 // indirect
@@ -77,6 +76,7 @@ require (
 	github.com/rivo/uniseg v0.2.0 // indirect
 	github.com/rs/cors v1.8.3 // indirect
 	github.com/skip-mev/block-sdk/v2 v2.1.2 // indirect
+	github.com/skip-mev/slinky v0.4.3 // indirect
 	github.com/ugorji/go/codec v1.2.12 // indirect
 	github.com/ulikunitz/xz v0.5.11 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect

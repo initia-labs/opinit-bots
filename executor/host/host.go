@@ -15,8 +15,6 @@ import (
 	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/codec"
 	sdk "github.com/cosmos/cosmos-sdk/types"
-
-	slinkycodec "github.com/skip-mev/slinky/abci/strategies/codec"
 )
 
 type childNode interface {
@@ -44,8 +42,7 @@ type Host struct {
 	cdc    codec.Codec
 	ac     address.Codec
 
-	ophostQueryClient   ophosttypes.QueryClient
-	extendedCommitCodec slinkycodec.ExtendedCommitCodec
+	ophostQueryClient ophosttypes.QueryClient
 
 	processedMsgs []nodetypes.ProcessedMsgs
 	msgQueue      []sdk.Msg
@@ -74,10 +71,6 @@ func NewHost(
 		ac:  cdc.InterfaceRegistry().SigningContext().AddressCodec(),
 
 		ophostQueryClient: ophosttypes.NewQueryClient(node),
-		extendedCommitCodec: slinkycodec.NewCompressionExtendedCommitCodec(
-			slinkycodec.NewDefaultExtendedCommitCodec(),
-			slinkycodec.NewZStdCompressor(),
-		),
 
 		processedMsgs: make([]nodetypes.ProcessedMsgs, 0),
 		msgQueue:      make([]sdk.Msg, 0),
