@@ -53,7 +53,11 @@ func NewExecutor(cfg *executortypes.Config, db types.DB, sv *server.Server, logg
 			db.WithPrefix([]byte(executortypes.ChildNodeName)),
 			logger.Named(executortypes.ChildNodeName), cdc, txConfig,
 		),
-		batch: batch.NewBatchSubmitter(cfg.Version, cfg.DANodeConfig(), cfg.BatchConfig(), db.WithPrefix([]byte(executortypes.BatchNodeName)), logger.Named(executortypes.BatchNodeName), cdc, txConfig, homePath),
+		batch: batch.NewBatchSubmitter(
+			cfg.Version, cfg.DANodeConfig(), cfg.BatchConfig(),
+			db.WithPrefix([]byte(executortypes.BatchNodeName)),
+			logger.Named(executortypes.BatchNodeName), cdc, txConfig, homePath,
+		),
 
 		cfg:    cfg,
 		db:     db,

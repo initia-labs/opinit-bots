@@ -46,8 +46,11 @@ type Config struct {
 	// RelayOracle is the flag to enable the oracle relay feature.
 	RelayOracle bool `json:"relay_oracle"`
 
-	MaxChunks         int64 `json:"max_chunks"`
-	MaxChunkSize      int64 `json:"max_chunk_size"`
+	// MaxChunks is the maximum number of chunks in a batch.
+	MaxChunks int64 `json:"max_chunks"`
+	// MaxChunkSize is the maximum size of a chunk in a batch.
+	MaxChunkSize int64 `json:"max_chunk_size"`
+	// MaxSubmissionTime is the maximum time to submit a batch.
 	MaxSubmissionTime int64 `json:"max_submission_time"` // seconds
 }
 

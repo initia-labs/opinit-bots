@@ -9,7 +9,7 @@ type DANode interface {
 	GetAddressStr() (string, error)
 	HasKey() bool
 	BroadcastMsgs(nodetypes.ProcessedMsgs)
-	ProcessedMsgsToRawKV([]nodetypes.ProcessedMsgs, bool) ([]types.RawKV, error)
+	ProcessedMsgsToRawKV(processedMsgs []nodetypes.ProcessedMsgs, delete bool) ([]types.RawKV, error)
 }
 
 type BatchHeader struct {

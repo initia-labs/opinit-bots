@@ -13,7 +13,6 @@ import (
 	opchildtypes "github.com/initia-labs/OPinit/x/opchild/types"
 	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
 	executortypes "github.com/initia-labs/opinit-bots-go/executor/types"
-	"github.com/initia-labs/opinit-bots-go/merkle"
 	nodetypes "github.com/initia-labs/opinit-bots-go/node/types"
 	"github.com/initia-labs/opinit-bots-go/types"
 	"go.uber.org/zap"
@@ -44,7 +43,6 @@ type BatchSubmitter struct {
 	node *node.Node
 	host hostNode
 	da   executortypes.DANode
-	mk   *merkle.Merkle
 
 	bridgeInfo opchildtypes.BridgeInfo
 
@@ -115,7 +113,7 @@ func (bs *BatchSubmitter) Initialize(host hostNode, da executortypes.DANode, bri
 		if len(bs.batchInfos) == 1 || batchInfo.Output.L2BlockNumber >= bs.node.GetHeight() {
 			break
 		}
-		bs.PopBatchInfo()
+		bs.DequeueBatchInfo()
 	}
 	// TODO: set da and  key that match the current batch info
 	bs.da = da
