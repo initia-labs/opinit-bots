@@ -2,6 +2,7 @@ package child
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"cosmossdk.io/core/address"
@@ -26,7 +27,7 @@ type hostNode interface {
 	AccountCodec() address.Codec
 	HasKey() bool
 	BroadcastMsgs(nodetypes.ProcessedMsgs)
-	RawKVProcessedData([]nodetypes.ProcessedMsgs, bool) ([]types.KV, error)
+	ProcessedMsgsToRawKV([]nodetypes.ProcessedMsgs, bool) ([]types.RawKV, error)
 	QueryLastOutput() (*ophosttypes.QueryOutputProposalResponse, error)
 	QueryOutput(uint64) (*ophosttypes.QueryOutputProposalResponse, error)
 }
@@ -56,13 +57,19 @@ type Child struct {
 	msgQueue      []sdk.Msg
 }
 
-func NewChild(version uint8, cfg nodetypes.NodeConfig, db types.DB, logger *zap.Logger, cdc codec.Codec, txConfig client.TxConfig) *Child {
+func NewChild(
+	version uint8, cfg nodetypes.NodeConfig,
+	db types.DB, logger *zap.Logger, cdc codec.Codec, txConfig client.TxConfig,
+) *Child {
 	node, err := node.NewNode(cfg, db, logger, cdc, txConfig)
 	if err != nil {
 		panic(err)
 	}
 
-	mk := merkle.NewMerkle(db.WithPrefix([]byte(executortypes.MerkleName)), ophosttypes.GenerateNodeHash)
+	mk, err := merkle.NewMerkle(db.WithPrefix([]byte(executortypes.MerkleName)), ophosttypes.GenerateNodeHash)
+	if err != nil {
+		panic(err)
+	}
 
 	ch := &Child{
 		version: version,
@@ -92,8 +99,15 @@ func (ch *Child) Initialize(host hostNode, bridgeInfo opchildtypes.BridgeInfo) {
 	ch.registerHandlers()
 }
 
-func (ch *Child) Start(ctx context.Context) {
-	ch.node.Start(ctx)
+func (ch *Child) Start(ctx context.Context, errCh chan error) {
+	defer func() {
+		if r := recover(); r != nil {
+			ch.logger.Error("child panic", zap.Any("recover", r))
+			errCh <- fmt.Errorf("child panic: %v", r)
+		}
+	}()
+
+	ch.node.Start(ctx, errCh)
 }
 
 func (ch *Child) registerHandlers() {
@@ -108,11 +122,12 @@ func (ch Child) BroadcastMsgs(msgs nodetypes.ProcessedMsgs) {
 	if !ch.node.HasKey() {
 		return
 	}
+
 	ch.node.BroadcastMsgs(msgs)
 }
 
-func (ch Child) RawKVProcessedData(msgs []nodetypes.ProcessedMsgs, delete bool) ([]types.KV, error) {
-	return ch.node.RawKVProcessedData(msgs, delete)
+func (ch Child) ProcessedMsgsToRawKV(msgs []nodetypes.ProcessedMsgs, delete bool) ([]types.RawKV, error) {
+	return ch.node.ProcessedMsgsToRawKV(msgs, delete)
 }
 
 func (ch Child) BridgeId() uint64 {
@@ -128,4 +143,8 @@ func (ch Child) HasKey() bool {
 
 func (ch *Child) SetBridgeInfo(bridgeInfo opchildtypes.BridgeInfo) {
 	ch.bridgeInfo = bridgeInfo
+}
+
+func (ch Child) GetHeight() uint64 {
+	return ch.node.GetHeight()
 }

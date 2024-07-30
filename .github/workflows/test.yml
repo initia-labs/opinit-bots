@@ -1,0 +1,42 @@
+name: Build & Test
+on:
+  pull_request:
+    paths:
+      - "**.go"
+  push:
+    branches:
+      - main
+      - "release/*"
+    paths:
+      - "**.go"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Run test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-go@v3
+        with:
+          go-version: 1.22
+      - name: Install openssl
+        run: sudo apt-get install libssl-dev
+      - uses: actions/checkout@v3
+      - uses: technote-space/get-diff-action@v4
+        with:
+          PATTERNS: |
+            **/**.go
+            go.mod
+            go.sum
+      - name: build
+        run: |
+          make build
+      - name: test
+        if: env.GIT_DIFF
+        run: |
+          go test ./... -mod=readonly -timeout 12m
+        env:
+          GIT_DIFF: ${{ env.GIT_DIFF }}

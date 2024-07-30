@@ -7,12 +7,16 @@ import (
 	"go.uber.org/zap"
 )
 
+//////////////
+// SyncInfo //
+//////////////
+
 func (n *Node) SaveSyncInfo() error {
 	return n.db.Set(nodetypes.LastProcessedBlockHeightKey, dbtypes.FromUint64(n.lastProcessedBlockHeight))
 }
 
-func (n *Node) RawKVSyncInfo(height uint64) types.KV {
-	return types.KV{
+func (n *Node) SyncInfoToRawKV(height uint64) types.RawKV {
+	return types.RawKV{
 		Key:   n.db.PrefixedKey(nodetypes.LastProcessedBlockHeightKey),
 		Value: dbtypes.FromUint64(height),
 	}
@@ -25,10 +29,19 @@ func (n *Node) loadSyncInfo() error {
 	} else if err != nil {
 		return err
 	}
-	n.lastProcessedBlockHeight = dbtypes.ToUint64(data)
+
+	n.lastProcessedBlockHeight, err = dbtypes.ToUint64(data)
+	if err != nil {
+		return err
+	}
+
 	n.logger.Info("load sync info", zap.Uint64("last_processed_height", n.lastProcessedBlockHeight))
 	return nil
 }
+
+///////////////
+// PendingTx //
+///////////////
 
 func (n Node) savePendingTx(sequence uint64, txInfo nodetypes.PendingTxInfo) error {
 	data, err := txInfo.Marshal()
@@ -43,25 +56,27 @@ func (n Node) deletePendingTx(sequence uint64) error {
 }
 
 func (n *Node) loadPendingTxs() (txs []nodetypes.PendingTxInfo, err error) {
-	iterErr := n.db.PrefixedIterate(nodetypes.PendingTxsKey, func(_, value []byte) (stop bool) {
+	iterErr := n.db.PrefixedIterate(nodetypes.PendingTxsKey, func(_, value []byte) (stop bool, err error) {
 		txInfo := nodetypes.PendingTxInfo{}
 		err = txInfo.Unmarshal(value)
 		if err != nil {
-			return true
+			return true, err
 		}
 		txs = append(txs, txInfo)
-		return false
+		return false, nil
 	})
-
 	if iterErr != nil {
 		return nil, iterErr
 	}
+
 	n.logger.Info("load pending txs", zap.Int("count", len(txs)))
 	return txs, err
 }
 
-func (n *Node) RawKVPendingTxs(txInfos []nodetypes.PendingTxInfo, delete bool) ([]types.KV, error) {
-	kvs := make([]types.KV, 0, len(txInfos))
+// PendingTxsToRawKV converts pending txs to raw kv pairs.
+// If delete is true, it will return kv pairs for deletion (empty value).
+func (n *Node) PendingTxsToRawKV(txInfos []nodetypes.PendingTxInfo, delete bool) ([]types.RawKV, error) {
+	kvs := make([]types.RawKV, 0, len(txInfos))
 	for _, txInfo := range txInfos {
 		if !txInfo.Save {
 			continue
@@ -76,7 +91,7 @@ func (n *Node) RawKVPendingTxs(txInfos []nodetypes.PendingTxInfo, delete bool) (
 				return nil, err
 			}
 		}
-		kvs = append(kvs, types.KV{
+		kvs = append(kvs, types.RawKV{
 			Key:   n.db.PrefixedKey(nodetypes.PrefixedPendingTx(txInfo.Sequence)),
 			Value: data,
 		})
@@ -84,9 +99,15 @@ func (n *Node) RawKVPendingTxs(txInfos []nodetypes.PendingTxInfo, delete bool) (
 	return kvs, nil
 }
 
-func (n *Node) RawKVProcessedData(processedData []nodetypes.ProcessedMsgs, delete bool) ([]types.KV, error) {
-	kvs := make([]types.KV, 0, len(processedData))
-	for _, processedMsgs := range processedData {
+///////////////////
+// ProcessedMsgs //
+///////////////////
+
+// ProcessedMsgsToRawKV converts processed data to raw kv pairs.
+// If delete is true, it will return kv pairs for deletion (empty value).
+func (n *Node) ProcessedMsgsToRawKV(ProcessedMsgs []nodetypes.ProcessedMsgs, delete bool) ([]types.RawKV, error) {
+	kvs := make([]types.RawKV, 0, len(ProcessedMsgs))
+	for _, processedMsgs := range ProcessedMsgs {
 		if !processedMsgs.Save {
 			continue
 		}
@@ -95,12 +116,12 @@ func (n *Node) RawKVProcessedData(processedData []nodetypes.ProcessedMsgs, delet
 		var err error
 
 		if !delete {
-			data, err = processedMsgs.Marshal()
+			data, err = processedMsgs.MarshalInterfaceJSON(n.cdc)
 			if err != nil {
 				return nil, err
 			}
 		}
-		kvs = append(kvs, types.KV{
+		kvs = append(kvs, types.RawKV{
 			Key:   n.db.PrefixedKey(nodetypes.PrefixedProcessedMsgs(uint64(processedMsgs.Timestamp))),
 			Value: data,
 		})
@@ -108,30 +129,31 @@ func (n *Node) RawKVProcessedData(processedData []nodetypes.ProcessedMsgs, delet
 	return kvs, nil
 }
 
-func (n *Node) saveProcessedMsgs(processedMsgs nodetypes.ProcessedMsgs) error {
-	data, err := processedMsgs.Marshal()
-	if err != nil {
-		return err
-	}
-	return n.db.Set(nodetypes.PrefixedProcessedMsgs(uint64(processedMsgs.Timestamp)), data)
-}
+// currently no use case, but keep it for future use
+// func (n *Node) saveProcessedMsgs(processedMsgs nodetypes.ProcessedMsgs) error {
+// 	data, err := processedMsgs.Marshal()
+// 	if err != nil {
+// 		return err
+// 	}
+// 	return n.db.Set(nodetypes.PrefixedProcessedMsgs(uint64(processedMsgs.Timestamp)), data)
+// }
 
-func (n *Node) loadProcessedData() (processedData []nodetypes.ProcessedMsgs, err error) {
-	iterErr := n.db.PrefixedIterate(nodetypes.ProcessedMsgsKey, func(_, value []byte) (stop bool) {
-		processedMsgs := nodetypes.ProcessedMsgs{}
-		err = processedMsgs.Unmarshal(value)
+func (n *Node) loadProcessedMsgs() (ProcessedMsgs []nodetypes.ProcessedMsgs, err error) {
+	iterErr := n.db.PrefixedIterate(nodetypes.ProcessedMsgsKey, func(_, value []byte) (stop bool, err error) {
+		var processedMsgs nodetypes.ProcessedMsgs
+		err = processedMsgs.UnmarshalInterfaceJSON(n.cdc, value)
 		if err != nil {
-			return true
+			return true, err
 		}
-		processedData = append(processedData, processedMsgs)
-		return false
+		ProcessedMsgs = append(ProcessedMsgs, processedMsgs)
+		return false, nil
 	})
 
 	if iterErr != nil {
 		return nil, iterErr
 	}
-	n.logger.Info("load pending processed msgs", zap.Int("count", len(processedData)))
-	return processedData, nil
+	n.logger.Info("load pending processed msgs", zap.Int("count", len(ProcessedMsgs)))
+	return ProcessedMsgs, nil
 }
 
 func (n *Node) deleteProcessedMsgs(timestamp int64) error {

@@ -21,7 +21,9 @@ func (ch Child) GetAddressStr() (string, error) {
 
 func (ch Child) QueryBridgeInfo() (opchildtypes.BridgeInfo, error) {
 	req := &opchildtypes.QueryBridgeInfoRequest{}
-	ctx := node.GetQueryContext(0)
+	ctx, cancel := node.GetQueryContext(0)
+	defer cancel()
+
 	res, err := ch.opchildQueryClient.BridgeInfo(ctx, req)
 	if err != nil {
 		return opchildtypes.BridgeInfo{}, err
@@ -31,7 +33,9 @@ func (ch Child) QueryBridgeInfo() (opchildtypes.BridgeInfo, error) {
 
 func (ch Child) QueryNextL1Sequence() (uint64, error) {
 	req := &opchildtypes.QueryNextL1SequenceRequest{}
-	ctx := node.GetQueryContext(0)
+	ctx, cancel := node.GetQueryContext(0)
+	defer cancel()
+
 	res, err := ch.opchildQueryClient.NextL1Sequence(ctx, req)
 	if err != nil {
 		return 0, err
@@ -41,7 +45,9 @@ func (ch Child) QueryNextL1Sequence() (uint64, error) {
 
 func (ch Child) QueryNextL2Sequence(height uint64) (uint64, error) {
 	req := &opchildtypes.QueryNextL2SequenceRequest{}
-	ctx := node.GetQueryContext(height)
+	ctx, cancel := node.GetQueryContext(height)
+	defer cancel()
+
 	res, err := ch.opchildQueryClient.NextL2Sequence(ctx, req)
 	if err != nil {
 		return 0, err
@@ -59,6 +65,7 @@ func (ch Child) QueryWithdrawal(sequence uint64) (executortypes.QueryWithdrawalR
 	if err != nil {
 		return executortypes.QueryWithdrawalResponse{}, err
 	}
+
 	amount := sdk.NewCoin(withdrawal.BaseDenom, math.NewIntFromUint64(withdrawal.Amount))
 
 	treeExtraData := executortypes.TreeExtraData{}
@@ -77,9 +84,8 @@ func (ch Child) QueryWithdrawal(sequence uint64) (executortypes.QueryWithdrawalR
 		Version:          []byte{ch.version},
 		StorageRoot:      outputRoot,
 		LatestBlockHash:  treeExtraData.BlockHash,
-
-		BlockNumber:    treeExtraData.BlockNumber,
-		Receiver:       withdrawal.To,
-		WithdrawalHash: withdrawal.WithdrawalHash,
+		BlockNumber:      treeExtraData.BlockNumber,
+		Receiver:         withdrawal.To,
+		WithdrawalHash:   withdrawal.WithdrawalHash,
 	}, nil
 }

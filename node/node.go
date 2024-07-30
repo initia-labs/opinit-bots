@@ -39,16 +39,21 @@ type Node struct {
 	txf        tx.Factory
 
 	lastProcessedBlockHeight uint64
-	pendingTxMu              *sync.Mutex
-	pendingTxs               []nodetypes.PendingTxInfo
 
-	pendingProcessedData []nodetypes.ProcessedMsgs
+	// local pending txs, which is following Queue data structure
+	pendingTxMu *sync.Mutex
+	pendingTxs  []nodetypes.PendingTxInfo
+
+	pendingProcessedMsgs []nodetypes.ProcessedMsgs
 
 	txChannel chan nodetypes.ProcessedMsgs
 }
 
 func NewNode(cfg nodetypes.NodeConfig, db types.DB, logger *zap.Logger, cdc codec.Codec, txConfig client.TxConfig) (*Node, error) {
 	client, err := client.NewClientFromNode(cfg.RPC)
+	if err != nil {
+		return nil, err
+	}
 
 	// Use memory keyring for now
 	// TODO: may use os keyring later
@@ -73,7 +78,7 @@ func NewNode(cfg nodetypes.NodeConfig, db types.DB, logger *zap.Logger, cdc code
 		pendingTxMu: &sync.Mutex{},
 		pendingTxs:  make([]nodetypes.PendingTxInfo, 0),
 
-		pendingProcessedData: make([]nodetypes.ProcessedMsgs, 0),
+		pendingProcessedMsgs: make([]nodetypes.ProcessedMsgs, 0),
 
 		txChannel: make(chan nodetypes.ProcessedMsgs),
 	}
@@ -97,27 +102,37 @@ func NewNode(cfg nodetypes.NodeConfig, db types.DB, logger *zap.Logger, cdc code
 			return nil, err
 		}
 	}
+
 	return n, nil
 }
 
-func (n Node) Start(ctx context.Context) {
-	go n.txBroadcastLooper(ctx)
+func (n Node) Start(ctx context.Context, errCh chan error) {
+	go func() {
+		err := n.txBroadcastLooper(ctx)
+		if err != nil {
+			errCh <- err
+		}
+	}()
 
 	// broadcast pending msgs first before executing block process looper
-	for _, processedMsg := range n.pendingProcessedData {
+	// @dev: these pending processed data is filled at initialization(`NewNode`).
+	for _, processedMsg := range n.pendingProcessedMsgs {
 		n.BroadcastMsgs(processedMsg)
 	}
-	go n.blockProcessLooper(ctx)
+
+	go func() {
+		err := n.blockProcessLooper(ctx)
+		if err != nil {
+			errCh <- err
+		}
+	}()
 }
 
 func (n Node) HasKey() bool {
-	if n.cfg.Mnemonic == "" {
-		return false
-	}
-	return true
+	return n.cfg.Mnemonic != ""
 }
 
-func (n *Node) prepareBroadcaster(lastBlockHeight uint64, lastBlockTime time.Time) error {
+func (n *Node) prepareBroadcaster(_ /*lastBlockHeight*/ uint64, lastBlockTime time.Time) error {
 	_, err := n.keyBase.NewAccount(nodetypes.KEY_NAME, n.cfg.Mnemonic, "", hd.CreateHDPath(sdk.GetConfig().GetCoinType(), 0, 0).String(), hd.Secp256k1)
 	if err != nil {
 		return err
@@ -149,7 +164,7 @@ func (n *Node) prepareBroadcaster(lastBlockHeight uint64, lastBlockTime time.Tim
 		return err
 	}
 
-	dbBatchKVs := make([]types.KV, 0)
+	dbBatchKVs := make([]types.RawKV, 0)
 
 	loadedPendingTxs, err := n.loadPendingTxs()
 	if err != nil {
@@ -160,66 +175,71 @@ func (n *Node) prepareBroadcaster(lastBlockHeight uint64, lastBlockTime time.Tim
 		pendingTxTime := time.Unix(0, loadedPendingTxs[0].Timestamp)
 
 		// if we have pending txs, wait until timeout
-		if lastBlockTime.Before(pendingTxTime.Add(nodetypes.TX_TIMEOUT)) {
-			timer := time.NewTimer(pendingTxTime.Add(nodetypes.TX_TIMEOUT).Sub(lastBlockTime))
+		if timeoutTime := pendingTxTime.Add(nodetypes.TX_TIMEOUT); lastBlockTime.Before(timeoutTime) {
+			timer := time.NewTimer(timeoutTime.Sub(lastBlockTime))
 			<-timer.C
 		}
 
-		// delete existing pending txs
-		pendingKVs, err := n.RawKVPendingTxs(loadedPendingTxs, true)
+		// convert pending txs to raw kv pairs for deletion
+		pendingKVs, err := n.PendingTxsToRawKV(loadedPendingTxs, true)
 		if err != nil {
 			return err
 		}
+
+		// add pending txs delegation to db batch
 		dbBatchKVs = append(dbBatchKVs, pendingKVs...)
 
 		// convert pending txs to pending msgs
-		for _, txInfo := range loadedPendingTxs {
+		for i, txInfo := range loadedPendingTxs {
 			tx, err := n.DecodeTx(txInfo.Tx)
 			if err != nil {
 				return err
 			}
 			if txInfo.Save {
-				n.pendingProcessedData = append(n.pendingProcessedData, nodetypes.ProcessedMsgs{
+				n.pendingProcessedMsgs = append(n.pendingProcessedMsgs, nodetypes.ProcessedMsgs{
 					Msgs:      tx.GetMsgs(),
 					Timestamp: time.Now().UnixNano(),
 					Save:      txInfo.Save,
 				})
 			}
-		}
 
-		for i, pendingTx := range loadedPendingTxs {
-			n.logger.Debug("pending tx", zap.Int("index", i), zap.String("tx", pendingTx.String()))
+			n.logger.Debug("pending tx", zap.Int("index", i), zap.String("tx", txInfo.String()))
 		}
 	}
 
-	loadedProcessedData, err := n.loadProcessedData()
+	loadedProcessedMsgs, err := n.loadProcessedMsgs()
 	if err != nil {
 		return err
 	}
-	kvProcessedData, err := n.RawKVProcessedData(loadedProcessedData, true)
-	if err != nil {
-		return err
-	}
-	dbBatchKVs = append(dbBatchKVs, kvProcessedData...)
 
-	for i, pendingMsgs := range loadedProcessedData {
-		loadedProcessedData[i].Timestamp = time.Now().UnixNano()
+	// need to remove processed msgs from db before updating the timestamp
+	// because the timestamp is used as a key.
+	kvProcessedMsgs, err := n.ProcessedMsgsToRawKV(loadedProcessedMsgs, true)
+	if err != nil {
+		return err
+	}
+	dbBatchKVs = append(dbBatchKVs, kvProcessedMsgs...)
+
+	// update timestamp of loaded processed msgs
+	for i, pendingMsgs := range loadedProcessedMsgs {
+		loadedProcessedMsgs[i].Timestamp = time.Now().UnixNano()
 		n.logger.Debug("pending msgs", zap.Int("index", i), zap.String("msgs", pendingMsgs.String()))
 	}
 
-	n.pendingProcessedData = append(n.pendingProcessedData, loadedProcessedData...)
-
-	kvProcessedData, err = n.RawKVProcessedData(n.pendingProcessedData, false)
+	// save all pending msgs with updated timestamp to db
+	n.pendingProcessedMsgs = append(n.pendingProcessedMsgs, loadedProcessedMsgs...)
+	kvProcessedMsgs, err = n.ProcessedMsgsToRawKV(n.pendingProcessedMsgs, false)
 	if err != nil {
 		return err
 	}
-	dbBatchKVs = append(dbBatchKVs, kvProcessedData...)
+	dbBatchKVs = append(dbBatchKVs, kvProcessedMsgs...)
 
 	// save all pending msgs first, then broadcast them
 	err = n.db.RawBatchSet(dbBatchKVs...)
 	if err != nil {
 		return err
 	}
+
 	return nil
 }
 

@@ -2,18 +2,18 @@ package host
 
 import (
 	"context"
+	"fmt"
 
-	"cosmossdk.io/core/address"
-	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
-	nodetypes "github.com/initia-labs/opinit-bots-go/node/types"
-	"github.com/initia-labs/opinit-bots-go/types"
 	"go.uber.org/zap"
 
+	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
 	"github.com/initia-labs/opinit-bots-go/node"
+	nodetypes "github.com/initia-labs/opinit-bots-go/node/types"
+	"github.com/initia-labs/opinit-bots-go/types"
 
+	"cosmossdk.io/core/address"
 	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/codec"
-
 	sdk "github.com/cosmos/cosmos-sdk/types"
 )
 
@@ -22,12 +22,13 @@ type childNode interface {
 	AccountCodec() address.Codec
 	HasKey() bool
 	BroadcastMsgs(nodetypes.ProcessedMsgs)
-	RawKVProcessedData([]nodetypes.ProcessedMsgs, bool) ([]types.KV, error)
+	ProcessedMsgsToRawKV([]nodetypes.ProcessedMsgs, bool) ([]types.RawKV, error)
 	QueryNextL1Sequence() (uint64, error)
 }
 
 type Host struct {
-	version uint8
+	version     uint8
+	relayOracle bool
 
 	node  *node.Node
 	child childNode
@@ -47,14 +48,18 @@ type Host struct {
 	msgQueue      []sdk.Msg
 }
 
-func NewHost(version uint8, cfg nodetypes.NodeConfig, db types.DB, logger *zap.Logger, cdc codec.Codec, txConfig client.TxConfig) *Host {
+func NewHost(
+	version uint8, relayOracle bool, cfg nodetypes.NodeConfig,
+	db types.DB, logger *zap.Logger, cdc codec.Codec, txConfig client.TxConfig,
+) *Host {
 	node, err := node.NewNode(cfg, db, logger, cdc, txConfig)
 	if err != nil {
 		panic(err)
 	}
 
 	h := &Host{
-		version: version,
+		version:     version,
+		relayOracle: relayOracle,
 
 		node: node,
 
@@ -84,11 +89,19 @@ func (h *Host) Initialize(child childNode, bridgeId int64) (err error) {
 	}
 
 	h.registerHandlers()
+
 	return nil
 }
 
-func (h *Host) Start(ctx context.Context) {
-	h.node.Start(ctx)
+func (h *Host) Start(ctx context.Context, errCh chan error) {
+	defer func() {
+		if r := recover(); r != nil {
+			h.logger.Error("host panic", zap.Any("recover", r))
+			errCh <- fmt.Errorf("host panic: %v", r)
+		}
+	}()
+
+	h.node.Start(ctx, errCh)
 }
 
 func (h *Host) registerHandlers() {
@@ -104,11 +117,12 @@ func (h Host) BroadcastMsgs(msgs nodetypes.ProcessedMsgs) {
 	if !h.node.HasKey() {
 		return
 	}
+
 	h.node.BroadcastMsgs(msgs)
 }
 
-func (h Host) RawKVProcessedData(msgs []nodetypes.ProcessedMsgs, delete bool) ([]types.KV, error) {
-	return h.node.RawKVProcessedData(msgs, delete)
+func (h Host) ProcessedMsgsToRawKV(msgs []nodetypes.ProcessedMsgs, delete bool) ([]types.RawKV, error) {
+	return h.node.ProcessedMsgsToRawKV(msgs, delete)
 }
 
 func (h *Host) SetBridgeId(brigeId int64) {
@@ -121,4 +135,8 @@ func (h Host) AccountCodec() address.Codec {
 
 func (h Host) HasKey() bool {
 	return h.node.HasKey()
+}
+
+func (ch Host) GetHeight() uint64 {
+	return ch.node.GetHeight()
 }
