@@ -29,7 +29,12 @@ func (n *Node) loadSyncInfo() error {
 	} else if err != nil {
 		return err
 	}
-	n.lastProcessedBlockHeight = dbtypes.ToUint64(data)
+
+	n.lastProcessedBlockHeight, err = dbtypes.ToUint64(data)
+	if err != nil {
+		return err
+	}
+
 	n.logger.Info("load sync info", zap.Uint64("last_processed_height", n.lastProcessedBlockHeight))
 	return nil
 }

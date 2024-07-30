@@ -2,6 +2,7 @@ package child
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"cosmossdk.io/core/address"
@@ -99,6 +100,13 @@ func (ch *Child) Initialize(host hostNode, bridgeInfo opchildtypes.BridgeInfo) {
 }
 
 func (ch *Child) Start(ctx context.Context, errCh chan error) {
+	defer func() {
+		if r := recover(); r != nil {
+			ch.logger.Error("child panic", zap.Any("recover", r))
+			errCh <- fmt.Errorf("child panic: %v", r)
+		}
+	}()
+
 	ch.node.Start(ctx, errCh)
 }
 
