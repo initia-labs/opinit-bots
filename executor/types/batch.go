@@ -13,7 +13,7 @@ type DANode interface {
 	HasKey() bool
 	CreateBatchMsg([]byte) (sdk.Msg, error)
 	BroadcastMsgs(nodetypes.ProcessedMsgs)
-	ProcessedMsgsToRawKV([]nodetypes.ProcessedMsgs, bool) ([]types.RawKV, error)
+	ProcessedMsgsToRawKV(processedMsgs []nodetypes.ProcessedMsgs, delete bool) ([]types.RawKV, error)
 }
 
 type BatchHeader struct {

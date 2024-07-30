@@ -9,6 +9,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/pkg/errors"
+
 	sdkerrors "cosmossdk.io/errors"
 	abci "github.com/cometbft/cometbft/abci/types"
 	comettypes "github.com/cometbft/cometbft/types"
@@ -61,7 +63,13 @@ func (n *Node) txBroadcastLooper(ctx context.Context) error {
 			}
 
 			if err != nil {
+<<<<<<< HEAD
 				return err
+||||||| parent of f6e90c0 (add comments)
+				panic(err)
+=======
+				return errors.Wrap(err, "failed to handle processed msgs")
+>>>>>>> f6e90c0 (add comments)
 			}
 		}
 	}

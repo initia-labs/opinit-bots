@@ -105,7 +105,7 @@ func (bs *BatchSubmitter) Initialize(host hostNode, bridgeInfo opchildtypes.Brid
 		if len(bs.batchInfos) == 1 || batchInfo.Output.L2BlockNumber >= bs.node.GetHeight() {
 			break
 		}
-		bs.PopBatchInfo()
+		bs.DequeueBatchInfo()
 	}
 
 	bs.batchFile, err = os.OpenFile(bs.homePath+"/batch", os.O_CREATE|os.O_APPEND|os.O_RDWR, 0666)
