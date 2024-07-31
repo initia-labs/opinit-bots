@@ -2,6 +2,7 @@ package node
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 
@@ -11,7 +12,6 @@ import (
 	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/client/tx"
 	"github.com/cosmos/cosmos-sdk/codec"
-	"github.com/cosmos/cosmos-sdk/crypto/hd"
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/tx/signing"
@@ -25,6 +25,8 @@ type BuildTxWithMessagesFn func(*Node, context.Context, []sdk.Msg) ([]byte, erro
 
 type Node struct {
 	*clienthttp.HTTP
+
+	processType nodetypes.BlockProcessType
 
 	cfg    nodetypes.NodeConfig
 	db     types.DB
@@ -54,9 +56,11 @@ type Node struct {
 
 	txChannel    chan nodetypes.ProcessedMsgs
 	bech32Prefix string
+
+	running bool
 }
 
-func NewNode(cfg nodetypes.NodeConfig, db types.DB, logger *zap.Logger, cdc codec.Codec, txConfig client.TxConfig, bech32Prefix string) (*Node, error) {
+func NewNode(processType nodetypes.BlockProcessType, cfg nodetypes.NodeConfig, db types.DB, logger *zap.Logger, cdc codec.Codec, txConfig client.TxConfig, bech32Prefix string, batchSubmitter string) (*Node, error) {
 	client, err := clienthttp.New(cfg.RPC, "/websocket")
 	if err != nil {
 		return nil, err
@@ -69,6 +73,8 @@ func NewNode(cfg nodetypes.NodeConfig, db types.DB, logger *zap.Logger, cdc code
 
 	n := &Node{
 		HTTP: client,
+
+		processType: processType,
 
 		cfg:    cfg,
 		db:     db,
@@ -91,6 +97,30 @@ func NewNode(cfg nodetypes.NodeConfig, db types.DB, logger *zap.Logger, cdc code
 		bech32Prefix: bech32Prefix,
 	}
 
+	var key *keyring.Record
+	if batchSubmitter != "" {
+		addr, err := n.DecodeBech32AccAddr(batchSubmitter)
+		if err != nil {
+			return nil, err
+		}
+		key, err = n.keyBase.KeyByAddress(addr)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get key by address from keyring: %s", batchSubmitter)
+		}
+	} else if n.cfg.Account != "" {
+		key, err = n.keyBase.Key(n.cfg.Account)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get key from keyring: %s", n.cfg.Account)
+		}
+	}
+
+	if key != nil {
+		addr, err := key.GetAddress()
+		if err != nil {
+			return nil, err
+		}
+		n.keyAddress = addr
+	}
 	err = n.loadSyncInfo()
 	if err != nil {
 		return nil, err
@@ -110,11 +140,15 @@ func NewNode(cfg nodetypes.NodeConfig, db types.DB, logger *zap.Logger, cdc code
 			return nil, err
 		}
 	}
-
 	return n, nil
 }
 
-func (n Node) Start(ctx context.Context, errCh chan error, processType nodetypes.BlockProcessType) {
+func (n *Node) Start(ctx context.Context, errCh chan error) {
+	if n.running {
+		return
+	}
+	n.running = true
+
 	go func() {
 		err := n.txBroadcastLooper(ctx)
 		if err != nil {
@@ -128,7 +162,7 @@ func (n Node) Start(ctx context.Context, errCh chan error, processType nodetypes
 		n.BroadcastMsgs(processedMsg)
 	}
 
-	if processType == nodetypes.PROCESS_TYPE_ONLY_BROADCAST {
+	if n.processType == nodetypes.PROCESS_TYPE_ONLY_BROADCAST {
 		go func() {
 			err := n.txChecker(ctx)
 			if err != nil {
@@ -137,7 +171,7 @@ func (n Node) Start(ctx context.Context, errCh chan error, processType nodetypes
 		}()
 	} else {
 		go func() {
-			err := n.blockProcessLooper(ctx, processType)
+			err := n.blockProcessLooper(ctx, n.processType)
 			if err != nil {
 				errCh <- err
 			}
@@ -146,27 +180,10 @@ func (n Node) Start(ctx context.Context, errCh chan error, processType nodetypes
 }
 
 func (n Node) HasKey() bool {
-	return n.cfg.Mnemonic != ""
+	return n.keyAddress != nil
 }
 
 func (n *Node) prepareBroadcaster(_ /*lastBlockHeight*/ uint64, lastBlockTime time.Time) error {
-	_, err := n.keyBase.NewAccount(nodetypes.KEY_NAME, n.cfg.Mnemonic, "", hd.CreateHDPath(sdk.GetConfig().GetCoinType(), 0, 0).String(), hd.Secp256k1)
-	if err != nil {
-		return err
-	}
-	// to check if the key is normally created
-	// TODO: delete this code
-	key, err := n.keyBase.Key(nodetypes.KEY_NAME)
-	if err != nil {
-		return err
-	}
-
-	addr, err := key.GetAddress()
-	if err != nil {
-		return err
-	}
-	n.keyAddress = addr
-
 	n.txf = tx.Factory{}.
 		WithAccountRetriever(n).
 		WithChainID(n.cfg.ChainID).
@@ -176,7 +193,7 @@ func (n *Node) prepareBroadcaster(_ /*lastBlockHeight*/ uint64, lastBlockTime ti
 		WithKeybase(n.keyBase).
 		WithSignMode(signing.SignMode_SIGN_MODE_DIRECT)
 
-	err = n.loadAccount()
+	err := n.loadAccount()
 	if err != nil {
 		return err
 	}

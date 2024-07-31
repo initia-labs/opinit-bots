@@ -53,10 +53,10 @@ type Celestia struct {
 
 func NewDACelestia(
 	version uint8, cfg nodetypes.NodeConfig,
-	db types.DB, logger *zap.Logger,
+	db types.DB, logger *zap.Logger, batchSubmitter string,
 ) *Celestia {
 	appCodec, txConfig, bech32Prefix := getCodec()
-	node, err := node.NewNode(cfg, db, logger, appCodec, txConfig, bech32Prefix)
+	node, err := node.NewNode(cfg, db, logger, appCodec, txConfig, bech32Prefix, batchSubmitter)
 	if err != nil {
 		panic(err)
 	}

@@ -62,7 +62,7 @@ type BatchSubmitter struct {
 }
 
 func NewBatchSubmitter(version uint8, cfg nodetypes.NodeConfig, batchCfg executortypes.BatchConfig, db types.DB, logger *zap.Logger, homePath string) *BatchSubmitter {
-	node, err := node.NewNode(cfg, db, logger, nil, nil, "")
+	node, err := node.NewNode(nodetypes.PROCESS_TYPE_RAW, cfg, db, logger, nil, nil, "", "")
 	if err != nil {
 		panic(err)
 	}
@@ -137,7 +137,8 @@ func (bs *BatchSubmitter) Start(ctx context.Context, errCh chan error) {
 		}
 	}()
 
-	bs.node.Start(ctx, errCh, nodetypes.PROCESS_TYPE_RAW)
+	bs.node.Start(ctx, errCh)
+	bs.da.Start(ctx, errCh)
 }
 
 func (bs *BatchSubmitter) SetBridgeInfo(bridgeInfo opchildtypes.BridgeInfo) {
@@ -165,4 +166,8 @@ func (bs *BatchSubmitter) SubmissionInfoToRawKV(timestamp int64) types.RawKV {
 
 func (bs *BatchSubmitter) ChainID() string {
 	return bs.cfg.ChainID
+}
+
+func (bs *BatchSubmitter) DA() executortypes.DANode {
+	return bs.da
 }

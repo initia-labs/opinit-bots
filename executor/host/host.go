@@ -66,10 +66,15 @@ type Host struct {
 
 func NewHost(
 	version uint8, relayOracle bool, cfg nodetypes.NodeConfig,
-	db types.DB, logger *zap.Logger,
+	db types.DB, logger *zap.Logger, batchSubmitter string,
 ) *Host {
 	appCodec, txConfig, bech32Prefix := getCodec()
-	node, err := node.NewNode(cfg, db, logger, appCodec, txConfig, bech32Prefix)
+	processType := nodetypes.PROCESS_TYPE_DEFAULT
+	if batchSubmitter != "" {
+		processType = nodetypes.PROCESS_TYPE_ONLY_BROADCAST
+	}
+
+	node, err := node.NewNode(processType, cfg, db, logger, appCodec, txConfig, bech32Prefix, batchSubmitter)
 	if err != nil {
 		panic(err)
 	}
@@ -127,7 +132,7 @@ func (h *Host) Start(ctx context.Context, errCh chan error) {
 		}
 	}()
 
-	h.node.Start(ctx, errCh, nodetypes.PROCESS_TYPE_DEFAULT)
+	h.node.Start(ctx, errCh)
 }
 
 func (h *Host) registerHandlers() {

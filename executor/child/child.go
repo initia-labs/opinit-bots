@@ -73,7 +73,7 @@ func NewChild(
 	if err != nil {
 		panic(err)
 	}
-	node, err := node.NewNode(cfg, db, logger, appCodec, txConfig, bech32Prefix)
+	node, err := node.NewNode(nodetypes.PROCESS_TYPE_DEFAULT, cfg, db, logger, appCodec, txConfig, bech32Prefix, "")
 	if err != nil {
 		panic(err)
 	}
@@ -133,7 +133,7 @@ func (ch *Child) Start(ctx context.Context, errCh chan error) {
 		}
 	}()
 
-	ch.node.Start(ctx, errCh, nodetypes.PROCESS_TYPE_DEFAULT)
+	ch.node.Start(ctx, errCh)
 }
 
 func (ch *Child) registerHandlers() {

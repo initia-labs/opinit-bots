@@ -45,7 +45,7 @@ func NewExecutor(cfg *executortypes.Config, db types.DB, sv *server.Server, logg
 		host: host.NewHost(
 			cfg.Version, cfg.RelayOracle, cfg.L1NodeConfig(),
 			db.WithPrefix([]byte(executortypes.HostNodeName)),
-			logger.Named(executortypes.HostNodeName),
+			logger.Named(executortypes.HostNodeName), "",
 		),
 		child: child.NewChild(
 			cfg.Version, cfg.L2NodeConfig(),
@@ -112,7 +112,7 @@ func (ex *Executor) Start(cmdCtx context.Context) error {
 	childCtx, childDone := context.WithCancel(cmdCtx)
 	batchCtx, batchDone := context.WithCancel(cmdCtx)
 
-	errCh := make(chan error, 3)
+	errCh := make(chan error, 4)
 	ex.host.Start(hostCtx, errCh)
 	ex.child.Start(childCtx, errCh)
 	ex.batch.Start(batchCtx, errCh)
@@ -182,12 +182,14 @@ func (ex *Executor) RegisterQuerier() {
 }
 
 func (ex *Executor) makeDANode() (executortypes.DANode, error) {
+	batchInfo := ex.batch.BatchInfo()
+
 	switch ex.cfg.DAChainID {
 	case ex.cfg.L1ChainID:
 		da := host.NewHost(
 			ex.cfg.Version, false, ex.cfg.DANodeConfig(),
 			ex.db.WithPrefix([]byte(executortypes.DAHostNodeName)),
-			ex.logger.Named(executortypes.DAHostNodeName),
+			ex.logger.Named(executortypes.DAHostNodeName), batchInfo.BatchInfo.Submitter,
 		)
 		if ex.host.GetAddress().Equals(da.GetAddress()) {
 			return ex.host, nil
@@ -196,7 +198,8 @@ func (ex *Executor) makeDANode() (executortypes.DANode, error) {
 	case "celestia":
 		return celestia.NewDACelestia(ex.cfg.Version, ex.cfg.DANodeConfig(),
 			ex.db.WithPrefix([]byte(executortypes.DACelestiaNodeName)),
-			ex.logger.Named(executortypes.DACelestiaNodeName)), nil
+			ex.logger.Named(executortypes.DACelestiaNodeName), batchInfo.BatchInfo.Submitter,
+		), nil
 	}
 	return nil, fmt.Errorf("unsupported chain id for DA: %s", ex.cfg.DAChainID)
 }

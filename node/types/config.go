@@ -8,6 +8,6 @@ type NodeConfig struct {
 	//
 	// If you don't want to use the mnemonic, you can leave it empty.
 	// Then the bot will skip the tx submission.
-	Mnemonic string `json:"mnemonic"`
+	Account  string `json:"account"`
 	GasPrice string `json:"gas_price"`
 }
