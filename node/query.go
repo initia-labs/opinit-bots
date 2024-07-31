@@ -11,6 +11,7 @@ import (
 	sdkerrors "cosmossdk.io/errors"
 	abci "github.com/cometbft/cometbft/abci/types"
 	client2 "github.com/cometbft/cometbft/rpc/client"
+	coretypes "github.com/cometbft/cometbft/rpc/core/types"
 	"github.com/cosmos/cosmos-sdk/codec/types"
 	legacyerrors "github.com/cosmos/cosmos-sdk/types/errors"
 	grpctypes "github.com/cosmos/cosmos-sdk/types/grpc"
@@ -163,4 +164,10 @@ func (n *Node) QueryBlockBulk(start uint64, end uint64) ([][]byte, error) {
 	ctx, cancel := GetQueryContext(0)
 	defer cancel()
 	return n.BlockBulk(ctx, &start, &end)
+}
+
+func (n *Node) QueryTx(txHash []byte) (*coretypes.ResultTx, error) {
+	ctx, cancel := GetQueryContext(0)
+	defer cancel()
+	return n.Tx(ctx, txHash, false)
 }

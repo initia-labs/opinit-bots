@@ -74,8 +74,9 @@ func NewBatchSubmitter(version uint8, cfg nodetypes.NodeConfig, batchCfg executo
 
 		cfg:      cfg,
 		batchCfg: batchCfg,
-		db:       db,
-		logger:   logger,
+
+		db:     db,
+		logger: logger,
 
 		opchildQueryClient: opchildtypes.NewQueryClient(node),
 
@@ -87,7 +88,7 @@ func NewBatchSubmitter(version uint8, cfg nodetypes.NodeConfig, batchCfg executo
 	return ch
 }
 
-func (bs *BatchSubmitter) Initialize(host hostNode, da executortypes.DANode, bridgeInfo opchildtypes.BridgeInfo) error {
+func (bs *BatchSubmitter) Initialize(host hostNode, bridgeInfo opchildtypes.BridgeInfo) error {
 	bs.host = host
 	bs.bridgeInfo = bridgeInfo
 
@@ -105,11 +106,6 @@ func (bs *BatchSubmitter) Initialize(host hostNode, da executortypes.DANode, bri
 		}
 		bs.PopBatchInfo()
 	}
-	// TODO: set da and  key that match the current batch info
-	bs.da = da
-	if !bs.da.HasKey() {
-		return errors.New("da has no key")
-	}
 
 	bs.batchFile, err = os.OpenFile(bs.homePath+"/batch", os.O_CREATE|os.O_APPEND|os.O_RDWR, 0666)
 	if err != nil {
@@ -122,6 +118,14 @@ func (bs *BatchSubmitter) Initialize(host hostNode, da executortypes.DANode, bri
 	}
 
 	bs.node.RegisterRawBlockHandler(bs.rawBlockHandler)
+	return nil
+}
+
+func (bs *BatchSubmitter) SetDANode(da executortypes.DANode) error {
+	bs.da = da
+	if !bs.da.HasKey() {
+		return errors.New("da has no key")
+	}
 	return nil
 }
 
@@ -157,4 +161,8 @@ func (bs *BatchSubmitter) SubmissionInfoToRawKV(timestamp int64) types.RawKV {
 		Key:   bs.db.PrefixedKey(SubmissionKey),
 		Value: dbtypes.FromInt64(timestamp),
 	}
+}
+
+func (bs *BatchSubmitter) ChainID() string {
+	return bs.cfg.ChainID
 }

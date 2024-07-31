@@ -16,4 +16,5 @@ type BlockProcessType uint8
 const (
 	PROCESS_TYPE_DEFAULT BlockProcessType = iota
 	PROCESS_TYPE_RAW
+	PROCESS_TYPE_ONLY_BROADCAST
 )

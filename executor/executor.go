@@ -3,10 +3,12 @@ package executor
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strconv"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/initia-labs/opinit-bots-go/executor/batch"
+	"github.com/initia-labs/opinit-bots-go/executor/celestia"
 	"github.com/initia-labs/opinit-bots-go/executor/child"
 	"github.com/initia-labs/opinit-bots-go/executor/host"
 	"github.com/initia-labs/opinit-bots-go/server"
@@ -72,14 +74,6 @@ func NewExecutor(cfg *executortypes.Config, db types.DB, sv *server.Server, logg
 		zap.Duration("submission_interval", bridgeInfo.BridgeConfig.SubmissionInterval),
 	)
 
-	da := executor.host
-	// if cfg.Batch.DANode.ChainID != cfg.HostNode.ChainID {
-	// 	switch cfg.Batch.DANode.ChainID {
-	// 	case "celestia":
-	// 		da = celestia.NewCelestia()
-	// 	}
-	// }
-
 	err = executor.host.Initialize(executor.child, executor.batch, int64(bridgeInfo.BridgeId))
 	if err != nil {
 		panic(err)
@@ -88,10 +82,20 @@ func NewExecutor(cfg *executortypes.Config, db types.DB, sv *server.Server, logg
 	if err != nil {
 		panic(err)
 	}
-	err = executor.batch.Initialize(executor.host, da, bridgeInfo)
+	err = executor.batch.Initialize(executor.host, bridgeInfo)
 	if err != nil {
 		panic(err)
 	}
+
+	da, err := executor.makeDANode()
+	if err != nil {
+		panic(err)
+	}
+	err = executor.batch.SetDANode(da)
+	if err != nil {
+		panic(err)
+	}
+
 	executor.RegisterQuerier()
 	return executor
 }
@@ -175,4 +179,24 @@ func (ex *Executor) RegisterQuerier() {
 
 		return c.JSON(res)
 	})
+}
+
+func (ex *Executor) makeDANode() (executortypes.DANode, error) {
+	switch ex.cfg.DAChainID {
+	case ex.cfg.L1ChainID:
+		da := host.NewHost(
+			ex.cfg.Version, false, ex.cfg.DANodeConfig(),
+			ex.db.WithPrefix([]byte(executortypes.DAHostNodeName)),
+			ex.logger.Named(executortypes.DAHostNodeName),
+		)
+		if ex.host.GetAddress().Equals(da.GetAddress()) {
+			return ex.host, nil
+		}
+		return da, nil
+	case "celestia":
+		return celestia.NewDACelestia(ex.cfg.Version, ex.cfg.DANodeConfig(),
+			ex.db.WithPrefix([]byte(executortypes.DACelestiaNodeName)),
+			ex.logger.Named(executortypes.DACelestiaNodeName)), nil
+	}
+	return nil, fmt.Errorf("unsupported chain id for DA: %s", ex.cfg.DAChainID)
 }

@@ -105,7 +105,7 @@ func (n *Node) handleMsgError(err error) error {
 
 func (n *Node) handleProcessedMsgs(ctx context.Context, data nodetypes.ProcessedMsgs) error {
 	sequence := n.txf.Sequence()
-	txBytes, err := n.buildTxWithMessages(ctx, data.Msgs)
+	txBytes, err := n.buildTxWithMessages(n, ctx, data.Msgs)
 	if err != nil {
 		return sdkerrors.Wrapf(err, "simulation failed")
 	}
@@ -160,40 +160,8 @@ func (n *Node) BroadcastMsgs(msgs nodetypes.ProcessedMsgs) {
 	n.txChannel <- msgs
 }
 
-// buildTxWithMessages creates a transaction from the given messages.
-func (n *Node) buildTxWithMessages(
-	ctx context.Context,
-	msgs []sdk.Msg,
-) (
-	txBytes []byte,
-	err error,
-) {
-	txf := n.txf
-	_, adjusted, err := n.calculateGas(ctx, txf, msgs...)
-	if err != nil {
-		return nil, err
-	}
-
-	txf = txf.WithGas(adjusted)
-	txb, err := txf.BuildUnsignedTx(msgs...)
-	if err != nil {
-		return nil, err
-	}
-
-	if err = tx.Sign(ctx, txf, nodetypes.KEY_NAME, txb, false); err != nil {
-		return nil, err
-	}
-
-	tx := txb.GetTx()
-	txBytes, err = n.EncodeTx(tx)
-	if err != nil {
-		return nil, err
-	}
-	return txBytes, nil
-}
-
 // CalculateGas simulates a tx to generate the appropriate gas settings before broadcasting a tx.
-func (n *Node) calculateGas(ctx context.Context, txf tx.Factory, msgs ...sdk.Msg) (txtypes.SimulateResponse, uint64, error) {
+func (n *Node) CalculateGas(ctx context.Context, txf tx.Factory, msgs ...sdk.Msg) (txtypes.SimulateResponse, uint64, error) {
 	keyInfo, err := n.keyBase.Key(nodetypes.KEY_NAME)
 	if err != nil {
 		return txtypes.SimulateResponse{}, 0, err
@@ -320,4 +288,37 @@ func (n *Node) DecodeTx(txBytes []byte) (authsigning.Tx, error) {
 
 func TxHash(txBytes []byte) string {
 	return fmt.Sprintf("%X", comettypes.Tx(txBytes).Hash())
+}
+
+// buildTxWithMessages creates a transaction from the given messages.
+func DefaultBuildTxWithMessages(
+	n *Node,
+	ctx context.Context,
+	msgs []sdk.Msg,
+) (
+	txBytes []byte,
+	err error,
+) {
+	txf := n.GetTxf()
+	_, adjusted, err := n.CalculateGas(ctx, txf, msgs...)
+	if err != nil {
+		return nil, err
+	}
+
+	txf = txf.WithGas(adjusted)
+	txb, err := txf.BuildUnsignedTx(msgs...)
+	if err != nil {
+		return nil, err
+	}
+
+	if err = tx.Sign(ctx, txf, nodetypes.KEY_NAME, txb, false); err != nil {
+		return nil, err
+	}
+
+	tx := txb.GetTx()
+	txBytes, err = n.EncodeTx(tx)
+	if err != nil {
+		return nil, err
+	}
+	return txBytes, nil
 }

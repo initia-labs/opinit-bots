@@ -27,7 +27,6 @@ Currently supported bots:
 			if err != nil {
 				return err
 			}
-
 			botType := bottypes.BotTypeFromString(args[0])
 			bot, err := bot.NewBot(botType, ctx.logger, ctx.homePath, configName)
 			if err != nil {

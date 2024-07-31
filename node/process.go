@@ -2,6 +2,7 @@ package node
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
 	"time"
 
@@ -205,4 +206,34 @@ func (n *Node) handleEvent(blockHeight uint64, latestHeight uint64, event abcity
 		LatestHeight:    latestHeight,
 		EventAttributes: event.GetAttributes(),
 	})
+}
+
+func (n *Node) txChecker(ctx context.Context) error {
+	timer := time.NewTicker(nodetypes.POLLING_INTERVAL)
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		case <-timer.C:
+		}
+
+		if n.lenLocalPendingTx() > 0 {
+			pendingTx := n.peekLocalPendingTx()
+			txHash, err := hex.DecodeString(pendingTx.TxHash)
+			if err != nil {
+				return err
+			}
+			res, err := n.QueryTx(txHash)
+			if err != nil {
+				n.logger.Debug("failed to query tx", zap.String("txHash", pendingTx.TxHash), zap.String("error", err.Error()))
+				continue
+			}
+			err = n.deletePendingTx(pendingTx.Sequence)
+			if err != nil {
+				return err
+			}
+			n.logger.Debug("tx inserted", zap.Int64("height", res.Height), zap.Uint64("sequence", pendingTx.Sequence), zap.String("txHash", pendingTx.TxHash))
+			n.dequeueLocalPendingTx()
+		}
+	}
 }

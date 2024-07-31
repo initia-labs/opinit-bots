@@ -99,12 +99,8 @@ func getCodec() (codec.Codec, client.TxConfig, string) {
 	txConfig := encodingConfig.TxConfig
 
 	std.RegisterInterfaces(encodingConfig.InterfaceRegistry)
-	std.RegisterLegacyAminoCodec(encodingConfig.Amino)
 	auth.AppModuleBasic{}.RegisterInterfaces(encodingConfig.InterfaceRegistry)
 	ophost.AppModuleBasic{}.RegisterInterfaces(encodingConfig.InterfaceRegistry)
-
-	auth.AppModuleBasic{}.RegisterLegacyAminoCodec(encodingConfig.Amino)
-	ophost.AppModuleBasic{}.RegisterLegacyAminoCodec(encodingConfig.Amino)
 	return appCodec, txConfig, initiaapp.AccountAddressPrefix
 }
 
@@ -164,6 +160,6 @@ func (h Host) HasKey() bool {
 	return h.node.HasKey()
 }
 
-func (ch Host) GetHeight() uint64 {
-	return ch.node.GetHeight()
+func (h Host) GetHeight() uint64 {
+	return h.node.GetHeight()
 }

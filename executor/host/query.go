@@ -4,7 +4,13 @@ import (
 	query "github.com/cosmos/cosmos-sdk/types/query"
 	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
 	"github.com/initia-labs/opinit-bots-go/node"
+
+	sdk "github.com/cosmos/cosmos-sdk/types"
 )
+
+func (h Host) GetAddress() sdk.AccAddress {
+	return h.node.GetAddress()
+}
 
 func (h Host) GetAddressStr() (string, error) {
 	return h.node.GetAddressString()

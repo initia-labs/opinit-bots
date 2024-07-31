@@ -109,12 +109,8 @@ func getCodec(chainID string) (codec.Codec, client.TxConfig, string, error) {
 		txConfig := encodingConfig.TxConfig
 
 		std.RegisterInterfaces(encodingConfig.InterfaceRegistry)
-		std.RegisterLegacyAminoCodec(encodingConfig.Amino)
 		auth.AppModuleBasic{}.RegisterInterfaces(encodingConfig.InterfaceRegistry)
 		opchild.AppModuleBasic{}.RegisterInterfaces(encodingConfig.InterfaceRegistry)
-
-		auth.AppModuleBasic{}.RegisterLegacyAminoCodec(encodingConfig.Amino)
-		opchild.AppModuleBasic{}.RegisterLegacyAminoCodec(encodingConfig.Amino)
 		return appCodec, txConfig, initiaapp.AccountAddressPrefix, nil
 	}
 

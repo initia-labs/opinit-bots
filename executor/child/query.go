@@ -10,6 +10,10 @@ import (
 	"github.com/initia-labs/opinit-bots-go/node"
 )
 
+func (ch Child) GetAddress() sdk.AccAddress {
+	return ch.node.GetAddress()
+}
+
 func (ch Child) GetAddressStr() (string, error) {
 	return ch.node.GetAddressString()
 }

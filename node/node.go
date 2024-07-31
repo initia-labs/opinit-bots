@@ -21,6 +21,8 @@ import (
 	"go.uber.org/zap"
 )
 
+type BuildTxWithMessagesFn func(*Node, context.Context, []sdk.Msg) ([]byte, error)
+
 type Node struct {
 	*clienthttp.HTTP
 
@@ -33,6 +35,8 @@ type Node struct {
 	beginBlockHandler nodetypes.BeginBlockHandlerFn
 	endBlockHandler   nodetypes.EndBlockHandlerFn
 	rawBlockHandler   nodetypes.RawBlockHandlerFn
+
+	buildTxWithMessages BuildTxWithMessagesFn
 
 	cdc        codec.Codec
 	txConfig   client.TxConfig
@@ -58,9 +62,7 @@ func NewNode(cfg nodetypes.NodeConfig, db types.DB, logger *zap.Logger, cdc code
 		return nil, err
 	}
 
-	// Use memory keyring for now
-	// TODO: may use os keyring later
-	keyBase, err := keyring.New(cfg.ChainID, "os", "", nil, cdc)
+	keyBase, err := keyring.New(cfg.ChainID, "os", db.GetPath(), nil, cdc)
 	if err != nil {
 		return nil, err
 	}
@@ -73,6 +75,8 @@ func NewNode(cfg nodetypes.NodeConfig, db types.DB, logger *zap.Logger, cdc code
 		logger: logger,
 
 		eventHandlers: make(map[string]nodetypes.EventHandlerFn),
+
+		buildTxWithMessages: DefaultBuildTxWithMessages,
 
 		cdc:      cdc,
 		txConfig: txConfig,
@@ -124,12 +128,21 @@ func (n Node) Start(ctx context.Context, errCh chan error, processType nodetypes
 		n.BroadcastMsgs(processedMsg)
 	}
 
-	go func() {
-		err := n.blockProcessLooper(ctx, processType)
-		if err != nil {
-			errCh <- err
-		}
-	}()
+	if processType == nodetypes.PROCESS_TYPE_ONLY_BROADCAST {
+		go func() {
+			err := n.txChecker(ctx)
+			if err != nil {
+				errCh <- err
+			}
+		}()
+	} else {
+		go func() {
+			err := n.blockProcessLooper(ctx, processType)
+			if err != nil {
+				errCh <- err
+			}
+		}()
+	}
 }
 
 func (n Node) HasKey() bool {
@@ -263,6 +276,10 @@ func (n *Node) getClientCtx() client.Context {
 		WithFromAddress(n.keyAddress)
 }
 
+func (n Node) GetTxf() tx.Factory {
+	return n.txf
+}
+
 func (n *Node) RegisterTxHandler(fn nodetypes.TxHandlerFn) {
 	n.txHandler = fn
 }
@@ -281,4 +298,8 @@ func (n *Node) RegisterEndBlockHandler(fn nodetypes.EndBlockHandlerFn) {
 
 func (n *Node) RegisterRawBlockHandler(fn nodetypes.RawBlockHandlerFn) {
 	n.rawBlockHandler = fn
+}
+
+func (n *Node) RegisterBuildTxWithMessages(fn BuildTxWithMessagesFn) {
+	n.buildTxWithMessages = fn
 }

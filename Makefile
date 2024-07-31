@@ -106,3 +106,30 @@ benchmark:
 	@go test -timeout 20m -mod=readonly -bench=. ./... 
 
 .PHONY: test test-all test-cover test-unit test-race benchmark
+
+###############################################################################
+###                                Protobuf                                 ###
+###############################################################################
+DOCKER := $(shell which docker)
+
+protoVer=0.14.0
+protoImageName=ghcr.io/cosmos/proto-builder:$(protoVer)
+protoImage=$(DOCKER) run --rm -v $(CURDIR):/workspace --workdir /workspace $(protoImageName)
+
+proto-all: proto-format proto-lint proto-gen
+
+proto-gen:
+	@echo "Generating Protobuf files"
+	@$(protoImage) sh ./scripts/protocgen.sh
+
+proto-format:
+	@$(protoImage) find ./proto -name "*.proto" -exec clang-format -i {} \;
+
+proto-lint:
+	@$(protoImage) buf lint --error-format=json ./proto
+
+proto-check-breaking:
+	@$(protoImage) buf breaking --against $(HTTPS_GIT)#branch=main
+
+.PHONY: proto-all proto-gen proto-format proto-lint proto-check-breaking
+

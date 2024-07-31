@@ -153,7 +153,7 @@ func (bs *BatchSubmitter) finalizeBatch(blockHeight uint64) error {
 			break
 		}
 		batchBuffer = batchBuffer[:readLength]
-		msg, err := bs.createBatchMsg(batchBuffer)
+		msg, err := bs.da.CreateBatchMsg(batchBuffer)
 		if err != nil {
 			return err
 		}
@@ -173,7 +173,7 @@ func (bs *BatchSubmitter) finalizeBatch(blockHeight uint64) error {
 	if err != nil {
 		return err
 	}
-	msg, err := bs.createBatchMsg(headerBytes)
+	msg, err := bs.da.CreateBatchMsg(headerBytes)
 	if err != nil {
 		return err
 	}
@@ -201,19 +201,6 @@ func (bs *BatchSubmitter) checkBatch(blockHeight uint64, blockTime time.Time) er
 		bs.batchHeader.End = blockHeight
 	}
 	return nil
-}
-
-func (bs *BatchSubmitter) createBatchMsg(batchBytes []byte) (sdk.Msg, error) {
-	submitter, err := bs.da.GetAddressStr()
-	if err != nil {
-		return nil, err
-	}
-
-	return ophosttypes.NewMsgRecordBatch(
-		submitter,
-		bs.bridgeInfo.BridgeId,
-		batchBytes,
-	), nil
 }
 
 func (bs *BatchSubmitter) UpdateBatchInfo(chain string, submitter string, outputIndex uint64, l2BlockNumber uint64) {
