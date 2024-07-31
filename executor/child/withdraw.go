@@ -14,10 +14,9 @@ import (
 	"github.com/initia-labs/opinit-bots-go/types"
 	"go.uber.org/zap"
 
+	cmtproto "github.com/cometbft/cometbft/proto/tendermint/types"
 	dbtypes "github.com/initia-labs/opinit-bots-go/db/types"
 	nodetypes "github.com/initia-labs/opinit-bots-go/node/types"
-
-	comettpyes "github.com/cometbft/cometbft/types"
 )
 
 func (ch *Child) initiateWithdrawalHandler(args nodetypes.EventHandlerArgs) error {
@@ -130,7 +129,7 @@ func (ch *Child) prepareOutput() error {
 	return nil
 }
 
-func (ch *Child) handleTree(blockHeight uint64, latestHeight uint64, blockId []byte, blockHeader comettpyes.Header) (kvs []types.RawKV, storageRoot []byte, err error) {
+func (ch *Child) handleTree(blockHeight uint64, latestHeight uint64, blockId []byte, blockHeader cmtproto.Header) (kvs []types.RawKV, storageRoot []byte, err error) {
 	// finalize working tree if we are fully synced or block time is over next output time
 	if ch.finalizingBlockHeight == blockHeight ||
 		(ch.finalizingBlockHeight == 0 &&

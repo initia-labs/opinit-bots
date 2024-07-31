@@ -7,6 +7,7 @@ import (
 	"go.uber.org/zap"
 
 	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
+	executortypes "github.com/initia-labs/opinit-bots-go/executor/types"
 	"github.com/initia-labs/opinit-bots-go/node"
 	nodetypes "github.com/initia-labs/opinit-bots-go/node/types"
 	"github.com/initia-labs/opinit-bots-go/types"
@@ -26,12 +27,19 @@ type childNode interface {
 	QueryNextL1Sequence() (uint64, error)
 }
 
+type batchNode interface {
+	UpdateBatchInfo(chain string, submitter string, outputIndex uint64, l2BlockNumber uint64)
+}
+
+var _ executortypes.DANode = &Host{}
+
 type Host struct {
 	version     uint8
 	relayOracle bool
 
 	node  *node.Node
 	child childNode
+	batch batchNode
 
 	bridgeId          int64
 	initialL1Sequence uint64
@@ -79,8 +87,9 @@ func NewHost(
 	return h
 }
 
-func (h *Host) Initialize(child childNode, bridgeId int64) (err error) {
+func (h *Host) Initialize(child childNode, batch batchNode, bridgeId int64) (err error) {
 	h.child = child
+	h.batch = batch
 	h.bridgeId = bridgeId
 
 	h.initialL1Sequence, err = h.child.QueryNextL1Sequence()
@@ -101,7 +110,7 @@ func (h *Host) Start(ctx context.Context, errCh chan error) {
 		}
 	}()
 
-	h.node.Start(ctx, errCh)
+	h.node.Start(ctx, errCh, nodetypes.PROCESS_TYPE_DEFAULT)
 }
 
 func (h *Host) registerHandlers() {
@@ -110,6 +119,7 @@ func (h *Host) registerHandlers() {
 	h.node.RegisterEventHandler(ophosttypes.EventTypeInitiateTokenDeposit, h.initiateDepositHandler)
 	h.node.RegisterEventHandler(ophosttypes.EventTypeProposeOutput, h.proposeOutputHandler)
 	h.node.RegisterEventHandler(ophosttypes.EventTypeFinalizeTokenWithdrawal, h.finalizeWithdrawalHandler)
+	h.node.RegisterEventHandler(ophosttypes.EventTypeRecordBatch, h.recordBatchHandler)
 	h.node.RegisterEndBlockHandler(h.endBlockHandler)
 }
 

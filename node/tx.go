@@ -7,6 +7,9 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
+
+	"github.com/pkg/errors"
 
 	sdkerrors "cosmossdk.io/errors"
 	abci "github.com/cometbft/cometbft/abci/types"
@@ -39,9 +42,22 @@ func (n *Node) txBroadcastLooper(ctx context.Context) error {
 		case <-ctx.Done():
 			return nil
 		case data := <-n.txChannel:
-			err := n.handleProcessedMsgs(ctx, data)
-			if err != nil && n.handleMsgError(err) != nil {
-				return err
+			var err error
+			for retry := 0; retry < 5; retry++ {
+				err = n.handleProcessedMsgs(ctx, data)
+				if err == nil {
+					break
+				} else if err = n.handleMsgError(err); err == nil {
+					break
+				}
+
+				n.logger.Warn("retry ", zap.String("error", err.Error()))
+				time.Sleep(2 * time.Second)
+				continue
+			}
+
+			if err != nil {
+				return errors.Wrap(err, "failed to handle processed msgs")
 			}
 		}
 	}

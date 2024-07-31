@@ -7,7 +7,6 @@ import (
 
 	"errors"
 
-	rpchttp "github.com/cometbft/cometbft/rpc/client/http"
 	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/client/tx"
 	"github.com/cosmos/cosmos-sdk/codec"
@@ -15,13 +14,14 @@ import (
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/tx/signing"
+	clienthttp "github.com/initia-labs/opinit-bots-go/client"
 	nodetypes "github.com/initia-labs/opinit-bots-go/node/types"
 	"github.com/initia-labs/opinit-bots-go/types"
 	"go.uber.org/zap"
 )
 
 type Node struct {
-	*rpchttp.HTTP
+	*clienthttp.HTTP
 
 	cfg    nodetypes.NodeConfig
 	db     types.DB
@@ -31,6 +31,7 @@ type Node struct {
 	txHandler         nodetypes.TxHandlerFn
 	beginBlockHandler nodetypes.BeginBlockHandlerFn
 	endBlockHandler   nodetypes.EndBlockHandlerFn
+	rawBlockHandler   nodetypes.RawBlockHandlerFn
 
 	cdc        codec.Codec
 	txConfig   client.TxConfig
@@ -50,7 +51,7 @@ type Node struct {
 }
 
 func NewNode(cfg nodetypes.NodeConfig, db types.DB, logger *zap.Logger, cdc codec.Codec, txConfig client.TxConfig) (*Node, error) {
-	client, err := client.NewClientFromNode(cfg.RPC)
+	client, err := clienthttp.New(cfg.RPC, "/websocket")
 	if err != nil {
 		return nil, err
 	}
@@ -106,7 +107,7 @@ func NewNode(cfg nodetypes.NodeConfig, db types.DB, logger *zap.Logger, cdc code
 	return n, nil
 }
 
-func (n Node) Start(ctx context.Context, errCh chan error) {
+func (n Node) Start(ctx context.Context, errCh chan error, processType nodetypes.BlockProcessType) {
 	go func() {
 		err := n.txBroadcastLooper(ctx)
 		if err != nil {
@@ -121,7 +122,7 @@ func (n Node) Start(ctx context.Context, errCh chan error) {
 	}
 
 	go func() {
-		err := n.blockProcessLooper(ctx)
+		err := n.blockProcessLooper(ctx, processType)
 		if err != nil {
 			errCh <- err
 		}
@@ -269,4 +270,8 @@ func (n *Node) RegisterBeginBlockHandler(fn nodetypes.BeginBlockHandlerFn) {
 
 func (n *Node) RegisterEndBlockHandler(fn nodetypes.EndBlockHandlerFn) {
 	n.endBlockHandler = fn
+}
+
+func (n *Node) RegisterRawBlockHandler(fn nodetypes.RawBlockHandlerFn) {
+	n.rawBlockHandler = fn
 }

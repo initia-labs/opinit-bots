@@ -11,7 +11,7 @@ import (
 	"go.uber.org/zap"
 )
 
-func (n *Node) blockProcessLooper(ctx context.Context) error {
+func (n *Node) blockProcessLooper(ctx context.Context, processType nodetypes.BlockProcessType) error {
 	timer := time.NewTicker(nodetypes.POLLING_INTERVAL)
 
 	for {
@@ -32,22 +32,51 @@ func (n *Node) blockProcessLooper(ctx context.Context) error {
 			continue
 		}
 
-		// TODO: may fetch blocks in batch
-		for queryHeight := n.lastProcessedBlockHeight + 1; queryHeight <= latestChainHeight; queryHeight++ {
-			block, blockResult, err := n.fetchNewBlock(ctx, int64(queryHeight))
-			if err != nil {
-				// TODO: handle error
-				n.logger.Error("failed to fetch new block", zap.String("error", err.Error()))
-				break
+		switch processType {
+		case nodetypes.PROCESS_TYPE_DEFAULT:
+			for queryHeight := n.lastProcessedBlockHeight + 1; queryHeight <= latestChainHeight; {
+				// TODO: may fetch blocks in batch
+				block, blockResult, err := n.fetchNewBlock(ctx, int64(queryHeight))
+				if err != nil {
+					// TODO: handle error
+					n.logger.Error("failed to fetch new block", zap.String("error", err.Error()))
+					break
+				}
+
+				err = n.handleNewBlock(block, blockResult, latestChainHeight)
+				if err != nil {
+					// TODO: handle error
+					n.logger.Error("failed to handle new block", zap.String("error", err.Error()))
+					break
+				}
+				n.lastProcessedBlockHeight = queryHeight
+				queryHeight++
 			}
 
-			err = n.handleNewBlock(block, blockResult, latestChainHeight)
-			if err != nil {
-				// TODO: handle error
-				n.logger.Error("failed to handle new block", zap.String("error", err.Error()))
-				break
+		case nodetypes.PROCESS_TYPE_RAW:
+			start := n.lastProcessedBlockHeight + 1
+			end := n.lastProcessedBlockHeight + 100
+			if end > latestChainHeight {
+				end = latestChainHeight
 			}
-			n.lastProcessedBlockHeight = queryHeight
+
+			blockBulk, err := n.QueryBlockBulk(start, end)
+			if err != nil {
+				n.logger.Error("failed to fetch block bulk", zap.String("error", err.Error()))
+				continue
+			}
+
+			for i := start; i <= end; i++ {
+				err := n.rawBlockHandler(nodetypes.RawBlockArgs{
+					BlockHeight: i,
+					BlockBytes:  blockBulk[i-start],
+				})
+				if err != nil {
+					n.logger.Error("failed to handle raw block", zap.String("error", err.Error()))
+					break
+				}
+				n.lastProcessedBlockHeight = i
+			}
 		}
 	}
 }
@@ -69,6 +98,10 @@ func (n *Node) fetchNewBlock(ctx context.Context, height int64) (block *rpccoret
 }
 
 func (n *Node) handleNewBlock(block *rpccoretypes.ResultBlock, blockResult *rpccoretypes.ResultBlockResults, latestChainHeight uint64) error {
+	protoBlock, err := block.Block.ToProto()
+	if err != nil {
+		return err
+	}
 	// check pending txs first
 	// TODO: may handle pending txs with same level of other handlers
 	for _, tx := range block.Block.Txs {
@@ -99,7 +132,7 @@ func (n *Node) handleNewBlock(block *rpccoretypes.ResultBlock, blockResult *rpcc
 	if n.beginBlockHandler != nil {
 		err := n.beginBlockHandler(nodetypes.BeginBlockArgs{
 			BlockID:      block.BlockID.Hash,
-			BlockHeader:  block.Block.Header,
+			Block:        *protoBlock,
 			LatestHeight: latestChainHeight,
 		})
 		if err != nil {
@@ -123,7 +156,7 @@ func (n *Node) handleNewBlock(block *rpccoretypes.ResultBlock, blockResult *rpcc
 		if len(n.eventHandlers) != 0 {
 			events := blockResult.TxsResults[txIndex].GetEvents()
 			for eventIndex, event := range events {
-				err := n.handleEvent(uint64(block.Block.Height), latestChainHeight, uint64(txIndex), event)
+				err := n.handleEvent(uint64(block.Block.Height), latestChainHeight, event)
 				if err != nil {
 					return fmt.Errorf("failed to handle event: tx_index: %d, event_index: %d; %w", txIndex, eventIndex, err)
 				}
@@ -131,10 +164,17 @@ func (n *Node) handleNewBlock(block *rpccoretypes.ResultBlock, blockResult *rpcc
 		}
 	}
 
+	for eventIndex, event := range blockResult.FinalizeBlockEvents {
+		err := n.handleEvent(uint64(block.Block.Height), latestChainHeight, event)
+		if err != nil {
+			return fmt.Errorf("failed to handle event: finalize block, event_index: %d; %w", eventIndex, err)
+		}
+	}
+
 	if n.endBlockHandler != nil {
 		err := n.endBlockHandler(nodetypes.EndBlockArgs{
 			BlockID:      block.BlockID.Hash,
-			BlockHeader:  block.Block.Header,
+			Block:        *protoBlock,
 			LatestHeight: latestChainHeight,
 		})
 		if err != nil {
@@ -144,7 +184,7 @@ func (n *Node) handleNewBlock(block *rpccoretypes.ResultBlock, blockResult *rpcc
 	return nil
 }
 
-func (n *Node) handleEvent(blockHeight uint64, latestHeight uint64, txIndex uint64, event abcitypes.Event) error {
+func (n *Node) handleEvent(blockHeight uint64, latestHeight uint64, event abcitypes.Event) error {
 	if n.eventHandlers[event.GetType()] == nil {
 		return nil
 	}
@@ -153,7 +193,6 @@ func (n *Node) handleEvent(blockHeight uint64, latestHeight uint64, txIndex uint
 	return n.eventHandlers[event.Type](nodetypes.EventHandlerArgs{
 		BlockHeight:     blockHeight,
 		LatestHeight:    latestHeight,
-		TxIndex:         txIndex,
 		EventAttributes: event.GetAttributes(),
 	})
 }

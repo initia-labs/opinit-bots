@@ -3,6 +3,7 @@ package child
 import (
 	"context"
 	"fmt"
+	"io"
 	"time"
 
 	"cosmossdk.io/core/address"
@@ -30,6 +31,12 @@ type hostNode interface {
 	ProcessedMsgsToRawKV([]nodetypes.ProcessedMsgs, bool) ([]types.RawKV, error)
 	QueryLastOutput() (*ophosttypes.QueryOutputProposalResponse, error)
 	QueryOutput(uint64) (*ophosttypes.QueryOutputProposalResponse, error)
+}
+
+type compressionFunc interface {
+	Write([]byte) (int, error)
+	Reset(io.Writer)
+	Close() error
 }
 
 type Child struct {
@@ -92,11 +99,12 @@ func NewChild(
 	return ch
 }
 
-func (ch *Child) Initialize(host hostNode, bridgeInfo opchildtypes.BridgeInfo) {
+func (ch *Child) Initialize(host hostNode, bridgeInfo opchildtypes.BridgeInfo) error {
 	ch.host = host
 	ch.bridgeInfo = bridgeInfo
 
 	ch.registerHandlers()
+	return nil
 }
 
 func (ch *Child) Start(ctx context.Context, errCh chan error) {
@@ -107,7 +115,7 @@ func (ch *Child) Start(ctx context.Context, errCh chan error) {
 		}
 	}()
 
-	ch.node.Start(ctx, errCh)
+	ch.node.Start(ctx, errCh, nodetypes.PROCESS_TYPE_DEFAULT)
 }
 
 func (ch *Child) registerHandlers() {

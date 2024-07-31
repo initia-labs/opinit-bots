@@ -7,12 +7,12 @@ import (
 	"go.uber.org/zap"
 )
 
-//////////////
-// SyncInfo //
-//////////////
+func (n *Node) SetSyncInfo(height uint64) {
+	n.lastProcessedBlockHeight = height
+}
 
-func (n *Node) SaveSyncInfo() error {
-	return n.db.Set(nodetypes.LastProcessedBlockHeightKey, dbtypes.FromUint64(n.lastProcessedBlockHeight))
+func (n *Node) SaveSyncInfo(height uint64) error {
+	return n.db.Set(nodetypes.LastProcessedBlockHeightKey, dbtypes.FromUint64(height))
 }
 
 func (n *Node) SyncInfoToRawKV(height uint64) types.RawKV {
@@ -78,14 +78,10 @@ func (n *Node) loadPendingTxs() (txs []nodetypes.PendingTxInfo, err error) {
 func (n *Node) PendingTxsToRawKV(txInfos []nodetypes.PendingTxInfo, delete bool) ([]types.RawKV, error) {
 	kvs := make([]types.RawKV, 0, len(txInfos))
 	for _, txInfo := range txInfos {
-		if !txInfo.Save {
-			continue
-		}
-
 		var data []byte
 		var err error
 
-		if !delete {
+		if !delete && txInfo.Save {
 			data, err = txInfo.Marshal()
 			if err != nil {
 				return nil, err
@@ -108,14 +104,10 @@ func (n *Node) PendingTxsToRawKV(txInfos []nodetypes.PendingTxInfo, delete bool)
 func (n *Node) ProcessedMsgsToRawKV(ProcessedMsgs []nodetypes.ProcessedMsgs, delete bool) ([]types.RawKV, error) {
 	kvs := make([]types.RawKV, 0, len(ProcessedMsgs))
 	for _, processedMsgs := range ProcessedMsgs {
-		if !processedMsgs.Save {
-			continue
-		}
-
 		var data []byte
 		var err error
 
-		if !delete {
+		if !delete && processedMsgs.Save {
 			data, err = processedMsgs.MarshalInterfaceJSON(n.cdc)
 			if err != nil {
 				return nil, err

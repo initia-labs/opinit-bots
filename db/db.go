@@ -14,6 +14,7 @@ var _ types.DB = (*LevelDB)(nil)
 
 type LevelDB struct {
 	db     *leveldb.DB
+	path   string
 	prefix []byte
 }
 
@@ -24,7 +25,8 @@ func NewDB(path string) (types.DB, error) {
 	}
 
 	return &LevelDB{
-		db: db,
+		db:   db,
+		path: path,
 	}, nil
 }
 
@@ -134,4 +136,8 @@ func (db LevelDB) PrefixedKey(key []byte) []byte {
 // if the key has the prefix.
 func (db LevelDB) UnprefixedKey(key []byte) []byte {
 	return bytes.TrimPrefix(key, append(db.prefix, dbtypes.Splitter))
+}
+
+func (db LevelDB) GetPath() string {
+	return db.path
 }

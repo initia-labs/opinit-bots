@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/initia-labs/opinit-bots-go/executor/batch"
 	"github.com/initia-labs/opinit-bots-go/executor/child"
 	"github.com/initia-labs/opinit-bots-go/executor/host"
 	"github.com/initia-labs/opinit-bots-go/server"
@@ -27,6 +28,7 @@ var _ bottypes.Bot = &Executor{}
 type Executor struct {
 	host  *host.Host
 	child *child.Child
+	batch *batch.BatchSubmitter
 
 	cfg    *executortypes.Config
 	db     types.DB
@@ -34,7 +36,7 @@ type Executor struct {
 	logger *zap.Logger
 }
 
-func NewExecutor(cfg *executortypes.Config, db types.DB, sv *server.Server, logger *zap.Logger, cdc codec.Codec, txConfig client.TxConfig) *Executor {
+func NewExecutor(cfg *executortypes.Config, db types.DB, sv *server.Server, logger *zap.Logger, cdc codec.Codec, txConfig client.TxConfig, homePath string) *Executor {
 	err := cfg.Validate()
 	if err != nil {
 		panic(err)
@@ -50,6 +52,11 @@ func NewExecutor(cfg *executortypes.Config, db types.DB, sv *server.Server, logg
 			cfg.Version, cfg.L2NodeConfig(),
 			db.WithPrefix([]byte(executortypes.ChildNodeName)),
 			logger.Named(executortypes.ChildNodeName), cdc, txConfig,
+		),
+		batch: batch.NewBatchSubmitter(
+			cfg.Version, cfg.DANodeConfig(), cfg.BatchConfig(),
+			db.WithPrefix([]byte(executortypes.BatchNodeName)),
+			logger.Named(executortypes.BatchNodeName), cdc, txConfig, homePath,
 		),
 
 		cfg:    cfg,
@@ -72,8 +79,23 @@ func NewExecutor(cfg *executortypes.Config, db types.DB, sv *server.Server, logg
 		zap.Duration("submission_interval", bridgeInfo.BridgeConfig.SubmissionInterval),
 	)
 
-	executor.child.Initialize(executor.host, bridgeInfo)
-	err = executor.host.Initialize(executor.child, int64(bridgeInfo.BridgeId))
+	da := executor.host
+	// if cfg.Batch.DANode.ChainID != cfg.HostNode.ChainID {
+	// 	switch cfg.Batch.DANode.ChainID {
+	// 	case "celestia":
+	// 		da = celestia.NewCelestia()
+	// 	}
+	// }
+
+	err = executor.host.Initialize(executor.child, executor.batch, int64(bridgeInfo.BridgeId))
+	if err != nil {
+		panic(err)
+	}
+	err = executor.child.Initialize(executor.host, bridgeInfo)
+	if err != nil {
+		panic(err)
+	}
+	err = executor.batch.Initialize(executor.host, da, bridgeInfo)
 	if err != nil {
 		panic(err)
 	}
@@ -91,10 +113,12 @@ func (ex *Executor) Start(cmdCtx context.Context) error {
 
 	hostCtx, hostDone := context.WithCancel(cmdCtx)
 	childCtx, childDone := context.WithCancel(cmdCtx)
+	batchCtx, batchDone := context.WithCancel(cmdCtx)
 
 	errCh := make(chan error, 3)
 	ex.host.Start(hostCtx, errCh)
 	ex.child.Start(childCtx, errCh)
+	ex.batch.Start(batchCtx, errCh)
 
 	go func() {
 		err := ex.server.Start(ex.cfg.ListenAddress)
@@ -114,6 +138,9 @@ func (ex *Executor) Start(cmdCtx context.Context) error {
 
 		ex.logger.Debug("executor shutdown", zap.String("state", "wait"), zap.String("target", "child"))
 		childDone()
+
+		ex.logger.Debug("executor shutdown", zap.String("state", "wait"), zap.String("target", "batch"))
+		batchDone()
 
 		ex.logger.Info("executor shutdown completed")
 		return err

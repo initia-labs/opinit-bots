@@ -8,7 +8,7 @@ import (
 )
 
 func (ch *Child) beginBlockHandler(args nodetypes.BeginBlockArgs) (err error) {
-	blockHeight := uint64(args.BlockHeader.Height)
+	blockHeight := uint64(args.Block.Header.Height)
 	// just to make sure that childMsgQueue is empty
 	if blockHeight == args.LatestHeight && len(ch.msgQueue) != 0 && len(ch.processedMsgs) != 0 {
 		panic("must not happen, msgQueue should be empty")
@@ -27,9 +27,9 @@ func (ch *Child) beginBlockHandler(args nodetypes.BeginBlockArgs) (err error) {
 }
 
 func (ch *Child) endBlockHandler(args nodetypes.EndBlockArgs) error {
-	blockHeight := uint64(args.BlockHeader.Height)
+	blockHeight := uint64(args.Block.Header.Height)
 	batchKVs := make([]types.RawKV, 0)
-	treeKVs, storageRoot, err := ch.handleTree(blockHeight, uint64(args.LatestHeight), args.BlockID, args.BlockHeader)
+	treeKVs, storageRoot, err := ch.handleTree(blockHeight, uint64(args.LatestHeight), args.BlockID, args.Block.Header)
 	if err != nil {
 		return err
 	}

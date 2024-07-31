@@ -10,7 +10,7 @@ import (
 )
 
 func (h *Host) beginBlockHandler(args nodetypes.BeginBlockArgs) error {
-	blockHeight := uint64(args.BlockHeader.Height)
+	blockHeight := uint64(args.Block.Header.Height)
 	// just to make sure that childMsgQueue is empty
 	if blockHeight == args.LatestHeight && len(h.msgQueue) != 0 && len(h.processedMsgs) != 0 {
 		panic("must not happen, msgQueue should be empty")
@@ -21,7 +21,7 @@ func (h *Host) beginBlockHandler(args nodetypes.BeginBlockArgs) error {
 func (h *Host) endBlockHandler(args nodetypes.EndBlockArgs) error {
 	// temporary 50 limit for msg queue
 	// collect more msgs if block height is not latest
-	blockHeight := uint64(args.BlockHeader.Height)
+	blockHeight := uint64(args.Block.Header.Height)
 	if blockHeight != args.LatestHeight && len(h.msgQueue) > 0 && len(h.msgQueue) <= 10 {
 		return nil
 	}

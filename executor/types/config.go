@@ -15,12 +15,15 @@ type Config struct {
 
 	L1RPCAddress string `json:"l1_rpc_address"`
 	L2RPCAddress string `json:"l2_rpc_address"`
+	DARPCAddress string `json:"da_rpc_address"`
 
 	L1GasPrice string `json:"l1_gas_price"`
 	L2GasPrice string `json:"l2_gas_price"`
+	DAGasPrice string `json:"da_gas_price"`
 
 	L1ChainID string `json:"l1_chain_id"`
 	L2ChainID string `json:"l2_chain_id"`
+	DAChainID string `json:"da_chain_id"`
 
 	// OutputSubmitterMnemonic is the mnemonic phrase for the output submitter,
 	// which is used to relay the output transaction from l2 to l1.
@@ -34,8 +37,21 @@ type Config struct {
 	// If you don't want to use the bridge executor feature, you can leave it empty.
 	BridgeExecutorMnemonic string `json:"bridge_executor_mnemonic"`
 
+	// BatchSubmitterMnemonic is the mnemonic phrase for the batch submitter,
+	// which is used to relay the batch of blocks from l2 to da.
+	//
+	// If you don't want to use the batch submitter feature, you can leave it empty.
+	BatchSubmitterMnemonic string `json:"batch_submitter_mnemonic"`
+
 	// RelayOracle is the flag to enable the oracle relay feature.
 	RelayOracle bool `json:"relay_oracle"`
+
+	// MaxChunks is the maximum number of chunks in a batch.
+	MaxChunks int64 `json:"max_chunks"`
+	// MaxChunkSize is the maximum size of a chunk in a batch.
+	MaxChunkSize int64 `json:"max_chunk_size"`
+	// MaxSubmissionTime is the maximum time to submit a batch.
+	MaxSubmissionTime int64 `json:"max_submission_time"` // seconds
 }
 
 type HostConfig struct {
@@ -50,15 +66,19 @@ func DefaultConfig() *Config {
 
 		L1RPCAddress: "tcp://localhost:26657",
 		L2RPCAddress: "tcp://localhost:27657",
+		DARPCAddress: "tcp://localhost:28657",
 
 		L1GasPrice: "0.15uinit",
 		L2GasPrice: "",
+		DAGasPrice: "",
 
 		L1ChainID: "testnet-l1-1",
 		L2ChainID: "testnet-l2-1",
+		DAChainID: "testnet-l3-1",
 
 		OutputSubmitterMnemonic: "",
 		BridgeExecutorMnemonic:  "",
+		BatchSubmitterMnemonic:  "",
 	}
 }
 
@@ -73,6 +93,9 @@ func (cfg Config) Validate() error {
 	if cfg.L2RPCAddress == "" {
 		return errors.New("L2 RPC URL is required")
 	}
+	if cfg.DARPCAddress == "" {
+		return errors.New("L2 RPC URL is required")
+	}
 
 	if cfg.L1ChainID == "" {
 		return errors.New("L1 chain ID is required")
@@ -80,11 +103,12 @@ func (cfg Config) Validate() error {
 	if cfg.L2ChainID == "" {
 		return errors.New("L2 chain ID is required")
 	}
-
+	if cfg.DAChainID == "" {
+		return errors.New("L2 RPC URL is required")
+	}
 	if cfg.ListenAddress == "" {
 		return errors.New("listen address is required")
 	}
-
 	return nil
 }
 
@@ -102,4 +126,26 @@ func (cfg Config) L2NodeConfig() nodetypes.NodeConfig {
 		ChainID:  cfg.L2ChainID,
 		Mnemonic: cfg.BridgeExecutorMnemonic,
 	}
+}
+
+func (cfg Config) DANodeConfig() nodetypes.NodeConfig {
+	return nodetypes.NodeConfig{
+		RPC:      cfg.DARPCAddress,
+		ChainID:  cfg.DAChainID,
+		Mnemonic: cfg.BatchSubmitterMnemonic,
+	}
+}
+
+func (cfg Config) BatchConfig() BatchConfig {
+	return BatchConfig{
+		MaxChunks:         cfg.MaxChunks,
+		MaxChunkSize:      cfg.MaxChunkSize,
+		MaxSubmissionTime: cfg.MaxSubmissionTime,
+	}
+}
+
+type BatchConfig struct {
+	MaxChunks         int64 `json:"max_chunks"`
+	MaxChunkSize      int64 `json:"max_chunk_size"`
+	MaxSubmissionTime int64 `json:"max_submission_time"` // seconds
 }
