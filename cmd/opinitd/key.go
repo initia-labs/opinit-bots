@@ -218,6 +218,7 @@ $ k s l2 key2`),
 					return err
 				}
 				fmt.Fprintf(cmd.OutOrStdout(), "%s: %s\n", account.Name, addrString)
+				return nil
 			}
 			return fmt.Errorf("key with name %s does not exist", keyName)
 		},
@@ -268,6 +269,7 @@ $ k d l2 key2`),
 				}
 
 				fmt.Fprintf(cmd.OutOrStdout(), "%s: %s deleted\n", account.Name, addrString)
+				return nil
 			}
 			return fmt.Errorf("key with name %s does not exist", keyName)
 		},
