@@ -206,7 +206,7 @@ func (bs *BatchSubmitter) UpdateBatchInfo(chain string, submitter string, output
 
 	bs.batchInfos = append(bs.batchInfos, ophosttypes.BatchInfoWithOutput{
 		BatchInfo: ophosttypes.BatchInfo{
-			Chain:     chain,
+			ChainType: ophosttypes.BatchInfo_ChainType(ophosttypes.BatchInfo_ChainType_value["CHAIN_TYPE_"+chain]),
 			Submitter: submitter,
 		},
 		Output: ophosttypes.Output{

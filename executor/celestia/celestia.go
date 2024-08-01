@@ -105,12 +105,14 @@ func (c *Celestia) Initialize(batch batchNode, bridgeId int64) error {
 
 func (c *Celestia) Start(ctx context.Context, errCh chan error) {
 	defer func() {
+		c.logger.Info("celestia end")
 		if r := recover(); r != nil {
 			c.logger.Error("da celestia panic", zap.Any("recover", r))
 			errCh <- fmt.Errorf("da celestia panic: %v", r)
 		}
 	}()
 
+	c.logger.Info("celestia start")
 	c.node.Start(ctx, errCh)
 }
 

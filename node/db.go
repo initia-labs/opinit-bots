@@ -35,7 +35,7 @@ func (n *Node) loadSyncInfo() error {
 		return err
 	}
 
-	n.logger.Info("load sync info", zap.Uint64("last_processed_height", n.lastProcessedBlockHeight))
+	n.logger.Debug("load sync info", zap.Uint64("last_processed_height", n.lastProcessedBlockHeight))
 	return nil
 }
 
@@ -69,7 +69,7 @@ func (n *Node) loadPendingTxs() (txs []nodetypes.PendingTxInfo, err error) {
 		return nil, iterErr
 	}
 
-	n.logger.Info("load pending txs", zap.Int("count", len(txs)))
+	n.logger.Debug("load pending txs", zap.Int("count", len(txs)))
 	return txs, err
 }
 
@@ -144,7 +144,7 @@ func (n *Node) loadProcessedMsgs() (ProcessedMsgs []nodetypes.ProcessedMsgs, err
 	if iterErr != nil {
 		return nil, iterErr
 	}
-	n.logger.Info("load pending processed msgs", zap.Int("count", len(ProcessedMsgs)))
+	n.logger.Debug("load pending processed msgs", zap.Int("count", len(ProcessedMsgs)))
 	return ProcessedMsgs, nil
 }
 

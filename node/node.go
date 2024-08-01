@@ -68,7 +68,7 @@ func NewNode(processType nodetypes.BlockProcessType, cfg nodetypes.NodeConfig, d
 	}
 
 	keyBase, err := GetKeyBase(cfg.ChainID, homeDir, cdc, nil)
-	if err != nil {
+	if err != nil || keyBase == nil {
 		return nil, err
 	}
 
@@ -100,7 +100,7 @@ func NewNode(processType nodetypes.BlockProcessType, cfg nodetypes.NodeConfig, d
 
 	var key *keyring.Record
 	if batchSubmitter != "" {
-		addr, err := DecodeBech32AccAddr(batchSubmitter)
+		addr, err := DecodeBech32AccAddr(batchSubmitter, n.bech32Prefix)
 		if err != nil {
 			return nil, err
 		}

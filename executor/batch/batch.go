@@ -62,6 +62,7 @@ type BatchSubmitter struct {
 }
 
 func NewBatchSubmitter(version uint8, cfg nodetypes.NodeConfig, batchCfg executortypes.BatchConfig, db types.DB, logger *zap.Logger, homePath string) *BatchSubmitter {
+	cfg.Account = ""
 	node, err := node.NewNode(nodetypes.PROCESS_TYPE_RAW, cfg, db, logger, nil, nil, homePath, "", "")
 	if err != nil {
 		panic(err)
@@ -131,12 +132,14 @@ func (bs *BatchSubmitter) SetDANode(da executortypes.DANode) error {
 
 func (bs *BatchSubmitter) Start(ctx context.Context, errCh chan error) {
 	defer func() {
+		bs.logger.Info("batch end")
 		if r := recover(); r != nil {
 			bs.logger.Error("batch panic", zap.Any("recover", r))
 			errCh <- fmt.Errorf("batch panic: %v", r)
 		}
 	}()
 
+	bs.logger.Info("batch start", zap.Uint64("height", bs.node.GetHeight()))
 	bs.node.Start(ctx, errCh)
 	bs.da.Start(ctx, errCh)
 }

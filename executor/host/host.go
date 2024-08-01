@@ -128,12 +128,14 @@ func (h *Host) Initialize(child childNode, batch batchNode, bridgeId int64) (err
 
 func (h *Host) Start(ctx context.Context, errCh chan error) {
 	defer func() {
+		h.logger.Info("host end")
 		if r := recover(); r != nil {
 			h.logger.Error("host panic", zap.Any("recover", r))
 			errCh <- fmt.Errorf("host panic: %v", r)
 		}
 	}()
 
+	h.logger.Info("host start", zap.Uint64("height", h.node.GetHeight()))
 	h.node.Start(ctx, errCh)
 }
 
@@ -161,6 +163,10 @@ func (h Host) ProcessedMsgsToRawKV(msgs []nodetypes.ProcessedMsgs, delete bool) 
 
 func (h *Host) SetBridgeId(brigeId int64) {
 	h.bridgeId = brigeId
+}
+
+func (h Host) BridgeId() int64 {
+	return h.bridgeId
 }
 
 func (h Host) HasKey() bool {

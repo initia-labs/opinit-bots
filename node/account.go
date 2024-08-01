@@ -7,7 +7,6 @@ import (
 
 	"github.com/cosmos/cosmos-sdk/client"
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	"github.com/cosmos/cosmos-sdk/types/bech32"
 	grpctypes "github.com/cosmos/cosmos-sdk/types/grpc"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	"google.golang.org/grpc"
@@ -95,10 +94,9 @@ func (n *Node) GetAccountNumberSequence(clientCtx client.Context, addr sdk.AccAd
 }
 
 func EncodeBech32AccAddr(addr sdk.AccAddress, prefix string) (string, error) {
-	return bech32.ConvertAndEncode(prefix, addr)
+	return sdk.Bech32ifyAddressBytes(prefix, addr)
 }
 
-func DecodeBech32AccAddr(addr string) (sdk.AccAddress, error) {
-	_, bz, err := bech32.DecodeAndConvert(addr)
-	return bz, err
+func DecodeBech32AccAddr(addr string, prefix string) (sdk.AccAddress, error) {
+	return sdk.GetFromBech32(addr, prefix)
 }

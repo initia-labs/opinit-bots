@@ -131,12 +131,14 @@ func (ch *Child) Initialize(host hostNode, bridgeInfo opchildtypes.BridgeInfo) e
 
 func (ch *Child) Start(ctx context.Context, errCh chan error) {
 	defer func() {
+		ch.logger.Info("child end")
 		if r := recover(); r != nil {
 			ch.logger.Error("child panic", zap.Any("recover", r))
 			errCh <- fmt.Errorf("child panic: %v", r)
 		}
 	}()
 
+	ch.logger.Info("child start", zap.Uint64("height", ch.node.GetHeight()))
 	ch.node.Start(ctx, errCh)
 }
 

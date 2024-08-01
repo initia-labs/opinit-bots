@@ -2,9 +2,10 @@ package executor
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strconv"
+
+	"github.com/pkg/errors"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/initia-labs/opinit-bots-go/executor/batch"
@@ -197,6 +198,10 @@ func (ex *Executor) makeDANode() (executortypes.DANode, error) {
 		)
 		if ex.host.GetAddress().Equals(da.GetAddress()) {
 			return ex.host, nil
+		}
+		err := da.Initialize(nil, nil, ex.host.BridgeId())
+		if err != nil {
+			return nil, err
 		}
 		return da, nil
 	case "celestia":

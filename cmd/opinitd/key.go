@@ -49,6 +49,7 @@ func keysCmd(ctx *cmdContext) *cobra.Command {
 		keysAddCmd(ctx),
 		keysListCmd(ctx),
 		keysShowCmd(ctx),
+		keysShowByAddressCmd(ctx),
 		keysDeleteCmd(ctx),
 	)
 
@@ -98,7 +99,7 @@ $ keys add l2 key2 --restore mnemonic.txt`),
 				if err != nil {
 					return err
 				}
-				mnemonic = string(bz)
+				mnemonic = strings.TrimSpace(string(bz))
 			} else {
 				mnemonic, err = node.CreateMnemonic()
 				if err != nil {
@@ -106,7 +107,7 @@ $ keys add l2 key2 --restore mnemonic.txt`),
 				}
 			}
 
-			account, err = keyBase.NewAccount(keyName, mnemonic, hd.CreateHDPath(sdk.CoinType, 0, 0).String(), "", hd.Secp256k1)
+			account, err = keyBase.NewAccount(keyName, mnemonic, "", hd.CreateHDPath(sdk.CoinType, 0, 0).String(), hd.Secp256k1)
 			if err != nil {
 				return err
 			}
@@ -227,6 +228,48 @@ $ k s l2 key2`),
 	return cmd
 }
 
+// keysShowByAddressCmd represents the `keys show-by-address` command
+func keysShowByAddressCmd(ctx *cmdContext) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "show-by-addr [chain-id] [key-address]",
+		Aliases: []string{"sa"},
+		Short:   "Shows the key by address from the keychain associated with a particular chain",
+		Args:    cobra.ExactArgs(2),
+		Example: strings.TrimSpace(`
+$ keys show-by-addr localnet key1
+$ k sa l2 key2`),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			chainId := args[0]
+			keyAddr := args[1]
+
+			cdc, prefix, err := GetCodec(chainId)
+			if err != nil {
+				return err
+			}
+
+			keyBase, err := node.GetKeyBase(chainId, ctx.homePath, cdc, cmd.InOrStdin())
+			if err != nil {
+				return err
+			}
+
+			addr, err := node.DecodeBech32AccAddr(keyAddr, prefix)
+			if err != nil {
+				return err
+			}
+
+			account, err := keyBase.KeyByAddress(addr)
+			if err != nil {
+				return fmt.Errorf("key with address %s does not exist", keyAddr)
+			}
+
+			fmt.Fprintf(cmd.OutOrStdout(), "%s: %s\n", account.Name, keyAddr)
+			return nil
+		},
+	}
+
+	return cmd
+}
+
 // keysDeleteCmd represents the `keys delete` command
 func keysDeleteCmd(ctx *cmdContext) *cobra.Command {
 	cmd := &cobra.Command{
@@ -283,7 +326,7 @@ func GetCodec(chainId string) (codec.Codec, string, error) {
 		cdc, _, prefix := host.GetCodec()
 		return cdc, prefix, nil
 
-	case "celestia":
+	case "celestia", "arabica-11":
 		cdc, _, prefix := celestia.GetCodec()
 		return cdc, prefix, nil
 
