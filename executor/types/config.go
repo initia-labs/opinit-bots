@@ -29,19 +29,13 @@ type Config struct {
 	// which is used to relay the output transaction from l2 to l1.
 	//
 	// If you don't want to use the output submitter feature, you can leave it empty.
-	OutputSubmitterMnemonic string `json:"output_submitter_mnemonic"`
+	OutputSubmitter string `json:"output_submitter"`
 
 	// BridgeExecutorMnemonic is the mnemonic phrase for the bridge executor,
 	// which is used to relay initiate token bridge transaction from l1 to l2.
 	//
 	// If you don't want to use the bridge executor feature, you can leave it empty.
-	BridgeExecutorMnemonic string `json:"bridge_executor_mnemonic"`
-
-	// BatchSubmitterMnemonic is the mnemonic phrase for the batch submitter,
-	// which is used to relay the batch of blocks from l2 to da.
-	//
-	// If you don't want to use the batch submitter feature, you can leave it empty.
-	BatchSubmitterMnemonic string `json:"batch_submitter_mnemonic"`
+	BridgeExecutor string `json:"bridge_executor"`
 
 	// RelayOracle is the flag to enable the oracle relay feature.
 	RelayOracle bool `json:"relay_oracle"`
@@ -73,9 +67,8 @@ func DefaultConfig() *Config {
 		L2ChainID: "testnet-l2-1",
 		DAChainID: "testnet-l3-1",
 
-		OutputSubmitterMnemonic: "",
-		BridgeExecutorMnemonic:  "",
-		BatchSubmitterMnemonic:  "",
+		OutputSubmitter: "",
+		BridgeExecutor:  "",
 
 		RelayOracle: true,
 
@@ -120,7 +113,7 @@ func (cfg Config) L1NodeConfig() nodetypes.NodeConfig {
 		RPC:      cfg.L1RPCAddress,
 		ChainID:  cfg.L1ChainID,
 		GasPrice: cfg.L1GasPrice,
-		Mnemonic: cfg.OutputSubmitterMnemonic,
+		Account:  cfg.OutputSubmitter,
 	}
 }
 
@@ -129,7 +122,7 @@ func (cfg Config) L2NodeConfig() nodetypes.NodeConfig {
 		RPC:      cfg.L2RPCAddress,
 		ChainID:  cfg.L2ChainID,
 		GasPrice: cfg.L2GasPrice,
-		Mnemonic: cfg.BridgeExecutorMnemonic,
+		Account:  cfg.BridgeExecutor,
 	}
 }
 
@@ -138,7 +131,6 @@ func (cfg Config) DANodeConfig() nodetypes.NodeConfig {
 		RPC:      cfg.DARPCAddress,
 		ChainID:  cfg.DAChainID,
 		GasPrice: cfg.DAGasPrice,
-		Mnemonic: cfg.BatchSubmitterMnemonic,
 	}
 }
 
