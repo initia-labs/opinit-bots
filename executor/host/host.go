@@ -103,8 +103,10 @@ func GetCodec() (codec.Codec, client.TxConfig, string) {
 	appCodec := encodingConfig.Codec
 	txConfig := encodingConfig.TxConfig
 
+	std.RegisterLegacyAminoCodec(encodingConfig.Amino)
 	std.RegisterInterfaces(encodingConfig.InterfaceRegistry)
 	auth.AppModuleBasic{}.RegisterInterfaces(encodingConfig.InterfaceRegistry)
+	auth.AppModuleBasic{}.RegisterLegacyAminoCodec(encodingConfig.Amino)
 	ophost.AppModuleBasic{}.RegisterInterfaces(encodingConfig.InterfaceRegistry)
 	return appCodec, txConfig, initiaapp.AccountAddressPrefix
 }

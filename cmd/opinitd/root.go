@@ -16,7 +16,7 @@ func NewRootCmd() *cobra.Command {
 	}
 
 	rootCmd := &cobra.Command{
-		Use: "opbot [command]",
+		Use: "opinitd [command]",
 	}
 
 	rootCmd.PersistentPreRunE = func(cmd *cobra.Command, _ []string) (err error) {
@@ -44,6 +44,7 @@ func NewRootCmd() *cobra.Command {
 	rootCmd.AddCommand(
 		initCmd(ctx),
 		startCmd(ctx),
+		keysCmd(ctx),
 		version.NewVersionCommand(),
 	)
 

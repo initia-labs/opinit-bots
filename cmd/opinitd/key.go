@@ -17,13 +17,15 @@ limitations under the License.
 package main
 
 import (
-	"encoding/json"
 	"fmt"
+	"io"
+	"os"
 	"strings"
 
 	"github.com/cosmos/cosmos-sdk/codec"
 	"github.com/cosmos/cosmos-sdk/crypto/hd"
 	sdk "github.com/cosmos/cosmos-sdk/types"
+	"github.com/initia-labs/opinit-bots-go/executor/celestia"
 	"github.com/initia-labs/opinit-bots-go/executor/child"
 	"github.com/initia-labs/opinit-bots-go/executor/host"
 	"github.com/initia-labs/opinit-bots-go/node"
@@ -31,10 +33,8 @@ import (
 )
 
 const (
-	flagCoinType           = "coin-type"
-	flagAlgo               = "signing-algorithm"
-	flagRestoreAll         = "restore-all"
-	defaultCoinType uint32 = sdk.CoinType
+	flagRestore     = "restore"
+	flagMnemonicSrc = "source"
 )
 
 // keysCmd represents the keys command
@@ -48,6 +48,8 @@ func keysCmd(ctx *cmdContext) *cobra.Command {
 	cmd.AddCommand(
 		keysAddCmd(ctx),
 		keysListCmd(ctx),
+		keysShowCmd(ctx),
+		keysDeleteCmd(ctx),
 	)
 
 	return cmd
@@ -61,13 +63,14 @@ func keysAddCmd(ctx *cmdContext) *cobra.Command {
 		Short:   "Adds a key to the keychain associated with a particular chain",
 		Args:    cobra.ExactArgs(2),
 		Example: strings.TrimSpace(`
-$ keys add localnet
-$ keys add l2 key2`),
+$ keys add localnet key1
+$ keys add l2 key2
+$ keys add l2 key2 --restore mnemonic.txt`),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			chainId := args[0]
 			keyName := args[1]
 
-			cdc, _, err := GetCodec(chainId)
+			cdc, prefix, err := GetCodec(chainId)
 			if err != nil {
 				return err
 			}
@@ -82,25 +85,47 @@ $ keys add l2 key2`),
 				return fmt.Errorf("key with name %s already exists", keyName)
 			}
 
-			mnemonicStr, err := node.CreateMnemonic()
+			mnemonic := ""
+			mnemonicSrc, err := cmd.Flags().GetString(flagRestore)
+			if err == nil && mnemonicSrc != "" {
+				file, err := os.Open(mnemonicSrc)
+				if err != nil {
+					return err
+				}
+				defer file.Close()
+
+				bz, err := io.ReadAll(file)
+				if err != nil {
+					return err
+				}
+				mnemonic = string(bz)
+			} else {
+				mnemonic, err = node.CreateMnemonic()
+				if err != nil {
+					return err
+				}
+			}
+
+			account, err = keyBase.NewAccount(keyName, mnemonic, hd.CreateHDPath(sdk.CoinType, 0, 0).String(), "", hd.Secp256k1)
 			if err != nil {
 				return err
 			}
 
-			account, err = keyBase.NewAccount(keyName, mnemonicStr, hd.CreateHDPath(sdk.CoinType, 0, 0).String(), "", hd.Secp256k1)
+			addr, err := account.GetAddress()
 			if err != nil {
 				return err
 			}
 
-			out, err := json.Marshal(&account)
+			addrString, err := node.EncodeBech32AccAddr(addr, prefix)
 			if err != nil {
 				return err
 			}
 
-			fmt.Fprintln(cmd.OutOrStdout(), string(out))
+			fmt.Fprintf(cmd.OutOrStdout(), "%s: %s\n%s\n", account.Name, addrString, mnemonic)
 			return nil
 		},
 	}
+	cmd.Flags().String(flagRestore, "", "restores from mnemonic file source")
 	return cmd
 }
 
@@ -133,7 +158,7 @@ $ k l l2`),
 			}
 
 			if len(info) == 0 {
-				fmt.Fprintf(cmd.ErrOrStderr(), "warning: no keys found for chain %s (do you need to add %s?)\n", chainId, chainId)
+				fmt.Fprintf(cmd.ErrOrStderr(), "no keys found for %s\n", chainId)
 			}
 
 			for _, account := range info {
@@ -147,7 +172,7 @@ $ k l l2`),
 					return err
 				}
 
-				fmt.Fprintf(cmd.OutOrStdout(), "key(%s) -> %s\n", account.Name, addrString)
+				fmt.Fprintf(cmd.OutOrStdout(), "%s: %s\n", account.Name, addrString)
 			}
 
 			return nil
@@ -157,21 +182,118 @@ $ k l l2`),
 	return cmd
 }
 
+// keysShowCmd represents the `keys show` command
+func keysShowCmd(ctx *cmdContext) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "show [chain-id] [key-name]",
+		Aliases: []string{"s"},
+		Short:   "Shows the key from the keychain associated with a particular chain",
+		Args:    cobra.ExactArgs(2),
+		Example: strings.TrimSpace(`
+$ keys show localnet key1
+$ k s l2 key2`),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			chainId := args[0]
+			keyName := args[1]
+
+			cdc, prefix, err := GetCodec(chainId)
+			if err != nil {
+				return err
+			}
+
+			keyBase, err := node.GetKeyBase(chainId, ctx.homePath, cdc, cmd.InOrStdin())
+			if err != nil {
+				return err
+			}
+
+			account, err := keyBase.Key(keyName)
+			if err == nil && account.Name == keyName {
+				addr, err := account.GetAddress()
+				if err != nil {
+					return err
+				}
+
+				addrString, err := node.EncodeBech32AccAddr(addr, prefix)
+				if err != nil {
+					return err
+				}
+				fmt.Fprintf(cmd.OutOrStdout(), "%s: %s\n", account.Name, addrString)
+			}
+			return fmt.Errorf("key with name %s does not exist", keyName)
+		},
+	}
+
+	return cmd
+}
+
+// keysDeleteCmd represents the `keys delete` command
+func keysDeleteCmd(ctx *cmdContext) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "delete [chain-id] [key-name]",
+		Aliases: []string{"d"},
+		Short:   "Deletes the key from the keychain associated with a particular chain",
+		Args:    cobra.ExactArgs(2),
+		Example: strings.TrimSpace(`
+$ keys delete localnet key1
+$ k d l2 key2`),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			chainId := args[0]
+			keyName := args[1]
+
+			cdc, prefix, err := GetCodec(chainId)
+			if err != nil {
+				return err
+			}
+
+			keyBase, err := node.GetKeyBase(chainId, ctx.homePath, cdc, cmd.InOrStdin())
+			if err != nil {
+				return err
+			}
+
+			account, err := keyBase.Key(keyName)
+			if err == nil && account.Name == keyName {
+				addr, err := account.GetAddress()
+				if err != nil {
+					return err
+				}
+
+				addrString, err := node.EncodeBech32AccAddr(addr, prefix)
+				if err != nil {
+					return err
+				}
+
+				err = keyBase.Delete(keyName)
+				if err != nil {
+					return err
+				}
+
+				fmt.Fprintf(cmd.OutOrStdout(), "%s: %s deleted\n", account.Name, addrString)
+			}
+			return fmt.Errorf("key with name %s does not exist", keyName)
+		},
+	}
+	return cmd
+}
+
 func GetCodec(chainId string) (codec.Codec, string, error) {
 	switch chainId {
 	case "initiation-1":
 		cdc, _, prefix := host.GetCodec()
 		return cdc, prefix, nil
 
+	case "celestia":
+		cdc, _, prefix := celestia.GetCodec()
+		return cdc, prefix, nil
+
 	// for test
 	case "localnet":
 		cdc, _, prefix := host.GetCodec()
 		return cdc, prefix, nil
-		// for test
-	case "l2":
+
+	default:
 		cdc, _, prefix, err := child.GetCodec(chainId)
 		return cdc, prefix, err
 	}
 
-	return nil, "", fmt.Errorf("unsupported chain id: %s", chainId)
+	// return nil, "", fmt.Errorf("unsupported chain id: %s", chainId)
 }

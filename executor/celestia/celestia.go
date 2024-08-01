@@ -78,10 +78,14 @@ func NewDACelestia(
 
 func GetCodec() (codec.Codec, client.TxConfig, string) {
 	interfaceRegistry := codectypes.NewInterfaceRegistry()
+	amino := codec.NewLegacyAmino()
+	std.RegisterLegacyAminoCodec(amino)
 	std.RegisterInterfaces(interfaceRegistry)
+
 	protoCodec := codec.NewProtoCodec(interfaceRegistry)
 	txConfig := tx.NewTxConfig(protoCodec, tx.DefaultSignModes)
 
+	auth.AppModuleBasic{}.RegisterLegacyAminoCodec(amino)
 	auth.AppModuleBasic{}.RegisterInterfaces(interfaceRegistry)
 	celestiatypes.RegisterInterfaces(interfaceRegistry)
 

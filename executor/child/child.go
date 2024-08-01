@@ -103,12 +103,16 @@ func NewChild(
 
 func GetCodec(chainID string) (codec.Codec, client.TxConfig, string, error) {
 	switch chainID {
-	case "minimove-1", "miniwasm-1":
+	case "minimove-1", "miniwasm-1",
+		// for test
+		"l2":
 		encodingConfig := params.MakeEncodingConfig()
 		appCodec := encodingConfig.Codec
 		txConfig := encodingConfig.TxConfig
 
+		std.RegisterLegacyAminoCodec(encodingConfig.Amino)
 		std.RegisterInterfaces(encodingConfig.InterfaceRegistry)
+		auth.AppModuleBasic{}.RegisterLegacyAminoCodec(encodingConfig.Amino)
 		auth.AppModuleBasic{}.RegisterInterfaces(encodingConfig.InterfaceRegistry)
 		opchild.AppModuleBasic{}.RegisterInterfaces(encodingConfig.InterfaceRegistry)
 		return appCodec, txConfig, initiaapp.AccountAddressPrefix, nil
