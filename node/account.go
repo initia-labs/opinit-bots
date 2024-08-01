@@ -31,7 +31,7 @@ func (n Node) GetAddress() sdk.AccAddress {
 }
 
 func (n Node) GetAddressString() (string, error) {
-	return n.EncodeBech32AccAddr(n.keyAddress)
+	return EncodeBech32AccAddr(n.keyAddress, n.bech32Prefix)
 }
 
 // GetAccount queries for an account given an address and a block height. An
@@ -46,7 +46,7 @@ func (n *Node) GetAccount(clientCtx client.Context, addr sdk.AccAddress) (client
 // or decoding fails.
 func (n *Node) GetAccountWithHeight(_ client.Context, addr sdk.AccAddress) (client.Account, int64, error) {
 	var header metadata.MD
-	address, err := n.EncodeBech32AccAddr(addr)
+	address, err := EncodeBech32AccAddr(addr, n.bech32Prefix)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -94,11 +94,11 @@ func (n *Node) GetAccountNumberSequence(clientCtx client.Context, addr sdk.AccAd
 	return acc.GetAccountNumber(), acc.GetSequence(), nil
 }
 
-func (n *Node) EncodeBech32AccAddr(addr sdk.AccAddress) (string, error) {
-	return bech32.ConvertAndEncode(n.bech32Prefix, addr)
+func EncodeBech32AccAddr(addr sdk.AccAddress, prefix string) (string, error) {
+	return bech32.ConvertAndEncode(prefix, addr)
 }
 
-func (n *Node) DecodeBech32AccAddr(addr string) (sdk.AccAddress, error) {
+func DecodeBech32AccAddr(addr string) (sdk.AccAddress, error) {
 	_, bz, err := bech32.DecodeAndConvert(addr)
 	return bz, err
 }

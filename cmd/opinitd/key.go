@@ -1,0 +1,177 @@
+/*
+Package cmd includes relayer commands
+Copyright © 2020 Jack Zampolin jack.zampolin@gmail.com
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+	http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+package main
+
+import (
+	"encoding/json"
+	"fmt"
+	"strings"
+
+	"github.com/cosmos/cosmos-sdk/codec"
+	"github.com/cosmos/cosmos-sdk/crypto/hd"
+	sdk "github.com/cosmos/cosmos-sdk/types"
+	"github.com/initia-labs/opinit-bots-go/executor/child"
+	"github.com/initia-labs/opinit-bots-go/executor/host"
+	"github.com/initia-labs/opinit-bots-go/node"
+	"github.com/spf13/cobra"
+)
+
+const (
+	flagCoinType           = "coin-type"
+	flagAlgo               = "signing-algorithm"
+	flagRestoreAll         = "restore-all"
+	defaultCoinType uint32 = sdk.CoinType
+)
+
+// keysCmd represents the keys command
+func keysCmd(ctx *cmdContext) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "keys",
+		Aliases: []string{"k"},
+		Short:   "Manage keys held by the opbot",
+	}
+
+	cmd.AddCommand(
+		keysAddCmd(ctx),
+		keysListCmd(ctx),
+	)
+
+	return cmd
+}
+
+// keysAddCmd represents the `keys add` command
+func keysAddCmd(ctx *cmdContext) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "add [chain-id] [key-name]",
+		Aliases: []string{"a"},
+		Short:   "Adds a key to the keychain associated with a particular chain",
+		Args:    cobra.ExactArgs(2),
+		Example: strings.TrimSpace(`
+$ keys add localnet
+$ keys add l2 key2`),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			chainId := args[0]
+			keyName := args[1]
+
+			cdc, _, err := GetCodec(chainId)
+			if err != nil {
+				return err
+			}
+
+			keyBase, err := node.GetKeyBase(chainId, ctx.homePath, cdc, cmd.InOrStdin())
+			if err != nil {
+				return err
+			}
+
+			account, err := keyBase.Key(keyName)
+			if err == nil && account.Name == keyName {
+				return fmt.Errorf("key with name %s already exists", keyName)
+			}
+
+			mnemonicStr, err := node.CreateMnemonic()
+			if err != nil {
+				return err
+			}
+
+			account, err = keyBase.NewAccount(keyName, mnemonicStr, hd.CreateHDPath(sdk.CoinType, 0, 0).String(), "", hd.Secp256k1)
+			if err != nil {
+				return err
+			}
+
+			out, err := json.Marshal(&account)
+			if err != nil {
+				return err
+			}
+
+			fmt.Fprintln(cmd.OutOrStdout(), string(out))
+			return nil
+		},
+	}
+	return cmd
+}
+
+// keysListCmd represents the `keys list` command
+func keysListCmd(ctx *cmdContext) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "list [chain-id]",
+		Aliases: []string{"l"},
+		Short:   "Lists keys from the keychain associated with a particular chain",
+		Args:    cobra.ExactArgs(1),
+		Example: strings.TrimSpace(`
+$ keys list localnet
+$ k l l2`),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			chainId := args[0]
+
+			cdc, prefix, err := GetCodec(chainId)
+			if err != nil {
+				return err
+			}
+
+			keyBase, err := node.GetKeyBase(chainId, ctx.homePath, cdc, cmd.InOrStdin())
+			if err != nil {
+				return err
+			}
+
+			info, err := keyBase.List()
+			if err != nil {
+				return err
+			}
+
+			if len(info) == 0 {
+				fmt.Fprintf(cmd.ErrOrStderr(), "warning: no keys found for chain %s (do you need to add %s?)\n", chainId, chainId)
+			}
+
+			for _, account := range info {
+				addr, err := account.GetAddress()
+				if err != nil {
+					return err
+				}
+
+				addrString, err := node.EncodeBech32AccAddr(addr, prefix)
+				if err != nil {
+					return err
+				}
+
+				fmt.Fprintf(cmd.OutOrStdout(), "key(%s) -> %s\n", account.Name, addrString)
+			}
+
+			return nil
+		},
+	}
+
+	return cmd
+}
+
+func GetCodec(chainId string) (codec.Codec, string, error) {
+	switch chainId {
+	case "initiation-1":
+		cdc, _, prefix := host.GetCodec()
+		return cdc, prefix, nil
+
+	// for test
+	case "localnet":
+		cdc, _, prefix := host.GetCodec()
+		return cdc, prefix, nil
+		// for test
+	case "l2":
+		cdc, _, prefix, err := child.GetCodec(chainId)
+		return cdc, prefix, err
+	}
+
+	return nil, "", fmt.Errorf("unsupported chain id: %s", chainId)
+}

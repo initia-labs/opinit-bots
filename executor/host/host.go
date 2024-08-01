@@ -66,15 +66,15 @@ type Host struct {
 
 func NewHost(
 	version uint8, relayOracle bool, cfg nodetypes.NodeConfig,
-	db types.DB, logger *zap.Logger, batchSubmitter string,
+	db types.DB, logger *zap.Logger, homePath string, batchSubmitter string,
 ) *Host {
-	appCodec, txConfig, bech32Prefix := getCodec()
+	appCodec, txConfig, bech32Prefix := GetCodec()
 	processType := nodetypes.PROCESS_TYPE_DEFAULT
 	if batchSubmitter != "" {
 		processType = nodetypes.PROCESS_TYPE_ONLY_BROADCAST
 	}
 
-	node, err := node.NewNode(processType, cfg, db, logger, appCodec, txConfig, bech32Prefix, batchSubmitter)
+	node, err := node.NewNode(processType, cfg, db, logger, appCodec, txConfig, homePath, bech32Prefix, batchSubmitter)
 	if err != nil {
 		panic(err)
 	}
@@ -98,7 +98,7 @@ func NewHost(
 	return h
 }
 
-func getCodec() (codec.Codec, client.TxConfig, string) {
+func GetCodec() (codec.Codec, client.TxConfig, string) {
 	encodingConfig := params.MakeEncodingConfig()
 	appCodec := encodingConfig.Codec
 	txConfig := encodingConfig.TxConfig

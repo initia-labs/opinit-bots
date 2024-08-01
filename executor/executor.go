@@ -33,6 +33,8 @@ type Executor struct {
 	db     types.DB
 	server *server.Server
 	logger *zap.Logger
+
+	homePath string
 }
 
 func NewExecutor(cfg *executortypes.Config, db types.DB, sv *server.Server, logger *zap.Logger, homePath string) *Executor {
@@ -45,12 +47,12 @@ func NewExecutor(cfg *executortypes.Config, db types.DB, sv *server.Server, logg
 		host: host.NewHost(
 			cfg.Version, cfg.RelayOracle, cfg.L1NodeConfig(),
 			db.WithPrefix([]byte(executortypes.HostNodeName)),
-			logger.Named(executortypes.HostNodeName), "",
+			logger.Named(executortypes.HostNodeName), homePath, "",
 		),
 		child: child.NewChild(
 			cfg.Version, cfg.L2NodeConfig(),
 			db.WithPrefix([]byte(executortypes.ChildNodeName)),
-			logger.Named(executortypes.ChildNodeName),
+			logger.Named(executortypes.ChildNodeName), homePath,
 		),
 		batch: batch.NewBatchSubmitter(cfg.Version, cfg.L2NodeConfig(), cfg.BatchConfig(), db.WithPrefix([]byte(executortypes.BatchNodeName)), logger.Named(executortypes.BatchNodeName), homePath),
 
@@ -58,6 +60,8 @@ func NewExecutor(cfg *executortypes.Config, db types.DB, sv *server.Server, logg
 		db:     db,
 		server: sv,
 		logger: logger,
+
+		homePath: homePath,
 	}
 
 	bridgeInfo, err := executor.child.QueryBridgeInfo()
@@ -189,7 +193,7 @@ func (ex *Executor) makeDANode() (executortypes.DANode, error) {
 		da := host.NewHost(
 			ex.cfg.Version, false, ex.cfg.DANodeConfig(),
 			ex.db.WithPrefix([]byte(executortypes.DAHostNodeName)),
-			ex.logger.Named(executortypes.DAHostNodeName), batchInfo.BatchInfo.Submitter,
+			ex.logger.Named(executortypes.DAHostNodeName), ex.homePath, batchInfo.BatchInfo.Submitter,
 		)
 		if ex.host.GetAddress().Equals(da.GetAddress()) {
 			return ex.host, nil
@@ -198,7 +202,7 @@ func (ex *Executor) makeDANode() (executortypes.DANode, error) {
 	case "celestia":
 		return celestia.NewDACelestia(ex.cfg.Version, ex.cfg.DANodeConfig(),
 			ex.db.WithPrefix([]byte(executortypes.DACelestiaNodeName)),
-			ex.logger.Named(executortypes.DACelestiaNodeName), batchInfo.BatchInfo.Submitter,
+			ex.logger.Named(executortypes.DACelestiaNodeName), ex.homePath, batchInfo.BatchInfo.Submitter,
 		), nil
 	}
 	return nil, fmt.Errorf("unsupported chain id for DA: %s", ex.cfg.DAChainID)

@@ -3,7 +3,6 @@ package batch
 import (
 	"compress/gzip"
 	"crypto/sha256"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -114,8 +113,7 @@ func (bs *BatchSubmitter) prepareBatch(blockHeight uint64, blockTime time.Time) 
 }
 
 func (bs *BatchSubmitter) handleBatch(blockBytes []byte) error {
-	encodedBlockBytes := base64.StdEncoding.EncodeToString(blockBytes)
-	_, err := bs.batchWriter.Write(append([]byte(encodedBlockBytes), ','))
+	_, err := bs.batchWriter.Write(WriteBatch(blockBytes))
 	if err != nil {
 		return err
 	}
@@ -127,8 +125,7 @@ func (bs *BatchSubmitter) finalizeBatch(blockHeight uint64) error {
 	if err != nil {
 		return err
 	}
-	encodedRawCommit := base64.StdEncoding.EncodeToString(rawCommit)
-	_, err = bs.batchWriter.Write([]byte(encodedRawCommit))
+	_, err = bs.batchWriter.Write(WriteBatch(rawCommit))
 	if err != nil {
 		return err
 	}

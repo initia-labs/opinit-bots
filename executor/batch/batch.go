@@ -62,7 +62,7 @@ type BatchSubmitter struct {
 }
 
 func NewBatchSubmitter(version uint8, cfg nodetypes.NodeConfig, batchCfg executortypes.BatchConfig, db types.DB, logger *zap.Logger, homePath string) *BatchSubmitter {
-	node, err := node.NewNode(nodetypes.PROCESS_TYPE_RAW, cfg, db, logger, nil, nil, "", "")
+	node, err := node.NewNode(nodetypes.PROCESS_TYPE_RAW, cfg, db, logger, nil, nil, homePath, "", "")
 	if err != nil {
 		panic(err)
 	}

@@ -67,13 +67,13 @@ type Child struct {
 
 func NewChild(
 	version uint8, cfg nodetypes.NodeConfig,
-	db types.DB, logger *zap.Logger,
+	db types.DB, logger *zap.Logger, homePath string,
 ) *Child {
-	appCodec, txConfig, bech32Prefix, err := getCodec(cfg.ChainID)
+	appCodec, txConfig, bech32Prefix, err := GetCodec(cfg.ChainID)
 	if err != nil {
 		panic(err)
 	}
-	node, err := node.NewNode(nodetypes.PROCESS_TYPE_DEFAULT, cfg, db, logger, appCodec, txConfig, bech32Prefix, "")
+	node, err := node.NewNode(nodetypes.PROCESS_TYPE_DEFAULT, cfg, db, logger, appCodec, txConfig, homePath, bech32Prefix, "")
 	if err != nil {
 		panic(err)
 	}
@@ -101,7 +101,7 @@ func NewChild(
 	return ch
 }
 
-func getCodec(chainID string) (codec.Codec, client.TxConfig, string, error) {
+func GetCodec(chainID string) (codec.Codec, client.TxConfig, string, error) {
 	switch chainID {
 	case "minimove-1", "miniwasm-1":
 		encodingConfig := params.MakeEncodingConfig()

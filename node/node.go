@@ -60,13 +60,13 @@ type Node struct {
 	running bool
 }
 
-func NewNode(processType nodetypes.BlockProcessType, cfg nodetypes.NodeConfig, db types.DB, logger *zap.Logger, cdc codec.Codec, txConfig client.TxConfig, bech32Prefix string, batchSubmitter string) (*Node, error) {
+func NewNode(processType nodetypes.BlockProcessType, cfg nodetypes.NodeConfig, db types.DB, logger *zap.Logger, cdc codec.Codec, txConfig client.TxConfig, homeDir string, bech32Prefix string, batchSubmitter string) (*Node, error) {
 	client, err := clienthttp.New(cfg.RPC, "/websocket")
 	if err != nil {
 		return nil, err
 	}
 
-	keyBase, err := keyring.New(cfg.ChainID, "os", db.GetPath(), nil, cdc)
+	keyBase, err := GetKeyBase(cfg.ChainID, homeDir, cdc, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -99,7 +99,7 @@ func NewNode(processType nodetypes.BlockProcessType, cfg nodetypes.NodeConfig, d
 
 	var key *keyring.Record
 	if batchSubmitter != "" {
-		addr, err := n.DecodeBech32AccAddr(batchSubmitter)
+		addr, err := DecodeBech32AccAddr(batchSubmitter)
 		if err != nil {
 			return nil, err
 		}

@@ -53,10 +53,10 @@ type Celestia struct {
 
 func NewDACelestia(
 	version uint8, cfg nodetypes.NodeConfig,
-	db types.DB, logger *zap.Logger, batchSubmitter string,
+	db types.DB, logger *zap.Logger, homePath string, batchSubmitter string,
 ) *Celestia {
-	appCodec, txConfig, bech32Prefix := getCodec()
-	node, err := node.NewNode(cfg, db, logger, appCodec, txConfig, bech32Prefix, batchSubmitter)
+	appCodec, txConfig, bech32Prefix := GetCodec()
+	node, err := node.NewNode(nodetypes.PROCESS_TYPE_ONLY_BROADCAST, cfg, db, logger, appCodec, txConfig, homePath, bech32Prefix, batchSubmitter)
 	if err != nil {
 		panic(err)
 	}
@@ -76,7 +76,7 @@ func NewDACelestia(
 	}
 }
 
-func getCodec() (codec.Codec, client.TxConfig, string) {
+func GetCodec() (codec.Codec, client.TxConfig, string) {
 	interfaceRegistry := codectypes.NewInterfaceRegistry()
 	std.RegisterInterfaces(interfaceRegistry)
 	protoCodec := codec.NewProtoCodec(interfaceRegistry)
@@ -107,7 +107,7 @@ func (c *Celestia) Start(ctx context.Context, errCh chan error) {
 		}
 	}()
 
-	c.node.Start(ctx, errCh, nodetypes.PROCESS_TYPE_ONLY_BROADCAST)
+	c.node.Start(ctx, errCh)
 }
 
 func (c Celestia) BroadcastMsgs(msgs nodetypes.ProcessedMsgs) {
