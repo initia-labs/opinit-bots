@@ -162,7 +162,7 @@ func (n *Node) BroadcastMsgs(msgs nodetypes.ProcessedMsgs) {
 
 // CalculateGas simulates a tx to generate the appropriate gas settings before broadcasting a tx.
 func (n *Node) CalculateGas(ctx context.Context, txf tx.Factory, msgs ...sdk.Msg) (txtypes.SimulateResponse, uint64, error) {
-	keyInfo, err := n.keyBase.Key(nodetypes.KEY_NAME)
+	keyInfo, err := n.keyBase.Key(n.keyName)
 	if err != nil {
 		return txtypes.SimulateResponse{}, 0, err
 	}
@@ -311,7 +311,7 @@ func DefaultBuildTxWithMessages(
 		return nil, err
 	}
 
-	if err = tx.Sign(ctx, txf, nodetypes.KEY_NAME, txb, false); err != nil {
+	if err = tx.Sign(ctx, txf, n.keyName, txb, false); err != nil {
 		return nil, err
 	}
 

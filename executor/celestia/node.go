@@ -6,7 +6,6 @@ import (
 	"github.com/cosmos/cosmos-sdk/client/tx"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	node "github.com/initia-labs/opinit-bots-go/node"
-	nodetypes "github.com/initia-labs/opinit-bots-go/node/types"
 	celestiatypes "github.com/initia-labs/opinit-bots-go/types/celestia"
 )
 
@@ -42,7 +41,7 @@ func CelestiaBuildTxWithMessages(
 		return nil, err
 	}
 
-	if err = tx.Sign(ctx, txf, nodetypes.KEY_NAME, txb, false); err != nil {
+	if err = tx.Sign(ctx, txf, n.KeyName(), txb, false); err != nil {
 		return nil, err
 	}
 

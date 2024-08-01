@@ -43,6 +43,7 @@ type Node struct {
 	cdc        codec.Codec
 	txConfig   client.TxConfig
 	keyBase    keyring.Keyring
+	keyName    string
 	keyAddress sdk.AccAddress
 	txf        tx.Factory
 
@@ -120,6 +121,7 @@ func NewNode(processType nodetypes.BlockProcessType, cfg nodetypes.NodeConfig, d
 			return nil, err
 		}
 		n.keyAddress = addr
+		n.keyName = key.Name
 	}
 	err = n.loadSyncInfo()
 	if err != nil {
@@ -181,6 +183,10 @@ func (n *Node) Start(ctx context.Context, errCh chan error) {
 
 func (n Node) HasKey() bool {
 	return n.keyAddress != nil
+}
+
+func (n Node) KeyName() string {
+	return n.keyName
 }
 
 func (n *Node) prepareBroadcaster(_ /*lastBlockHeight*/ uint64, lastBlockTime time.Time) error {
