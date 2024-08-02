@@ -71,11 +71,11 @@ func (n *Node) txBroadcastLooper(ctx context.Context) error {
 
 func (n *Node) handleMsgError(err error) error {
 	if strs := accountSeqRegex.FindStringSubmatch(err.Error()); strs != nil {
-		expected, parseErr := strconv.ParseUint(strs[0], 10, 64)
+		expected, parseErr := strconv.ParseUint(strs[1], 10, 64)
 		if parseErr != nil {
 			return parseErr
 		}
-		got, parseErr := strconv.ParseUint(strs[1], 10, 64)
+		got, parseErr := strconv.ParseUint(strs[2], 10, 64)
 		if parseErr != nil {
 			return parseErr
 		}
@@ -89,11 +89,11 @@ func (n *Node) handleMsgError(err error) error {
 	}
 
 	if strs := outputIndexRegex.FindStringSubmatch(err.Error()); strs != nil {
-		expected, parseErr := strconv.ParseInt(strs[0], 10, 64)
+		expected, parseErr := strconv.ParseInt(strs[1], 10, 64)
 		if parseErr != nil {
 			return parseErr
 		}
-		got, parseErr := strconv.ParseInt(strs[1], 10, 64)
+		got, parseErr := strconv.ParseInt(strs[2], 10, 64)
 		if parseErr != nil {
 			return parseErr
 		}

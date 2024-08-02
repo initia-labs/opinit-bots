@@ -124,7 +124,6 @@ func (h *Host) Initialize(child childNode, batch batchNode, bridgeId int64) (err
 	}
 
 	h.registerHandlers()
-
 	return nil
 }
 
@@ -148,6 +147,10 @@ func (h *Host) registerHandlers() {
 	h.node.RegisterEventHandler(ophosttypes.EventTypeFinalizeTokenWithdrawal, h.finalizeWithdrawalHandler)
 	h.node.RegisterEventHandler(ophosttypes.EventTypeRecordBatch, h.recordBatchHandler)
 	h.node.RegisterEndBlockHandler(h.endBlockHandler)
+}
+
+func (h *Host) RegisterDAHandlers() {
+	h.node.RegisterEventHandler(ophosttypes.EventTypeRecordBatch, h.recordBatchHandler)
 }
 
 func (h Host) BroadcastMsgs(msgs nodetypes.ProcessedMsgs) {

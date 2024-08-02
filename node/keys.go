@@ -9,7 +9,7 @@ import (
 )
 
 func GetKeyBase(chainId string, dir string, cdc codec.Codec, userInput io.Reader) (keyring.Keyring, error) {
-	return keyring.New(chainId, "os", dir, userInput, cdc)
+	return keyring.New(chainId, "test", dir, userInput, cdc)
 }
 
 // CreateMnemonic generates a new mnemonic.

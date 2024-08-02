@@ -56,23 +56,6 @@ func NewBot(name bottypes.BotType, logger *zap.Logger, homePath string, configNa
 	return nil, errors.New("not providing bot name")
 }
 
-// func SetSDKConfig() {
-// 	sdkConfig := sdk.GetConfig()
-// 	sdkConfig.SetCoinType(initiaapp.CoinType)
-
-// 	accountPubKeyPrefix := initiaapp.AccountAddressPrefix + "pub"
-// 	validatorAddressPrefix := initiaapp.AccountAddressPrefix + "valoper"
-// 	validatorPubKeyPrefix := initiaapp.AccountAddressPrefix + "valoperpub"
-// 	consNodeAddressPrefix := initiaapp.AccountAddressPrefix + "valcons"
-// 	consNodePubKeyPrefix := initiaapp.AccountAddressPrefix + "valconspub"
-
-// 	sdkConfig.SetBech32PrefixForAccount(initiaapp.AccountAddressPrefix, accountPubKeyPrefix)
-// 	sdkConfig.SetBech32PrefixForValidator(validatorAddressPrefix, validatorPubKeyPrefix)
-// 	sdkConfig.SetBech32PrefixForConsensusNode(consNodeAddressPrefix, consNodePubKeyPrefix)
-// 	sdkConfig.SetAddressVerifier(initiaapp.VerifyAddressLen())
-// 	sdkConfig.Seal()
-// }
-
 func getDBPath(homePath string, botName bottypes.BotType) string {
 	return fmt.Sprintf(homePath+"/%s.db", botName)
 }

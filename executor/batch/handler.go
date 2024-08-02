@@ -74,7 +74,6 @@ func (bs *BatchSubmitter) rawBlockHandler(args nodetypes.RawBlockArgs) error {
 }
 
 func (bs *BatchSubmitter) prepareBatch(blockHeight uint64, blockTime time.Time) error {
-
 	// check whether the requested block height is reached to the l2 block number of the next batch info.
 	if nextBatchInfo := bs.NextBatchInfo(); nextBatchInfo != nil && nextBatchInfo.Output.L2BlockNumber < blockHeight {
 

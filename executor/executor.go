@@ -16,6 +16,8 @@ import (
 
 	bottypes "github.com/initia-labs/opinit-bots-go/bot/types"
 	executortypes "github.com/initia-labs/opinit-bots-go/executor/types"
+
+	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
 	"github.com/initia-labs/opinit-bots-go/types"
 	"go.uber.org/zap"
 )
@@ -193,9 +195,8 @@ func (ex *Executor) RegisterQuerier() {
 
 func (ex *Executor) makeDANode(bridgeId int64) (executortypes.DANode, error) {
 	batchInfo := ex.batch.BatchInfo()
-
-	switch ex.cfg.DAChainID {
-	case ex.cfg.L1ChainID:
+	switch batchInfo.BatchInfo.ChainType {
+	case ophosttypes.BatchInfo_CHAIN_TYPE_INITIA:
 		da := host.NewHost(
 			ex.cfg.Version, false, ex.cfg.DANodeConfig(),
 			ex.db.WithPrefix([]byte(executortypes.DAHostNodeName)),
@@ -205,12 +206,17 @@ func (ex *Executor) makeDANode(bridgeId int64) (executortypes.DANode, error) {
 			return ex.host, nil
 		}
 		da.SetBridgeId(bridgeId)
+		da.RegisterDAHandlers()
 		return da, nil
-	case "celestia":
-		return celestia.NewDACelestia(ex.cfg.Version, ex.cfg.DANodeConfig(),
+	case ophosttypes.BatchInfo_CHAIN_TYPE_CELESTIA:
+		da := celestia.NewDACelestia(ex.cfg.Version, ex.cfg.DANodeConfig(),
 			ex.db.WithPrefix([]byte(executortypes.DACelestiaNodeName)),
 			ex.logger.Named(executortypes.DACelestiaNodeName), ex.homePath, batchInfo.BatchInfo.Submitter,
-		), nil
+		)
+		da.Initialize(ex.batch, bridgeId)
+		da.RegisterDAHandlers()
+		return da, nil
 	}
-	return nil, fmt.Errorf("unsupported chain id for DA: %s", ex.cfg.DAChainID)
+
+	return nil, fmt.Errorf("unsupported chain id for DA: %s", ophosttypes.BatchInfo_ChainType_name[int32(batchInfo.BatchInfo.ChainType)])
 }

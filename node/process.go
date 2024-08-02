@@ -234,6 +234,16 @@ func (n *Node) txChecker(ctx context.Context) error {
 			}
 			n.logger.Debug("tx inserted", zap.Int64("height", res.Height), zap.Uint64("sequence", pendingTx.Sequence), zap.String("txHash", pendingTx.TxHash))
 			n.dequeueLocalPendingTx()
+
+			if len(n.eventHandlers) != 0 {
+				events := res.TxResult.GetEvents()
+				for eventIndex, event := range events {
+					err := n.handleEvent(uint64(res.Height), 0, event)
+					if err != nil {
+						return fmt.Errorf("failed to handle event: tx_hash: %X, event_index: %d; %w", res.Hash, eventIndex, err)
+					}
+				}
+			}
 		}
 	}
 }

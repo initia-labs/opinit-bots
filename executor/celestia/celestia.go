@@ -105,6 +105,10 @@ func (c *Celestia) Initialize(batch batchNode, bridgeId int64) error {
 	return nil
 }
 
+func (c *Celestia) RegisterDAHandlers() {
+	c.node.RegisterEventHandler("celestia.blob.v1.EventPayForBlobs", c.payForBlobsHandler)
+}
+
 func (c *Celestia) Start(ctx context.Context, errCh chan error) {
 	defer func() {
 		if r := recover(); r != nil {
