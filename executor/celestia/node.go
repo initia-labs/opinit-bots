@@ -36,7 +36,7 @@ func CelestiaBuildTxWithMessages(
 	}
 
 	txf = txf.WithGas(adjusted)
-	txb, err := txf.BuildUnsignedTx(msgs...)
+	txb, err := txf.BuildUnsignedTx(pfbMsgs...)
 	if err != nil {
 		return nil, err
 	}

@@ -37,33 +37,30 @@ var accountSeqRegex = regexp.MustCompile("account sequence mismatch, expected ([
 var outputIndexRegex = regexp.MustCompile("expected ([0-9]+), got ([0-9]+): invalid output index")
 
 func (n *Node) txBroadcastLooper(ctx context.Context) error {
+	retry := time.NewTicker(30 * time.Second)
+
 	for {
 		select {
 		case <-ctx.Done():
 			return nil
-
 		case data := <-n.txChannel:
-			var err error
-			for retry := 1; retry <= 5; retry++ {
-				select {
-				case <-ctx.Done():
-					return nil
-				default:
-				}
-				err = n.handleProcessedMsgs(ctx, data)
+			count := 1
+			select {
+			case <-ctx.Done():
+				return nil
+			case <-retry.C:
+				err := n.handleProcessedMsgs(ctx, data)
 				if err == nil {
 					break
 				} else if err = n.handleMsgError(err); err == nil {
 					break
 				}
+				n.logger.Warn("retry", zap.Int("count", count), zap.String("error", err.Error()))
+				count++
 
-				n.logger.Warn("retry", zap.Int("count", retry), zap.String("error", err.Error()))
-				time.Sleep(2 * time.Second)
-				continue
-			}
-
-			if err != nil {
-				return errors.Wrap(err, "failed to handle processed msgs")
+				if count >= 10 {
+					return errors.Wrap(err, "failed to handle processed msgs")
+				}
 			}
 		}
 	}
