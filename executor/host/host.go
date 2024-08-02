@@ -128,7 +128,6 @@ func (h *Host) Initialize(child childNode, batch batchNode, bridgeId int64) (err
 
 func (h *Host) Start(ctx context.Context, errCh chan error) {
 	defer func() {
-		h.logger.Info("host end")
 		if r := recover(); r != nil {
 			h.logger.Error("host panic", zap.Any("recover", r))
 			errCh <- fmt.Errorf("host panic: %v", r)

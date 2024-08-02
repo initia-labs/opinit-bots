@@ -121,7 +121,8 @@ func (ex *Executor) Start(cmdCtx context.Context) error {
 	errCh := make(chan error, 5)
 	ex.host.Start(hostCtx, errCh)
 	ex.child.Start(childCtx, errCh)
-	ex.batch.Start(batchCtx, daCtx, errCh)
+	ex.batch.Start(batchCtx, errCh)
+	ex.batch.DA().Start(daCtx, errCh)
 
 	go func() {
 		err := ex.server.Start(ex.cfg.ListenAddress)

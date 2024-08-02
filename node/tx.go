@@ -44,7 +44,7 @@ func (n *Node) txBroadcastLooper(ctx context.Context) error {
 
 		case data := <-n.txChannel:
 			var err error
-			for retry := 0; retry < 5; retry++ {
+			for retry := 1; retry <= 5; retry++ {
 				select {
 				case <-ctx.Done():
 					return nil
@@ -56,8 +56,9 @@ func (n *Node) txBroadcastLooper(ctx context.Context) error {
 				} else if err = n.handleMsgError(err); err == nil {
 					break
 				}
+				fmt.Println(data, err)
 
-				n.logger.Warn("retry ", zap.String("error", err.Error()))
+				n.logger.Warn("retry", zap.Int("count", retry), zap.String("error", err.Error()))
 				time.Sleep(2 * time.Second)
 				continue
 			}
@@ -273,6 +274,9 @@ func (n *Node) dequeueLocalPendingTx() {
 }
 
 func (n *Node) EncodeTx(tx authsigning.Tx) ([]byte, error) {
+	unlock := SetSDKConfigContext(n.bech32Prefix)
+	defer unlock()
+
 	txBytes, err := n.txConfig.TxEncoder()(tx)
 	if err != nil {
 		return nil, err
@@ -281,6 +285,9 @@ func (n *Node) EncodeTx(tx authsigning.Tx) ([]byte, error) {
 }
 
 func (n *Node) DecodeTx(txBytes []byte) (authsigning.Tx, error) {
+	unlock := SetSDKConfigContext(n.bech32Prefix)
+	defer unlock()
+
 	tx, err := n.txConfig.TxDecoder()(txBytes)
 	if err != nil {
 		return nil, err

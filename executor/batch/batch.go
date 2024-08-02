@@ -130,9 +130,8 @@ func (bs *BatchSubmitter) SetDANode(da executortypes.DANode) error {
 	return nil
 }
 
-func (bs *BatchSubmitter) Start(ctx context.Context, daCtx context.Context, errCh chan error) {
+func (bs *BatchSubmitter) Start(ctx context.Context, errCh chan error) {
 	defer func() {
-		bs.logger.Info("batch end")
 		if r := recover(); r != nil {
 			bs.logger.Error("batch panic", zap.Any("recover", r))
 			errCh <- fmt.Errorf("batch panic: %v", r)
@@ -141,7 +140,6 @@ func (bs *BatchSubmitter) Start(ctx context.Context, daCtx context.Context, errC
 
 	bs.logger.Info("batch start", zap.Uint64("height", bs.node.GetHeight()))
 	bs.node.Start(ctx, errCh)
-	bs.da.Start(daCtx, errCh)
 }
 
 func (bs *BatchSubmitter) SetBridgeInfo(bridgeInfo opchildtypes.BridgeInfo) {
