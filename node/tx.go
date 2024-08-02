@@ -274,9 +274,6 @@ func (n *Node) dequeueLocalPendingTx() {
 }
 
 func (n *Node) EncodeTx(tx authsigning.Tx) ([]byte, error) {
-	unlock := SetSDKConfigContext(n.bech32Prefix)
-	defer unlock()
-
 	txBytes, err := n.txConfig.TxEncoder()(tx)
 	if err != nil {
 		return nil, err
@@ -285,9 +282,6 @@ func (n *Node) EncodeTx(tx authsigning.Tx) ([]byte, error) {
 }
 
 func (n *Node) DecodeTx(txBytes []byte) (authsigning.Tx, error) {
-	unlock := SetSDKConfigContext(n.bech32Prefix)
-	defer unlock()
-
 	tx, err := n.txConfig.TxDecoder()(txBytes)
 	if err != nil {
 		return nil, err

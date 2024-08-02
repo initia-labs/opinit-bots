@@ -99,6 +99,8 @@ func NewHost(
 }
 
 func GetCodec() (codec.Codec, client.TxConfig, string) {
+	unlock := node.SetSDKConfigContext(initiaapp.AccountAddressPrefix)
+	defer unlock()
 	encodingConfig := params.MakeEncodingConfig()
 	appCodec := encodingConfig.Codec
 	txConfig := encodingConfig.TxConfig

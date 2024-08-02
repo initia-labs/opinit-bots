@@ -106,6 +106,9 @@ func GetCodec(chainID string) (codec.Codec, client.TxConfig, string, error) {
 	case "minimove-1", "miniwasm-1",
 		// for test
 		"l2":
+
+		unlock := node.SetSDKConfigContext(initiaapp.AccountAddressPrefix)
+		defer unlock()
 		encodingConfig := params.MakeEncodingConfig()
 		appCodec := encodingConfig.Codec
 		txConfig := encodingConfig.TxConfig

@@ -17,11 +17,13 @@ limitations under the License.
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"io"
 	"os"
 	"strings"
 
+	"github.com/cosmos/cosmos-sdk/client/input"
 	"github.com/cosmos/cosmos-sdk/codec"
 	"github.com/cosmos/cosmos-sdk/crypto/hd"
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -33,7 +35,7 @@ import (
 )
 
 const (
-	flagRestore     = "restore"
+	flagRecover     = "recover"
 	flagMnemonicSrc = "source"
 )
 
@@ -87,19 +89,28 @@ $ keys add l2 key2 --restore mnemonic.txt`),
 			}
 
 			mnemonic := ""
-			mnemonicSrc, err := cmd.Flags().GetString(flagRestore)
-			if err == nil && mnemonicSrc != "" {
-				file, err := os.Open(mnemonicSrc)
-				if err != nil {
-					return err
-				}
-				defer file.Close()
+			recoverFlag, _ := cmd.Flags().GetBool(flagRecover)
+			mnemonicSrc, _ := cmd.Flags().GetString(flagMnemonicSrc)
 
-				bz, err := io.ReadAll(file)
-				if err != nil {
-					return err
+			if recoverFlag {
+				if mnemonicSrc != "" {
+					file, err := os.Open(mnemonicSrc)
+					if err != nil {
+						return err
+					}
+					bz, err := io.ReadAll(file)
+					file.Close()
+					if err != nil {
+						return err
+					}
+					mnemonic = strings.TrimSpace(string(bz))
+				} else {
+					buf := bufio.NewReader(cmd.InOrStdin())
+					mnemonic, err = input.GetString("Enter your bip39 mnemonic", buf)
+					if err != nil {
+						return err
+					}
 				}
-				mnemonic = strings.TrimSpace(string(bz))
 			} else {
 				mnemonic, err = node.CreateMnemonic()
 				if err != nil {
@@ -126,7 +137,8 @@ $ keys add l2 key2 --restore mnemonic.txt`),
 			return nil
 		},
 	}
-	cmd.Flags().String(flagRestore, "", "restores from mnemonic file source")
+	cmd.Flags().Bool(flagRecover, false, "Provide seed phrase to recover existing key instead of creating")
+	cmd.Flags().String(flagMnemonicSrc, "", "Import mnemonic from a file")
 	return cmd
 }
 

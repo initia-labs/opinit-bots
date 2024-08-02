@@ -77,6 +77,8 @@ func NewDACelestia(
 }
 
 func GetCodec() (codec.Codec, client.TxConfig, string) {
+	unlock := node.SetSDKConfigContext("celestia")
+	defer unlock()
 	interfaceRegistry := codectypes.NewInterfaceRegistry()
 	amino := codec.NewLegacyAmino()
 	std.RegisterLegacyAminoCodec(amino)
