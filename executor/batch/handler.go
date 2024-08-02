@@ -104,7 +104,7 @@ func (bs *BatchSubmitter) prepareBatch(blockHeight uint64, blockTime time.Time) 
 		bs.DequeueBatchInfo()
 
 		// error will restart block process from nextBatchInfo.Output.L2BlockNumber + 1
-		return fmt.Errorf("batch info updated: reset from %d", nextBatchInfo.Output.L2BlockNumber)
+		panic(fmt.Errorf("batch info updated: reset from %d", nextBatchInfo.Output.L2BlockNumber))
 	}
 
 	if bs.batchHeader != nil {
