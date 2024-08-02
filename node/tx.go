@@ -56,7 +56,6 @@ func (n *Node) txBroadcastLooper(ctx context.Context) error {
 				} else if err = n.handleMsgError(err); err == nil {
 					break
 				}
-				fmt.Println(data, err)
 
 				n.logger.Warn("retry", zap.Int("count", retry), zap.String("error", err.Error()))
 				time.Sleep(2 * time.Second)
@@ -71,7 +70,19 @@ func (n *Node) txBroadcastLooper(ctx context.Context) error {
 }
 
 func (n *Node) handleMsgError(err error) error {
-	if accountSeqRegex.FindStringSubmatch(err.Error()) != nil {
+	if strs := accountSeqRegex.FindStringSubmatch(err.Error()); strs != nil {
+		expected, parseErr := strconv.ParseUint(strs[0], 10, 64)
+		if parseErr != nil {
+			return parseErr
+		}
+		got, parseErr := strconv.ParseUint(strs[1], 10, 64)
+		if parseErr != nil {
+			return parseErr
+		}
+
+		if expected > got {
+			n.txf = n.txf.WithSequence(expected)
+		}
 		// account sequence mismatched
 		// TODO: handle mismatched sequence
 		return err

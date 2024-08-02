@@ -96,5 +96,5 @@ func (p ProcessedMsgs) String() string {
 		msgStr += msg.String() + ","
 	}
 	tsStr := time.Unix(0, p.Timestamp).UTC().String()
-	return fmt.Sprintf("Pending msgs: %s at height: %d, %s", msgStr, p.Timestamp, tsStr)
+	return fmt.Sprintf("Pending msgs: %s at %s", msgStr, tsStr)
 }
