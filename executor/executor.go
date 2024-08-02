@@ -92,7 +92,7 @@ func NewExecutor(cfg *executortypes.Config, db types.DB, sv *server.Server, logg
 		panic(err)
 	}
 
-	da, err := executor.makeDANode()
+	da, err := executor.makeDANode(int64(bridgeInfo.BridgeId))
 	if err != nil {
 		panic(err)
 	}
@@ -116,11 +116,12 @@ func (ex *Executor) Start(cmdCtx context.Context) error {
 	hostCtx, hostDone := context.WithCancel(cmdCtx)
 	childCtx, childDone := context.WithCancel(cmdCtx)
 	batchCtx, batchDone := context.WithCancel(cmdCtx)
+	daCtx, daDone := context.WithCancel(cmdCtx)
 
-	errCh := make(chan error, 4)
+	errCh := make(chan error, 5)
 	ex.host.Start(hostCtx, errCh)
 	ex.child.Start(childCtx, errCh)
-	ex.batch.Start(batchCtx, errCh)
+	ex.batch.Start(batchCtx, daCtx, errCh)
 
 	go func() {
 		err := ex.server.Start(ex.cfg.ListenAddress)
@@ -143,6 +144,9 @@ func (ex *Executor) Start(cmdCtx context.Context) error {
 
 		ex.logger.Debug("executor shutdown", zap.String("state", "wait"), zap.String("target", "batch"))
 		batchDone()
+
+		ex.logger.Debug("executor shutdown", zap.String("state", "wait"), zap.String("target", "da"))
+		daDone()
 
 		ex.logger.Info("executor shutdown completed")
 		return err
@@ -186,7 +190,7 @@ func (ex *Executor) RegisterQuerier() {
 	})
 }
 
-func (ex *Executor) makeDANode() (executortypes.DANode, error) {
+func (ex *Executor) makeDANode(bridgeId int64) (executortypes.DANode, error) {
 	batchInfo := ex.batch.BatchInfo()
 
 	switch ex.cfg.DAChainID {
@@ -199,10 +203,7 @@ func (ex *Executor) makeDANode() (executortypes.DANode, error) {
 		if ex.host.GetAddress().Equals(da.GetAddress()) {
 			return ex.host, nil
 		}
-		err := da.Initialize(nil, nil, ex.host.BridgeId())
-		if err != nil {
-			return nil, err
-		}
+		da.SetBridgeId(bridgeId)
 		return da, nil
 	case "celestia":
 		return celestia.NewDACelestia(ex.cfg.Version, ex.cfg.DANodeConfig(),

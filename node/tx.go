@@ -63,13 +63,7 @@ func (n *Node) txBroadcastLooper(ctx context.Context) error {
 			}
 
 			if err != nil {
-<<<<<<< HEAD
-				return err
-||||||| parent of f6e90c0 (add comments)
-				panic(err)
-=======
 				return errors.Wrap(err, "failed to handle processed msgs")
->>>>>>> f6e90c0 (add comments)
 			}
 		}
 	}

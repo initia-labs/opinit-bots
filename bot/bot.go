@@ -50,7 +50,7 @@ func NewBot(name bottypes.BotType, logger *zap.Logger, homePath string, configNa
 			return nil, err
 		}
 		server := server.NewServer()
-		return executor.NewExecutor(cfg, db, server, logger, homePath), nil
+		return executor.NewExecutor(cfg, db, server, logger.Named("executor"), homePath), nil
 	}
 
 	return nil, errors.New("not providing bot name")
