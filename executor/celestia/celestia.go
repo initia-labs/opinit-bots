@@ -3,7 +3,6 @@ package celestia
 import (
 	"context"
 	"crypto/sha256"
-	"fmt"
 
 	"go.uber.org/zap"
 
@@ -110,13 +109,6 @@ func (c *Celestia) RegisterDAHandlers() {
 }
 
 func (c *Celestia) Start(ctx context.Context, errCh chan error) {
-	defer func() {
-		if r := recover(); r != nil {
-			c.logger.Error("da celestia panic", zap.Any("recover", r))
-			errCh <- fmt.Errorf("da celestia panic: %v", r)
-		}
-	}()
-
 	c.logger.Info("celestia start")
 	c.node.Start(ctx, errCh)
 }

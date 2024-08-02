@@ -152,6 +152,12 @@ func (n *Node) Start(ctx context.Context, errCh chan error) {
 	n.running = true
 
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				n.logger.Error("tx broadcast looper panic", zap.Any("recover", r))
+				errCh <- fmt.Errorf("tx broadcast looper panic: %v", r)
+			}
+		}()
 		err := n.txBroadcastLooper(ctx)
 		if err != nil {
 			errCh <- err
@@ -166,6 +172,12 @@ func (n *Node) Start(ctx context.Context, errCh chan error) {
 
 	if n.processType == nodetypes.PROCESS_TYPE_ONLY_BROADCAST {
 		go func() {
+			defer func() {
+				if r := recover(); r != nil {
+					n.logger.Error("tx checker panic", zap.Any("recover", r))
+					errCh <- fmt.Errorf("tx checker panic: %v", r)
+				}
+			}()
 			err := n.txChecker(ctx)
 			if err != nil {
 				errCh <- err
@@ -173,6 +185,12 @@ func (n *Node) Start(ctx context.Context, errCh chan error) {
 		}()
 	} else {
 		go func() {
+			defer func() {
+				if r := recover(); r != nil {
+					n.logger.Error("block process looper panic", zap.Any("recover", r))
+					errCh <- fmt.Errorf("block process looper panic: %v", r)
+				}
+			}()
 			err := n.blockProcessLooper(ctx, n.processType)
 			if err != nil {
 				errCh <- err

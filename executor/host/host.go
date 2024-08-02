@@ -2,7 +2,6 @@ package host
 
 import (
 	"context"
-	"fmt"
 
 	"go.uber.org/zap"
 
@@ -128,13 +127,6 @@ func (h *Host) Initialize(child childNode, batch batchNode, bridgeId int64) (err
 }
 
 func (h *Host) Start(ctx context.Context, errCh chan error) {
-	defer func() {
-		if r := recover(); r != nil {
-			h.logger.Error("host panic", zap.Any("recover", r))
-			errCh <- fmt.Errorf("host panic: %v", r)
-		}
-	}()
-
 	h.logger.Info("host start", zap.Uint64("height", h.node.GetHeight()))
 	h.node.Start(ctx, errCh)
 }

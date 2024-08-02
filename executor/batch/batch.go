@@ -3,7 +3,6 @@ package batch
 import (
 	"context"
 	"errors"
-	"fmt"
 	"io"
 	"os"
 	"sync"
@@ -131,13 +130,6 @@ func (bs *BatchSubmitter) SetDANode(da executortypes.DANode) error {
 }
 
 func (bs *BatchSubmitter) Start(ctx context.Context, errCh chan error) {
-	defer func() {
-		if r := recover(); r != nil {
-			bs.logger.Error("batch panic", zap.Any("recover", r))
-			errCh <- fmt.Errorf("batch panic: %v", r)
-		}
-	}()
-
 	bs.logger.Info("batch start", zap.Uint64("height", bs.node.GetHeight()))
 	bs.node.Start(ctx, errCh)
 }
