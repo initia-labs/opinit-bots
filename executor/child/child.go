@@ -73,7 +73,7 @@ func NewChild(
 	if err != nil {
 		panic(err)
 	}
-	node, err := node.NewNode(nodetypes.PROCESS_TYPE_DEFAULT, cfg, db, logger, appCodec, txConfig, homePath, bech32Prefix, "")
+	node, err := node.NewNode(nodetypes.PROCESS_TYPE_DEFAULT, cfg, db, logger, appCodec, txConfig, homePath, bech32Prefix, "", nil)
 	if err != nil {
 		panic(err)
 	}
@@ -132,9 +132,9 @@ func (ch *Child) Initialize(host hostNode, bridgeInfo opchildtypes.BridgeInfo) e
 	return nil
 }
 
-func (ch *Child) Start(ctx context.Context, errCh chan error) {
+func (ch *Child) Start(ctx context.Context) {
 	ch.logger.Info("child start", zap.Uint64("height", ch.node.GetHeight()))
-	ch.node.Start(ctx, errCh)
+	ch.node.Start(ctx)
 }
 
 func (ch *Child) registerHandlers() {

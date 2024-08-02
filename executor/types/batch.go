@@ -9,7 +9,7 @@ import (
 )
 
 type DANode interface {
-	Start(context.Context, chan error)
+	Start(context.Context)
 	HasKey() bool
 	CreateBatchMsg([]byte) (sdk.Msg, error)
 	BroadcastMsgs(nodetypes.ProcessedMsgs)

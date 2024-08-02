@@ -19,9 +19,11 @@ import (
 	nodetypes "github.com/initia-labs/opinit-bots-go/node/types"
 	"github.com/initia-labs/opinit-bots-go/types"
 	"go.uber.org/zap"
+	"golang.org/x/sync/errgroup"
 )
 
 type BuildTxWithMessagesFn func(*Node, context.Context, []sdk.Msg) ([]byte, error)
+type PendingTxToProcessedMsgsFn func(*Node, []byte) ([]sdk.Msg, error)
 
 type Node struct {
 	*clienthttp.HTTP
@@ -38,7 +40,8 @@ type Node struct {
 	endBlockHandler   nodetypes.EndBlockHandlerFn
 	rawBlockHandler   nodetypes.RawBlockHandlerFn
 
-	buildTxWithMessages BuildTxWithMessagesFn
+	buildTxWithMessages      BuildTxWithMessagesFn
+	pendingTxToProcessedMsgs PendingTxToProcessedMsgsFn
 
 	cdc        codec.Codec
 	txConfig   client.TxConfig
@@ -61,7 +64,7 @@ type Node struct {
 	running bool
 }
 
-func NewNode(processType nodetypes.BlockProcessType, cfg nodetypes.NodeConfig, db types.DB, logger *zap.Logger, cdc codec.Codec, txConfig client.TxConfig, homeDir string, bech32Prefix string, batchSubmitter string) (*Node, error) {
+func NewNode(processType nodetypes.BlockProcessType, cfg nodetypes.NodeConfig, db types.DB, logger *zap.Logger, cdc codec.Codec, txConfig client.TxConfig, homeDir string, bech32Prefix string, batchSubmitter string, processingFn PendingTxToProcessedMsgsFn) (*Node, error) {
 	client, err := clienthttp.New(cfg.RPC, "/websocket")
 	if err != nil {
 		return nil, err
@@ -70,6 +73,10 @@ func NewNode(processType nodetypes.BlockProcessType, cfg nodetypes.NodeConfig, d
 	keyBase, err := GetKeyBase(cfg.ChainID, homeDir, cdc, nil)
 	if err != nil || keyBase == nil {
 		return nil, err
+	}
+
+	if processingFn == nil {
+		processingFn = DefaultPendingTxToProcessedMsgs
 	}
 
 	n := &Node{
@@ -83,7 +90,8 @@ func NewNode(processType nodetypes.BlockProcessType, cfg nodetypes.NodeConfig, d
 
 		eventHandlers: make(map[string]nodetypes.EventHandlerFn),
 
-		buildTxWithMessages: DefaultBuildTxWithMessages,
+		buildTxWithMessages:      DefaultBuildTxWithMessages,
+		pendingTxToProcessedMsgs: processingFn,
 
 		cdc:      cdc,
 		txConfig: txConfig,
@@ -145,24 +153,25 @@ func NewNode(processType nodetypes.BlockProcessType, cfg nodetypes.NodeConfig, d
 	return n, nil
 }
 
-func (n *Node) Start(ctx context.Context, errCh chan error) {
+func (n *Node) Start(ctx context.Context) {
 	if n.running {
 		return
 	}
 	n.running = true
 
-	go func() {
+	errGrp := ctx.Value("errGrp").(*errgroup.Group)
+	if errGrp == nil {
+		panic("error group must be set")
+	}
+	errGrp.Go(func() (err error) {
 		defer func() {
 			if r := recover(); r != nil {
 				n.logger.Error("tx broadcast looper panic", zap.Any("recover", r))
-				errCh <- fmt.Errorf("tx broadcast looper panic: %v", r)
+				err = fmt.Errorf("tx broadcast looper panic: %v", r)
 			}
 		}()
-		err := n.txBroadcastLooper(ctx)
-		if err != nil {
-			errCh <- err
-		}
-	}()
+		return n.txBroadcastLooper(ctx)
+	})
 
 	// broadcast pending msgs first before executing block process looper
 	// @dev: these pending processed data is filled at initialization(`NewNode`).
@@ -171,31 +180,25 @@ func (n *Node) Start(ctx context.Context, errCh chan error) {
 	}
 
 	if n.processType == nodetypes.PROCESS_TYPE_ONLY_BROADCAST {
-		go func() {
+		errGrp.Go(func() (err error) {
 			defer func() {
 				if r := recover(); r != nil {
 					n.logger.Error("tx checker panic", zap.Any("recover", r))
-					errCh <- fmt.Errorf("tx checker panic: %v", r)
+					err = fmt.Errorf("tx checker panic: %v", r)
 				}
 			}()
-			err := n.txChecker(ctx)
-			if err != nil {
-				errCh <- err
-			}
-		}()
+			return n.txChecker(ctx)
+		})
 	} else {
-		go func() {
+		errGrp.Go(func() (err error) {
 			defer func() {
 				if r := recover(); r != nil {
 					n.logger.Error("block process looper panic", zap.Any("recover", r))
-					errCh <- fmt.Errorf("block process looper panic: %v", r)
+					err = fmt.Errorf("block process looper panic: %v", r)
 				}
 			}()
-			err := n.blockProcessLooper(ctx, n.processType)
-			if err != nil {
-				errCh <- err
-			}
-		}()
+			return n.blockProcessLooper(ctx, n.processType)
+		})
 	}
 }
 
@@ -249,13 +252,14 @@ func (n *Node) prepareBroadcaster(_ /*lastBlockHeight*/ uint64, lastBlockTime ti
 
 		// convert pending txs to pending msgs
 		for i, txInfo := range loadedPendingTxs {
-			tx, err := n.DecodeTx(txInfo.Tx)
+			msgs, err := n.pendingTxToProcessedMsgs(n, txInfo.Tx)
 			if err != nil {
 				return err
 			}
+
 			if txInfo.Save {
 				n.pendingProcessedMsgs = append(n.pendingProcessedMsgs, nodetypes.ProcessedMsgs{
-					Msgs:      tx.GetMsgs(),
+					Msgs:      msgs,
 					Timestamp: time.Now().UnixNano(),
 					Save:      txInfo.Save,
 				})

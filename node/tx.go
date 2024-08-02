@@ -333,3 +333,14 @@ func DefaultBuildTxWithMessages(
 	}
 	return txBytes, nil
 }
+
+func DefaultPendingTxToProcessedMsgs(
+	n *Node,
+	txBytes []byte,
+) ([]sdk.Msg, error) {
+	tx, err := n.DecodeTx(txBytes)
+	if err != nil {
+		return nil, err
+	}
+	return tx.GetMsgs(), nil
+}

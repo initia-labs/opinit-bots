@@ -5,5 +5,6 @@ import (
 )
 
 type Bot interface {
-	Start(context.Context) error
+	Start(context.Context)
+	Close()
 }

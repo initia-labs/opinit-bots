@@ -73,7 +73,7 @@ func NewHost(
 		processType = nodetypes.PROCESS_TYPE_ONLY_BROADCAST
 	}
 
-	node, err := node.NewNode(processType, cfg, db, logger, appCodec, txConfig, homePath, bech32Prefix, batchSubmitter)
+	node, err := node.NewNode(processType, cfg, db, logger, appCodec, txConfig, homePath, bech32Prefix, batchSubmitter, nil)
 	if err != nil {
 		panic(err)
 	}
@@ -126,9 +126,9 @@ func (h *Host) Initialize(child childNode, batch batchNode, bridgeId int64) (err
 	return nil
 }
 
-func (h *Host) Start(ctx context.Context, errCh chan error) {
+func (h *Host) Start(ctx context.Context) {
 	h.logger.Info("host start", zap.Uint64("height", h.node.GetHeight()))
-	h.node.Start(ctx, errCh)
+	h.node.Start(ctx)
 }
 
 func (h *Host) registerHandlers() {

@@ -20,6 +20,7 @@ import (
 	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
 	"github.com/initia-labs/opinit-bots-go/types"
 	"go.uber.org/zap"
+	"golang.org/x/sync/errgroup"
 )
 
 var _ bottypes.Bot = &Executor{}
@@ -107,61 +108,28 @@ func NewExecutor(cfg *executortypes.Config, db types.DB, sv *server.Server, logg
 	return executor
 }
 
-func (ex *Executor) Start(cmdCtx context.Context) error {
-	defer ex.db.Close()
+func (ex *Executor) Start(cmdCtx context.Context) {
+	// err := ex.server.ShutdownWithContext(cmdCtx)
+	// if err != nil {
+	// 	return err
+	// }
 
-	err := ex.server.ShutdownWithContext(cmdCtx)
-	if err != nil {
-		return err
+	errGrp := cmdCtx.Value("errGrp").(*errgroup.Group)
+	if errGrp == nil {
+		panic("error group must be set")
 	}
+	errGrp.Go(func() (err error) {
+		return ex.server.Start(ex.cfg.ListenAddress)
+	})
 
-	hostCtx, hostDone := context.WithCancel(cmdCtx)
-	childCtx, childDone := context.WithCancel(cmdCtx)
-	batchCtx, batchDone := context.WithCancel(cmdCtx)
-	daCtx, daDone := context.WithCancel(cmdCtx)
+	ex.host.Start(cmdCtx)
+	ex.child.Start(cmdCtx)
+	ex.batch.Start(cmdCtx)
+	ex.batch.DA().Start(cmdCtx)
+}
 
-	errCh := make(chan error, 5)
-	ex.host.Start(hostCtx, errCh)
-	ex.child.Start(childCtx, errCh)
-	ex.batch.Start(batchCtx, errCh)
-	ex.batch.DA().Start(daCtx, errCh)
-
-	go func() {
-		err := ex.server.Start(ex.cfg.ListenAddress)
-		if err != nil {
-			errCh <- err
-		}
-	}()
-
-	shutdown := func(err error) error {
-		ex.logger.Info("executor shutdown", zap.String("state", "requested"))
-
-		ex.logger.Debug("executor shutdown", zap.String("state", "wait"), zap.String("target", "api"))
-		ex.server.Shutdown()
-
-		ex.logger.Debug("executor shutdown", zap.String("state", "wait"), zap.String("target", "host"))
-		hostDone()
-
-		ex.logger.Debug("executor shutdown", zap.String("state", "wait"), zap.String("target", "child"))
-		childDone()
-
-		ex.logger.Debug("executor shutdown", zap.String("state", "wait"), zap.String("target", "batch"))
-		batchDone()
-
-		ex.logger.Debug("executor shutdown", zap.String("state", "wait"), zap.String("target", "da"))
-		daDone()
-
-		ex.logger.Info("executor shutdown completed")
-		return err
-	}
-
-	select {
-	case err := <-errCh:
-		ex.logger.Error("executor error", zap.String("error", err.Error()))
-		return shutdown(err)
-	case <-cmdCtx.Done():
-		return shutdown(nil)
-	}
+func (ex *Executor) Close() {
+	ex.db.Close()
 }
 
 func (ex *Executor) RegisterQuerier() {

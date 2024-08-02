@@ -55,11 +55,11 @@ func NewDACelestia(
 	db types.DB, logger *zap.Logger, homePath string, batchSubmitter string,
 ) *Celestia {
 	appCodec, txConfig, bech32Prefix := GetCodec()
-	node, err := node.NewNode(nodetypes.PROCESS_TYPE_ONLY_BROADCAST, cfg, db, logger, appCodec, txConfig, homePath, bech32Prefix, batchSubmitter)
+	node, err := node.NewNode(nodetypes.PROCESS_TYPE_ONLY_BROADCAST, cfg, db, logger, appCodec, txConfig, homePath, bech32Prefix, batchSubmitter, PendingTxToProcessedMsgs)
 	if err != nil {
 		panic(err)
 	}
-	node.RegisterBuildTxWithMessages(CelestiaBuildTxWithMessages)
+	node.RegisterBuildTxWithMessages(BuildTxWithMessages)
 
 	return &Celestia{
 		version: version,
@@ -108,9 +108,9 @@ func (c *Celestia) RegisterDAHandlers() {
 	c.node.RegisterEventHandler("celestia.blob.v1.EventPayForBlobs", c.payForBlobsHandler)
 }
 
-func (c *Celestia) Start(ctx context.Context, errCh chan error) {
+func (c *Celestia) Start(ctx context.Context) {
 	c.logger.Info("celestia start")
-	c.node.Start(ctx, errCh)
+	c.node.Start(ctx)
 }
 
 func (c Celestia) BroadcastMsgs(msgs nodetypes.ProcessedMsgs) {

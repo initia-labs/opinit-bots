@@ -10,7 +10,7 @@ import (
 )
 
 // buildTxWithMessages creates a transaction from the given messages.
-func CelestiaBuildTxWithMessages(
+func BuildTxWithMessages(
 	n *node.Node,
 	ctx context.Context,
 	msgs []sdk.Msg,
@@ -57,4 +57,31 @@ func CelestiaBuildTxWithMessages(
 		TypeId: "BLOB",
 	}
 	return blobTx.Marshal()
+}
+
+func PendingTxToProcessedMsgs(
+	n *node.Node,
+	txBytes []byte,
+) ([]sdk.Msg, error) {
+	blobTx := &celestiatypes.BlobTx{}
+	if err := blobTx.Unmarshal(txBytes); err == nil {
+		pfbTx, err := n.DecodeTx(blobTx.Tx)
+		if err != nil {
+			return nil, err
+		}
+		pfbMsg := pfbTx.GetMsgs()[0]
+
+		return []sdk.Msg{
+			&celestiatypes.MsgPayForBlobsWithBlob{
+				MsgPayForBlobs: pfbMsg.(*celestiatypes.MsgPayForBlobs),
+				Blob:           blobTx.Blobs[0],
+			},
+		}, nil
+	}
+
+	tx, err := n.DecodeTx(txBytes)
+	if err != nil {
+		return nil, err
+	}
+	return tx.GetMsgs(), nil
 }

@@ -2,11 +2,13 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
 
 	"github.com/spf13/cobra"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/initia-labs/opinit-bots-go/bot"
 	bottypes "github.com/initia-labs/opinit-bots-go/bot/types"
@@ -36,7 +38,12 @@ Currently supported bots:
 			cmdCtx, botDone := context.WithCancel(cmd.Context())
 			gracefulShutdown(botDone)
 
-			return bot.Start(cmdCtx)
+			errGrp, ctx := errgroup.WithContext(cmdCtx)
+			ctx = context.WithValue(ctx, "errGrp", errGrp)
+
+			bot.Start(ctx)
+			defer bot.Close()
+			return errGrp.Wait()
 		},
 	}
 
@@ -49,6 +56,7 @@ func gracefulShutdown(done context.CancelFunc) {
 	signal.Notify(signalChannel, os.Interrupt, syscall.SIGTERM)
 	go func() {
 		<-signalChannel
+		fmt.Println("Received signal to stop. Shutting down...")
 		done()
 	}()
 }

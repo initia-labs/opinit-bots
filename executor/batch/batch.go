@@ -62,7 +62,7 @@ type BatchSubmitter struct {
 
 func NewBatchSubmitter(version uint8, cfg nodetypes.NodeConfig, batchCfg executortypes.BatchConfig, db types.DB, logger *zap.Logger, homePath string) *BatchSubmitter {
 	cfg.Account = ""
-	node, err := node.NewNode(nodetypes.PROCESS_TYPE_RAW, cfg, db, logger, nil, nil, homePath, "", "")
+	node, err := node.NewNode(nodetypes.PROCESS_TYPE_RAW, cfg, db, logger, nil, nil, homePath, "", "", nil)
 	if err != nil {
 		panic(err)
 	}
@@ -129,9 +129,9 @@ func (bs *BatchSubmitter) SetDANode(da executortypes.DANode) error {
 	return nil
 }
 
-func (bs *BatchSubmitter) Start(ctx context.Context, errCh chan error) {
+func (bs *BatchSubmitter) Start(ctx context.Context) {
 	bs.logger.Info("batch start", zap.Uint64("height", bs.node.GetHeight()))
-	bs.node.Start(ctx, errCh)
+	bs.node.Start(ctx)
 }
 
 func (bs *BatchSubmitter) SetBridgeInfo(bridgeInfo opchildtypes.BridgeInfo) {
