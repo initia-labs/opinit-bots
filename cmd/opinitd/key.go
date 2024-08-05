@@ -67,7 +67,7 @@ func keysAddCmd(ctx *cmdContext) *cobra.Command {
 		Args:    cobra.ExactArgs(2),
 		Example: strings.TrimSpace(`
 $ keys add localnet key1
-$ keys add l2 key2 --bech celestia
+$ keys add l2 key2 --bech32 celestia
 $ keys add l2 key2 --restore mnemonic.txt`),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			chainId := args[0]
@@ -155,7 +155,7 @@ func keysListCmd(ctx *cmdContext) *cobra.Command {
 		Short:   "Lists keys from the keychain associated with a particular chain",
 		Args:    cobra.ExactArgs(1),
 		Example: strings.TrimSpace(`
-$ keys list localnet
+$ keys list localnet --bech32 celestia
 $ k l l2`),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			chainId := args[0]
@@ -214,7 +214,7 @@ func keysShowCmd(ctx *cmdContext) *cobra.Command {
 		Short:   "Shows the key from the keychain associated with a particular chain",
 		Args:    cobra.ExactArgs(2),
 		Example: strings.TrimSpace(`
-$ keys show localnet key1
+$ keys show localnet key1 --bech32 celestia
 $ k s l2 key2`),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			chainId := args[0]
@@ -265,7 +265,7 @@ func keysShowByAddressCmd(ctx *cmdContext) *cobra.Command {
 		Short:   "Shows the key by address from the keychain associated with a particular chain",
 		Args:    cobra.ExactArgs(2),
 		Example: strings.TrimSpace(`
-$ keys show-by-addr localnet key1
+$ keys show-by-addr localnet key1 --bech32 celestia
 $ k sa l2 key2`),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			chainId := args[0]
@@ -313,7 +313,7 @@ func keysDeleteCmd(ctx *cmdContext) *cobra.Command {
 		Short:   "Deletes the key from the keychain associated with a particular chain",
 		Args:    cobra.ExactArgs(2),
 		Example: strings.TrimSpace(`
-$ keys delete localnet key1
+$ keys delete localnet key1 --bech32 celestia
 $ k d l2 key2`),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			chainId := args[0]
