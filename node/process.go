@@ -221,6 +221,12 @@ func (n *Node) txChecker(ctx context.Context) error {
 
 		if n.lenLocalPendingTx() > 0 {
 			pendingTx := n.peekLocalPendingTx()
+			pendingTxTime := time.Unix(0, n.peekLocalPendingTx().Timestamp)
+			if time.Now().After(pendingTxTime.Add(nodetypes.TX_TIMEOUT)) {
+				// @sh-cha: should we rebroadcast pending txs? or rasing monitoring alert?
+				panic(fmt.Errorf("something wrong, pending txs are not processed for a long time; current block time: %s, pending tx processing time: %s", time.Now().UTC().String(), pendingTxTime.UTC().String()))
+			}
+
 			txHash, err := hex.DecodeString(pendingTx.TxHash)
 			if err != nil {
 				return err
