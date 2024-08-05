@@ -49,16 +49,21 @@ func NewExecutor(cfg *executortypes.Config, db types.DB, sv *server.Server, logg
 
 	executor := &Executor{
 		host: host.NewHost(
-			cfg.Version, cfg.RelayOracle, cfg.L1NodeConfig(),
+			cfg.Version, cfg.RelayOracle, cfg.L1NodeConfig(homePath),
 			db.WithPrefix([]byte(executortypes.HostNodeName)),
-			logger.Named(executortypes.HostNodeName), homePath, "",
+			logger.Named(executortypes.HostNodeName), cfg.L1Bech32Prefix, "",
 		),
 		child: child.NewChild(
-			cfg.Version, cfg.L2NodeConfig(),
+			cfg.Version, cfg.L2NodeConfig(homePath),
 			db.WithPrefix([]byte(executortypes.ChildNodeName)),
-			logger.Named(executortypes.ChildNodeName), homePath,
+			logger.Named(executortypes.ChildNodeName), cfg.L2Bech32Prefix,
 		),
-		batch: batch.NewBatchSubmitter(cfg.Version, cfg.L2NodeConfig(), cfg.BatchConfig(), db.WithPrefix([]byte(executortypes.BatchNodeName)), logger.Named(executortypes.BatchNodeName), homePath),
+		batch: batch.NewBatchSubmitter(
+			cfg.Version, cfg.L2NodeConfig(homePath),
+			cfg.BatchConfig(), db.WithPrefix([]byte(executortypes.BatchNodeName)),
+			logger.Named(executortypes.BatchNodeName), cfg.L2ChainID, homePath,
+			cfg.DABech32Prefix,
+		),
 
 		cfg:    cfg,
 		db:     db,
@@ -169,9 +174,10 @@ func (ex *Executor) makeDANode(bridgeId int64) (executortypes.DANode, error) {
 	switch batchInfo.BatchInfo.ChainType {
 	case ophosttypes.BatchInfo_CHAIN_TYPE_INITIA:
 		da := host.NewHost(
-			ex.cfg.Version, false, ex.cfg.DANodeConfig(),
+			ex.cfg.Version, false, ex.cfg.DANodeConfig(ex.homePath),
 			ex.db.WithPrefix([]byte(executortypes.DAHostNodeName)),
-			ex.logger.Named(executortypes.DAHostNodeName), ex.homePath, batchInfo.BatchInfo.Submitter,
+			ex.logger.Named(executortypes.DAHostNodeName),
+			ex.homePath, batchInfo.BatchInfo.Submitter,
 		)
 		if ex.host.GetAddress().Equals(da.GetAddress()) {
 			return ex.host, nil
@@ -180,9 +186,10 @@ func (ex *Executor) makeDANode(bridgeId int64) (executortypes.DANode, error) {
 		da.RegisterDAHandlers()
 		return da, nil
 	case ophosttypes.BatchInfo_CHAIN_TYPE_CELESTIA:
-		da := celestia.NewDACelestia(ex.cfg.Version, ex.cfg.DANodeConfig(),
+		da := celestia.NewDACelestia(ex.cfg.Version, ex.cfg.DANodeConfig(ex.homePath),
 			ex.db.WithPrefix([]byte(executortypes.DACelestiaNodeName)),
-			ex.logger.Named(executortypes.DACelestiaNodeName), ex.homePath, batchInfo.BatchInfo.Submitter,
+			ex.logger.Named(executortypes.DACelestiaNodeName),
+			ex.homePath, batchInfo.BatchInfo.Submitter,
 		)
 		da.Initialize(ex.batch, bridgeId)
 		da.RegisterDAHandlers()

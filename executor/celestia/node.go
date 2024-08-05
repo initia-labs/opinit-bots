@@ -5,13 +5,13 @@ import (
 
 	"github.com/cosmos/cosmos-sdk/client/tx"
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	node "github.com/initia-labs/opinit-bots-go/node"
+
+	btypes "github.com/initia-labs/opinit-bots-go/node/broadcaster/types"
 	celestiatypes "github.com/initia-labs/opinit-bots-go/types/celestia"
 )
 
 // buildTxWithMessages creates a transaction from the given messages.
-func BuildTxWithMessages(
-	n *node.Node,
+func (c *Celestia) BuildTxWithMessages(
 	ctx context.Context,
 	msgs []sdk.Msg,
 ) (
@@ -30,8 +30,10 @@ func BuildTxWithMessages(
 		blobMsgs = append(blobMsgs, withBlobMsg.Blob)
 	}
 
-	txf := n.GetTxf()
-	_, adjusted, err := n.CalculateGas(ctx, txf, pfbMsgs...)
+	b := c.node.MustGetBroadcaster()
+	txf := b.GetTxf()
+
+	_, adjusted, err := b.CalculateGas(ctx, txf, pfbMsgs...)
 	if err != nil {
 		return nil, "", err
 	}
@@ -42,12 +44,12 @@ func BuildTxWithMessages(
 		return nil, "", err
 	}
 
-	if err = tx.Sign(ctx, txf, n.KeyName(), txb, false); err != nil {
+	if err = tx.Sign(ctx, txf, b.KeyName(), txb, false); err != nil {
 		return nil, "", err
 	}
 
 	tx := txb.GetTx()
-	txBytes, err = n.EncodeTx(tx)
+	txBytes, err = b.EncodeTx(tx)
 	if err != nil {
 		return nil, "", err
 	}
@@ -62,16 +64,17 @@ func BuildTxWithMessages(
 		return nil, "", err
 	}
 
-	return blobTxBytes, node.TxHash(txBytes), nil
+	return blobTxBytes, btypes.TxHash(txBytes), nil
 }
 
-func PendingTxToProcessedMsgs(
-	n *node.Node,
+func (c *Celestia) PendingTxToProcessedMsgs(
 	txBytes []byte,
 ) ([]sdk.Msg, error) {
+	b := c.node.MustGetBroadcaster()
+
 	blobTx := &celestiatypes.BlobTx{}
 	if err := blobTx.Unmarshal(txBytes); err == nil {
-		pfbTx, err := n.DecodeTx(blobTx.Tx)
+		pfbTx, err := b.DecodeTx(blobTx.Tx)
 		if err != nil {
 			return nil, err
 		}
@@ -85,7 +88,7 @@ func PendingTxToProcessedMsgs(
 		}, nil
 	}
 
-	tx, err := n.DecodeTx(txBytes)
+	tx, err := b.DecodeTx(txBytes)
 	if err != nil {
 		return nil, err
 	}

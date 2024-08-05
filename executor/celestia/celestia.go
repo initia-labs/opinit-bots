@@ -6,23 +6,21 @@ import (
 
 	"go.uber.org/zap"
 
-	codectypes "github.com/cosmos/cosmos-sdk/codec/types"
-	executortypes "github.com/initia-labs/opinit-bots-go/executor/types"
-	"github.com/initia-labs/opinit-bots-go/node"
-	nodetypes "github.com/initia-labs/opinit-bots-go/node/types"
-	"github.com/initia-labs/opinit-bots-go/types"
-
 	"github.com/cometbft/cometbft/crypto/merkle"
 	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/codec"
-	"github.com/cosmos/cosmos-sdk/std"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/x/auth"
-	"github.com/cosmos/cosmos-sdk/x/auth/tx"
 
 	inclusion "github.com/celestiaorg/go-square/v2/inclusion"
 	sh "github.com/celestiaorg/go-square/v2/share"
 
+	executortypes "github.com/initia-labs/opinit-bots-go/executor/types"
+	"github.com/initia-labs/opinit-bots-go/keys"
+	"github.com/initia-labs/opinit-bots-go/node"
+	btypes "github.com/initia-labs/opinit-bots-go/node/broadcaster/types"
+	nodetypes "github.com/initia-labs/opinit-bots-go/node/types"
+	"github.com/initia-labs/opinit-bots-go/types"
 	celestiatypes "github.com/initia-labs/opinit-bots-go/types/celestia"
 )
 
@@ -46,51 +44,52 @@ type Celestia struct {
 	db     types.DB
 	logger *zap.Logger
 
-	processedMsgs []nodetypes.ProcessedMsgs
+	processedMsgs []btypes.ProcessedMsgs
 	msgQueue      []sdk.Msg
 }
 
 func NewDACelestia(
 	version uint8, cfg nodetypes.NodeConfig,
-	db types.DB, logger *zap.Logger, homePath string, batchSubmitter string,
+	db types.DB, logger *zap.Logger, bech32Prefix, batchSubmitter string,
 ) *Celestia {
-	appCodec, txConfig, bech32Prefix := GetCodec()
-	node, err := node.NewNode(nodetypes.PROCESS_TYPE_ONLY_BROADCAST, cfg, db, logger, appCodec, txConfig, homePath, bech32Prefix, batchSubmitter, PendingTxToProcessedMsgs)
-	if err != nil {
-		panic(err)
-	}
-	node.RegisterBuildTxWithMessages(BuildTxWithMessages)
-
-	return &Celestia{
+	c := &Celestia{
 		version: version,
-
-		node: node,
 
 		cfg:    cfg,
 		db:     db,
 		logger: logger,
 
-		processedMsgs: make([]nodetypes.ProcessedMsgs, 0),
+		processedMsgs: make([]btypes.ProcessedMsgs, 0),
 		msgQueue:      make([]sdk.Msg, 0),
 	}
+
+	appCodec, txConfig, err := createCodec(bech32Prefix)
+	if err != nil {
+		panic(err)
+	}
+
+	cfg.ProcessType = nodetypes.PROCESS_TYPE_ONLY_BROADCAST
+	cfg.BroadcasterConfig.KeyringConfig.Address = batchSubmitter
+	cfg.BroadcasterConfig.BuildTxWithMessages = c.BuildTxWithMessages
+	cfg.BroadcasterConfig.PendingTxToProcessedMsgs = c.PendingTxToProcessedMsgs
+
+	node, err := node.NewNode(cfg, db, logger, appCodec, txConfig)
+	if err != nil {
+		panic(err)
+	}
+
+	c.node = node
+	return c
 }
 
-func GetCodec() (codec.Codec, client.TxConfig, string) {
-	unlock := node.SetSDKConfigContext("celestia")
+func createCodec(bech32Prefix string) (codec.Codec, client.TxConfig, error) {
+	unlock := keys.SetSDKConfigContext(bech32Prefix)
 	defer unlock()
-	interfaceRegistry := codectypes.NewInterfaceRegistry()
-	amino := codec.NewLegacyAmino()
-	std.RegisterLegacyAminoCodec(amino)
-	std.RegisterInterfaces(interfaceRegistry)
 
-	auth.AppModuleBasic{}.RegisterLegacyAminoCodec(amino)
-	auth.AppModuleBasic{}.RegisterInterfaces(interfaceRegistry)
-	celestiatypes.RegisterLegacyAminoCodec(amino)
-	celestiatypes.RegisterInterfaces(interfaceRegistry)
-
-	protoCodec := codec.NewProtoCodec(interfaceRegistry)
-	txConfig := tx.NewTxConfig(protoCodec, tx.DefaultSignModes)
-	return protoCodec, txConfig, "celestia"
+	return keys.CreateCodec([]keys.RegisterInterfaces{
+		auth.AppModuleBasic{}.RegisterInterfaces,
+		celestiatypes.RegisterInterfaces,
+	})
 }
 
 func (c *Celestia) Initialize(batch batchNode, bridgeId int64) error {
@@ -113,16 +112,16 @@ func (c *Celestia) Start(ctx context.Context) {
 	c.node.Start(ctx)
 }
 
-func (c Celestia) BroadcastMsgs(msgs nodetypes.ProcessedMsgs) {
-	if !c.node.HasKey() {
+func (c Celestia) BroadcastMsgs(msgs btypes.ProcessedMsgs) {
+	if len(msgs.Msgs) == 0 {
 		return
 	}
 
-	c.node.BroadcastMsgs(msgs)
+	c.node.MustGetBroadcaster().BroadcastMsgs(msgs)
 }
 
-func (c Celestia) ProcessedMsgsToRawKV(msgs []nodetypes.ProcessedMsgs, delete bool) ([]types.RawKV, error) {
-	return c.node.ProcessedMsgsToRawKV(msgs, delete)
+func (c Celestia) ProcessedMsgsToRawKV(msgs []btypes.ProcessedMsgs, delete bool) ([]types.RawKV, error) {
+	return c.node.MustGetBroadcaster().ProcessedMsgsToRawKV(msgs, delete)
 }
 
 func (c *Celestia) SetBridgeId(brigeId int64) {
@@ -130,7 +129,7 @@ func (c *Celestia) SetBridgeId(brigeId int64) {
 }
 
 func (c Celestia) HasKey() bool {
-	return c.node.HasKey()
+	return c.node.HasBroadcaster()
 }
 
 func (c Celestia) GetHeight() uint64 {
@@ -138,7 +137,7 @@ func (c Celestia) GetHeight() uint64 {
 }
 
 func (c Celestia) CreateBatchMsg(rawBlob []byte) (sdk.Msg, error) {
-	submitter, err := c.node.GetAddressString()
+	submitter, err := c.node.MustGetBroadcaster().GetAddressString()
 	if err != nil {
 		return nil, err
 	}
@@ -148,8 +147,9 @@ func (c Celestia) CreateBatchMsg(rawBlob []byte) (sdk.Msg, error) {
 	}
 	commitment, err := inclusion.CreateCommitment(blob,
 		merkle.HashFromByteSlices,
-		// github.com/celestiaorg/celestia-app/pkg/appconsts/v1.SubtreeRootThreshold
-		64)
+		// https://github.com/celestiaorg/celestia-app/blob/4f4d0f7ff1a43b62b232726e52d1793616423df7/pkg/appconsts/v1/app_consts.go#L6
+		64,
+	)
 	if err != nil {
 		return nil, err
 	}

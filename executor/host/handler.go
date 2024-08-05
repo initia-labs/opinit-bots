@@ -3,10 +3,12 @@ package host
 import (
 	"time"
 
-	nodetypes "github.com/initia-labs/opinit-bots-go/node/types"
 	"github.com/initia-labs/opinit-bots-go/types"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
+
+	btypes "github.com/initia-labs/opinit-bots-go/node/broadcaster/types"
+	nodetypes "github.com/initia-labs/opinit-bots-go/node/types"
 )
 
 func (h *Host) beginBlockHandler(args nodetypes.BeginBlockArgs) error {
@@ -29,9 +31,9 @@ func (h *Host) endBlockHandler(args nodetypes.EndBlockArgs) error {
 	batchKVs := []types.RawKV{
 		h.node.SyncInfoToRawKV(blockHeight),
 	}
-	if h.node.HasKey() {
+	if h.node.HasBroadcaster() {
 		if len(h.msgQueue) != 0 {
-			h.processedMsgs = append(h.processedMsgs, nodetypes.ProcessedMsgs{
+			h.processedMsgs = append(h.processedMsgs, btypes.ProcessedMsgs{
 				Msgs:      h.msgQueue,
 				Timestamp: time.Now().UnixNano(),
 				Save:      true,
@@ -64,7 +66,7 @@ func (h *Host) txHandler(args nodetypes.TxHandlerArgs) error {
 		if msg, err := h.oracleTxHandler(args.BlockHeight, args.Tx); err != nil {
 			return err
 		} else if msg != nil {
-			h.processedMsgs = append(h.processedMsgs, nodetypes.ProcessedMsgs{
+			h.processedMsgs = append(h.processedMsgs, btypes.ProcessedMsgs{
 				Msgs:      []sdk.Msg{msg},
 				Timestamp: time.Now().UnixNano(),
 				Save:      false,
