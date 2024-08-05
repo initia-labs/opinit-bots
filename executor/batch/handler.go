@@ -17,6 +17,7 @@ import (
 
 	cmtproto "github.com/cometbft/cometbft/proto/tendermint/types"
 	"github.com/cosmos/gogoproto/proto"
+	opchildtypes "github.com/initia-labs/OPinit/x/opchild/types"
 	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
 )
 
@@ -36,7 +37,12 @@ func (bs *BatchSubmitter) rawBlockHandler(args nodetypes.RawBlockArgs) error {
 		return errors.Wrap(err, "failed to prepare batch")
 	}
 
-	err = bs.handleBatch(args.BlockBytes)
+	blockBytes, err := bs.convertBlock(pbb)
+	if err != nil {
+		return err
+	}
+
+	err = bs.handleBatch(blockBytes)
 	if err != nil {
 		return errors.Wrap(err, "failed to handle batch")
 	}
@@ -282,4 +288,39 @@ func (bs *BatchSubmitter) DequeueBatchInfo() {
 	defer bs.batchInfoMu.Unlock()
 
 	bs.batchInfos = bs.batchInfos[1:]
+}
+
+func (bs *BatchSubmitter) convertBlock(pbb *cmtproto.Block) ([]byte, error) {
+	for i, txBytes := range pbb.Data.GetTxs() {
+		tx, err := bs.node.DecodeTx(txBytes)
+		if err != nil {
+			// ignore not registered tx in codec
+			continue
+		}
+
+		msgs := tx.GetMsgs()
+		if len(msgs) != 1 {
+			continue
+		}
+
+		if msg, ok := msgs[0].(*opchildtypes.MsgUpdateOracle); ok {
+			msg.Data = []byte{}
+			tx, err := bs.node.ChangeMsgsFromTx(tx, []sdk.Msg{msg})
+			if err != nil {
+				return nil, err
+			}
+			convertedTxBytes, err := bs.node.EncodeTx(tx)
+			if err != nil {
+				return nil, err
+			}
+			pbb.Data.Txs[i] = convertedTxBytes
+		}
+	}
+
+	// convert block to bytes
+	blockBytes, err := proto.Marshal(pbb)
+	if err != nil {
+		return nil, err
+	}
+	return blockBytes, nil
 }

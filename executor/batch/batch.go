@@ -10,6 +10,7 @@ import (
 
 	opchildtypes "github.com/initia-labs/OPinit/x/opchild/types"
 	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
+	"github.com/initia-labs/opinit-bots-go/executor/child"
 	executortypes "github.com/initia-labs/opinit-bots-go/executor/types"
 	nodetypes "github.com/initia-labs/opinit-bots-go/node/types"
 	"github.com/initia-labs/opinit-bots-go/types"
@@ -62,7 +63,11 @@ type BatchSubmitter struct {
 
 func NewBatchSubmitter(version uint8, cfg nodetypes.NodeConfig, batchCfg executortypes.BatchConfig, db types.DB, logger *zap.Logger, homePath string) *BatchSubmitter {
 	cfg.Account = ""
-	node, err := node.NewNode(nodetypes.PROCESS_TYPE_RAW, cfg, db, logger, nil, nil, homePath, "", "", nil)
+	appCodec, txConfig, bech32Prefix, err := child.GetCodec(cfg.ChainID)
+	if err != nil {
+		panic(err)
+	}
+	node, err := node.NewNode(nodetypes.PROCESS_TYPE_RAW, cfg, db, logger, appCodec, txConfig, homePath, bech32Prefix, "", nil)
 	if err != nil {
 		panic(err)
 	}
