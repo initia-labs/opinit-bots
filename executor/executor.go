@@ -108,24 +108,27 @@ func NewExecutor(cfg *executortypes.Config, db types.DB, sv *server.Server, logg
 	return executor
 }
 
-func (ex *Executor) Start(cmdCtx context.Context) {
-	// err := ex.server.ShutdownWithContext(cmdCtx)
-	// if err != nil {
-	// 	return err
-	// }
+func (ex *Executor) Start(cmdCtx context.Context) error {
+	defer ex.Close()
+	errGrp, ctx := errgroup.WithContext(cmdCtx)
+	ctx = context.WithValue(ctx, "errGrp", errGrp)
 
-	errGrp := cmdCtx.Value("errGrp").(*errgroup.Group)
-	if errGrp == nil {
-		panic("error group must be set")
-	}
 	errGrp.Go(func() (err error) {
-		return ex.server.Start(ex.cfg.ListenAddress)
+		<-ctx.Done()
+		return ex.server.Shutdown()
 	})
 
-	ex.host.Start(cmdCtx)
-	ex.child.Start(cmdCtx)
-	ex.batch.Start(cmdCtx)
-	ex.batch.DA().Start(cmdCtx)
+	errGrp.Go(func() (err error) {
+		defer func() {
+			ex.logger.Info("api server stopped")
+		}()
+		return ex.server.Start(ex.cfg.ListenAddress)
+	})
+	ex.host.Start(ctx)
+	ex.child.Start(ctx)
+	ex.batch.Start(ctx)
+	ex.batch.DA().Start(ctx)
+	return errGrp.Wait()
 }
 
 func (ex *Executor) Close() {

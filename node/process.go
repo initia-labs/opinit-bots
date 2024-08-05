@@ -14,6 +14,7 @@ import (
 
 func (n *Node) blockProcessLooper(ctx context.Context, processType nodetypes.BlockProcessType) error {
 	timer := time.NewTicker(nodetypes.POLLING_INTERVAL)
+	defer timer.Stop()
 
 	for {
 		select {
@@ -136,7 +137,7 @@ func (n *Node) handleNewBlock(block *rpccoretypes.ResultBlock, blockResult *rpcc
 		pendingTxTime := time.Unix(0, n.peekLocalPendingTx().Timestamp)
 		if block.Block.Time.After(pendingTxTime.Add(nodetypes.TX_TIMEOUT)) {
 			// @sh-cha: should we rebroadcast pending txs? or rasing monitoring alert?
-			panic(fmt.Errorf("something wrong, pending txs are not processed for a long time; current block time: %s, pending tx processing time: %s", block.Block.Time.String(), pendingTxTime.String()))
+			panic(fmt.Errorf("something wrong, pending txs are not processed for a long time; current block time: %s, pending tx processing time: %s", block.Block.Time.UTC().String(), pendingTxTime.UTC().String()))
 		}
 	}
 
@@ -210,6 +211,7 @@ func (n *Node) handleEvent(blockHeight uint64, latestHeight uint64, event abcity
 
 func (n *Node) txChecker(ctx context.Context) error {
 	timer := time.NewTicker(nodetypes.POLLING_INTERVAL)
+	defer timer.Stop()
 	for {
 		select {
 		case <-ctx.Done():
@@ -228,22 +230,22 @@ func (n *Node) txChecker(ctx context.Context) error {
 				n.logger.Debug("failed to query tx", zap.String("txHash", pendingTx.TxHash), zap.String("error", err.Error()))
 				continue
 			}
+			if len(n.eventHandlers) != 0 {
+				events := res.TxResult.GetEvents()
+				for eventIndex, event := range events {
+					err := n.handleEvent(uint64(res.Height), 0, event)
+					if err != nil {
+						n.logger.Error("failed to handle event", zap.String("txHash", pendingTx.TxHash), zap.Int("event_index", eventIndex), zap.String("error", err.Error()))
+						break
+					}
+				}
+			}
 			err = n.deletePendingTx(pendingTx.Sequence)
 			if err != nil {
 				return err
 			}
 			n.logger.Debug("tx inserted", zap.Int64("height", res.Height), zap.Uint64("sequence", pendingTx.Sequence), zap.String("txHash", pendingTx.TxHash))
 			n.dequeueLocalPendingTx()
-
-			if len(n.eventHandlers) != 0 {
-				events := res.TxResult.GetEvents()
-				for eventIndex, event := range events {
-					err := n.handleEvent(uint64(res.Height), 0, event)
-					if err != nil {
-						return fmt.Errorf("failed to handle event: tx_hash: %X, event_index: %d; %w", res.Hash, eventIndex, err)
-					}
-				}
-			}
 		}
 	}
 }

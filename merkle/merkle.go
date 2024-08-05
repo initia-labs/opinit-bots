@@ -56,11 +56,11 @@ func NewMerkle(db types.DB, nodeGeneratorFn NodeGeneratorFn) (*Merkle, error) {
 // InitializeWorkingTree resets the working tree with the given tree index and start leaf index.
 func (m *Merkle) InitializeWorkingTree(treeIndex uint64, startLeafIndex uint64) error {
 	if m.workingTree != nil && !m.workingTree.Done {
-		return fmt.Errorf("failed to initialize working tree (`%d`); working tree is not finalized", treeIndex)
+		return fmt.Errorf("failed to initialize working tree index: %d; working tree is not finalized", treeIndex)
 	}
 
 	if treeIndex < 1 || startLeafIndex < 1 {
-		return fmt.Errorf("failed to initialize working tree (`%d`, `%d`); invalid index", treeIndex, startLeafIndex)
+		return fmt.Errorf("failed to initialize working tree index: %d, leaf: %d; invalid index", treeIndex, startLeafIndex)
 	}
 
 	m.workingTree = &merkletypes.TreeInfo{

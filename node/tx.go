@@ -38,6 +38,10 @@ var outputIndexRegex = regexp.MustCompile("expected ([0-9]+), got ([0-9]+): inva
 
 func (n *Node) txBroadcastLooper(ctx context.Context) error {
 	retry := time.NewTicker(30 * time.Second)
+	defer func() {
+		retry.Stop()
+		close(n.txChannelStopped)
+	}()
 
 	for {
 		select {
@@ -168,7 +172,10 @@ func (n *Node) BroadcastMsgs(msgs nodetypes.ProcessedMsgs) {
 		return
 	}
 
-	n.txChannel <- msgs
+	select {
+	case <-n.txChannelStopped:
+	case n.txChannel <- msgs:
+	}
 }
 
 // CalculateGas simulates a tx to generate the appropriate gas settings before broadcasting a tx.

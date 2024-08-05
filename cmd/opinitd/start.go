@@ -8,7 +8,6 @@ import (
 	"syscall"
 
 	"github.com/spf13/cobra"
-	"golang.org/x/sync/errgroup"
 
 	"github.com/initia-labs/opinit-bots-go/bot"
 	bottypes "github.com/initia-labs/opinit-bots-go/bot/types"
@@ -38,12 +37,7 @@ Currently supported bots:
 			cmdCtx, botDone := context.WithCancel(cmd.Context())
 			gracefulShutdown(botDone)
 
-			errGrp, ctx := errgroup.WithContext(cmdCtx)
-			ctx = context.WithValue(ctx, "errGrp", errGrp)
-
-			bot.Start(ctx)
-			defer bot.Close()
-			return errGrp.Wait()
+			return bot.Start(cmdCtx)
 		},
 	}
 

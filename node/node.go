@@ -58,8 +58,9 @@ type Node struct {
 
 	pendingProcessedMsgs []nodetypes.ProcessedMsgs
 
-	txChannel    chan nodetypes.ProcessedMsgs
-	bech32Prefix string
+	txChannel        chan nodetypes.ProcessedMsgs
+	txChannelStopped chan struct{}
+	bech32Prefix     string
 
 	running bool
 }
@@ -102,8 +103,9 @@ func NewNode(processType nodetypes.BlockProcessType, cfg nodetypes.NodeConfig, d
 
 		pendingProcessedMsgs: make([]nodetypes.ProcessedMsgs, 0),
 
-		txChannel:    make(chan nodetypes.ProcessedMsgs),
-		bech32Prefix: bech32Prefix,
+		txChannel:        make(chan nodetypes.ProcessedMsgs),
+		txChannelStopped: make(chan struct{}),
+		bech32Prefix:     bech32Prefix,
 	}
 
 	var key *keyring.Record
@@ -160,11 +162,9 @@ func (n *Node) Start(ctx context.Context) {
 	n.running = true
 
 	errGrp := ctx.Value("errGrp").(*errgroup.Group)
-	if errGrp == nil {
-		panic("error group must be set")
-	}
 	errGrp.Go(func() (err error) {
 		defer func() {
+			n.logger.Info("tx broadcast looper stopped")
 			if r := recover(); r != nil {
 				n.logger.Error("tx broadcast looper panic", zap.Any("recover", r))
 				err = fmt.Errorf("tx broadcast looper panic: %v", r)
@@ -182,6 +182,7 @@ func (n *Node) Start(ctx context.Context) {
 	if n.processType == nodetypes.PROCESS_TYPE_ONLY_BROADCAST {
 		errGrp.Go(func() (err error) {
 			defer func() {
+				n.logger.Info("tx checker looper stopped")
 				if r := recover(); r != nil {
 					n.logger.Error("tx checker panic", zap.Any("recover", r))
 					err = fmt.Errorf("tx checker panic: %v", r)
@@ -192,6 +193,7 @@ func (n *Node) Start(ctx context.Context) {
 	} else {
 		errGrp.Go(func() (err error) {
 			defer func() {
+				n.logger.Info("block process looper stopped")
 				if r := recover(); r != nil {
 					n.logger.Error("block process looper panic", zap.Any("recover", r))
 					err = fmt.Errorf("block process looper panic: %v", r)

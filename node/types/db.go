@@ -93,7 +93,7 @@ func (p *ProcessedMsgs) UnmarshalInterfaceJSON(cdc codec.Codec, data []byte) err
 func (p ProcessedMsgs) String() string {
 	msgStr := ""
 	for _, msg := range p.Msgs {
-		msgStr += msg.String() + ","
+		msgStr += sdk.MsgTypeURL(msg) + ","
 	}
 	tsStr := time.Unix(0, p.Timestamp).UTC().String()
 	return fmt.Sprintf("Pending msgs: %s at %s", msgStr, tsStr)
