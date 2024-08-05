@@ -22,7 +22,7 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-type BuildTxWithMessagesFn func(*Node, context.Context, []sdk.Msg) ([]byte, error)
+type BuildTxWithMessagesFn func(*Node, context.Context, []sdk.Msg) ([]byte, string, error)
 type PendingTxToProcessedMsgsFn func(*Node, []byte) ([]sdk.Msg, error)
 
 type Node struct {

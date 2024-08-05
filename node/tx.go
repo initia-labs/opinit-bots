@@ -117,7 +117,7 @@ func (n *Node) handleMsgError(err error) error {
 
 func (n *Node) handleProcessedMsgs(ctx context.Context, data nodetypes.ProcessedMsgs) error {
 	sequence := n.txf.Sequence()
-	txBytes, err := n.buildTxWithMessages(n, ctx, data.Msgs)
+	txBytes, txHash, err := n.buildTxWithMessages(n, ctx, data.Msgs)
 	if err != nil {
 		return sdkerrors.Wrapf(err, "simulation failed")
 	}
@@ -131,7 +131,7 @@ func (n *Node) handleProcessedMsgs(ctx context.Context, data nodetypes.Processed
 		return fmt.Errorf("broadcast txs: %s", res.Log)
 	}
 
-	n.logger.Debug("broadcast tx", zap.String("tx_hash", TxHash(txBytes)), zap.Uint64("sequence", sequence))
+	n.logger.Debug("broadcast tx", zap.String("tx_hash", txHash), zap.Uint64("sequence", sequence))
 
 	// @sh-cha: maybe we should use data.Save?
 	if data.Timestamp != 0 {
@@ -146,7 +146,7 @@ func (n *Node) handleProcessedMsgs(ctx context.Context, data nodetypes.Processed
 		ProcessedHeight: n.GetHeight(),
 		Sequence:        sequence,
 		Tx:              txBytes,
-		TxHash:          TxHash(txBytes),
+		TxHash:          txHash,
 		Timestamp:       data.Timestamp,
 		Save:            data.Save,
 	}
@@ -312,30 +312,32 @@ func DefaultBuildTxWithMessages(
 	msgs []sdk.Msg,
 ) (
 	txBytes []byte,
+	txHash string,
 	err error,
 ) {
 	txf := n.GetTxf()
 	_, adjusted, err := n.CalculateGas(ctx, txf, msgs...)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
 	txf = txf.WithGas(adjusted)
 	txb, err := txf.BuildUnsignedTx(msgs...)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
 	if err = tx.Sign(ctx, txf, n.keyName, txb, false); err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
 	tx := txb.GetTx()
 	txBytes, err = n.EncodeTx(tx)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
-	return txBytes, nil
+
+	return txBytes, TxHash(txBytes), nil
 }
 
 func DefaultPendingTxToProcessedMsgs(

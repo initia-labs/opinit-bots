@@ -16,6 +16,7 @@ func BuildTxWithMessages(
 	msgs []sdk.Msg,
 ) (
 	txBytes []byte,
+	txHash string,
 	err error,
 ) {
 	pfbMsgs := make([]sdk.Msg, 0, len(msgs))
@@ -23,7 +24,7 @@ func BuildTxWithMessages(
 	for _, msg := range msgs {
 		withBlobMsg, ok := msg.(*celestiatypes.MsgPayForBlobsWithBlob)
 		if !ok {
-			return nil, err
+			return nil, "", err
 		}
 		pfbMsgs = append(pfbMsgs, withBlobMsg.MsgPayForBlobs)
 		blobMsgs = append(blobMsgs, withBlobMsg.Blob)
@@ -32,23 +33,23 @@ func BuildTxWithMessages(
 	txf := n.GetTxf()
 	_, adjusted, err := n.CalculateGas(ctx, txf, pfbMsgs...)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
 	txf = txf.WithGas(adjusted)
 	txb, err := txf.BuildUnsignedTx(pfbMsgs...)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
 	if err = tx.Sign(ctx, txf, n.KeyName(), txb, false); err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
 	tx := txb.GetTx()
 	txBytes, err = n.EncodeTx(tx)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
 	blobTx := celestiatypes.BlobTx{
@@ -56,7 +57,12 @@ func BuildTxWithMessages(
 		Blobs:  blobMsgs,
 		TypeId: "BLOB",
 	}
-	return blobTx.Marshal()
+	blobTxBytes, err := blobTx.Marshal()
+	if err != nil {
+		return nil, "", err
+	}
+
+	return blobTxBytes, node.TxHash(txBytes), nil
 }
 
 func PendingTxToProcessedMsgs(
