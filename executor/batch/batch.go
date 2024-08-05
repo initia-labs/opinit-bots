@@ -101,7 +101,7 @@ func (bs *BatchSubmitter) Initialize(host hostNode, bridgeInfo opchildtypes.Brid
 		return errors.New("no batch info")
 	}
 	for _, batchInfo := range bs.batchInfos {
-		if len(bs.batchInfos) == 1 || batchInfo.Output.L2BlockNumber >= bs.node.GetHeight() {
+		if len(bs.batchInfos) == 1 || (batchInfo.Output.L2BlockNumber+1) >= bs.node.GetHeight() {
 			break
 		}
 		bs.DequeueBatchInfo()
