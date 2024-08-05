@@ -239,6 +239,11 @@ func (n *Node) txChecker(ctx context.Context) error {
 			if len(n.eventHandlers) != 0 {
 				events := res.TxResult.GetEvents()
 				for eventIndex, event := range events {
+					select {
+					case <-ctx.Done():
+						return nil
+					default:
+					}
 					err := n.handleEvent(uint64(res.Height), 0, event)
 					if err != nil {
 						n.logger.Error("failed to handle event", zap.String("txHash", pendingTx.TxHash), zap.Int("event_index", eventIndex), zap.String("error", err.Error()))

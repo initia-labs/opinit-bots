@@ -37,6 +37,7 @@ var accountSeqRegex = regexp.MustCompile("account sequence mismatch, expected ([
 var outputIndexRegex = regexp.MustCompile("expected ([0-9]+), got ([0-9]+): invalid output index")
 
 func (n *Node) txBroadcastLooper(ctx context.Context) error {
+	defer close(n.txChannelStopped)
 	for {
 		select {
 		case <-ctx.Done():
