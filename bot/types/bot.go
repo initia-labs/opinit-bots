@@ -6,4 +6,5 @@ import (
 
 type Bot interface {
 	Start(context.Context) error
+	Close()
 }
