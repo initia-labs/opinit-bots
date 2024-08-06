@@ -2,41 +2,42 @@ package child
 
 import (
 	"context"
-	"fmt"
-	"io"
 	"time"
 
-	"cosmossdk.io/core/address"
-	opchildtypes "github.com/initia-labs/OPinit/x/opchild/types"
-	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
-	executortypes "github.com/initia-labs/opinit-bots-go/executor/types"
-	"github.com/initia-labs/opinit-bots-go/merkle"
-	nodetypes "github.com/initia-labs/opinit-bots-go/node/types"
-	"github.com/initia-labs/opinit-bots-go/types"
 	"go.uber.org/zap"
-
-	"github.com/initia-labs/opinit-bots-go/node"
 
 	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/codec"
-
 	sdk "github.com/cosmos/cosmos-sdk/types"
+	"github.com/cosmos/cosmos-sdk/x/auth"
+
+	"github.com/initia-labs/OPinit/x/opchild"
+	opchildtypes "github.com/initia-labs/OPinit/x/opchild/types"
+	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
+
+	executortypes "github.com/initia-labs/opinit-bots-go/executor/types"
+	"github.com/initia-labs/opinit-bots-go/keys"
+	"github.com/initia-labs/opinit-bots-go/merkle"
+	"github.com/initia-labs/opinit-bots-go/node"
+	btypes "github.com/initia-labs/opinit-bots-go/node/broadcaster/types"
+	nodetypes "github.com/initia-labs/opinit-bots-go/node/types"
+	"github.com/initia-labs/opinit-bots-go/types"
 )
 
 type hostNode interface {
 	GetAddressStr() (string, error)
-	AccountCodec() address.Codec
 	HasKey() bool
-	BroadcastMsgs(nodetypes.ProcessedMsgs)
-	ProcessedMsgsToRawKV([]nodetypes.ProcessedMsgs, bool) ([]types.RawKV, error)
+	BroadcastMsgs(btypes.ProcessedMsgs)
+	ProcessedMsgsToRawKV([]btypes.ProcessedMsgs, bool) ([]types.RawKV, error)
 	QueryLastOutput() (*ophosttypes.QueryOutputProposalResponse, error)
 	QueryOutput(uint64) (*ophosttypes.QueryOutputProposalResponse, error)
-}
 
-type compressionFunc interface {
-	Write([]byte) (int, error)
-	Reset(io.Writer)
-	Close() error
+	GetMsgProposeOutput(
+		bridgeId uint64,
+		outputIndex uint64,
+		l2BlockNumber uint64,
+		outputRoot []byte,
+	) (sdk.Msg, error)
 }
 
 type Child struct {
@@ -55,20 +56,22 @@ type Child struct {
 	db     types.DB
 	logger *zap.Logger
 
-	cdc codec.Codec
-	ac  address.Codec
-
 	opchildQueryClient opchildtypes.QueryClient
 
-	processedMsgs []nodetypes.ProcessedMsgs
+	processedMsgs []btypes.ProcessedMsgs
 	msgQueue      []sdk.Msg
 }
 
 func NewChild(
 	version uint8, cfg nodetypes.NodeConfig,
-	db types.DB, logger *zap.Logger, cdc codec.Codec, txConfig client.TxConfig,
+	db types.DB, logger *zap.Logger, bech32Prefix string,
 ) *Child {
-	node, err := node.NewNode(cfg, db, logger, cdc, txConfig)
+	appCodec, txConfig, err := GetCodec(bech32Prefix)
+	if err != nil {
+		panic(err)
+	}
+
+	node, err := node.NewNode(cfg, db, logger, appCodec, txConfig)
 	if err != nil {
 		panic(err)
 	}
@@ -88,15 +91,22 @@ func NewChild(
 		db:     db,
 		logger: logger,
 
-		cdc: cdc,
-		ac:  cdc.InterfaceRegistry().SigningContext().AddressCodec(),
+		opchildQueryClient: opchildtypes.NewQueryClient(node.GetRPCClient()),
 
-		opchildQueryClient: opchildtypes.NewQueryClient(node),
-
-		processedMsgs: make([]nodetypes.ProcessedMsgs, 0),
+		processedMsgs: make([]btypes.ProcessedMsgs, 0),
 		msgQueue:      make([]sdk.Msg, 0),
 	}
 	return ch
+}
+
+func GetCodec(bech32Prefix string) (codec.Codec, client.TxConfig, error) {
+	unlock := keys.SetSDKConfigContext(bech32Prefix)
+	defer unlock()
+
+	return keys.CreateCodec([]keys.RegisterInterfaces{
+		auth.AppModuleBasic{}.RegisterInterfaces,
+		opchild.AppModuleBasic{}.RegisterInterfaces,
+	})
 }
 
 func (ch *Child) Initialize(host hostNode, bridgeInfo opchildtypes.BridgeInfo) error {
@@ -107,15 +117,9 @@ func (ch *Child) Initialize(host hostNode, bridgeInfo opchildtypes.BridgeInfo) e
 	return nil
 }
 
-func (ch *Child) Start(ctx context.Context, errCh chan error) {
-	defer func() {
-		if r := recover(); r != nil {
-			ch.logger.Error("child panic", zap.Any("recover", r))
-			errCh <- fmt.Errorf("child panic: %v", r)
-		}
-	}()
-
-	ch.node.Start(ctx, errCh, nodetypes.PROCESS_TYPE_DEFAULT)
+func (ch *Child) Start(ctx context.Context) {
+	ch.logger.Info("child start", zap.Uint64("height", ch.node.GetHeight()))
+	ch.node.Start(ctx)
 }
 
 func (ch *Child) registerHandlers() {
@@ -126,27 +130,28 @@ func (ch *Child) registerHandlers() {
 	ch.node.RegisterEndBlockHandler(ch.endBlockHandler)
 }
 
-func (ch Child) BroadcastMsgs(msgs nodetypes.ProcessedMsgs) {
-	if !ch.node.HasKey() {
+func (ch Child) BroadcastMsgs(msgs btypes.ProcessedMsgs) {
+	if len(msgs.Msgs) == 0 {
 		return
 	}
 
-	ch.node.BroadcastMsgs(msgs)
+	ch.node.MustGetBroadcaster().BroadcastMsgs(msgs)
 }
 
-func (ch Child) ProcessedMsgsToRawKV(msgs []nodetypes.ProcessedMsgs, delete bool) ([]types.RawKV, error) {
-	return ch.node.ProcessedMsgsToRawKV(msgs, delete)
+func (ch Child) ProcessedMsgsToRawKV(msgs []btypes.ProcessedMsgs, delete bool) ([]types.RawKV, error) {
+	if len(msgs) == 0 {
+		return nil, nil
+	}
+
+	return ch.node.MustGetBroadcaster().ProcessedMsgsToRawKV(msgs, delete)
 }
 
 func (ch Child) BridgeId() uint64 {
 	return ch.bridgeInfo.BridgeId
 }
-func (ch Child) AccountCodec() address.Codec {
-	return ch.ac
-}
 
 func (ch Child) HasKey() bool {
-	return ch.node.HasKey()
+	return ch.node.HasBroadcaster()
 }
 
 func (ch *Child) SetBridgeInfo(bridgeInfo opchildtypes.BridgeInfo) {

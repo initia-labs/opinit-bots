@@ -6,7 +6,6 @@ import (
 	"strconv"
 
 	"cosmossdk.io/math"
-	opchildtypes "github.com/initia-labs/OPinit/x/opchild/types"
 	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
 	nodetypes "github.com/initia-labs/opinit-bots-go/node/types"
 
@@ -86,18 +85,13 @@ func (h *Host) handleInitiateDeposit(
 	amount string,
 	data []byte,
 ) (sdk.Msg, error) {
-	sender, err := h.child.GetAddressStr()
-	if err != nil {
-		return nil, err
-	}
 	coinAmount, ok := math.NewIntFromString(amount)
 	if !ok {
 		return nil, errors.New("invalid amount")
 	}
 	coin := sdk.NewCoin(l2Denom, coinAmount)
 
-	msg := opchildtypes.NewMsgFinalizeTokenDeposit(
-		sender,
+	return h.child.GetMsgFinalizeTokenDeposit(
 		from,
 		to,
 		coin,
@@ -106,9 +100,4 @@ func (h *Host) handleInitiateDeposit(
 		l1Denom,
 		data,
 	)
-	err = msg.Validate(h.child.AccountCodec())
-	if err != nil {
-		return nil, err
-	}
-	return msg, nil
 }

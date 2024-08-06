@@ -3,6 +3,7 @@ package types
 import (
 	"errors"
 
+	btypes "github.com/initia-labs/opinit-bots-go/node/broadcaster/types"
 	nodetypes "github.com/initia-labs/opinit-bots-go/node/types"
 )
 
@@ -25,23 +26,21 @@ type Config struct {
 	L2ChainID string `json:"l2_chain_id"`
 	DAChainID string `json:"da_chain_id"`
 
-	// OutputSubmitterMnemonic is the mnemonic phrase for the output submitter,
+	L1Bech32Prefix string `json:"l1_bech32_prefix"`
+	L2Bech32Prefix string `json:"l2_bech32_prefix"`
+	DABech32Prefix string `json:"da_bech32_prefix"`
+
+	// OutputSubmitter is the key name in the keyring for the output submitter,
 	// which is used to relay the output transaction from l2 to l1.
 	//
 	// If you don't want to use the output submitter feature, you can leave it empty.
-	OutputSubmitterMnemonic string `json:"output_submitter_mnemonic"`
+	OutputSubmitter string `json:"output_submitter"`
 
-	// BridgeExecutorMnemonic is the mnemonic phrase for the bridge executor,
+	// BridgeExecutor is the key name in the keyring for the bridge executor,
 	// which is used to relay initiate token bridge transaction from l1 to l2.
 	//
 	// If you don't want to use the bridge executor feature, you can leave it empty.
-	BridgeExecutorMnemonic string `json:"bridge_executor_mnemonic"`
-
-	// BatchSubmitterMnemonic is the mnemonic phrase for the batch submitter,
-	// which is used to relay the batch of blocks from l2 to da.
-	//
-	// If you don't want to use the batch submitter feature, you can leave it empty.
-	BatchSubmitterMnemonic string `json:"batch_submitter_mnemonic"`
+	BridgeExecutor string `json:"bridge_executor"`
 
 	// RelayOracle is the flag to enable the oracle relay feature.
 	RelayOracle bool `json:"relay_oracle"`
@@ -62,7 +61,7 @@ type HostConfig struct {
 func DefaultConfig() *Config {
 	return &Config{
 		Version:       1,
-		ListenAddress: "tcp://localhost:3000",
+		ListenAddress: "localhost:3000",
 
 		L1RPCAddress: "tcp://localhost:26657",
 		L2RPCAddress: "tcp://localhost:27657",
@@ -76,9 +75,18 @@ func DefaultConfig() *Config {
 		L2ChainID: "testnet-l2-1",
 		DAChainID: "testnet-l3-1",
 
-		OutputSubmitterMnemonic: "",
-		BridgeExecutorMnemonic:  "",
-		BatchSubmitterMnemonic:  "",
+		L1Bech32Prefix: "init",
+		L2Bech32Prefix: "init",
+		DABech32Prefix: "init",
+
+		OutputSubmitter: "",
+		BridgeExecutor:  "",
+
+		RelayOracle: true,
+
+		MaxChunks:         5000,
+		MaxChunkSize:      300000,  // 300KB
+		MaxSubmissionTime: 60 * 60, // 1 hour
 	}
 }
 
@@ -109,31 +117,77 @@ func (cfg Config) Validate() error {
 	if cfg.ListenAddress == "" {
 		return errors.New("listen address is required")
 	}
+
+	if cfg.L1Bech32Prefix == "" {
+		return errors.New("L1 bech32 prefix is required")
+	}
+	if cfg.L2Bech32Prefix == "" {
+		return errors.New("L2 bech32 prefix is required")
+	}
+	if cfg.DABech32Prefix == "" {
+		return errors.New("DA bech32 prefix is required")
+	}
+
 	return nil
 }
 
-func (cfg Config) L1NodeConfig() nodetypes.NodeConfig {
-	return nodetypes.NodeConfig{
-		RPC:      cfg.L1RPCAddress,
-		ChainID:  cfg.L1ChainID,
-		Mnemonic: cfg.OutputSubmitterMnemonic,
+func (cfg Config) L1NodeConfig(homePath string) nodetypes.NodeConfig {
+	nc := nodetypes.NodeConfig{
+		RPC:         cfg.L1RPCAddress,
+		ProcessType: nodetypes.PROCESS_TYPE_DEFAULT,
 	}
+
+	if cfg.OutputSubmitter != "" {
+		nc.BroadcasterConfig = &btypes.BroadcasterConfig{
+			ChainID:      cfg.L1ChainID,
+			GasPrice:     cfg.L1GasPrice,
+			Bech32Prefix: cfg.L1Bech32Prefix,
+			KeyringConfig: btypes.KeyringConfig{
+				Name:     cfg.OutputSubmitter,
+				HomePath: homePath,
+			},
+		}
+	}
+
+	return nc
 }
 
-func (cfg Config) L2NodeConfig() nodetypes.NodeConfig {
-	return nodetypes.NodeConfig{
-		RPC:      cfg.L2RPCAddress,
-		ChainID:  cfg.L2ChainID,
-		Mnemonic: cfg.BridgeExecutorMnemonic,
+func (cfg Config) L2NodeConfig(homePath string) nodetypes.NodeConfig {
+	nc := nodetypes.NodeConfig{
+		RPC:         cfg.L2RPCAddress,
+		ProcessType: nodetypes.PROCESS_TYPE_DEFAULT,
 	}
+
+	if cfg.BridgeExecutor != "" {
+		nc.BroadcasterConfig = &btypes.BroadcasterConfig{
+			ChainID:      cfg.L2ChainID,
+			GasPrice:     cfg.L2GasPrice,
+			Bech32Prefix: cfg.L2Bech32Prefix,
+			KeyringConfig: btypes.KeyringConfig{
+				Name:     cfg.BridgeExecutor,
+				HomePath: homePath,
+			},
+		}
+	}
+
+	return nc
 }
 
-func (cfg Config) DANodeConfig() nodetypes.NodeConfig {
-	return nodetypes.NodeConfig{
-		RPC:      cfg.DARPCAddress,
-		ChainID:  cfg.DAChainID,
-		Mnemonic: cfg.BatchSubmitterMnemonic,
+func (cfg Config) DANodeConfig(homePath string) nodetypes.NodeConfig {
+	nc := nodetypes.NodeConfig{
+		RPC:         cfg.DARPCAddress,
+		ProcessType: nodetypes.PROCESS_TYPE_DEFAULT,
+		BroadcasterConfig: &btypes.BroadcasterConfig{
+			ChainID:      cfg.DAChainID,
+			GasPrice:     cfg.DAGasPrice,
+			Bech32Prefix: cfg.DABech32Prefix,
+			KeyringConfig: btypes.KeyringConfig{
+				HomePath: homePath,
+			},
+		},
 	}
+
+	return nc
 }
 
 func (cfg Config) BatchConfig() BatchConfig {

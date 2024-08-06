@@ -11,8 +11,10 @@ import (
 	"go.uber.org/zap"
 )
 
+// blockProcessLooper fetches new blocks and processes them
 func (n *Node) blockProcessLooper(ctx context.Context, processType nodetypes.BlockProcessType) error {
 	timer := time.NewTicker(nodetypes.POLLING_INTERVAL)
+	defer timer.Stop()
 
 	for {
 		select {
@@ -21,7 +23,7 @@ func (n *Node) blockProcessLooper(ctx context.Context, processType nodetypes.Blo
 		case <-timer.C:
 		}
 
-		status, err := n.Status(ctx)
+		status, err := n.rpcClient.Status(ctx)
 		if err != nil {
 			n.logger.Error("failed to get node status ", zap.String("error", err.Error()))
 			continue
@@ -35,6 +37,11 @@ func (n *Node) blockProcessLooper(ctx context.Context, processType nodetypes.Blo
 		switch processType {
 		case nodetypes.PROCESS_TYPE_DEFAULT:
 			for queryHeight := n.lastProcessedBlockHeight + 1; queryHeight <= latestChainHeight; {
+				select {
+				case <-ctx.Done():
+					return nil
+				default:
+				}
 				// TODO: may fetch blocks in batch
 				block, blockResult, err := n.fetchNewBlock(ctx, int64(queryHeight))
 				if err != nil {
@@ -60,13 +67,18 @@ func (n *Node) blockProcessLooper(ctx context.Context, processType nodetypes.Blo
 				end = latestChainHeight
 			}
 
-			blockBulk, err := n.QueryBlockBulk(start, end)
+			blockBulk, err := n.rpcClient.QueryBlockBulk(start, end)
 			if err != nil {
 				n.logger.Error("failed to fetch block bulk", zap.String("error", err.Error()))
 				continue
 			}
 
 			for i := start; i <= end; i++ {
+				select {
+				case <-ctx.Done():
+					return nil
+				default:
+				}
 				err := n.rawBlockHandler(nodetypes.RawBlockArgs{
 					BlockHeight: i,
 					BlockBytes:  blockBulk[i-start],
@@ -81,15 +93,16 @@ func (n *Node) blockProcessLooper(ctx context.Context, processType nodetypes.Blo
 	}
 }
 
+// fetch new block from the chain
 func (n *Node) fetchNewBlock(ctx context.Context, height int64) (block *rpccoretypes.ResultBlock, blockResult *rpccoretypes.ResultBlockResults, err error) {
 	n.logger.Debug("fetch new block", zap.Int64("height", height))
-	block, err = n.Block(ctx, &height)
+	block, err = n.rpcClient.Block(ctx, &height)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	if len(n.eventHandlers) != 0 {
-		blockResult, err = n.BlockResults(ctx, &height)
+		blockResult, err = n.rpcClient.BlockResults(ctx, &height)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -102,30 +115,12 @@ func (n *Node) handleNewBlock(block *rpccoretypes.ResultBlock, blockResult *rpcc
 	if err != nil {
 		return err
 	}
-	// check pending txs first
-	// TODO: may handle pending txs with same level of other handlers
-	for _, tx := range block.Block.Txs {
-		if n.lenLocalPendingTx() == 0 {
-			break
-		}
 
-		// check if the first pending tx is included in the block
-		if pendingTx := n.peekLocalPendingTx(); TxHash(tx) == pendingTx.TxHash {
-			n.logger.Debug("tx inserted", zap.Int64("height", block.Block.Height), zap.Uint64("sequence", pendingTx.Sequence), zap.String("txHash", pendingTx.TxHash))
-			err := n.deletePendingTx(pendingTx.Sequence)
-			if err != nil {
-				return err
-			}
-			n.dequeueLocalPendingTx()
-		}
-	}
-
-	if length := n.lenLocalPendingTx(); length > 0 {
-		n.logger.Debug("remaining pending txs", zap.Int64("height", block.Block.Height), zap.Int("count", length))
-		pendingTxTime := time.Unix(0, n.peekLocalPendingTx().Timestamp)
-		if block.Block.Time.After(pendingTxTime.Add(nodetypes.TX_TIMEOUT)) {
-			// @sh-cha: should we rebroadcast pending txs? or rasing monitoring alert?
-			panic(fmt.Errorf("something wrong, pending txs are not processed for a long time; current block time: %s, pending tx processing time: %s", block.Block.Time.String(), pendingTxTime.String()))
+	// handle broadcaster first to check pending txs
+	if n.broadcaster != nil {
+		err := n.broadcaster.HandleNewBlock(block, blockResult, latestChainHeight)
+		if err != nil {
+			return err
 		}
 	}
 
@@ -195,4 +190,51 @@ func (n *Node) handleEvent(blockHeight uint64, latestHeight uint64, event abcity
 		LatestHeight:    latestHeight,
 		EventAttributes: event.GetAttributes(),
 	})
+}
+
+// txChecker checks pending txs and handle events if the tx is included in the block
+func (n *Node) txChecker(ctx context.Context) error {
+	if n.broadcaster != nil {
+		return nil
+	}
+
+	timer := time.NewTicker(nodetypes.POLLING_INTERVAL)
+	defer timer.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		case <-timer.C:
+		}
+
+		pendingTx, res, err := n.broadcaster.CheckPendingTx()
+		if err != nil {
+			return err
+		} else if pendingTx == nil || res == nil {
+			// tx not found
+			continue
+		}
+
+		if len(n.eventHandlers) != 0 {
+			events := res.TxResult.GetEvents()
+			for eventIndex, event := range events {
+				select {
+				case <-ctx.Done():
+					return nil
+				default:
+				}
+
+				err := n.handleEvent(uint64(res.Height), 0, event)
+				if err != nil {
+					n.logger.Error("failed to handle event", zap.String("txHash", pendingTx.TxHash), zap.Int("event_index", eventIndex), zap.String("error", err.Error()))
+					break
+				}
+			}
+		}
+
+		err = n.broadcaster.RemovePendingTx(int64(res.Height), pendingTx.TxHash, pendingTx.Sequence)
+		if err != nil {
+			return err
+		}
+	}
 }

@@ -3,26 +3,23 @@ package batch
 import (
 	"context"
 	"errors"
-	"fmt"
 	"io"
 	"os"
 	"sync"
 	"time"
 
-	"cosmossdk.io/core/address"
-	opchildtypes "github.com/initia-labs/OPinit/x/opchild/types"
-	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
-	executortypes "github.com/initia-labs/opinit-bots-go/executor/types"
-	nodetypes "github.com/initia-labs/opinit-bots-go/node/types"
-	"github.com/initia-labs/opinit-bots-go/types"
 	"go.uber.org/zap"
 
-	"github.com/initia-labs/opinit-bots-go/node"
-
-	"github.com/cosmos/cosmos-sdk/client"
-	"github.com/cosmos/cosmos-sdk/codec"
+	opchildtypes "github.com/initia-labs/OPinit/x/opchild/types"
+	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
 
 	dbtypes "github.com/initia-labs/opinit-bots-go/db/types"
+	"github.com/initia-labs/opinit-bots-go/executor/child"
+	executortypes "github.com/initia-labs/opinit-bots-go/executor/types"
+	"github.com/initia-labs/opinit-bots-go/node"
+	btypes "github.com/initia-labs/opinit-bots-go/node/broadcaster/types"
+	nodetypes "github.com/initia-labs/opinit-bots-go/node/types"
+	"github.com/initia-labs/opinit-bots-go/types"
 )
 
 type hostNode interface {
@@ -51,9 +48,6 @@ type BatchSubmitter struct {
 	db       types.DB
 	logger   *zap.Logger
 
-	cdc codec.Codec
-	ac  address.Codec
-
 	opchildQueryClient opchildtypes.QueryClient
 
 	batchInfoMu *sync.Mutex
@@ -62,14 +56,28 @@ type BatchSubmitter struct {
 	batchFile   *os.File
 	batchHeader *executortypes.BatchHeader
 
-	processedMsgs []nodetypes.ProcessedMsgs
-	homePath      string
+	processedMsgs []btypes.ProcessedMsgs
+
+	chainID  string
+	homePath string
 
 	lastSubmissionTime time.Time
 }
 
-func NewBatchSubmitter(version uint8, cfg nodetypes.NodeConfig, batchCfg executortypes.BatchConfig, db types.DB, logger *zap.Logger, cdc codec.Codec, txConfig client.TxConfig, homePath string) *BatchSubmitter {
-	node, err := node.NewNode(cfg, db, logger, cdc, txConfig)
+func NewBatchSubmitter(
+	version uint8, cfg nodetypes.NodeConfig,
+	batchCfg executortypes.BatchConfig,
+	db types.DB, logger *zap.Logger,
+	chainID, homePath, bech32Prefix string,
+) *BatchSubmitter {
+	appCodec, txConfig, err := child.GetCodec(bech32Prefix)
+	if err != nil {
+		panic(err)
+	}
+
+	cfg.BroadcasterConfig = nil
+	cfg.ProcessType = nodetypes.PROCESS_TYPE_RAW
+	node, err := node.NewNode(cfg, db, logger, appCodec, txConfig)
 	if err != nil {
 		panic(err)
 	}
@@ -81,23 +89,22 @@ func NewBatchSubmitter(version uint8, cfg nodetypes.NodeConfig, batchCfg executo
 
 		cfg:      cfg,
 		batchCfg: batchCfg,
-		db:       db,
-		logger:   logger,
 
-		cdc: cdc,
-		ac:  cdc.InterfaceRegistry().SigningContext().AddressCodec(),
+		db:     db,
+		logger: logger,
 
-		opchildQueryClient: opchildtypes.NewQueryClient(node),
+		opchildQueryClient: opchildtypes.NewQueryClient(node.GetRPCClient()),
 
 		batchInfoMu: &sync.Mutex{},
 
-		processedMsgs: make([]nodetypes.ProcessedMsgs, 0),
+		processedMsgs: make([]btypes.ProcessedMsgs, 0),
 		homePath:      homePath,
+		chainID:       chainID,
 	}
 	return ch
 }
 
-func (bs *BatchSubmitter) Initialize(host hostNode, da executortypes.DANode, bridgeInfo opchildtypes.BridgeInfo) error {
+func (bs *BatchSubmitter) Initialize(host hostNode, bridgeInfo opchildtypes.BridgeInfo) error {
 	bs.host = host
 	bs.bridgeInfo = bridgeInfo
 
@@ -110,15 +117,10 @@ func (bs *BatchSubmitter) Initialize(host hostNode, da executortypes.DANode, bri
 		return errors.New("no batch info")
 	}
 	for _, batchInfo := range bs.batchInfos {
-		if len(bs.batchInfos) == 1 || batchInfo.Output.L2BlockNumber >= bs.node.GetHeight() {
+		if len(bs.batchInfos) == 1 || (batchInfo.Output.L2BlockNumber+1) >= bs.node.GetHeight() {
 			break
 		}
 		bs.DequeueBatchInfo()
-	}
-	// TODO: set da and  key that match the current batch info
-	bs.da = da
-	if !bs.da.HasKey() {
-		return errors.New("da has no key")
 	}
 
 	bs.batchFile, err = os.OpenFile(bs.homePath+"/batch", os.O_CREATE|os.O_APPEND|os.O_RDWR, 0666)
@@ -135,15 +137,18 @@ func (bs *BatchSubmitter) Initialize(host hostNode, da executortypes.DANode, bri
 	return nil
 }
 
-func (bs *BatchSubmitter) Start(ctx context.Context, errCh chan error) {
-	defer func() {
-		if r := recover(); r != nil {
-			bs.logger.Error("batch panic", zap.Any("recover", r))
-			errCh <- fmt.Errorf("batch panic: %v", r)
-		}
-	}()
+func (bs *BatchSubmitter) SetDANode(da executortypes.DANode) error {
+	if !da.HasKey() {
+		return errors.New("da has no key")
+	}
 
-	bs.node.Start(ctx, errCh, nodetypes.PROCESS_TYPE_RAW)
+	bs.da = da
+	return nil
+}
+
+func (bs *BatchSubmitter) Start(ctx context.Context) {
+	bs.logger.Info("batch start", zap.Uint64("height", bs.node.GetHeight()))
+	bs.node.Start(ctx)
 }
 
 func (bs *BatchSubmitter) SetBridgeInfo(bridgeInfo opchildtypes.BridgeInfo) {
@@ -167,4 +172,12 @@ func (bs *BatchSubmitter) SubmissionInfoToRawKV(timestamp int64) types.RawKV {
 		Key:   bs.db.PrefixedKey(SubmissionKey),
 		Value: dbtypes.FromInt64(timestamp),
 	}
+}
+
+func (bs *BatchSubmitter) ChainID() string {
+	return bs.chainID
+}
+
+func (bs *BatchSubmitter) DA() executortypes.DANode {
+	return bs.da
 }

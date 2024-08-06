@@ -45,7 +45,7 @@ func (h *Host) updateBatchInfoHandler(args nodetypes.EventHandlerArgs) error {
 				// pass other bridge deposit event
 				return nil
 			}
-		case ophosttypes.AttributeKeyBatchChain:
+		case ophosttypes.AttributeKeyBatchChainType:
 			chain = attr.Value
 		case ophosttypes.AttributeKeyBatchSubmitter:
 			submitter = attr.Value
@@ -61,6 +61,12 @@ func (h *Host) updateBatchInfoHandler(args nodetypes.EventHandlerArgs) error {
 			}
 		}
 	}
+	h.logger.Info("update batch info",
+		zap.String("chain", chain),
+		zap.String("submitter", submitter),
+		zap.Uint64("output_index", outputIndex),
+		zap.Uint64("l2_block_number", l2BlockNumber),
+	)
 
 	h.batch.UpdateBatchInfo(chain, submitter, outputIndex, l2BlockNumber)
 	return nil

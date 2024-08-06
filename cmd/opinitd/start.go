@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
@@ -27,7 +28,6 @@ Currently supported bots:
 			if err != nil {
 				return err
 			}
-
 			botType := bottypes.BotTypeFromString(args[0])
 			bot, err := bot.NewBot(botType, ctx.logger, ctx.homePath, configName)
 			if err != nil {
@@ -50,6 +50,7 @@ func gracefulShutdown(done context.CancelFunc) {
 	signal.Notify(signalChannel, os.Interrupt, syscall.SIGTERM)
 	go func() {
 		<-signalChannel
+		fmt.Println("Received signal to stop. Shutting down...")
 		done()
 	}()
 }

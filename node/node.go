@@ -2,69 +2,56 @@ package node
 
 import (
 	"context"
-	"sync"
-	"time"
+	"fmt"
 
-	"errors"
+	"github.com/pkg/errors"
 
+	"cosmossdk.io/core/address"
 	"github.com/cosmos/cosmos-sdk/client"
-	"github.com/cosmos/cosmos-sdk/client/tx"
 	"github.com/cosmos/cosmos-sdk/codec"
-	"github.com/cosmos/cosmos-sdk/crypto/hd"
-	"github.com/cosmos/cosmos-sdk/crypto/keyring"
-	sdk "github.com/cosmos/cosmos-sdk/types"
-	"github.com/cosmos/cosmos-sdk/types/tx/signing"
-	clienthttp "github.com/initia-labs/opinit-bots-go/client"
+	"github.com/initia-labs/opinit-bots-go/node/broadcaster"
+	"github.com/initia-labs/opinit-bots-go/node/rpcclient"
 	nodetypes "github.com/initia-labs/opinit-bots-go/node/types"
 	"github.com/initia-labs/opinit-bots-go/types"
 	"go.uber.org/zap"
+	"golang.org/x/sync/errgroup"
 )
 
 type Node struct {
-	*clienthttp.HTTP
-
 	cfg    nodetypes.NodeConfig
 	db     types.DB
 	logger *zap.Logger
 
+	cdc      codec.Codec
+	txConfig client.TxConfig
+
+	rpcClient   *rpcclient.RPCClient
+	broadcaster *broadcaster.Broadcaster
+
+	// handlers
 	eventHandlers     map[string]nodetypes.EventHandlerFn
 	txHandler         nodetypes.TxHandlerFn
 	beginBlockHandler nodetypes.BeginBlockHandlerFn
 	endBlockHandler   nodetypes.EndBlockHandlerFn
 	rawBlockHandler   nodetypes.RawBlockHandlerFn
 
-	cdc        codec.Codec
-	txConfig   client.TxConfig
-	keyBase    keyring.Keyring
-	keyAddress sdk.AccAddress
-	txf        tx.Factory
-
+	// status info
 	lastProcessedBlockHeight uint64
-
-	// local pending txs, which is following Queue data structure
-	pendingTxMu *sync.Mutex
-	pendingTxs  []nodetypes.PendingTxInfo
-
-	pendingProcessedMsgs []nodetypes.ProcessedMsgs
-
-	txChannel chan nodetypes.ProcessedMsgs
+	running                  bool
 }
 
 func NewNode(cfg nodetypes.NodeConfig, db types.DB, logger *zap.Logger, cdc codec.Codec, txConfig client.TxConfig) (*Node, error) {
-	client, err := clienthttp.New(cfg.RPC, "/websocket")
-	if err != nil {
+	if err := cfg.Validate(); err != nil {
 		return nil, err
 	}
 
-	// Use memory keyring for now
-	// TODO: may use os keyring later
-	keyBase, err := keyring.New(cfg.ChainID, "memory", "", nil, cdc)
+	rpcClient, err := rpcclient.NewRPCClient(cdc, cfg.RPC)
 	if err != nil {
 		return nil, err
 	}
 
 	n := &Node{
-		HTTP: client,
+		rpcClient: rpcClient,
 
 		cfg:    cfg,
 		db:     db,
@@ -74,22 +61,10 @@ func NewNode(cfg nodetypes.NodeConfig, db types.DB, logger *zap.Logger, cdc code
 
 		cdc:      cdc,
 		txConfig: txConfig,
-		keyBase:  keyBase,
-
-		pendingTxMu: &sync.Mutex{},
-		pendingTxs:  make([]nodetypes.PendingTxInfo, 0),
-
-		pendingProcessedMsgs: make([]nodetypes.ProcessedMsgs, 0),
-
-		txChannel: make(chan nodetypes.ProcessedMsgs),
 	}
 
-	err = n.loadSyncInfo()
-	if err != nil {
-		return nil, err
-	}
-
-	status, err := n.Status(context.Background())
+	// check if node is catching up
+	status, err := rpcClient.Status(context.Background())
 	if err != nil {
 		return nil, err
 	}
@@ -97,163 +72,116 @@ func NewNode(cfg nodetypes.NodeConfig, db types.DB, logger *zap.Logger, cdc code
 		return nil, errors.New("node is catching up")
 	}
 
-	if n.HasKey() {
-		err := n.prepareBroadcaster(uint64(status.SyncInfo.LatestBlockHeight), status.SyncInfo.LatestBlockTime)
+	// create broadcaster
+	if cfg.BroadcasterConfig != nil {
+		n.broadcaster, err = broadcaster.NewBroadcaster(
+			*cfg.BroadcasterConfig,
+			db,
+			logger,
+			cdc,
+			txConfig,
+			rpcClient,
+			status,
+		)
 		if err != nil {
-			return nil, err
+			return nil, errors.Wrap(err, "failed to create broadcaster")
 		}
+	}
+
+	// load sync info
+	err = n.loadSyncInfo()
+	if err != nil {
+		return nil, err
 	}
 
 	return n, nil
 }
 
-func (n Node) Start(ctx context.Context, errCh chan error, processType nodetypes.BlockProcessType) {
-	go func() {
-		err := n.txBroadcastLooper(ctx)
-		if err != nil {
-			errCh <- err
-		}
-	}()
+func (n *Node) Start(ctx context.Context) {
+	if n.running {
+		return
+	}
+	n.running = true
 
-	// broadcast pending msgs first before executing block process looper
-	// @dev: these pending processed data is filled at initialization(`NewNode`).
-	for _, processedMsg := range n.pendingProcessedMsgs {
-		n.BroadcastMsgs(processedMsg)
+	errGrp := ctx.Value("errGrp").(*errgroup.Group)
+	if n.broadcaster != nil {
+		errGrp.Go(func() (err error) {
+			defer func() {
+				n.logger.Info("tx broadcast looper stopped")
+				if r := recover(); r != nil {
+					n.logger.Error("tx broadcast looper panic", zap.Any("recover", r))
+					err = fmt.Errorf("tx broadcast looper panic: %v", r)
+				}
+			}()
+
+			return n.broadcaster.Start(ctx)
+		})
+
+		// broadcast pending msgs first before executing block process looper
+		n.broadcaster.BroadcastPendingProcessedMsgs()
 	}
 
-	go func() {
-		err := n.blockProcessLooper(ctx, processType)
-		if err != nil {
-			errCh <- err
+	if n.cfg.ProcessType == nodetypes.PROCESS_TYPE_ONLY_BROADCAST {
+		if n.broadcaster == nil {
+			panic("broadcaster cannot be nil with nodetypes.PROCESS_TYPE_ONLY_BROADCAST")
 		}
-	}()
+
+		errGrp.Go(func() (err error) {
+			defer func() {
+				n.logger.Info("tx checker looper stopped")
+				if r := recover(); r != nil {
+					n.logger.Error("tx checker panic", zap.Any("recover", r))
+					err = fmt.Errorf("tx checker panic: %v", r)
+				}
+			}()
+
+			return n.txChecker(ctx)
+		})
+	} else {
+		errGrp.Go(func() (err error) {
+			defer func() {
+				n.logger.Info("block process looper stopped")
+				if r := recover(); r != nil {
+					n.logger.Error("block process looper panic", zap.Any("recover", r))
+					err = fmt.Errorf("block process looper panic: %v", r)
+				}
+			}()
+
+			return n.blockProcessLooper(ctx, n.cfg.ProcessType)
+		})
+	}
 }
 
-func (n Node) HasKey() bool {
-	return n.cfg.Mnemonic != ""
-}
-
-func (n *Node) prepareBroadcaster(_ /*lastBlockHeight*/ uint64, lastBlockTime time.Time) error {
-	_, err := n.keyBase.NewAccount(nodetypes.KEY_NAME, n.cfg.Mnemonic, "", hd.CreateHDPath(sdk.GetConfig().GetCoinType(), 0, 0).String(), hd.Secp256k1)
-	if err != nil {
-		return err
-	}
-	// to check if the key is normally created
-	// TODO: delete this code
-	key, err := n.keyBase.Key(nodetypes.KEY_NAME)
-	if err != nil {
-		return err
-	}
-
-	addr, err := key.GetAddress()
-	if err != nil {
-		return err
-	}
-	n.keyAddress = addr
-
-	n.txf = tx.Factory{}.
-		WithAccountRetriever(n).
-		WithChainID(n.cfg.ChainID).
-		WithTxConfig(n.txConfig).
-		WithGasAdjustment(nodetypes.GAS_ADJUSTMENT).
-		WithGasPrices(n.cfg.GasPrice).
-		WithKeybase(n.keyBase).
-		WithSignMode(signing.SignMode_SIGN_MODE_DIRECT)
-
-	err = n.loadAccount()
-	if err != nil {
-		return err
-	}
-
-	dbBatchKVs := make([]types.RawKV, 0)
-
-	loadedPendingTxs, err := n.loadPendingTxs()
-	if err != nil {
-		return err
-	}
-	// TODO: handle mismatched sequence & pending txs
-	if len(loadedPendingTxs) > 0 {
-		pendingTxTime := time.Unix(0, loadedPendingTxs[0].Timestamp)
-
-		// if we have pending txs, wait until timeout
-		if timeoutTime := pendingTxTime.Add(nodetypes.TX_TIMEOUT); lastBlockTime.Before(timeoutTime) {
-			timer := time.NewTimer(timeoutTime.Sub(lastBlockTime))
-			<-timer.C
-		}
-
-		// convert pending txs to raw kv pairs for deletion
-		pendingKVs, err := n.PendingTxsToRawKV(loadedPendingTxs, true)
-		if err != nil {
-			return err
-		}
-
-		// add pending txs delegation to db batch
-		dbBatchKVs = append(dbBatchKVs, pendingKVs...)
-
-		// convert pending txs to pending msgs
-		for i, txInfo := range loadedPendingTxs {
-			tx, err := n.DecodeTx(txInfo.Tx)
-			if err != nil {
-				return err
-			}
-			if txInfo.Save {
-				n.pendingProcessedMsgs = append(n.pendingProcessedMsgs, nodetypes.ProcessedMsgs{
-					Msgs:      tx.GetMsgs(),
-					Timestamp: time.Now().UnixNano(),
-					Save:      txInfo.Save,
-				})
-			}
-
-			n.logger.Debug("pending tx", zap.Int("index", i), zap.String("tx", txInfo.String()))
-		}
-	}
-
-	loadedProcessedMsgs, err := n.loadProcessedMsgs()
-	if err != nil {
-		return err
-	}
-
-	// need to remove processed msgs from db before updating the timestamp
-	// because the timestamp is used as a key.
-	kvProcessedMsgs, err := n.ProcessedMsgsToRawKV(loadedProcessedMsgs, true)
-	if err != nil {
-		return err
-	}
-	dbBatchKVs = append(dbBatchKVs, kvProcessedMsgs...)
-
-	// update timestamp of loaded processed msgs
-	for i, pendingMsgs := range loadedProcessedMsgs {
-		loadedProcessedMsgs[i].Timestamp = time.Now().UnixNano()
-		n.logger.Debug("pending msgs", zap.Int("index", i), zap.String("msgs", pendingMsgs.String()))
-	}
-
-	// save all pending msgs with updated timestamp to db
-	n.pendingProcessedMsgs = append(n.pendingProcessedMsgs, loadedProcessedMsgs...)
-	kvProcessedMsgs, err = n.ProcessedMsgsToRawKV(n.pendingProcessedMsgs, false)
-	if err != nil {
-		return err
-	}
-	dbBatchKVs = append(dbBatchKVs, kvProcessedMsgs...)
-
-	// save all pending msgs first, then broadcast them
-	err = n.db.RawBatchSet(dbBatchKVs...)
-	if err != nil {
-		return err
-	}
-
-	return nil
+func (n Node) AccountCodec() address.Codec {
+	return n.cdc.InterfaceRegistry().SigningContext().AddressCodec()
 }
 
 func (n Node) GetHeight() uint64 {
 	return n.lastProcessedBlockHeight + 1
 }
 
-func (n *Node) getClientCtx() client.Context {
-	return client.Context{}.WithClient(n).
-		WithInterfaceRegistry(n.cdc.InterfaceRegistry()).
-		WithChainID(n.cfg.ChainID).
-		WithCodec(n.cdc).
-		WithFromAddress(n.keyAddress)
+func (n Node) HasBroadcaster() bool {
+	return n.broadcaster != nil
+}
+
+func (n Node) GetBroadcaster() (*broadcaster.Broadcaster, error) {
+	if n.broadcaster == nil {
+		return nil, errors.New("cannot get broadcaster without broadcaster")
+	}
+
+	return n.broadcaster, nil
+}
+
+func (n Node) MustGetBroadcaster() *broadcaster.Broadcaster {
+	if n.broadcaster == nil {
+		panic("cannot get broadcaster without broadcaster")
+	}
+
+	return n.broadcaster
+}
+
+func (n Node) GetRPCClient() *rpcclient.RPCClient {
+	return n.rpcClient
 }
 
 func (n *Node) RegisterTxHandler(fn nodetypes.TxHandlerFn) {

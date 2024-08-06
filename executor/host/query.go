@@ -1,19 +1,20 @@
 package host
 
 import (
-	"errors"
-
+	sdk "github.com/cosmos/cosmos-sdk/types"
 	query "github.com/cosmos/cosmos-sdk/types/query"
+
 	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
-	"github.com/initia-labs/opinit-bots-go/node"
+
+	"github.com/initia-labs/opinit-bots-go/node/rpcclient"
 )
 
+func (h Host) GetAddress() sdk.AccAddress {
+	return h.node.MustGetBroadcaster().GetAddress()
+}
+
 func (h Host) GetAddressStr() (string, error) {
-	addr := h.node.GetAddress()
-	if addr == nil {
-		return "", errors.New("nil address")
-	}
-	return h.ac.BytesToString(addr)
+	return h.node.MustGetBroadcaster().GetAddressString()
 }
 
 func (h Host) QueryLastOutput() (*ophosttypes.QueryOutputProposalResponse, error) {
@@ -24,7 +25,7 @@ func (h Host) QueryLastOutput() (*ophosttypes.QueryOutputProposalResponse, error
 			Reverse: true,
 		},
 	}
-	ctx, cancel := node.GetQueryContext(0)
+	ctx, cancel := rpcclient.GetQueryContext(0)
 	defer cancel()
 
 	res, err := h.ophostQueryClient.OutputProposals(ctx, req)
@@ -42,7 +43,7 @@ func (h Host) QueryOutput(outputIndex uint64) (*ophosttypes.QueryOutputProposalR
 		BridgeId:    uint64(h.bridgeId),
 		OutputIndex: outputIndex,
 	}
-	ctx, cancel := node.GetQueryContext(0)
+	ctx, cancel := rpcclient.GetQueryContext(0)
 	defer cancel()
 
 	return h.ophostQueryClient.OutputProposal(ctx, req)
@@ -52,7 +53,7 @@ func (h Host) QueryBatchInfos() (*ophosttypes.QueryBatchInfosResponse, error) {
 	req := &ophosttypes.QueryBatchInfosRequest{
 		BridgeId: uint64(h.bridgeId),
 	}
-	ctx, cancel := node.GetQueryContext(0)
+	ctx, cancel := rpcclient.GetQueryContext(0)
 	defer cancel()
 	return h.ophostQueryClient.BatchInfos(ctx, req)
 }

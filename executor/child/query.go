@@ -2,26 +2,26 @@ package child
 
 import (
 	"encoding/json"
-	"errors"
 
 	"cosmossdk.io/math"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	opchildtypes "github.com/initia-labs/OPinit/x/opchild/types"
+
 	executortypes "github.com/initia-labs/opinit-bots-go/executor/types"
-	"github.com/initia-labs/opinit-bots-go/node"
+	"github.com/initia-labs/opinit-bots-go/node/rpcclient"
 )
 
+func (ch Child) GetAddress() sdk.AccAddress {
+	return ch.node.MustGetBroadcaster().GetAddress()
+}
+
 func (ch Child) GetAddressStr() (string, error) {
-	addr := ch.node.GetAddress()
-	if addr == nil {
-		return "", errors.New("nil address")
-	}
-	return ch.ac.BytesToString(addr)
+	return ch.node.MustGetBroadcaster().GetAddressString()
 }
 
 func (ch Child) QueryBridgeInfo() (opchildtypes.BridgeInfo, error) {
 	req := &opchildtypes.QueryBridgeInfoRequest{}
-	ctx, cancel := node.GetQueryContext(0)
+	ctx, cancel := rpcclient.GetQueryContext(0)
 	defer cancel()
 
 	res, err := ch.opchildQueryClient.BridgeInfo(ctx, req)
@@ -33,7 +33,7 @@ func (ch Child) QueryBridgeInfo() (opchildtypes.BridgeInfo, error) {
 
 func (ch Child) QueryNextL1Sequence() (uint64, error) {
 	req := &opchildtypes.QueryNextL1SequenceRequest{}
-	ctx, cancel := node.GetQueryContext(0)
+	ctx, cancel := rpcclient.GetQueryContext(0)
 	defer cancel()
 
 	res, err := ch.opchildQueryClient.NextL1Sequence(ctx, req)
@@ -45,7 +45,7 @@ func (ch Child) QueryNextL1Sequence() (uint64, error) {
 
 func (ch Child) QueryNextL2Sequence(height uint64) (uint64, error) {
 	req := &opchildtypes.QueryNextL2SequenceRequest{}
-	ctx, cancel := node.GetQueryContext(height)
+	ctx, cancel := rpcclient.GetQueryContext(height)
 	defer cancel()
 
 	res, err := ch.opchildQueryClient.NextL2Sequence(ctx, req)

@@ -1,13 +1,45 @@
 package types
 
-type NodeConfig struct {
-	RPC     string `json:"rpc"`
-	ChainID string `json:"chain_id"`
+import (
+	"fmt"
 
-	// Mnemonic is the mnemonic phrase for the bot account.
+	btypes "github.com/initia-labs/opinit-bots-go/node/broadcaster/types"
+)
+
+type BlockProcessType uint8
+
+const (
+	PROCESS_TYPE_DEFAULT BlockProcessType = iota
+	PROCESS_TYPE_RAW
+	PROCESS_TYPE_ONLY_BROADCAST
+)
+
+type NodeConfig struct {
+	RPC string
+
+	// BlockProcessType is the type of block process.
+	ProcessType BlockProcessType
+
+	// You can leave it empty, then the bot will skip the transaction submission.
+	BroadcasterConfig *btypes.BroadcasterConfig
+}
+
+func (nc NodeConfig) Validate() error {
+	if nc.RPC == "" {
+		return fmt.Errorf("rpc is empty")
+	}
+
+	if nc.ProcessType > PROCESS_TYPE_ONLY_BROADCAST {
+		return fmt.Errorf("invalid process type")
+	}
+
+	// Validated in broadcaster
 	//
-	// If you don't want to use the mnemonic, you can leave it empty.
-	// Then the bot will skip the tx submission.
-	Mnemonic string `json:"mnemonic"`
-	GasPrice string `json:"gas_price"`
+	// if nc.BroadcasterConfig != nil {
+	// 	if err := nc.BroadcasterConfig.Validate(); err != nil {
+	// 		return err
+	// 	}
+	// }
+
+	return nil
 }

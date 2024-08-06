@@ -2,22 +2,25 @@ package executor
 
 import (
 	"context"
-	"errors"
+	"fmt"
 	"strconv"
+
+	"github.com/pkg/errors"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/initia-labs/opinit-bots-go/executor/batch"
+	"github.com/initia-labs/opinit-bots-go/executor/celestia"
 	"github.com/initia-labs/opinit-bots-go/executor/child"
 	"github.com/initia-labs/opinit-bots-go/executor/host"
 	"github.com/initia-labs/opinit-bots-go/server"
 
 	bottypes "github.com/initia-labs/opinit-bots-go/bot/types"
 	executortypes "github.com/initia-labs/opinit-bots-go/executor/types"
+
+	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
 	"github.com/initia-labs/opinit-bots-go/types"
 	"go.uber.org/zap"
-
-	"github.com/cosmos/cosmos-sdk/client"
-	"github.com/cosmos/cosmos-sdk/codec"
+	"golang.org/x/sync/errgroup"
 )
 
 var _ bottypes.Bot = &Executor{}
@@ -34,9 +37,11 @@ type Executor struct {
 	db     types.DB
 	server *server.Server
 	logger *zap.Logger
+
+	homePath string
 }
 
-func NewExecutor(cfg *executortypes.Config, db types.DB, sv *server.Server, logger *zap.Logger, cdc codec.Codec, txConfig client.TxConfig, homePath string) *Executor {
+func NewExecutor(cfg *executortypes.Config, db types.DB, sv *server.Server, logger *zap.Logger, homePath string) *Executor {
 	err := cfg.Validate()
 	if err != nil {
 		panic(err)
@@ -44,25 +49,28 @@ func NewExecutor(cfg *executortypes.Config, db types.DB, sv *server.Server, logg
 
 	executor := &Executor{
 		host: host.NewHost(
-			cfg.Version, cfg.RelayOracle, cfg.L1NodeConfig(),
+			cfg.Version, cfg.RelayOracle, cfg.L1NodeConfig(homePath),
 			db.WithPrefix([]byte(executortypes.HostNodeName)),
-			logger.Named(executortypes.HostNodeName), cdc, txConfig,
+			logger.Named(executortypes.HostNodeName), cfg.L1Bech32Prefix, "",
 		),
 		child: child.NewChild(
-			cfg.Version, cfg.L2NodeConfig(),
+			cfg.Version, cfg.L2NodeConfig(homePath),
 			db.WithPrefix([]byte(executortypes.ChildNodeName)),
-			logger.Named(executortypes.ChildNodeName), cdc, txConfig,
+			logger.Named(executortypes.ChildNodeName), cfg.L2Bech32Prefix,
 		),
 		batch: batch.NewBatchSubmitter(
-			cfg.Version, cfg.DANodeConfig(), cfg.BatchConfig(),
-			db.WithPrefix([]byte(executortypes.BatchNodeName)),
-			logger.Named(executortypes.BatchNodeName), cdc, txConfig, homePath,
+			cfg.Version, cfg.L2NodeConfig(homePath),
+			cfg.BatchConfig(), db.WithPrefix([]byte(executortypes.BatchNodeName)),
+			logger.Named(executortypes.BatchNodeName), cfg.L2ChainID, homePath,
+			cfg.DABech32Prefix,
 		),
 
 		cfg:    cfg,
 		db:     db,
 		server: sv,
 		logger: logger,
+
+		homePath: homePath,
 	}
 
 	bridgeInfo, err := executor.child.QueryBridgeInfo()
@@ -79,14 +87,6 @@ func NewExecutor(cfg *executortypes.Config, db types.DB, sv *server.Server, logg
 		zap.Duration("submission_interval", bridgeInfo.BridgeConfig.SubmissionInterval),
 	)
 
-	da := executor.host
-	// if cfg.Batch.DANode.ChainID != cfg.HostNode.ChainID {
-	// 	switch cfg.Batch.DANode.ChainID {
-	// 	case "celestia":
-	// 		da = celestia.NewCelestia()
-	// 	}
-	// }
-
 	err = executor.host.Initialize(executor.child, executor.batch, int64(bridgeInfo.BridgeId))
 	if err != nil {
 		panic(err)
@@ -95,64 +95,49 @@ func NewExecutor(cfg *executortypes.Config, db types.DB, sv *server.Server, logg
 	if err != nil {
 		panic(err)
 	}
-	err = executor.batch.Initialize(executor.host, da, bridgeInfo)
+	err = executor.batch.Initialize(executor.host, bridgeInfo)
 	if err != nil {
 		panic(err)
 	}
+
+	da, err := executor.makeDANode(int64(bridgeInfo.BridgeId))
+	if err != nil {
+		panic(err)
+	}
+	err = executor.batch.SetDANode(da)
+	if err != nil {
+		panic(err)
+	}
+
 	executor.RegisterQuerier()
 	return executor
 }
 
 func (ex *Executor) Start(cmdCtx context.Context) error {
-	defer ex.db.Close()
+	defer ex.Close()
+	errGrp, ctx := errgroup.WithContext(cmdCtx)
+	ctx = context.WithValue(ctx, "errGrp", errGrp)
 
-	err := ex.server.ShutdownWithContext(cmdCtx)
-	if err != nil {
-		return err
-	}
+	errGrp.Go(func() (err error) {
+		<-ctx.Done()
+		return ex.server.Shutdown()
+	})
 
-	hostCtx, hostDone := context.WithCancel(cmdCtx)
-	childCtx, childDone := context.WithCancel(cmdCtx)
-	batchCtx, batchDone := context.WithCancel(cmdCtx)
+	errGrp.Go(func() (err error) {
+		defer func() {
+			ex.logger.Info("api server stopped")
+		}()
+		return ex.server.Start(ex.cfg.ListenAddress)
+	})
+	ex.host.Start(ctx)
+	ex.child.Start(ctx)
+	ex.batch.Start(ctx)
+	ex.batch.DA().Start(ctx)
+	return errGrp.Wait()
+}
 
-	errCh := make(chan error, 3)
-	ex.host.Start(hostCtx, errCh)
-	ex.child.Start(childCtx, errCh)
-	ex.batch.Start(batchCtx, errCh)
-
-	go func() {
-		err := ex.server.Start(ex.cfg.ListenAddress)
-		if err != nil {
-			errCh <- err
-		}
-	}()
-
-	shutdown := func(err error) error {
-		ex.logger.Info("executor shutdown", zap.String("state", "requested"))
-
-		ex.logger.Debug("executor shutdown", zap.String("state", "wait"), zap.String("target", "api"))
-		ex.server.Shutdown()
-
-		ex.logger.Debug("executor shutdown", zap.String("state", "wait"), zap.String("target", "host"))
-		hostDone()
-
-		ex.logger.Debug("executor shutdown", zap.String("state", "wait"), zap.String("target", "child"))
-		childDone()
-
-		ex.logger.Debug("executor shutdown", zap.String("state", "wait"), zap.String("target", "batch"))
-		batchDone()
-
-		ex.logger.Info("executor shutdown completed")
-		return err
-	}
-
-	select {
-	case err := <-errCh:
-		ex.logger.Error("executor error", zap.String("error", err.Error()))
-		return shutdown(err)
-	case <-cmdCtx.Done():
-		return shutdown(nil)
-	}
+func (ex *Executor) Close() {
+	ex.db.Close()
 }
 
 func (ex *Executor) RegisterQuerier() {
@@ -182,4 +167,34 @@ func (ex *Executor) RegisterQuerier() {
 
 		return c.JSON(res)
 	})
+}
+
+func (ex *Executor) makeDANode(bridgeId int64) (executortypes.DANode, error) {
+	batchInfo := ex.batch.BatchInfo()
+	switch batchInfo.BatchInfo.ChainType {
+	case ophosttypes.BatchInfo_CHAIN_TYPE_INITIA:
+		da := host.NewHost(
+			ex.cfg.Version, false, ex.cfg.DANodeConfig(ex.homePath),
+			ex.db.WithPrefix([]byte(executortypes.DAHostNodeName)),
+			ex.logger.Named(executortypes.DAHostNodeName),
+			ex.homePath, batchInfo.BatchInfo.Submitter,
+		)
+		if ex.host.GetAddress().Equals(da.GetAddress()) {
+			return ex.host, nil
+		}
+		da.SetBridgeId(bridgeId)
+		da.RegisterDAHandlers()
+		return da, nil
+	case ophosttypes.BatchInfo_CHAIN_TYPE_CELESTIA:
+		da := celestia.NewDACelestia(ex.cfg.Version, ex.cfg.DANodeConfig(ex.homePath),
+			ex.db.WithPrefix([]byte(executortypes.DACelestiaNodeName)),
+			ex.logger.Named(executortypes.DACelestiaNodeName),
+			ex.homePath, batchInfo.BatchInfo.Submitter,
+		)
+		da.Initialize(ex.batch, bridgeId)
+		da.RegisterDAHandlers()
+		return da, nil
+	}
+
+	return nil, fmt.Errorf("unsupported chain id for DA: %s", ophosttypes.BatchInfo_ChainType_name[int32(batchInfo.BatchInfo.ChainType)])
 }
