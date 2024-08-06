@@ -2,6 +2,7 @@ package celestia
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/cosmos/cosmos-sdk/client/tx"
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -24,7 +25,9 @@ func BuildTxWithMessages(
 	for _, msg := range msgs {
 		withBlobMsg, ok := msg.(*celestiatypes.MsgPayForBlobsWithBlob)
 		if !ok {
-			return nil, "", err
+			// not support other message types for now
+			// only MsgPayForBlobsWithBlob in one tx
+			return nil, "", fmt.Errorf("unsupported message type: %s", sdk.MsgTypeURL(msg))
 		}
 		pfbMsgs = append(pfbMsgs, withBlobMsg.MsgPayForBlobs)
 		blobMsgs = append(blobMsgs, withBlobMsg.Blob)
