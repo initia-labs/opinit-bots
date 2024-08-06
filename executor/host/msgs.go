@@ -11,7 +11,7 @@ func (h Host) GetMsgProposeOutput(
 	l2BlockNumber uint64,
 	outputRoot []byte,
 ) (sdk.Msg, error) {
-	sender, err := h.node.GetAddressString()
+	sender, err := h.node.MustGetBroadcaster().GetAddressString()
 	if err != nil {
 		return nil, err
 	}
@@ -31,14 +31,19 @@ func (h Host) GetMsgProposeOutput(
 }
 
 func (h Host) CreateBatchMsg(batchBytes []byte) (sdk.Msg, error) {
-	submitter, err := h.node.GetAddressString()
+	submitter, err := h.node.MustGetBroadcaster().GetAddressString()
 	if err != nil {
 		return nil, err
 	}
 
-	return ophosttypes.NewMsgRecordBatch(
+	msg := ophosttypes.NewMsgRecordBatch(
 		submitter,
 		uint64(h.bridgeId),
 		batchBytes,
-	), nil
+	)
+	err = msg.Validate(h.node.AccountCodec())
+	if err != nil {
+		return nil, err
+	}
+	return msg, nil
 }

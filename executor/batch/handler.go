@@ -10,15 +10,17 @@ import (
 
 	"github.com/pkg/errors"
 
+	cmtproto "github.com/cometbft/cometbft/proto/tendermint/types"
+
 	sdk "github.com/cosmos/cosmos-sdk/types"
+	"github.com/cosmos/gogoproto/proto"
+
+	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
+
 	executortypes "github.com/initia-labs/opinit-bots-go/executor/types"
+	btypes "github.com/initia-labs/opinit-bots-go/node/broadcaster/types"
 	nodetypes "github.com/initia-labs/opinit-bots-go/node/types"
 	"github.com/initia-labs/opinit-bots-go/types"
-
-	cmtproto "github.com/cometbft/cometbft/proto/tendermint/types"
-	"github.com/cosmos/gogoproto/proto"
-	opchildtypes "github.com/initia-labs/OPinit/x/opchild/types"
-	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
 )
 
 func (bs *BatchSubmitter) rawBlockHandler(args nodetypes.RawBlockArgs) error {
@@ -37,7 +39,7 @@ func (bs *BatchSubmitter) rawBlockHandler(args nodetypes.RawBlockArgs) error {
 		return errors.Wrap(err, "failed to prepare batch")
 	}
 
-	blockBytes, err := bs.convertBlock(pbb)
+	blockBytes, err := bs.emptyOracleData(pbb)
 	if err != nil {
 		return err
 	}
@@ -143,7 +145,7 @@ func (bs *BatchSubmitter) prepareBatch(blockHeight uint64, blockTime time.Time) 
 
 // write block bytes to batch file
 func (bs *BatchSubmitter) handleBatch(blockBytes []byte) error {
-	_, err := bs.batchWriter.Write(WriteBatch(blockBytes))
+	_, err := bs.batchWriter.Write(prependLength(blockBytes))
 	if err != nil {
 		return err
 	}
@@ -154,11 +156,11 @@ func (bs *BatchSubmitter) handleBatch(blockBytes []byte) error {
 func (bs *BatchSubmitter) finalizeBatch(blockHeight uint64) error {
 
 	// write last block's commit to batch file
-	rawCommit, err := bs.node.QueryRawCommit(int64(blockHeight))
+	rawCommit, err := bs.node.GetRPCClient().QueryRawCommit(int64(blockHeight))
 	if err != nil {
 		return errors.Wrap(err, "failed to query raw commit")
 	}
-	_, err = bs.batchWriter.Write(WriteBatch(rawCommit))
+	_, err = bs.batchWriter.Write(prependLength(rawCommit))
 	if err != nil {
 		return errors.Wrap(err, "failed to write raw commit")
 	}
@@ -171,7 +173,7 @@ func (bs *BatchSubmitter) finalizeBatch(blockHeight uint64) error {
 	checksums := make([][]byte, 0)
 
 	// room for batch header
-	bs.processedMsgs = append(bs.processedMsgs, nodetypes.ProcessedMsgs{
+	bs.processedMsgs = append(bs.processedMsgs, btypes.ProcessedMsgs{
 		Timestamp: time.Now().UnixNano(),
 		Save:      true,
 	})
@@ -190,7 +192,7 @@ func (bs *BatchSubmitter) finalizeBatch(blockHeight uint64) error {
 		if err != nil {
 			return err
 		}
-		bs.processedMsgs = append(bs.processedMsgs, nodetypes.ProcessedMsgs{
+		bs.processedMsgs = append(bs.processedMsgs, btypes.ProcessedMsgs{
 			Msgs:      []sdk.Msg{msg},
 			Timestamp: time.Now().UnixNano(),
 			Save:      true,
@@ -288,39 +290,4 @@ func (bs *BatchSubmitter) DequeueBatchInfo() {
 	defer bs.batchInfoMu.Unlock()
 
 	bs.batchInfos = bs.batchInfos[1:]
-}
-
-func (bs *BatchSubmitter) convertBlock(pbb *cmtproto.Block) ([]byte, error) {
-	for i, txBytes := range pbb.Data.GetTxs() {
-		tx, err := bs.node.DecodeTx(txBytes)
-		if err != nil {
-			// ignore not registered tx in codec
-			continue
-		}
-
-		msgs := tx.GetMsgs()
-		if len(msgs) != 1 {
-			continue
-		}
-
-		if msg, ok := msgs[0].(*opchildtypes.MsgUpdateOracle); ok {
-			msg.Data = []byte{}
-			tx, err := bs.node.ChangeMsgsFromTx(tx, []sdk.Msg{msg})
-			if err != nil {
-				return nil, err
-			}
-			convertedTxBytes, err := bs.node.EncodeTx(tx)
-			if err != nil {
-				return nil, err
-			}
-			pbb.Data.Txs[i] = convertedTxBytes
-		}
-	}
-
-	// convert block to bytes
-	blockBytes, err := proto.Marshal(pbb)
-	if err != nil {
-		return nil, err
-	}
-	return blockBytes, nil
 }

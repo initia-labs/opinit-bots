@@ -42,7 +42,9 @@ func (h *Host) proposeOutputHandler(args nodetypes.EventHandlerArgs) error {
 			}
 		}
 	}
+
 	h.handleProposeOutput(bridgeId, proposer, outputIndex, l2BlockNumber, outputRoot)
+
 	return nil
 }
 

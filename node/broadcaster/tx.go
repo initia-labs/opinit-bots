@@ -1,4 +1,4 @@
-package node
+package broadcaster
 
 import (
 	"context"
@@ -7,13 +7,12 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-	"time"
 
-	"github.com/pkg/errors"
+	"go.uber.org/zap"
 
 	sdkerrors "cosmossdk.io/errors"
 	abci "github.com/cometbft/cometbft/abci/types"
-	comettypes "github.com/cometbft/cometbft/types"
+
 	"github.com/cosmos/cosmos-sdk/client/tx"
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
 	cryptotypes "github.com/cosmos/cosmos-sdk/crypto/types"
@@ -21,8 +20,8 @@ import (
 	txtypes "github.com/cosmos/cosmos-sdk/types/tx"
 	"github.com/cosmos/cosmos-sdk/types/tx/signing"
 	authsigning "github.com/cosmos/cosmos-sdk/x/auth/signing"
-	nodetypes "github.com/initia-labs/opinit-bots-go/node/types"
-	"go.uber.org/zap"
+
+	btypes "github.com/initia-labs/opinit-bots-go/node/broadcaster/types"
 
 	opchildtypes "github.com/initia-labs/OPinit/x/opchild/types"
 )
@@ -36,38 +35,7 @@ var ignoringErrors = []error{
 var accountSeqRegex = regexp.MustCompile("account sequence mismatch, expected ([0-9]+), got ([0-9]+)")
 var outputIndexRegex = regexp.MustCompile("expected ([0-9]+), got ([0-9]+): invalid output index")
 
-func (n *Node) txBroadcastLooper(ctx context.Context) error {
-	defer close(n.txChannelStopped)
-	for {
-		select {
-		case <-ctx.Done():
-			return nil
-		case data := <-n.txChannel:
-			var err error
-			for retry := 1; retry <= 10; retry++ {
-				select {
-				case <-ctx.Done():
-					return nil
-				default:
-				}
-				err = n.handleProcessedMsgs(ctx, data)
-				if err == nil {
-					break
-				} else if err = n.handleMsgError(err); err == nil {
-					break
-				}
-				n.logger.Warn("retry", zap.Int("count", retry), zap.String("error", err.Error()))
-
-				time.Sleep(30 * time.Second)
-			}
-			if err != nil {
-				return errors.Wrap(err, "failed to handle processed msgs")
-			}
-		}
-	}
-}
-
-func (n *Node) handleMsgError(err error) error {
+func (b *Broadcaster) handleMsgError(err error) error {
 	if strs := accountSeqRegex.FindStringSubmatch(err.Error()); strs != nil {
 		expected, parseErr := strconv.ParseUint(strs[1], 10, 64)
 		if parseErr != nil {
@@ -79,8 +47,9 @@ func (n *Node) handleMsgError(err error) error {
 		}
 
 		if expected > got {
-			n.txf = n.txf.WithSequence(expected)
+			b.txf = b.txf.WithSequence(expected)
 		}
+
 		// account sequence mismatched
 		// TODO: handle mismatched sequence
 		return err
@@ -97,7 +66,7 @@ func (n *Node) handleMsgError(err error) error {
 		}
 
 		if expected > got {
-			n.logger.Warn("ignoring error", zap.String("error", err.Error()))
+			b.logger.Warn("ignoring error", zap.String("error", err.Error()))
 			return nil
 		}
 
@@ -106,23 +75,25 @@ func (n *Node) handleMsgError(err error) error {
 
 	for _, e := range ignoringErrors {
 		if strings.Contains(err.Error(), e.Error()) {
-			n.logger.Warn("ignoring error", zap.String("error", e.Error()))
+			b.logger.Warn("ignoring error", zap.String("error", e.Error()))
 			return nil
 		}
 	}
 
-	// n.logger.Error("failed to handle processed msgs", zap.String("error", err.Error()))
+	// b.logger.Error("failed to handle processed msgs", zap.String("error", err.Error()))
 	return err
 }
 
-func (n *Node) handleProcessedMsgs(ctx context.Context, data nodetypes.ProcessedMsgs) error {
-	sequence := n.txf.Sequence()
-	txBytes, txHash, err := n.buildTxWithMessages(n, ctx, data.Msgs)
+// HandleProcessedMsgs handles processed messages by broadcasting them to the network.
+// It stores the transaction in the database and local memory and keep track of the successful broadcast.
+func (b *Broadcaster) handleProcessedMsgs(ctx context.Context, data btypes.ProcessedMsgs) error {
+	sequence := b.txf.Sequence()
+	txBytes, txHash, err := b.cfg.BuildTxWithMessages(ctx, data.Msgs)
 	if err != nil {
 		return sdkerrors.Wrapf(err, "simulation failed")
 	}
 
-	res, err := n.BroadcastTxSync(ctx, txBytes)
+	res, err := b.rpcClient.BroadcastTxSync(ctx, txBytes)
 	if err != nil {
 		// TODO: handle error, may repeat sending tx
 		return fmt.Errorf("broadcast txs: %w", err)
@@ -131,19 +102,19 @@ func (n *Node) handleProcessedMsgs(ctx context.Context, data nodetypes.Processed
 		return fmt.Errorf("broadcast txs: %s", res.Log)
 	}
 
-	n.logger.Debug("broadcast tx", zap.String("tx_hash", txHash), zap.Uint64("sequence", sequence))
+	b.logger.Debug("broadcast tx", zap.String("tx_hash", txHash), zap.Uint64("sequence", sequence))
 
 	// @sh-cha: maybe we should use data.Save?
 	if data.Timestamp != 0 {
-		err = n.deleteProcessedMsgs(data.Timestamp)
+		err = b.deleteProcessedMsgs(data.Timestamp)
 		if err != nil {
 			return err
 		}
 	}
 
-	n.txf = n.txf.WithSequence(n.txf.Sequence() + 1)
-	pendingTx := nodetypes.PendingTxInfo{
-		ProcessedHeight: n.GetHeight(),
+	b.txf = b.txf.WithSequence(b.txf.Sequence() + 1)
+	pendingTx := btypes.PendingTxInfo{
+		ProcessedHeight: b.GetHeight(),
 		Sequence:        sequence,
 		Tx:              txBytes,
 		TxHash:          txHash,
@@ -152,37 +123,37 @@ func (n *Node) handleProcessedMsgs(ctx context.Context, data nodetypes.Processed
 	}
 
 	// save pending transaction to the database for handling after restart
-	err = n.savePendingTx(sequence, pendingTx)
+	err = b.savePendingTx(sequence, pendingTx)
 	if err != nil {
 		return err
 	}
 
 	// save pending tx to local memory to handle this tx in this session
-	n.enqueueLocalPendingTx(pendingTx)
+	b.enqueueLocalPendingTx(pendingTx)
 
 	return nil
 }
 
 // BroadcastTxSync broadcasts transaction bytes to txBroadcastLooper.
-func (n *Node) BroadcastMsgs(msgs nodetypes.ProcessedMsgs) {
-	if n.txChannel == nil || !n.HasKey() {
+func (b Broadcaster) BroadcastMsgs(msgs btypes.ProcessedMsgs) {
+	if b.txChannel == nil {
 		return
 	}
 
 	select {
-	case <-n.txChannelStopped:
-	case n.txChannel <- msgs:
+	case <-b.txChannelStopped:
+	case b.txChannel <- msgs:
 	}
 }
 
 // CalculateGas simulates a tx to generate the appropriate gas settings before broadcasting a tx.
-func (n *Node) CalculateGas(ctx context.Context, txf tx.Factory, msgs ...sdk.Msg) (txtypes.SimulateResponse, uint64, error) {
-	keyInfo, err := n.keyBase.Key(n.keyName)
+func (b Broadcaster) CalculateGas(ctx context.Context, txf tx.Factory, msgs ...sdk.Msg) (txtypes.SimulateResponse, uint64, error) {
+	keyInfo, err := b.keyBase.Key(b.keyName)
 	if err != nil {
 		return txtypes.SimulateResponse{}, 0, err
 	}
 
-	txBytes, err := n.buildSimTx(keyInfo, txf, msgs...)
+	txBytes, err := b.buildSimTx(keyInfo, txf, msgs...)
 	if err != nil {
 		return txtypes.SimulateResponse{}, 0, err
 	}
@@ -198,7 +169,7 @@ func (n *Node) CalculateGas(ctx context.Context, txf tx.Factory, msgs ...sdk.Msg
 		Data: reqBytes,
 	}
 
-	res, err := n.QueryABCI(ctx, simQuery)
+	res, err := b.rpcClient.QueryABCI(ctx, simQuery)
 	if err != nil {
 		return txtypes.SimulateResponse{}, 0, err
 	}
@@ -208,28 +179,29 @@ func (n *Node) CalculateGas(ctx context.Context, txf tx.Factory, msgs ...sdk.Msg
 		return txtypes.SimulateResponse{}, 0, err
 	}
 
-	gas, err := n.adjustEstimatedGas(simRes.GasInfo.GasUsed)
+	gas, err := b.adjustEstimatedGas(simRes.GasInfo.GasUsed)
 	return simRes, gas, err
 }
 
 // AdjustEstimatedGas adjusts the estimated gas usage by multiplying it by the gas adjustment factor
 // and return estimated gas is higher than max gas error. If the gas usage is zero, the adjusted gas
 // is also zero.
-func (n *Node) adjustEstimatedGas(gasUsed uint64) (uint64, error) {
+func (b Broadcaster) adjustEstimatedGas(gasUsed uint64) (uint64, error) {
 	if gasUsed == 0 {
 		return gasUsed, nil
 	}
 
-	gas := nodetypes.GAS_ADJUSTMENT * float64(gasUsed)
+	gas := btypes.GAS_ADJUSTMENT * float64(gasUsed)
 	if math.IsInf(gas, 1) {
 		return 0, fmt.Errorf("infinite gas used")
 	}
+
 	return uint64(gas), nil
 }
 
 // BuildSimTx creates an unsigned tx with an empty single signature and returns
 // the encoded transaction or an error if the unsigned transaction cannot be built.
-func (n Node) buildSimTx(info *keyring.Record, txf tx.Factory, msgs ...sdk.Msg) ([]byte, error) {
+func (b Broadcaster) buildSimTx(info *keyring.Record, txf tx.Factory, msgs ...sdk.Msg) ([]byte, error) {
 	txb, err := txf.BuildUnsignedTx(msgs...)
 	if err != nil {
 		return nil, err
@@ -254,54 +226,54 @@ func (n Node) buildSimTx(info *keyring.Record, txf tx.Factory, msgs ...sdk.Msg) 
 		return nil, err
 	}
 
-	return n.EncodeTx(txb.GetTx())
+	return b.EncodeTx(txb.GetTx())
 }
 
-func (n *Node) enqueueLocalPendingTx(tx nodetypes.PendingTxInfo) {
-	n.pendingTxMu.Lock()
-	defer n.pendingTxMu.Unlock()
+func (b *Broadcaster) enqueueLocalPendingTx(tx btypes.PendingTxInfo) {
+	b.pendingTxMu.Lock()
+	defer b.pendingTxMu.Unlock()
 
-	n.pendingTxs = append(n.pendingTxs, tx)
+	b.pendingTxs = append(b.pendingTxs, tx)
 }
 
-func (n *Node) peekLocalPendingTx() nodetypes.PendingTxInfo {
-	n.pendingTxMu.Lock()
-	defer n.pendingTxMu.Unlock()
+func (b *Broadcaster) peekLocalPendingTx() btypes.PendingTxInfo {
+	b.pendingTxMu.Lock()
+	defer b.pendingTxMu.Unlock()
 
-	return n.pendingTxs[0]
+	return b.pendingTxs[0]
 }
 
-func (n *Node) lenLocalPendingTx() int {
-	n.pendingTxMu.Lock()
-	defer n.pendingTxMu.Unlock()
+func (b Broadcaster) lenLocalPendingTx() int {
+	b.pendingTxMu.Lock()
+	defer b.pendingTxMu.Unlock()
 
-	return len(n.pendingTxs)
+	return len(b.pendingTxs)
 }
 
-func (n *Node) dequeueLocalPendingTx() {
-	n.pendingTxMu.Lock()
-	defer n.pendingTxMu.Unlock()
+func (b *Broadcaster) dequeueLocalPendingTx() {
+	b.pendingTxMu.Lock()
+	defer b.pendingTxMu.Unlock()
 
-	n.pendingTxs = n.pendingTxs[1:]
+	b.pendingTxs = b.pendingTxs[1:]
 }
 
-func (n *Node) EncodeTx(tx authsigning.Tx) ([]byte, error) {
-	txBytes, err := n.txConfig.TxEncoder()(tx)
+func (b Broadcaster) EncodeTx(tx authsigning.Tx) ([]byte, error) {
+	txBytes, err := b.txConfig.TxEncoder()(tx)
 	if err != nil {
 		return nil, err
 	}
 	return txBytes, nil
 }
 
-func (n *Node) DecodeTx(txBytes []byte) (authsigning.Tx, error) {
-	tx, err := n.txConfig.TxDecoder()(txBytes)
+func (b Broadcaster) DecodeTx(txBytes []byte) (authsigning.Tx, error) {
+	tx, err := b.txConfig.TxDecoder()(txBytes)
 	if err != nil {
 		return nil, err
 	}
 	return tx.(authsigning.Tx), nil
 }
 
-func (n *Node) ChangeMsgsFromTx(tx authsigning.Tx, msgs []sdk.Msg) (authsigning.Tx, error) {
+func (n Broadcaster) ChangeMsgsFromTx(tx authsigning.Tx, msgs []sdk.Msg) (authsigning.Tx, error) {
 	builder, err := n.txConfig.WrapTxBuilder(tx)
 	if err != nil {
 		return nil, err
@@ -313,13 +285,8 @@ func (n *Node) ChangeMsgsFromTx(tx authsigning.Tx, msgs []sdk.Msg) (authsigning.
 	return builder.GetTx(), nil
 }
 
-func TxHash(txBytes []byte) string {
-	return fmt.Sprintf("%X", comettypes.Tx(txBytes).Hash())
-}
-
 // buildTxWithMessages creates a transaction from the given messages.
-func DefaultBuildTxWithMessages(
-	n *Node,
+func (b Broadcaster) DefaultBuildTxWithMessages(
 	ctx context.Context,
 	msgs []sdk.Msg,
 ) (
@@ -327,8 +294,8 @@ func DefaultBuildTxWithMessages(
 	txHash string,
 	err error,
 ) {
-	txf := n.GetTxf()
-	_, adjusted, err := n.CalculateGas(ctx, txf, msgs...)
+	txf := b.txf
+	_, adjusted, err := b.CalculateGas(ctx, txf, msgs...)
 	if err != nil {
 		return nil, "", err
 	}
@@ -339,26 +306,25 @@ func DefaultBuildTxWithMessages(
 		return nil, "", err
 	}
 
-	if err = tx.Sign(ctx, txf, n.keyName, txb, false); err != nil {
+	if err = tx.Sign(ctx, txf, b.keyName, txb, false); err != nil {
 		return nil, "", err
 	}
 
 	tx := txb.GetTx()
-	txBytes, err = n.EncodeTx(tx)
+	txBytes, err = b.EncodeTx(tx)
 	if err != nil {
 		return nil, "", err
 	}
-
-	return txBytes, TxHash(txBytes), nil
+	return txBytes, btypes.TxHash(txBytes), nil
 }
 
-func DefaultPendingTxToProcessedMsgs(
-	n *Node,
+func (b Broadcaster) DefaultPendingTxToProcessedMsgs(
 	txBytes []byte,
 ) ([]sdk.Msg, error) {
-	tx, err := n.DecodeTx(txBytes)
+	tx, err := b.DecodeTx(txBytes)
 	if err != nil {
 		return nil, err
 	}
+
 	return tx.GetMsgs(), nil
 }

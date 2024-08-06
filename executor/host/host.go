@@ -5,28 +5,27 @@ import (
 
 	"go.uber.org/zap"
 
-	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
-	executortypes "github.com/initia-labs/opinit-bots-go/executor/types"
-	"github.com/initia-labs/opinit-bots-go/node"
-	nodetypes "github.com/initia-labs/opinit-bots-go/node/types"
-	"github.com/initia-labs/opinit-bots-go/types"
-
 	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/codec"
-	"github.com/cosmos/cosmos-sdk/std"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/x/auth"
 
 	"github.com/initia-labs/OPinit/x/ophost"
-	initiaapp "github.com/initia-labs/initia/app"
-	"github.com/initia-labs/initia/app/params"
+	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
+
+	executortypes "github.com/initia-labs/opinit-bots-go/executor/types"
+	"github.com/initia-labs/opinit-bots-go/keys"
+	"github.com/initia-labs/opinit-bots-go/node"
+	btypes "github.com/initia-labs/opinit-bots-go/node/broadcaster/types"
+	nodetypes "github.com/initia-labs/opinit-bots-go/node/types"
+	"github.com/initia-labs/opinit-bots-go/types"
 )
 
 type childNode interface {
 	GetAddressStr() (string, error)
 	HasKey() bool
-	BroadcastMsgs(nodetypes.ProcessedMsgs)
-	ProcessedMsgsToRawKV([]nodetypes.ProcessedMsgs, bool) ([]types.RawKV, error)
+	BroadcastMsgs(btypes.ProcessedMsgs)
+	ProcessedMsgsToRawKV([]btypes.ProcessedMsgs, bool) ([]types.RawKV, error)
 	QueryNextL1Sequence() (uint64, error)
 
 	GetMsgFinalizeTokenDeposit(string, string, sdk.Coin, uint64, uint64, string, []byte) (sdk.Msg, error)
@@ -59,21 +58,26 @@ type Host struct {
 
 	ophostQueryClient ophosttypes.QueryClient
 
-	processedMsgs []nodetypes.ProcessedMsgs
+	processedMsgs []btypes.ProcessedMsgs
 	msgQueue      []sdk.Msg
 }
 
 func NewHost(
 	version uint8, relayOracle bool, cfg nodetypes.NodeConfig,
-	db types.DB, logger *zap.Logger, homePath string, batchSubmitter string,
+	db types.DB, logger *zap.Logger, bech32Prefix, batchSubmitter string,
 ) *Host {
-	appCodec, txConfig, bech32Prefix := GetCodec()
-	processType := nodetypes.PROCESS_TYPE_DEFAULT
-	if batchSubmitter != "" {
-		processType = nodetypes.PROCESS_TYPE_ONLY_BROADCAST
+	appCodec, txConfig, err := GetCodec(bech32Prefix)
+	if err != nil {
+		panic(err)
 	}
 
-	node, err := node.NewNode(processType, cfg, db, logger, appCodec, txConfig, homePath, bech32Prefix, batchSubmitter, nil)
+	if batchSubmitter != "" {
+		cfg.ProcessType = nodetypes.PROCESS_TYPE_ONLY_BROADCAST
+		cfg.BroadcasterConfig.Bech32Prefix = bech32Prefix
+		cfg.BroadcasterConfig.KeyringConfig.Address = batchSubmitter
+	}
+
+	node, err := node.NewNode(cfg, db, logger, appCodec, txConfig)
 	if err != nil {
 		panic(err)
 	}
@@ -88,28 +92,23 @@ func NewHost(
 		db:     db,
 		logger: logger,
 
-		ophostQueryClient: ophosttypes.NewQueryClient(node),
+		ophostQueryClient: ophosttypes.NewQueryClient(node.GetRPCClient()),
 
-		processedMsgs: make([]nodetypes.ProcessedMsgs, 0),
+		processedMsgs: make([]btypes.ProcessedMsgs, 0),
 		msgQueue:      make([]sdk.Msg, 0),
 	}
 
 	return h
 }
 
-func GetCodec() (codec.Codec, client.TxConfig, string) {
-	unlock := node.SetSDKConfigContext(initiaapp.AccountAddressPrefix)
+func GetCodec(bech32Prefix string) (codec.Codec, client.TxConfig, error) {
+	unlock := keys.SetSDKConfigContext(bech32Prefix)
 	defer unlock()
-	encodingConfig := params.MakeEncodingConfig()
-	appCodec := encodingConfig.Codec
-	txConfig := encodingConfig.TxConfig
 
-	std.RegisterLegacyAminoCodec(encodingConfig.Amino)
-	std.RegisterInterfaces(encodingConfig.InterfaceRegistry)
-	auth.AppModuleBasic{}.RegisterInterfaces(encodingConfig.InterfaceRegistry)
-	auth.AppModuleBasic{}.RegisterLegacyAminoCodec(encodingConfig.Amino)
-	ophost.AppModuleBasic{}.RegisterInterfaces(encodingConfig.InterfaceRegistry)
-	return appCodec, txConfig, initiaapp.AccountAddressPrefix
+	return keys.CreateCodec([]keys.RegisterInterfaces{
+		auth.AppModuleBasic{}.RegisterInterfaces,
+		ophost.AppModuleBasic{}.RegisterInterfaces,
+	})
 }
 
 func (h *Host) Initialize(child childNode, batch batchNode, bridgeId int64) (err error) {
@@ -146,20 +145,24 @@ func (h *Host) RegisterDAHandlers() {
 	h.node.RegisterEventHandler(ophosttypes.EventTypeRecordBatch, h.recordBatchHandler)
 }
 
-func (h Host) BroadcastMsgs(msgs nodetypes.ProcessedMsgs) {
-	if !h.node.HasKey() {
+func (h Host) BroadcastMsgs(msgs btypes.ProcessedMsgs) {
+	if len(msgs.Msgs) == 0 {
 		return
 	}
 
-	h.node.BroadcastMsgs(msgs)
+	h.node.MustGetBroadcaster().BroadcastMsgs(msgs)
 }
 
-func (h Host) ProcessedMsgsToRawKV(msgs []nodetypes.ProcessedMsgs, delete bool) ([]types.RawKV, error) {
-	return h.node.ProcessedMsgsToRawKV(msgs, delete)
+func (h Host) ProcessedMsgsToRawKV(msgs []btypes.ProcessedMsgs, delete bool) ([]types.RawKV, error) {
+	if len(msgs) == 0 {
+		return nil, nil
+	}
+
+	return h.node.MustGetBroadcaster().ProcessedMsgsToRawKV(msgs, delete)
 }
 
-func (h *Host) SetBridgeId(brigeId int64) {
-	h.bridgeId = brigeId
+func (h *Host) SetBridgeId(bridgeId int64) {
+	h.bridgeId = bridgeId
 }
 
 func (h Host) BridgeId() int64 {
@@ -167,7 +170,7 @@ func (h Host) BridgeId() int64 {
 }
 
 func (h Host) HasKey() bool {
-	return h.node.HasKey()
+	return h.node.HasBroadcaster()
 }
 
 func (h Host) GetHeight() uint64 {

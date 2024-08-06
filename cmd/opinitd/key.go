@@ -23,20 +23,20 @@ import (
 	"os"
 	"strings"
 
+	"github.com/spf13/cobra"
+
 	"github.com/cosmos/cosmos-sdk/client/input"
 	"github.com/cosmos/cosmos-sdk/codec"
 	"github.com/cosmos/cosmos-sdk/crypto/hd"
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	"github.com/initia-labs/opinit-bots-go/executor/celestia"
-	"github.com/initia-labs/opinit-bots-go/executor/child"
-	"github.com/initia-labs/opinit-bots-go/executor/host"
-	"github.com/initia-labs/opinit-bots-go/node"
-	"github.com/spf13/cobra"
+
+	"github.com/initia-labs/opinit-bots-go/keys"
 )
 
 const (
-	flagRecover     = "recover"
-	flagMnemonicSrc = "source"
+	flagRecover      = "recover"
+	flagMnemonicSrc  = "source"
+	flagBech32Prefix = "bech32"
 )
 
 // keysCmd represents the keys command
@@ -67,18 +67,22 @@ func keysAddCmd(ctx *cmdContext) *cobra.Command {
 		Args:    cobra.ExactArgs(2),
 		Example: strings.TrimSpace(`
 $ keys add localnet key1
-$ keys add l2 key2
+$ keys add l2 key2 --bech32 celestia
 $ keys add l2 key2 --restore mnemonic.txt`),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			chainId := args[0]
 			keyName := args[1]
 
-			cdc, prefix, err := GetCodec(chainId)
+			prefix, err := cmd.Flags().GetString(flagBech32Prefix)
 			if err != nil {
 				return err
 			}
 
-			keyBase, err := node.GetKeyBase(chainId, ctx.homePath, cdc, cmd.InOrStdin())
+			cdc, err := getCodec(prefix)
+			if err != nil {
+				return err
+			}
+			keyBase, err := keys.GetKeyBase(chainId, ctx.homePath, cdc, cmd.InOrStdin())
 			if err != nil {
 				return err
 			}
@@ -112,7 +116,7 @@ $ keys add l2 key2 --restore mnemonic.txt`),
 					}
 				}
 			} else {
-				mnemonic, err = node.CreateMnemonic()
+				mnemonic, err = keys.CreateMnemonic()
 				if err != nil {
 					return err
 				}
@@ -128,7 +132,7 @@ $ keys add l2 key2 --restore mnemonic.txt`),
 				return err
 			}
 
-			addrString, err := node.EncodeBech32AccAddr(addr, prefix)
+			addrString, err := keys.EncodeBech32AccAddr(addr, prefix)
 			if err != nil {
 				return err
 			}
@@ -139,6 +143,7 @@ $ keys add l2 key2 --restore mnemonic.txt`),
 	}
 	cmd.Flags().Bool(flagRecover, false, "Provide seed phrase to recover existing key instead of creating")
 	cmd.Flags().String(flagMnemonicSrc, "", "Import mnemonic from a file")
+	cmd.Flags().String(flagBech32Prefix, "init", "Bech32 prefix")
 	return cmd
 }
 
@@ -150,17 +155,21 @@ func keysListCmd(ctx *cmdContext) *cobra.Command {
 		Short:   "Lists keys from the keychain associated with a particular chain",
 		Args:    cobra.ExactArgs(1),
 		Example: strings.TrimSpace(`
-$ keys list localnet
+$ keys list localnet --bech32 celestia
 $ k l l2`),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			chainId := args[0]
 
-			cdc, prefix, err := GetCodec(chainId)
+			prefix, err := cmd.Flags().GetString(flagBech32Prefix)
 			if err != nil {
 				return err
 			}
 
-			keyBase, err := node.GetKeyBase(chainId, ctx.homePath, cdc, cmd.InOrStdin())
+			cdc, err := getCodec(prefix)
+			if err != nil {
+				return err
+			}
+			keyBase, err := keys.GetKeyBase(chainId, ctx.homePath, cdc, cmd.InOrStdin())
 			if err != nil {
 				return err
 			}
@@ -180,7 +189,7 @@ $ k l l2`),
 					return err
 				}
 
-				addrString, err := node.EncodeBech32AccAddr(addr, prefix)
+				addrString, err := keys.EncodeBech32AccAddr(addr, prefix)
 				if err != nil {
 					return err
 				}
@@ -191,6 +200,8 @@ $ k l l2`),
 			return nil
 		},
 	}
+
+	cmd.Flags().String(flagBech32Prefix, "init", "Bech32 prefix")
 
 	return cmd
 }
@@ -203,18 +214,22 @@ func keysShowCmd(ctx *cmdContext) *cobra.Command {
 		Short:   "Shows the key from the keychain associated with a particular chain",
 		Args:    cobra.ExactArgs(2),
 		Example: strings.TrimSpace(`
-$ keys show localnet key1
+$ keys show localnet key1 --bech32 celestia
 $ k s l2 key2`),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			chainId := args[0]
 			keyName := args[1]
 
-			cdc, prefix, err := GetCodec(chainId)
+			prefix, err := cmd.Flags().GetString(flagBech32Prefix)
 			if err != nil {
 				return err
 			}
 
-			keyBase, err := node.GetKeyBase(chainId, ctx.homePath, cdc, cmd.InOrStdin())
+			cdc, err := getCodec(prefix)
+			if err != nil {
+				return err
+			}
+			keyBase, err := keys.GetKeyBase(chainId, ctx.homePath, cdc, cmd.InOrStdin())
 			if err != nil {
 				return err
 			}
@@ -226,7 +241,7 @@ $ k s l2 key2`),
 					return err
 				}
 
-				addrString, err := node.EncodeBech32AccAddr(addr, prefix)
+				addrString, err := keys.EncodeBech32AccAddr(addr, prefix)
 				if err != nil {
 					return err
 				}
@@ -236,6 +251,8 @@ $ k s l2 key2`),
 			return fmt.Errorf("key with name %s does not exist", keyName)
 		},
 	}
+
+	cmd.Flags().String(flagBech32Prefix, "init", "Bech32 prefix")
 
 	return cmd
 }
@@ -248,23 +265,27 @@ func keysShowByAddressCmd(ctx *cmdContext) *cobra.Command {
 		Short:   "Shows the key by address from the keychain associated with a particular chain",
 		Args:    cobra.ExactArgs(2),
 		Example: strings.TrimSpace(`
-$ keys show-by-addr localnet key1
+$ keys show-by-addr localnet key1 --bech32 celestia
 $ k sa l2 key2`),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			chainId := args[0]
 			keyAddr := args[1]
 
-			cdc, prefix, err := GetCodec(chainId)
+			prefix, err := cmd.Flags().GetString(flagBech32Prefix)
 			if err != nil {
 				return err
 			}
 
-			keyBase, err := node.GetKeyBase(chainId, ctx.homePath, cdc, cmd.InOrStdin())
+			cdc, err := getCodec(prefix)
+			if err != nil {
+				return err
+			}
+			keyBase, err := keys.GetKeyBase(chainId, ctx.homePath, cdc, cmd.InOrStdin())
 			if err != nil {
 				return err
 			}
 
-			addr, err := node.DecodeBech32AccAddr(keyAddr, prefix)
+			addr, err := keys.DecodeBech32AccAddr(keyAddr, prefix)
 			if err != nil {
 				return err
 			}
@@ -279,6 +300,8 @@ $ k sa l2 key2`),
 		},
 	}
 
+	cmd.Flags().String(flagBech32Prefix, "init", "Bech32 prefix")
+
 	return cmd
 }
 
@@ -290,18 +313,22 @@ func keysDeleteCmd(ctx *cmdContext) *cobra.Command {
 		Short:   "Deletes the key from the keychain associated with a particular chain",
 		Args:    cobra.ExactArgs(2),
 		Example: strings.TrimSpace(`
-$ keys delete localnet key1
+$ keys delete localnet key1 --bech32 celestia
 $ k d l2 key2`),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			chainId := args[0]
 			keyName := args[1]
 
-			cdc, prefix, err := GetCodec(chainId)
+			prefix, err := cmd.Flags().GetString(flagBech32Prefix)
 			if err != nil {
 				return err
 			}
 
-			keyBase, err := node.GetKeyBase(chainId, ctx.homePath, cdc, cmd.InOrStdin())
+			cdc, err := getCodec(prefix)
+			if err != nil {
+				return err
+			}
+			keyBase, err := keys.GetKeyBase(chainId, ctx.homePath, cdc, cmd.InOrStdin())
 			if err != nil {
 				return err
 			}
@@ -313,7 +340,7 @@ $ k d l2 key2`),
 					return err
 				}
 
-				addrString, err := node.EncodeBech32AccAddr(addr, prefix)
+				addrString, err := keys.EncodeBech32AccAddr(addr, prefix)
 				if err != nil {
 					return err
 				}
@@ -329,28 +356,16 @@ $ k d l2 key2`),
 			return fmt.Errorf("key with name %s does not exist", keyName)
 		},
 	}
+
+	cmd.Flags().String(flagBech32Prefix, "init", "Bech32 prefix")
+
 	return cmd
 }
 
-func GetCodec(chainId string) (codec.Codec, string, error) {
-	switch chainId {
-	case "initiation-1":
-		cdc, _, prefix := host.GetCodec()
-		return cdc, prefix, nil
+func getCodec(bech32Prefix string) (codec.Codec, error) {
+	unlock := keys.SetSDKConfigContext(bech32Prefix)
+	defer unlock()
 
-	case "celestia", "arabica-11":
-		cdc, _, prefix := celestia.GetCodec()
-		return cdc, prefix, nil
-
-	// for test
-	case "localnet":
-		cdc, _, prefix := host.GetCodec()
-		return cdc, prefix, nil
-
-	default:
-		cdc, _, prefix, err := child.GetCodec(chainId)
-		return cdc, prefix, err
-	}
-
-	// return nil, "", fmt.Errorf("unsupported chain id: %s", chainId)
+	appCodec, _, err := keys.CreateCodec(nil)
+	return appCodec, err
 }

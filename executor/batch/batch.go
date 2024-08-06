@@ -8,17 +8,18 @@ import (
 	"sync"
 	"time"
 
-	opchildtypes "github.com/initia-labs/OPinit/x/opchild/types"
-	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
-	"github.com/initia-labs/opinit-bots-go/executor/child"
-	executortypes "github.com/initia-labs/opinit-bots-go/executor/types"
-	nodetypes "github.com/initia-labs/opinit-bots-go/node/types"
-	"github.com/initia-labs/opinit-bots-go/types"
 	"go.uber.org/zap"
 
-	"github.com/initia-labs/opinit-bots-go/node"
+	opchildtypes "github.com/initia-labs/OPinit/x/opchild/types"
+	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
 
 	dbtypes "github.com/initia-labs/opinit-bots-go/db/types"
+	"github.com/initia-labs/opinit-bots-go/executor/child"
+	executortypes "github.com/initia-labs/opinit-bots-go/executor/types"
+	"github.com/initia-labs/opinit-bots-go/node"
+	btypes "github.com/initia-labs/opinit-bots-go/node/broadcaster/types"
+	nodetypes "github.com/initia-labs/opinit-bots-go/node/types"
+	"github.com/initia-labs/opinit-bots-go/types"
 )
 
 type hostNode interface {
@@ -55,19 +56,28 @@ type BatchSubmitter struct {
 	batchFile   *os.File
 	batchHeader *executortypes.BatchHeader
 
-	processedMsgs []nodetypes.ProcessedMsgs
-	homePath      string
+	processedMsgs []btypes.ProcessedMsgs
+
+	chainID  string
+	homePath string
 
 	lastSubmissionTime time.Time
 }
 
-func NewBatchSubmitter(version uint8, cfg nodetypes.NodeConfig, batchCfg executortypes.BatchConfig, db types.DB, logger *zap.Logger, homePath string) *BatchSubmitter {
-	cfg.Account = ""
-	appCodec, txConfig, bech32Prefix, err := child.GetCodec(cfg.ChainID)
+func NewBatchSubmitter(
+	version uint8, cfg nodetypes.NodeConfig,
+	batchCfg executortypes.BatchConfig,
+	db types.DB, logger *zap.Logger,
+	chainID, homePath, bech32Prefix string,
+) *BatchSubmitter {
+	appCodec, txConfig, err := child.GetCodec(bech32Prefix)
 	if err != nil {
 		panic(err)
 	}
-	node, err := node.NewNode(nodetypes.PROCESS_TYPE_RAW, cfg, db, logger, appCodec, txConfig, homePath, bech32Prefix, "", nil)
+
+	cfg.BroadcasterConfig = nil
+	cfg.ProcessType = nodetypes.PROCESS_TYPE_RAW
+	node, err := node.NewNode(cfg, db, logger, appCodec, txConfig)
 	if err != nil {
 		panic(err)
 	}
@@ -83,12 +93,13 @@ func NewBatchSubmitter(version uint8, cfg nodetypes.NodeConfig, batchCfg executo
 		db:     db,
 		logger: logger,
 
-		opchildQueryClient: opchildtypes.NewQueryClient(node),
+		opchildQueryClient: opchildtypes.NewQueryClient(node.GetRPCClient()),
 
 		batchInfoMu: &sync.Mutex{},
 
-		processedMsgs: make([]nodetypes.ProcessedMsgs, 0),
+		processedMsgs: make([]btypes.ProcessedMsgs, 0),
 		homePath:      homePath,
+		chainID:       chainID,
 	}
 	return ch
 }
@@ -127,10 +138,11 @@ func (bs *BatchSubmitter) Initialize(host hostNode, bridgeInfo opchildtypes.Brid
 }
 
 func (bs *BatchSubmitter) SetDANode(da executortypes.DANode) error {
-	bs.da = da
-	if !bs.da.HasKey() {
+	if !da.HasKey() {
 		return errors.New("da has no key")
 	}
+
+	bs.da = da
 	return nil
 }
 
@@ -163,7 +175,7 @@ func (bs *BatchSubmitter) SubmissionInfoToRawKV(timestamp int64) types.RawKV {
 }
 
 func (bs *BatchSubmitter) ChainID() string {
-	return bs.cfg.ChainID
+	return bs.chainID
 }
 
 func (bs *BatchSubmitter) DA() executortypes.DANode {

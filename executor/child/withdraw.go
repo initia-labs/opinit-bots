@@ -175,10 +175,12 @@ func (ch *Child) handleTree(blockHeight uint64, latestHeight uint64, blockId []b
 
 func (ch *Child) handleOutput(blockHeight uint64, version uint8, blockId []byte, outputIndex uint64, storageRoot []byte) error {
 	outputRoot := ophosttypes.GenerateOutputRoot(version, storageRoot, blockId)
-	msg, err := ch.host.GetMsgProposeOutput(ch.BridgeId(),
+	msg, err := ch.host.GetMsgProposeOutput(
+		ch.BridgeId(),
 		outputIndex,
 		blockHeight,
-		outputRoot[:])
+		outputRoot[:],
+	)
 	if err != nil {
 		return err
 	}

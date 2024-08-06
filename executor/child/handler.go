@@ -3,6 +3,7 @@ package child
 import (
 	"time"
 
+	btypes "github.com/initia-labs/opinit-bots-go/node/broadcaster/types"
 	nodetypes "github.com/initia-labs/opinit-bots-go/node/types"
 	"github.com/initia-labs/opinit-bots-go/types"
 )
@@ -55,7 +56,7 @@ func (ch *Child) endBlockHandler(args nodetypes.EndBlockArgs) error {
 	// if has key, then process the messages
 	if ch.host.HasKey() {
 		if len(ch.msgQueue) != 0 {
-			ch.processedMsgs = append(ch.processedMsgs, nodetypes.ProcessedMsgs{
+			ch.processedMsgs = append(ch.processedMsgs, btypes.ProcessedMsgs{
 				Msgs:      ch.msgQueue,
 				Timestamp: time.Now().UnixNano(),
 				Save:      true,
