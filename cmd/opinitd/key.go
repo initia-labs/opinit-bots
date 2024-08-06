@@ -68,7 +68,7 @@ func keysAddCmd(ctx *cmdContext) *cobra.Command {
 		Example: strings.TrimSpace(`
 $ keys add localnet key1
 $ keys add l2 key2 --bech32 celestia
-$ keys add l2 key2 --restore mnemonic.txt`),
+$ keys add l2 key2 --recover --source mnemonic.txt`),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			chainId := args[0]
 			keyName := args[1]
