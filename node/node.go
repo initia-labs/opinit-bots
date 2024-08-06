@@ -2,229 +2,208 @@ package node
 
 import (
 	"context"
-	"time"
+	"fmt"
 
-	comettypes "github.com/cometbft/cometbft/abci/types"
-	rpchttp "github.com/cometbft/cometbft/rpc/client/http"
-	rpccoretypes "github.com/cometbft/cometbft/rpc/core/types"
+	"github.com/pkg/errors"
+
+	"cosmossdk.io/core/address"
 	"github.com/cosmos/cosmos-sdk/client"
-	"github.com/cosmos/cosmos-sdk/client/tx"
 	"github.com/cosmos/cosmos-sdk/codec"
-	"github.com/cosmos/cosmos-sdk/crypto/hd"
-	"github.com/cosmos/cosmos-sdk/crypto/keyring"
-	sdk "github.com/cosmos/cosmos-sdk/types"
-	"github.com/cosmos/cosmos-sdk/types/tx/signing"
+	"github.com/initia-labs/opinit-bots-go/node/broadcaster"
+	"github.com/initia-labs/opinit-bots-go/node/rpcclient"
+	nodetypes "github.com/initia-labs/opinit-bots-go/node/types"
+	"github.com/initia-labs/opinit-bots-go/types"
 	"go.uber.org/zap"
+	"golang.org/x/sync/errgroup"
 )
 
-type EventHandlerArgs struct {
-	BlockHeight     int64
-	TxIndex         int64
-	EventIndex      int64
-	EventAttributes []comettypes.EventAttribute
-}
-
-type EventHandlerFn func(EventHandlerArgs) error
-
-const POLLING_INTERVAL = 1 * time.Second
-const MSG_QUEUE_SIZE = 100
-const GAS_ADJUSTMENT = 1.5
-const KEY_NAME = "key"
-
 type Node struct {
-	*rpchttp.HTTP
-
-	name   string
-	cfg    NodeConfig
+	cfg    nodetypes.NodeConfig
+	db     types.DB
 	logger *zap.Logger
 
-	lastProcessedHeight int64
-	eventHandlers       map[string]EventHandlerFn
-	msgQueue            chan sdk.Msg
+	cdc      codec.Codec
+	txConfig client.TxConfig
 
-	cdc        codec.Codec
-	txConfig   client.TxConfig
-	keyBase    keyring.Keyring
-	keyAddress sdk.AccAddress
-	txf        tx.Factory
+	rpcClient   *rpcclient.RPCClient
+	broadcaster *broadcaster.Broadcaster
+
+	// handlers
+	eventHandlers     map[string]nodetypes.EventHandlerFn
+	txHandler         nodetypes.TxHandlerFn
+	beginBlockHandler nodetypes.BeginBlockHandlerFn
+	endBlockHandler   nodetypes.EndBlockHandlerFn
+	rawBlockHandler   nodetypes.RawBlockHandlerFn
+
+	// status info
+	lastProcessedBlockHeight uint64
+	running                  bool
 }
 
-func NewNode(name string, cfg NodeConfig, logger *zap.Logger, cdc codec.Codec, txConfig client.TxConfig) (*Node, error) {
-	client, err := client.NewClientFromNode(cfg.RPC)
+func NewNode(cfg nodetypes.NodeConfig, db types.DB, logger *zap.Logger, cdc codec.Codec, txConfig client.TxConfig) (*Node, error) {
+	if err := cfg.Validate(); err != nil {
+		return nil, err
+	}
 
-	// Use memory keyring for now
-	// TODO: may use os keyring later
-	keyBase, err := keyring.New(cfg.ChainID, "memory", "", nil, cdc)
+	rpcClient, err := rpcclient.NewRPCClient(cdc, cfg.RPC)
 	if err != nil {
 		return nil, err
 	}
 
 	n := &Node{
-		HTTP: client,
+		rpcClient: rpcClient,
 
-		name:          name,
-		cfg:           cfg,
-		logger:        logger,
-		eventHandlers: make(map[string]EventHandlerFn),
-		msgQueue:      make(chan sdk.Msg, MSG_QUEUE_SIZE),
+		cfg:    cfg,
+		db:     db,
+		logger: logger,
+
+		eventHandlers: make(map[string]nodetypes.EventHandlerFn),
 
 		cdc:      cdc,
 		txConfig: txConfig,
-		keyBase:  keyBase,
 	}
 
-	if cfg.Mnemonic != "" {
-		_, err := n.keyBase.NewAccount(KEY_NAME, cfg.Mnemonic, "", hd.CreateHDPath(sdk.GetConfig().GetCoinType(), 0, 0).String(), hd.Secp256k1)
-		if err != nil {
-			return nil, err
-		}
-		// to check if the key is normally created
-		// TODO: delete this code
-		key, err := n.keyBase.Key(KEY_NAME)
-		if err != nil {
-			return nil, err
-		}
-
-		addr, err := key.GetAddress()
-		if err != nil {
-			return nil, err
-		}
-		n.keyAddress = addr
-
-		n.txf = tx.Factory{}.
-			WithAccountRetriever(n).
-			WithChainID(cfg.ChainID).
-			WithTxConfig(txConfig).
-			WithGasAdjustment(GAS_ADJUSTMENT).
-			WithGasPrices(cfg.GasPrice).
-			WithKeybase(n.keyBase).
-			WithSignMode(signing.SignMode_SIGN_MODE_DIRECT)
+	// check if node is catching up
+	status, err := rpcClient.Status(context.Background())
+	if err != nil {
+		return nil, err
 	}
-	return n, err
+	if status.SyncInfo.CatchingUp {
+		return nil, errors.New("node is catching up")
+	}
+
+	// create broadcaster
+	if cfg.BroadcasterConfig != nil {
+		n.broadcaster, err = broadcaster.NewBroadcaster(
+			*cfg.BroadcasterConfig,
+			db,
+			logger,
+			cdc,
+			txConfig,
+			rpcClient,
+			status,
+		)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to create broadcaster")
+		}
+	}
+
+	// load sync info
+	err = n.loadSyncInfo()
+	if err != nil {
+		return nil, err
+	}
+
+	return n, nil
 }
 
-func (n Node) RegisterEventHandler(eventType string, fn EventHandlerFn) {
+func (n *Node) Start(ctx context.Context) {
+	if n.running {
+		return
+	}
+	n.running = true
+
+	errGrp := ctx.Value(types.ContextKeyErrGrp).(*errgroup.Group)
+	if n.broadcaster != nil {
+		errGrp.Go(func() (err error) {
+			defer func() {
+				n.logger.Info("tx broadcast looper stopped")
+				if r := recover(); r != nil {
+					n.logger.Error("tx broadcast looper panic", zap.Any("recover", r))
+					err = fmt.Errorf("tx broadcast looper panic: %v", r)
+				}
+			}()
+
+			return n.broadcaster.Start(ctx)
+		})
+
+		// broadcast pending msgs first before executing block process looper
+		n.broadcaster.BroadcastPendingProcessedMsgs()
+	}
+
+	if n.cfg.ProcessType == nodetypes.PROCESS_TYPE_ONLY_BROADCAST {
+		if n.broadcaster == nil {
+			panic("broadcaster cannot be nil with nodetypes.PROCESS_TYPE_ONLY_BROADCAST")
+		}
+
+		errGrp.Go(func() (err error) {
+			defer func() {
+				n.logger.Info("tx checker looper stopped")
+				if r := recover(); r != nil {
+					n.logger.Error("tx checker panic", zap.Any("recover", r))
+					err = fmt.Errorf("tx checker panic: %v", r)
+				}
+			}()
+
+			return n.txChecker(ctx)
+		})
+	} else {
+		errGrp.Go(func() (err error) {
+			defer func() {
+				n.logger.Info("block process looper stopped")
+				if r := recover(); r != nil {
+					n.logger.Error("block process looper panic", zap.Any("recover", r))
+					err = fmt.Errorf("block process looper panic: %v", r)
+				}
+			}()
+
+			return n.blockProcessLooper(ctx, n.cfg.ProcessType)
+		})
+	}
+}
+
+func (n Node) AccountCodec() address.Codec {
+	return n.cdc.InterfaceRegistry().SigningContext().AddressCodec()
+}
+
+func (n Node) GetHeight() uint64 {
+	return n.lastProcessedBlockHeight + 1
+}
+
+func (n Node) GetTxConfig() client.TxConfig {
+	return n.txConfig
+}
+
+func (n Node) HasBroadcaster() bool {
+	return n.broadcaster != nil
+}
+
+func (n Node) GetBroadcaster() (*broadcaster.Broadcaster, error) {
+	if n.broadcaster == nil {
+		return nil, errors.New("cannot get broadcaster without broadcaster")
+	}
+
+	return n.broadcaster, nil
+}
+
+func (n Node) MustGetBroadcaster() *broadcaster.Broadcaster {
+	if n.broadcaster == nil {
+		panic("cannot get broadcaster without broadcaster")
+	}
+
+	return n.broadcaster
+}
+
+func (n Node) GetRPCClient() *rpcclient.RPCClient {
+	return n.rpcClient
+}
+
+func (n *Node) RegisterTxHandler(fn nodetypes.TxHandlerFn) {
+	n.txHandler = fn
+}
+
+func (n *Node) RegisterEventHandler(eventType string, fn nodetypes.EventHandlerFn) {
 	n.eventHandlers[eventType] = fn
 }
 
-func (n Node) BlockProcessLooper(ctx context.Context) error {
-	timer := time.NewTicker(POLLING_INTERVAL)
-
-	for {
-		select {
-		case <-ctx.Done():
-			return nil
-		case <-timer.C:
-		}
-
-		err := n.handleNewBlocks(ctx)
-		if err != nil {
-			n.logger.Error("failed to get block results", zap.Error(err))
-			continue
-		}
-	}
+func (n *Node) RegisterBeginBlockHandler(fn nodetypes.BeginBlockHandlerFn) {
+	n.beginBlockHandler = fn
 }
 
-func (n *Node) handleNewBlocks(ctx context.Context) error {
-	// TODO: save processed block height & receive new blocks from the last processed block
-	status, err := n.Status(ctx)
-	if err != nil {
-		return err
-	}
-
-	latestHeight := status.SyncInfo.LatestBlockHeight
-	if n.lastProcessedHeight >= latestHeight {
-		return nil
-	}
-
-	// TODO: save last processed height and delete this code
-	if n.lastProcessedHeight == 0 {
-		n.lastProcessedHeight = latestHeight - 1
-	}
-
-	for queryHeight := n.lastProcessedHeight + 1; queryHeight <= latestHeight; queryHeight++ {
-		blockResult, err := n.BlockResults(ctx, &queryHeight)
-		if err != nil {
-			return err
-		}
-		err = n.handleBlockResult(ctx, blockResult)
-		if err != nil {
-			return err
-		}
-		n.lastProcessedHeight = queryHeight
-	}
-	return nil
+func (n *Node) RegisterEndBlockHandler(fn nodetypes.EndBlockHandlerFn) {
+	n.endBlockHandler = fn
 }
 
-func (n Node) handleBlockResult(ctx context.Context, blockResult *rpccoretypes.ResultBlockResults) error {
-	for txIndex, txResult := range blockResult.TxsResults {
-		events := txResult.GetEvents()
-		for eventIndex, event := range events {
-			err := n.handleEvent(blockResult.Height, int64(txIndex), int64(eventIndex), event)
-			if err != nil {
-				// TODO: handle error
-				return err
-			}
-		}
-	}
-	return nil
-}
-
-func (n Node) handleEvent(height int64, txIndex int64, eventIndex int64, event comettypes.Event) error {
-	if n.eventHandlers[event.GetType()] == nil {
-		return nil
-	}
-	n.logger.Info("handle event", zap.String("name", n.name), zap.Int64("height", height), zap.String("type", event.GetType()))
-
-	// Prepare (height, txIndex, eventIndex) to process the event
-	err := n.eventHandlers[event.Type](EventHandlerArgs{
-		BlockHeight:     height,
-		TxIndex:         txIndex,
-		EventIndex:      eventIndex,
-		EventAttributes: event.GetAttributes(),
-	})
-	// Store to success event
-	return err
-}
-
-func (n Node) TxBroadCastLooper(ctx context.Context) {
-	// no need to execute this goroutine if mnemonic is not set
-	if n.cfg.Mnemonic == "" {
-		return
-	}
-	timer := time.NewTicker(time.Second)
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-timer.C:
-			// Broadcast tx
-			msgs := n.popMsgs()
-			if len(msgs) == 0 {
-				continue
-			}
-			err := n.handleTx(ctx, msgs)
-			if err != nil {
-				n.logger.Error("failed to broadcast tx", zap.String("name", n.name), zap.Error(err))
-				continue
-			}
-		}
-	}
-}
-
-func (n Node) popMsgs() []sdk.Msg {
-	msgs := make([]sdk.Msg, 0, len(n.msgQueue))
-	for range len(n.msgQueue) {
-		msg := <-n.msgQueue
-		msgs = append(msgs, msg)
-		// TODO: check total msg size if it is over tx max size or not
-		if len(msgs) >= 10 {
-			break
-		}
-	}
-	return msgs
-}
-
-func (n Node) SendTx(msg sdk.Msg) {
-	n.msgQueue <- msg
+func (n *Node) RegisterRawBlockHandler(fn nodetypes.RawBlockHandlerFn) {
+	n.rawBlockHandler = fn
 }

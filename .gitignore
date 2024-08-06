@@ -1,1 +1,17 @@
 executor.json
+
+# Go specific
+*.exe
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+
+# Build output
+build/
+
+# Dependency directories
+vendor/
+
+test_key/
