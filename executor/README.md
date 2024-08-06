@@ -20,7 +20,7 @@ To configure the Executor, fill in the values in the `~/.opinit/executor.json` f
 
   "l1_rpc_address": "tcp://localhost:26657",
   "l2_rpc_address": "tcp://localhost:27657",
-  "l2_rpc_address": "tcp://localhost:27657",
+  "da_rpc_address": "tcp://localhost:27657",
 
   "l1_gas_price": "0.15uinit",
   "l2_gas_price": "",
