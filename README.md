@@ -63,3 +63,9 @@ To reset the bot database, use the following command:
 ```bash
 opinitd reset-db [bot-name]
 ```
+
+### Query withdrawals 
+```bash
+curl localhost:3000/withdrawal/1 | jq . > ./withdrawal-info.json
+initiad tx ophost finalize-token-withdrawal ./withdrawal-info.json --gas= --gas-prices= --chain-id= --from=
+```
