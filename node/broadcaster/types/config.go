@@ -51,10 +51,6 @@ func (bc BroadcasterConfig) Validate() error {
 		return fmt.Errorf("failed to parse gas price: %s", bc.GasPrice)
 	}
 
-	if bc.GasPrice == "" {
-		return fmt.Errorf("gas price is empty")
-	}
-
 	if bc.Bech32Prefix == "" {
 		return fmt.Errorf("bech32 prefix is empty")
 	}
@@ -78,7 +74,7 @@ func (bc BroadcasterConfig) GetKeyringRecord(cdc codec.Codec, chainID string) (k
 		return nil, nil, fmt.Errorf("failed to get key base")
 	}
 
-	keyringRecord, err := bc.KeyringConfig.GetKeyRecord(keyBase, "")
+	keyringRecord, err := bc.KeyringConfig.GetKeyRecord(keyBase, bc.Bech32Prefix)
 	if err != nil {
 		return nil, nil, err
 	} else if keyringRecord == nil {

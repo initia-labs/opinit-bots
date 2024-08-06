@@ -19,9 +19,9 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	txtypes "github.com/cosmos/cosmos-sdk/types/tx"
 	"github.com/cosmos/cosmos-sdk/types/tx/signing"
-	authsigning "github.com/cosmos/cosmos-sdk/x/auth/signing"
 
 	btypes "github.com/initia-labs/opinit-bots-go/node/broadcaster/types"
+	"github.com/initia-labs/opinit-bots-go/txutils"
 
 	opchildtypes "github.com/initia-labs/OPinit/x/opchild/types"
 )
@@ -226,7 +226,7 @@ func (b Broadcaster) buildSimTx(info *keyring.Record, txf tx.Factory, msgs ...sd
 		return nil, err
 	}
 
-	return b.EncodeTx(txb.GetTx())
+	return txutils.EncodeTx(b.txConfig, txb.GetTx())
 }
 
 func (b *Broadcaster) enqueueLocalPendingTx(tx btypes.PendingTxInfo) {
@@ -257,36 +257,8 @@ func (b *Broadcaster) dequeueLocalPendingTx() {
 	b.pendingTxs = b.pendingTxs[1:]
 }
 
-func (b Broadcaster) EncodeTx(tx authsigning.Tx) ([]byte, error) {
-	txBytes, err := b.txConfig.TxEncoder()(tx)
-	if err != nil {
-		return nil, err
-	}
-	return txBytes, nil
-}
-
-func (b Broadcaster) DecodeTx(txBytes []byte) (authsigning.Tx, error) {
-	tx, err := b.txConfig.TxDecoder()(txBytes)
-	if err != nil {
-		return nil, err
-	}
-	return tx.(authsigning.Tx), nil
-}
-
-func (n Broadcaster) ChangeMsgsFromTx(tx authsigning.Tx, msgs []sdk.Msg) (authsigning.Tx, error) {
-	builder, err := n.txConfig.WrapTxBuilder(tx)
-	if err != nil {
-		return nil, err
-	}
-	err = builder.SetMsgs(msgs...)
-	if err != nil {
-		return nil, err
-	}
-	return builder.GetTx(), nil
-}
-
 // buildTxWithMessages creates a transaction from the given messages.
-func (b Broadcaster) DefaultBuildTxWithMessages(
+func (b *Broadcaster) DefaultBuildTxWithMessages(
 	ctx context.Context,
 	msgs []sdk.Msg,
 ) (
@@ -311,17 +283,17 @@ func (b Broadcaster) DefaultBuildTxWithMessages(
 	}
 
 	tx := txb.GetTx()
-	txBytes, err = b.EncodeTx(tx)
+	txBytes, err = txutils.EncodeTx(b.txConfig, tx)
 	if err != nil {
 		return nil, "", err
 	}
 	return txBytes, btypes.TxHash(txBytes), nil
 }
 
-func (b Broadcaster) DefaultPendingTxToProcessedMsgs(
+func (b *Broadcaster) DefaultPendingTxToProcessedMsgs(
 	txBytes []byte,
 ) ([]sdk.Msg, error) {
-	tx, err := b.DecodeTx(txBytes)
+	tx, err := txutils.DecodeTx(b.txConfig, txBytes)
 	if err != nil {
 		return nil, err
 	}

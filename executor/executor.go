@@ -177,7 +177,7 @@ func (ex *Executor) makeDANode(bridgeId int64) (executortypes.DANode, error) {
 			ex.cfg.Version, false, ex.cfg.DANodeConfig(ex.homePath),
 			ex.db.WithPrefix([]byte(executortypes.DAHostNodeName)),
 			ex.logger.Named(executortypes.DAHostNodeName),
-			ex.homePath, batchInfo.BatchInfo.Submitter,
+			ex.cfg.DABech32Prefix, batchInfo.BatchInfo.Submitter,
 		)
 		if ex.host.GetAddress().Equals(da.GetAddress()) {
 			return ex.host, nil
@@ -189,7 +189,7 @@ func (ex *Executor) makeDANode(bridgeId int64) (executortypes.DANode, error) {
 		da := celestia.NewDACelestia(ex.cfg.Version, ex.cfg.DANodeConfig(ex.homePath),
 			ex.db.WithPrefix([]byte(executortypes.DACelestiaNodeName)),
 			ex.logger.Named(executortypes.DACelestiaNodeName),
-			ex.homePath, batchInfo.BatchInfo.Submitter,
+			ex.cfg.DABech32Prefix, batchInfo.BatchInfo.Submitter,
 		)
 		da.Initialize(ex.batch, bridgeId)
 		da.RegisterDAHandlers()

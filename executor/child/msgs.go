@@ -15,6 +15,10 @@ func (ch Child) GetMsgFinalizeTokenDeposit(
 	data []byte,
 ) (sdk.Msg, error) {
 	sender, err := ch.node.MustGetBroadcaster().GetAddressString()
+	if err != nil {
+		return nil, err
+	}
+
 	msg := opchildtypes.NewMsgFinalizeTokenDeposit(
 		sender,
 		from,
@@ -37,6 +41,10 @@ func (ch Child) GetMsgUpdateOracle(
 	data []byte,
 ) (sdk.Msg, error) {
 	sender, err := ch.node.MustGetBroadcaster().GetAddressString()
+	if err != nil {
+		return nil, err
+	}
+
 	msg := opchildtypes.NewMsgUpdateOracle(
 		sender,
 		height,

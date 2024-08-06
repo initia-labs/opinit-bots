@@ -8,6 +8,7 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 
 	btypes "github.com/initia-labs/opinit-bots-go/node/broadcaster/types"
+	"github.com/initia-labs/opinit-bots-go/txutils"
 	celestiatypes "github.com/initia-labs/opinit-bots-go/types/celestia"
 )
 
@@ -52,7 +53,8 @@ func (c *Celestia) BuildTxWithMessages(
 	}
 
 	tx := txb.GetTx()
-	txBytes, err = b.EncodeTx(tx)
+	txConfig := c.node.GetTxConfig()
+	txBytes, err = txutils.EncodeTx(txConfig, tx)
 	if err != nil {
 		return nil, "", err
 	}
@@ -73,11 +75,11 @@ func (c *Celestia) BuildTxWithMessages(
 func (c *Celestia) PendingTxToProcessedMsgs(
 	txBytes []byte,
 ) ([]sdk.Msg, error) {
-	b := c.node.MustGetBroadcaster()
+	txConfig := c.node.GetTxConfig()
 
 	blobTx := &celestiatypes.BlobTx{}
 	if err := blobTx.Unmarshal(txBytes); err == nil {
-		pfbTx, err := b.DecodeTx(blobTx.Tx)
+		pfbTx, err := txutils.DecodeTx(txConfig, blobTx.Tx)
 		if err != nil {
 			return nil, err
 		}
@@ -91,7 +93,7 @@ func (c *Celestia) PendingTxToProcessedMsgs(
 		}, nil
 	}
 
-	tx, err := b.DecodeTx(txBytes)
+	tx, err := txutils.DecodeTx(txConfig, txBytes)
 	if err != nil {
 		return nil, err
 	}

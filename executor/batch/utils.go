@@ -6,7 +6,9 @@ import (
 	cmtproto "github.com/cometbft/cometbft/proto/tendermint/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/gogoproto/proto"
+
 	opchildtypes "github.com/initia-labs/OPinit/x/opchild/types"
+	"github.com/initia-labs/opinit-bots-go/txutils"
 )
 
 // prependLength prepends the length of the data to the data.
@@ -20,7 +22,8 @@ func prependLength(data []byte) []byte {
 // to decrease the size of the batch.
 func (bs *BatchSubmitter) emptyOracleData(pbb *cmtproto.Block) ([]byte, error) {
 	for i, txBytes := range pbb.Data.GetTxs() {
-		tx, err := bs.node.MustGetBroadcaster().DecodeTx(txBytes)
+		txConfig := bs.node.GetTxConfig()
+		tx, err := txutils.DecodeTx(txConfig, txBytes)
 		if err != nil {
 			// ignore not registered tx in codec
 			continue
@@ -33,11 +36,11 @@ func (bs *BatchSubmitter) emptyOracleData(pbb *cmtproto.Block) ([]byte, error) {
 
 		if msg, ok := msgs[0].(*opchildtypes.MsgUpdateOracle); ok {
 			msg.Data = []byte{}
-			tx, err := bs.node.MustGetBroadcaster().ChangeMsgsFromTx(tx, []sdk.Msg{msg})
+			tx, err := txutils.ChangeMsgsFromTx(txConfig, tx, []sdk.Msg{msg})
 			if err != nil {
 				return nil, err
 			}
-			convertedTxBytes, err := bs.node.MustGetBroadcaster().EncodeTx(tx)
+			convertedTxBytes, err := txutils.EncodeTx(txConfig, tx)
 			if err != nil {
 				return nil, err
 			}

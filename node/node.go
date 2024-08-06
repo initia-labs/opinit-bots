@@ -160,6 +160,10 @@ func (n Node) GetHeight() uint64 {
 	return n.lastProcessedBlockHeight + 1
 }
 
+func (n Node) GetTxConfig() client.TxConfig {
+	return n.txConfig
+}
+
 func (n Node) HasBroadcaster() bool {
 	return n.broadcaster != nil
 }
