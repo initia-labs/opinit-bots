@@ -11,6 +11,7 @@ import (
 	"go.uber.org/zap"
 )
 
+// blockProcessLooper fetches new blocks and processes them
 func (n *Node) blockProcessLooper(ctx context.Context, processType nodetypes.BlockProcessType) error {
 	timer := time.NewTicker(nodetypes.POLLING_INTERVAL)
 	defer timer.Stop()
@@ -92,6 +93,7 @@ func (n *Node) blockProcessLooper(ctx context.Context, processType nodetypes.Blo
 	}
 }
 
+// fetch new block from the chain
 func (n *Node) fetchNewBlock(ctx context.Context, height int64) (block *rpccoretypes.ResultBlock, blockResult *rpccoretypes.ResultBlockResults, err error) {
 	n.logger.Debug("fetch new block", zap.Int64("height", height))
 	block, err = n.rpcClient.Block(ctx, &height)
@@ -116,7 +118,7 @@ func (n *Node) handleNewBlock(block *rpccoretypes.ResultBlock, blockResult *rpcc
 
 	// handle broadcaster first to check pending txs
 	if n.broadcaster != nil {
-		err := n.broadcaster.HandleBlock(block, blockResult, latestChainHeight)
+		err := n.broadcaster.HandleNewBlock(block, blockResult, latestChainHeight)
 		if err != nil {
 			return err
 		}
@@ -230,7 +232,7 @@ func (n *Node) txChecker(ctx context.Context) error {
 			}
 		}
 
-		err = n.broadcaster.MarkPendingTxAsProcessed(int64(res.Height), pendingTx.TxHash, pendingTx.Sequence)
+		err = n.broadcaster.RemovePendingTx(int64(res.Height), pendingTx.TxHash, pendingTx.Sequence)
 		if err != nil {
 			return err
 		}

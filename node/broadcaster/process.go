@@ -18,7 +18,8 @@ func (b Broadcaster) GetHeight() uint64 {
 	return b.lastProcessedBlockHeight + 1
 }
 
-func (b *Broadcaster) HandleBlock(block *rpccoretypes.ResultBlock, blockResult *rpccoretypes.ResultBlockResults, latestChainHeight uint64) error {
+// HandleNewBlock is called when a new block is received.
+func (b *Broadcaster) HandleNewBlock(block *rpccoretypes.ResultBlock, blockResult *rpccoretypes.ResultBlockResults, latestChainHeight uint64) error {
 
 	// check pending txs first
 	for _, tx := range block.Block.Txs {
@@ -28,7 +29,7 @@ func (b *Broadcaster) HandleBlock(block *rpccoretypes.ResultBlock, blockResult *
 
 		// check if the first pending tx is included in the block
 		if pendingTx := b.peekLocalPendingTx(); btypes.TxHash(tx) == pendingTx.TxHash {
-			err := b.MarkPendingTxAsProcessed(block.Block.Height, pendingTx.TxHash, pendingTx.Sequence)
+			err := b.RemovePendingTx(block.Block.Height, pendingTx.TxHash, pendingTx.Sequence)
 			if err != nil {
 				return err
 			}
@@ -51,19 +52,7 @@ func (b *Broadcaster) HandleBlock(block *rpccoretypes.ResultBlock, blockResult *
 	return nil
 }
 
-func (b *Broadcaster) MarkPendingTxAsProcessed(blockHeight int64, txHash string, sequence uint64) error {
-	err := b.deletePendingTx(sequence)
-	if err != nil {
-		return err
-	}
-
-	b.logger.Debug("tx inserted", zap.Int64("height", blockHeight), zap.Uint64("sequence", sequence), zap.String("txHash", txHash))
-	b.dequeueLocalPendingTx()
-
-	return nil
-}
-
-// CheckPendingTx checks if the pending tx is included in the block
+// CheckPendingTx query tx info to check if pending tx is processed.
 func (b *Broadcaster) CheckPendingTx() (*btypes.PendingTxInfo, *rpccoretypes.ResultTx, error) {
 	if b.lenLocalPendingTx() == 0 {
 		return nil, nil, nil
@@ -87,6 +76,20 @@ func (b *Broadcaster) CheckPendingTx() (*btypes.PendingTxInfo, *rpccoretypes.Res
 	}
 
 	return &pendingTx, res, nil
+}
+
+// RemovePendingTx remove pending tx from local pending txs.
+// It is called when the pending tx is included in the block.
+func (b *Broadcaster) RemovePendingTx(blockHeight int64, txHash string, sequence uint64) error {
+	err := b.deletePendingTx(sequence)
+	if err != nil {
+		return err
+	}
+
+	b.logger.Debug("tx inserted", zap.Int64("height", blockHeight), zap.Uint64("sequence", sequence), zap.String("txHash", txHash))
+	b.dequeueLocalPendingTx()
+
+	return nil
 }
 
 // Start broadcaster loop
@@ -123,10 +126,8 @@ func (b *Broadcaster) Start(ctx context.Context) error {
 }
 
 // @dev: these pending processed data is filled at initialization(`NewBroadcaster`).
-func (b Broadcaster) BroadcastPendingProcessedMsgs() error {
+func (b Broadcaster) BroadcastPendingProcessedMsgs() {
 	for _, processedMsg := range b.pendingProcessedMsgs {
 		b.BroadcastMsgs(processedMsg)
 	}
-
-	return nil
 }

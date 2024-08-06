@@ -7,9 +7,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-	"time"
 
-	"github.com/pkg/errors"
 	"go.uber.org/zap"
 
 	sdkerrors "cosmossdk.io/errors"
@@ -36,36 +34,6 @@ var ignoringErrors = []error{
 }
 var accountSeqRegex = regexp.MustCompile("account sequence mismatch, expected ([0-9]+), got ([0-9]+)")
 var outputIndexRegex = regexp.MustCompile("expected ([0-9]+), got ([0-9]+): invalid output index")
-
-func (b *Broadcaster) txBroadcastLooper(ctx context.Context) error {
-	retry := time.NewTicker(30 * time.Second)
-
-	for {
-		select {
-		case <-ctx.Done():
-			return nil
-		case data := <-b.txChannel:
-			count := 1
-			select {
-			case <-ctx.Done():
-				return nil
-			case <-retry.C:
-				err := b.handleProcessedMsgs(ctx, data)
-				if err == nil {
-					break
-				} else if err = b.handleMsgError(err); err == nil {
-					break
-				}
-				b.logger.Warn("retry", zap.Int("count", count), zap.String("error", err.Error()))
-				count++
-
-				if count >= 10 {
-					return errors.Wrap(err, "failed to handle processed msgs")
-				}
-			}
-		}
-	}
-}
 
 func (b *Broadcaster) handleMsgError(err error) error {
 	if strs := accountSeqRegex.FindStringSubmatch(err.Error()); strs != nil {
@@ -116,6 +84,8 @@ func (b *Broadcaster) handleMsgError(err error) error {
 	return err
 }
 
+// HandleProcessedMsgs handles processed messages by broadcasting them to the network.
+// It stores the transaction in the database and local memory and keep track of the successful broadcast.
 func (b *Broadcaster) handleProcessedMsgs(ctx context.Context, data btypes.ProcessedMsgs) error {
 	sequence := b.txf.Sequence()
 	txBytes, txHash, err := b.cfg.BuildTxWithMessages(ctx, data.Msgs)
