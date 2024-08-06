@@ -32,10 +32,12 @@ func (bs *BatchSubmitter) rawBlockHandler(args nodetypes.RawBlockArgs) error {
 	err := proto.Unmarshal(args.BlockBytes, pbb)
 	if err != nil {
 		return errors.Wrap(err, "failed to unmarshal block")
+		return errors.Wrap(err, "failed to unmarshal block")
 	}
 
 	err = bs.prepareBatch(args.BlockHeight, pbb.Header.Time)
 	if err != nil {
+		return errors.Wrap(err, "failed to prepare batch")
 		return errors.Wrap(err, "failed to prepare batch")
 	}
 
@@ -52,15 +54,21 @@ func (bs *BatchSubmitter) rawBlockHandler(args nodetypes.RawBlockArgs) error {
 	err = bs.checkBatch(args.BlockHeight, pbb.Header.Time)
 	if err != nil {
 		return errors.Wrap(err, "failed to check batch")
+		return errors.Wrap(err, "failed to check batch")
 	}
 
+	// store the processed state into db with batch operation
 	// store the processed state into db with batch operation
 	batchKVs := make([]types.RawKV, 0)
 	batchKVs = append(batchKVs, bs.node.SyncInfoToRawKV(args.BlockHeight))
 	batchMsgKVs, err := bs.da.ProcessedMsgsToRawKV(bs.processedMsgs, false)
+	batchMsgKVs, err := bs.da.ProcessedMsgsToRawKV(bs.processedMsgs, false)
 	if err != nil {
 		return errors.Wrap(err, "failed to convert processed messages to raw key value")
+		return errors.Wrap(err, "failed to convert processed messages to raw key value")
 	}
+	batchKVs = append(batchKVs, batchMsgKVs...)
+	if len(batchMsgKVs) > 0 {
 	batchKVs = append(batchKVs, batchMsgKVs...)
 	if len(batchMsgKVs) > 0 {
 		batchKVs = append(batchKVs, bs.SubmissionInfoToRawKV(pbb.Header.Time.UnixNano()))
@@ -68,7 +76,10 @@ func (bs *BatchSubmitter) rawBlockHandler(args nodetypes.RawBlockArgs) error {
 	err = bs.db.RawBatchSet(batchKVs...)
 	if err != nil {
 		return errors.Wrap(err, "failed to set raw batch")
+		return errors.Wrap(err, "failed to set raw batch")
 	}
+
+	// broadcast processed messages
 
 	// broadcast processed messages
 	for _, processedMsg := range bs.processedMsgs {
@@ -76,7 +87,10 @@ func (bs *BatchSubmitter) rawBlockHandler(args nodetypes.RawBlockArgs) error {
 	}
 
 	// clear processed messages
+
+	// clear processed messages
 	bs.processedMsgs = bs.processedMsgs[:0]
+
 
 	return nil
 }
@@ -86,29 +100,39 @@ func (bs *BatchSubmitter) prepareBatch(blockHeight uint64, blockTime time.Time) 
 	if nextBatchInfo := bs.NextBatchInfo(); nextBatchInfo != nil && nextBatchInfo.Output.L2BlockNumber < blockHeight {
 
 		// if the next batch info is reached, finalize the current batch and update the batch info.
+
+		// if the next batch info is reached, finalize the current batch and update the batch info.
 		if bs.batchWriter != nil {
 			err := bs.batchWriter.Close()
 			if err != nil {
+				return errors.Wrap(err, "failed to close batch writer")
 				return errors.Wrap(err, "failed to close batch writer")
 			}
 		}
 		err := bs.batchFile.Truncate(0)
 		if err != nil {
 			return errors.Wrap(err, "failed to truncate batch file")
+			return errors.Wrap(err, "failed to truncate batch file")
 		}
 		_, err = bs.batchFile.Seek(0, 0)
 		if err != nil {
 			return errors.Wrap(err, "failed to seek batch file")
+			return errors.Wrap(err, "failed to seek batch file")
 		}
+
+		// save sync info
 
 		// save sync info
 		err = bs.node.SaveSyncInfo(nextBatchInfo.Output.L2BlockNumber)
 		if err != nil {
 			return errors.Wrap(err, "failed to save sync info")
+			return errors.Wrap(err, "failed to save sync info")
 		}
+
 
 		// set last processed block height to l2 block number
 		bs.node.SetSyncInfo(nextBatchInfo.Output.L2BlockNumber)
+		bs.DequeueBatchInfo()
 		bs.DequeueBatchInfo()
 
 		// error will restart block process from nextBatchInfo.Output.L2BlockNumber + 1
@@ -117,14 +141,19 @@ func (bs *BatchSubmitter) prepareBatch(blockHeight uint64, blockTime time.Time) 
 
 	if bs.batchHeader != nil {
 		// if the batch header end is not set, it means the batch is not finalized yet.
+		// if the batch header end is not set, it means the batch is not finalized yet.
 		if bs.batchHeader.End == 0 {
 			return nil
 		}
 
+
 		err := bs.finalizeBatch(blockHeight)
 		if err != nil {
 			return errors.Wrap(err, "failed to finalize batch")
+			return errors.Wrap(err, "failed to finalize batch")
 		}
+
+		// update last submission time
 
 		// update last submission time
 		bs.lastSubmissionTime = blockTime
@@ -132,7 +161,11 @@ func (bs *BatchSubmitter) prepareBatch(blockHeight uint64, blockTime time.Time) 
 
 	// reset batch header
 	var err error
+
+	// reset batch header
+	var err error
 	bs.batchHeader = &executortypes.BatchHeader{}
+
 
 	// linux command gzip use level 6 as default
 	bs.batchWriter, err = gzip.NewWriterLevel(bs.batchFile, 6)
@@ -140,9 +173,11 @@ func (bs *BatchSubmitter) prepareBatch(blockHeight uint64, blockTime time.Time) 
 		return err
 	}
 
+
 	return nil
 }
 
+// write block bytes to batch file
 // write block bytes to batch file
 func (bs *BatchSubmitter) handleBatch(blockBytes []byte) error {
 	_, err := bs.batchWriter.Write(prependLength(blockBytes))
@@ -153,24 +188,29 @@ func (bs *BatchSubmitter) handleBatch(blockBytes []byte) error {
 }
 
 // finalize batch and create batch messages
+// finalize batch and create batch messages
 func (bs *BatchSubmitter) finalizeBatch(blockHeight uint64) error {
 
 	// write last block's commit to batch file
 	rawCommit, err := bs.node.GetRPCClient().QueryRawCommit(int64(blockHeight))
 	if err != nil {
 		return errors.Wrap(err, "failed to query raw commit")
+		return errors.Wrap(err, "failed to query raw commit")
 	}
 	_, err = bs.batchWriter.Write(prependLength(rawCommit))
 	if err != nil {
+		return errors.Wrap(err, "failed to write raw commit")
 		return errors.Wrap(err, "failed to write raw commit")
 	}
 	err = bs.batchWriter.Close()
 	if err != nil {
 		return errors.Wrap(err, "failed to close batch writer")
+		return errors.Wrap(err, "failed to close batch writer")
 	}
 
 	batchBuffer := make([]byte, bs.batchCfg.MaxChunkSize)
 	checksums := make([][]byte, 0)
+
 
 	// room for batch header
 	bs.processedMsgs = append(bs.processedMsgs, btypes.ProcessedMsgs{
@@ -205,6 +245,8 @@ func (bs *BatchSubmitter) finalizeBatch(blockHeight uint64) error {
 	}
 
 	// update batch header
+
+	// update batch header
 	bs.batchHeader.Chunks = checksums
 	headerBytes, err := json.Marshal(bs.batchHeader)
 	if err != nil {
@@ -217,6 +259,8 @@ func (bs *BatchSubmitter) finalizeBatch(blockHeight uint64) error {
 	bs.processedMsgs[0].Msgs = []sdk.Msg{msg}
 
 	// reset batch file
+
+	// reset batch file
 	err = bs.batchFile.Truncate(0)
 	if err != nil {
 		return err
@@ -226,6 +270,7 @@ func (bs *BatchSubmitter) finalizeBatch(blockHeight uint64) error {
 		return err
 	}
 
+
 	return nil
 }
 
@@ -233,8 +278,13 @@ func (bs *BatchSubmitter) checkBatch(blockHeight uint64, blockTime time.Time) er
 	info, err := bs.batchFile.Stat()
 	if err != nil {
 		return errors.Wrap(err, "failed to get batch file stat")
+		return errors.Wrap(err, "failed to get batch file stat")
 	}
 
+	// if the block time is after the last submission time + submission interval * 2/3
+	// or the block time is after the last submission time + max submission time
+	// or the batch file size is greater than (max chunks - 1) * max chunk size
+	// then finalize the batch
 	// if the block time is after the last submission time + submission interval * 2/3
 	// or the block time is after the last submission time + max submission time
 	// or the batch file size is greater than (max chunks - 1) * max chunk size
@@ -244,8 +294,11 @@ func (bs *BatchSubmitter) checkBatch(blockHeight uint64, blockTime time.Time) er
 		info.Size() > (bs.batchCfg.MaxChunks-1)*bs.batchCfg.MaxChunkSize {
 
 		// finalize the batch
+
+		// finalize the batch
 		bs.batchHeader.End = blockHeight
 	}
+
 
 	return nil
 }
@@ -267,6 +320,7 @@ func (bs *BatchSubmitter) UpdateBatchInfo(chain string, submitter string, output
 }
 
 // BatchInfo returns the current batch info
+// BatchInfo returns the current batch info
 func (bs *BatchSubmitter) BatchInfo() *ophosttypes.BatchInfoWithOutput {
 	bs.batchInfoMu.Lock()
 	defer bs.batchInfoMu.Unlock()
@@ -274,6 +328,7 @@ func (bs *BatchSubmitter) BatchInfo() *ophosttypes.BatchInfoWithOutput {
 	return &bs.batchInfos[0]
 }
 
+// NextBatchInfo returns the next batch info in the queue
 // NextBatchInfo returns the next batch info in the queue
 func (bs *BatchSubmitter) NextBatchInfo() *ophosttypes.BatchInfoWithOutput {
 	bs.batchInfoMu.Lock()
@@ -284,6 +339,8 @@ func (bs *BatchSubmitter) NextBatchInfo() *ophosttypes.BatchInfoWithOutput {
 	return &bs.batchInfos[1]
 }
 
+// DequeueBatchInfo removes the first batch info from the queue
+func (bs *BatchSubmitter) DequeueBatchInfo() {
 // DequeueBatchInfo removes the first batch info from the queue
 func (bs *BatchSubmitter) DequeueBatchInfo() {
 	bs.batchInfoMu.Lock()
