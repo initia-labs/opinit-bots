@@ -45,6 +45,7 @@ func NewRootCmd() *cobra.Command {
 		initCmd(ctx),
 		startCmd(ctx),
 		keysCmd(ctx),
+		resetStateCmd(ctx),
 		version.NewVersionCommand(),
 	)
 
