@@ -14,7 +14,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-package main
+package cmd
 
 import (
 	"bufio"
@@ -68,6 +68,7 @@ func keysAddCmd(ctx *cmdContext) *cobra.Command {
 		Example: strings.TrimSpace(`
 $ keys add localnet key1
 $ keys add l2 key2 --bech32 celestia
+$ keys add l2 key2 --recover 
 $ keys add l2 key2 --recover --source mnemonic.txt`),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			chainId := args[0]
