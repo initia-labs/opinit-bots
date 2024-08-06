@@ -68,16 +68,8 @@ func (b *Broadcaster) GetAccountWithHeight(_ client.Context, addr sdk.AccAddress
 		return nil, 0, fmt.Errorf("failed to parse block height: %w", err)
 	}
 
-<<<<<<< HEAD:node/account.go
-	var acc authtypes.AccountI //nolint:staticcheck
-	if err := n.cdc.UnpackAny(res.Account, &acc); err != nil {
-||||||| 168b4ff:node/account.go
-	var acc authtypes.AccountI
-	if err := n.cdc.UnpackAny(res.Account, &acc); err != nil {
-=======
 	var acc sdk.AccountI
 	if err := b.cdc.UnpackAny(res.Account, &acc); err != nil {
->>>>>>> main:node/broadcaster/account.go
 		return nil, 0, err
 	}
 

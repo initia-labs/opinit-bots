@@ -125,8 +125,8 @@ func (b Broadcaster) getClientCtx() client.Context {
 		WithFromAddress(b.keyAddress)
 }
 
-func (n Broadcaster) GetTxf() tx.Factory {
-	return n.txf
+func (b Broadcaster) GetTxf() tx.Factory {
+	return b.txf
 }
 
 func (b *Broadcaster) prepareBroadcaster(_ /*lastBlockHeight*/ uint64, lastBlockTime time.Time) error {
