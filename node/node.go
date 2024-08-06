@@ -103,7 +103,7 @@ func (n *Node) Start(ctx context.Context) {
 	}
 	n.running = true
 
-	errGrp := ctx.Value("errGrp").(*errgroup.Group)
+	errGrp := ctx.Value(types.ContextKeyErrGrp).(*errgroup.Group)
 	if n.broadcaster != nil {
 		errGrp.Go(func() (err error) {
 			defer func() {

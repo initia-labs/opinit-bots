@@ -28,8 +28,14 @@ type Merkle struct {
 func validateNodeGeneratorFn(fn NodeGeneratorFn) error {
 	randInput1 := make([]byte, 32)
 	randInput2 := make([]byte, 32)
-	rand.Read(randInput1)
-	rand.Read(randInput2)
+	_, err := rand.Read(randInput1)
+	if err != nil {
+		return err
+	}
+	_, err = rand.Read(randInput2)
+	if err != nil {
+		return err
+	}
 
 	node1 := fn(randInput1, randInput2)
 	node2 := fn(randInput2, randInput1)

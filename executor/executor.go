@@ -116,7 +116,7 @@ func NewExecutor(cfg *executortypes.Config, db types.DB, sv *server.Server, logg
 func (ex *Executor) Start(cmdCtx context.Context) error {
 	defer ex.Close()
 	errGrp, ctx := errgroup.WithContext(cmdCtx)
-	ctx = context.WithValue(ctx, "errGrp", errGrp)
+	ctx = context.WithValue(ctx, types.ContextKeyErrGrp, errGrp)
 
 	errGrp.Go(func() (err error) {
 		<-ctx.Done()
@@ -191,7 +191,10 @@ func (ex *Executor) makeDANode(bridgeId int64) (executortypes.DANode, error) {
 			ex.logger.Named(executortypes.DACelestiaNodeName),
 			ex.cfg.DABech32Prefix, batchInfo.BatchInfo.Submitter,
 		)
-		da.Initialize(ex.batch, bridgeId)
+		err := da.Initialize(ex.batch, bridgeId)
+		if err != nil {
+			return nil, err
+		}
 		da.RegisterDAHandlers()
 		return da, nil
 	}
