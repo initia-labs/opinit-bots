@@ -1,4 +1,4 @@
-package cmd
+package main
 
 import (
 	"os"
@@ -9,7 +9,7 @@ import (
 	bottypes "github.com/initia-labs/opinit-bots-go/bot/types"
 )
 
-func resetStateCmd(ctx *cmdContext) *cobra.Command {
+func resetDBCmd(ctx *cmdContext) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "reset-db [bot-name]",
 		Args:  cobra.ExactArgs(1),

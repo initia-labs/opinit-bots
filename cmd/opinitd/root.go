@@ -1,4 +1,4 @@
-package cmd
+package main
 
 import (
 	"github.com/spf13/cobra"
@@ -45,10 +45,9 @@ func NewRootCmd() *cobra.Command {
 		initCmd(ctx),
 		startCmd(ctx),
 		keysCmd(ctx),
-		resetStateCmd(ctx),
+		resetDBCmd(ctx),
 		version.NewVersionCommand(),
 	)
-
 	return rootCmd
 }
 
