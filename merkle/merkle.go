@@ -186,7 +186,6 @@ func (m *Merkle) fillLeaves() error {
 	}
 
 	lastLeaf := m.workingTree.LastSiblings[0]
-	//nolint:typecheck
 	for range numRestLeaves {
 		if err := m.InsertLeaf(lastLeaf); err != nil {
 			return err

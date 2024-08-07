@@ -177,7 +177,7 @@ func (bs *BatchSubmitter) finalizeBatch(blockHeight uint64) error {
 		Save:      true,
 	})
 
-	for offset := int64(0); ; offset += int64(bs.batchCfg.MaxChunkSize) {
+	for offset := int64(0); ; offset += bs.batchCfg.MaxChunkSize {
 		readLength, err := bs.batchFile.ReadAt(batchBuffer, offset)
 		if err != nil && err != io.EOF {
 			return err

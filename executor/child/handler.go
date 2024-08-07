@@ -30,7 +30,7 @@ func (ch *Child) beginBlockHandler(args nodetypes.BeginBlockArgs) (err error) {
 func (ch *Child) endBlockHandler(args nodetypes.EndBlockArgs) error {
 	blockHeight := uint64(args.Block.Header.Height)
 	batchKVs := make([]types.RawKV, 0)
-	treeKVs, storageRoot, err := ch.handleTree(blockHeight, uint64(args.LatestHeight), args.BlockID, args.Block.Header)
+	treeKVs, storageRoot, err := ch.handleTree(blockHeight, args.LatestHeight, args.BlockID, args.Block.Header)
 	if err != nil {
 		return err
 	}

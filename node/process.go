@@ -232,7 +232,7 @@ func (n *Node) txChecker(ctx context.Context) error {
 			}
 		}
 
-		err = n.broadcaster.RemovePendingTx(int64(res.Height), pendingTx.TxHash, pendingTx.Sequence)
+		err = n.broadcaster.RemovePendingTx(res.Height, pendingTx.TxHash, pendingTx.Sequence)
 		if err != nil {
 			return err
 		}
