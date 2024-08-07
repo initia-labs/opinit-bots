@@ -14,7 +14,7 @@ import (
 // prependLength prepends the length of the data to the data.
 func prependLength(data []byte) []byte {
 	lengthBytes := make([]byte, 8)
-	binary.LittleEndian.PutUint64(lengthBytes, uint64(len(lengthBytes)))
+	binary.LittleEndian.PutUint64(lengthBytes, uint64(len(data)))
 	return append(lengthBytes, data...)
 }
 
