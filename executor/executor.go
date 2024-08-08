@@ -211,5 +211,11 @@ func (ex *Executor) getStartHeights() (l1StartHeight uint64, l2StartHeight uint6
 	if ex.cfg.L2StartHeight != 0 {
 		l1StartHeight, l2StartHeight, err = ex.host.QueryHeightsOfOutputTxWithL2BlockNumber(uint64(ex.cfg.L2StartHeight))
 	}
-	return l1StartHeight, l2StartHeight, uint64(ex.cfg.BatchStartHeight), err
+
+	if ex.cfg.BatchStartWithL2Height {
+		batchStartHeight = l2StartHeight
+	} else {
+		batchStartHeight = uint64(ex.cfg.BatchStartHeight)
+	}
+	return l1StartHeight, l2StartHeight, batchStartHeight, err
 }
