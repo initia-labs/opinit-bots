@@ -109,7 +109,11 @@ func GetCodec(bech32Prefix string) (codec.Codec, client.TxConfig, error) {
 	})
 }
 
-func (ch *Child) Initialize(host hostNode, bridgeInfo opchildtypes.BridgeInfo) error {
+func (ch *Child) Initialize(startHeight uint64, host hostNode, bridgeInfo opchildtypes.BridgeInfo) error {
+	err := ch.node.Initialize(startHeight)
+	if err != nil {
+		return err
+	}
 	ch.host = host
 	ch.bridgeInfo = bridgeInfo
 

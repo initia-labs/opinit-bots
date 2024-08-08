@@ -256,6 +256,11 @@ func (bs *BatchSubmitter) UpdateBatchInfo(chain string, submitter string, output
 	bs.batchInfoMu.Lock()
 	defer bs.batchInfoMu.Unlock()
 
+	// check if the batch info is already updated
+	if bs.batchInfos[len(bs.batchInfos)-1].Output.L2BlockNumber >= l2BlockNumber {
+		return
+	}
+
 	bs.batchInfos = append(bs.batchInfos, ophosttypes.BatchInfoWithOutput{
 		BatchInfo: ophosttypes.BatchInfo{
 			ChainType: ophosttypes.BatchInfo_ChainType(ophosttypes.BatchInfo_ChainType_value["CHAIN_TYPE_"+chain]),

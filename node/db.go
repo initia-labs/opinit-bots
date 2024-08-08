@@ -14,9 +14,10 @@ func (n *Node) SetSyncInfo(height uint64) {
 	}
 }
 
-func (n *Node) loadSyncInfo() error {
+func (n *Node) loadSyncInfo(startHeight uint64) error {
 	data, err := n.db.Get(nodetypes.LastProcessedBlockHeightKey)
 	if err == dbtypes.ErrNotFound {
+		n.SetSyncInfo(startHeight)
 		return nil
 	} else if err != nil {
 		return err

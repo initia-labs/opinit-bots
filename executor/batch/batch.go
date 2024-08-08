@@ -104,7 +104,11 @@ func NewBatchSubmitter(
 	return ch
 }
 
-func (bs *BatchSubmitter) Initialize(host hostNode, bridgeInfo opchildtypes.BridgeInfo) error {
+func (bs *BatchSubmitter) Initialize(startHeight uint64, host hostNode, bridgeInfo opchildtypes.BridgeInfo) error {
+	err := bs.node.Initialize(startHeight)
+	if err != nil {
+		return err
+	}
 	bs.host = host
 	bs.bridgeInfo = bridgeInfo
 
@@ -123,7 +127,13 @@ func (bs *BatchSubmitter) Initialize(host hostNode, bridgeInfo opchildtypes.Brid
 		bs.DequeueBatchInfo()
 	}
 
-	bs.batchFile, err = os.OpenFile(bs.homePath+"/batch", os.O_CREATE|os.O_APPEND|os.O_RDWR, 0666)
+	fileFlag := os.O_CREATE | os.O_RDWR
+	// if the node has already processed blocks, append to the file
+	if bs.node.GetHeight()-1 != startHeight {
+		fileFlag |= os.O_APPEND
+	}
+
+	bs.batchFile, err = os.OpenFile(bs.homePath+"/batch", fileFlag, 0666)
 	if err != nil {
 		return err
 	}

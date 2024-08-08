@@ -51,6 +51,15 @@ type Config struct {
 	MaxChunkSize int64 `json:"max_chunk_size"`
 	// MaxSubmissionTime is the maximum time to submit a batch.
 	MaxSubmissionTime int64 `json:"max_submission_time"` // seconds
+
+	// L2StartHeight is the height to start the l2 node. If it is 0, it will start from the latest height.
+	// If the latest height stored in the db is not 0, this config is ignored.
+	// L2 starts from the last submitted output l2 block number + 1 before L2StartHeight.
+	// L1 starts from the block number of the output tx + 1
+	L2StartHeight int64 `json:"l2_start_height"`
+	// StartBatchHeight is the height to start the batch. If it is 0, it will start from the latest height.
+	// If the latest height stored in the db is not 0, this config is ignored.
+	BatchStartHeight int64 `json:"batch_start_height"`
 }
 
 type HostConfig struct {
@@ -73,7 +82,7 @@ func DefaultConfig() *Config {
 
 		L1ChainID: "testnet-l1-1",
 		L2ChainID: "testnet-l2-1",
-		DAChainID: "testnet-l3-1",
+		DAChainID: "testnet-da-1",
 
 		L1Bech32Prefix: "init",
 		L2Bech32Prefix: "init",
@@ -87,6 +96,9 @@ func DefaultConfig() *Config {
 		MaxChunks:         5000,
 		MaxChunkSize:      300000,  // 300KB
 		MaxSubmissionTime: 60 * 60, // 1 hour
+
+		L2StartHeight:    0,
+		BatchStartHeight: 0,
 	}
 }
 
@@ -112,8 +124,9 @@ func (cfg Config) Validate() error {
 		return errors.New("L2 chain ID is required")
 	}
 	if cfg.DAChainID == "" {
-		return errors.New("L2 RPC URL is required")
+		return errors.New("DA chain ID is required")
 	}
+
 	if cfg.ListenAddress == "" {
 		return errors.New("listen address is required")
 	}

@@ -111,7 +111,11 @@ func GetCodec(bech32Prefix string) (codec.Codec, client.TxConfig, error) {
 	})
 }
 
-func (h *Host) Initialize(child childNode, batch batchNode, bridgeId int64) (err error) {
+func (h *Host) Initialize(startHeight uint64, child childNode, batch batchNode, bridgeId int64) error {
+	err := h.node.Initialize(startHeight)
+	if err != nil {
+		return err
+	}
 	h.child = child
 	h.batch = batch
 	h.bridgeId = bridgeId
