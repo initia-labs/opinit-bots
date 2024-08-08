@@ -115,6 +115,7 @@ func (b *Broadcaster) Start(ctx context.Context) error {
 					break
 				} else if !data.Save {
 					// if the message does not need to be saved, we can skip retry
+					err = nil
 					break
 				}
 				b.logger.Warn("retry", zap.Int("count", retry), zap.String("error", err.Error()))
