@@ -129,7 +129,7 @@ func (bs *BatchSubmitter) Initialize(startHeight uint64, host hostNode, bridgeIn
 
 	fileFlag := os.O_CREATE | os.O_RDWR
 	// if the node has already processed blocks, append to the file
-	if bs.node.GetHeight()-1 != startHeight {
+	if !bs.node.HeightInitialized() {
 		fileFlag |= os.O_APPEND
 	}
 

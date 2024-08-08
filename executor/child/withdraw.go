@@ -86,8 +86,14 @@ func (ch *Child) handleInitiateWithdrawal(l2Sequence uint64, from string, to str
 }
 
 func (ch *Child) prepareTree(blockHeight uint64) error {
-	if blockHeight == 1 {
-		return ch.mk.InitializeWorkingTree(1, 1)
+	if ch.startTreeIndex != 0 {
+		ch.logger.Info("initiate tree", zap.Uint64("index", ch.startTreeIndex))
+		err := ch.mk.InitializeWorkingTree(ch.startTreeIndex, 1)
+		if err != nil {
+			return err
+		}
+		ch.startTreeIndex = 0
+		return nil
 	}
 
 	err := ch.mk.LoadWorkingTree(blockHeight - 1)

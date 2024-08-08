@@ -87,7 +87,7 @@ func NewExecutor(cfg *executortypes.Config, db types.DB, sv *server.Server, logg
 		zap.Duration("submission_interval", bridgeInfo.BridgeConfig.SubmissionInterval),
 	)
 
-	hostStartHeight, childStartHeight, batchStartHeight, err := executor.getStartHeights()
+	hostStartHeight, childStartHeight, startOutputIndex, batchStartHeight, err := executor.getStartHeights(int64(bridgeInfo.BridgeId))
 	if err != nil {
 		panic(err)
 	}
@@ -96,7 +96,7 @@ func NewExecutor(cfg *executortypes.Config, db types.DB, sv *server.Server, logg
 	if err != nil {
 		panic(err)
 	}
-	err = executor.child.Initialize(childStartHeight, executor.host, bridgeInfo)
+	err = executor.child.Initialize(childStartHeight, startOutputIndex, executor.host, bridgeInfo)
 	if err != nil {
 		panic(err)
 	}
@@ -207,9 +207,9 @@ func (ex *Executor) makeDANode(bridgeId int64) (executortypes.DANode, error) {
 	return nil, fmt.Errorf("unsupported chain id for DA: %s", ophosttypes.BatchInfo_ChainType_name[int32(batchInfo.BatchInfo.ChainType)])
 }
 
-func (ex *Executor) getStartHeights() (l1StartHeight uint64, l2StartHeight uint64, batchStartHeight uint64, err error) {
+func (ex *Executor) getStartHeights(bridgeId int64) (l1StartHeight uint64, l2StartHeight uint64, startOutputIndex uint64, batchStartHeight uint64, err error) {
 	if ex.cfg.L2StartHeight != 0 {
-		l1StartHeight, l2StartHeight, err = ex.host.QueryHeightsOfOutputTxWithL2BlockNumber(uint64(ex.cfg.L2StartHeight))
+		l1StartHeight, l2StartHeight, startOutputIndex, err = ex.host.QueryHeightsOfOutputTxWithL2BlockNumber(bridgeId, uint64(ex.cfg.L2StartHeight))
 	}
 
 	if ex.cfg.BatchStartWithL2Height {
@@ -217,5 +217,5 @@ func (ex *Executor) getStartHeights() (l1StartHeight uint64, l2StartHeight uint6
 	} else {
 		batchStartHeight = uint64(ex.cfg.BatchStartHeight)
 	}
-	return l1StartHeight, l2StartHeight, batchStartHeight, err
+	return l1StartHeight, l2StartHeight, startOutputIndex, batchStartHeight, err
 }

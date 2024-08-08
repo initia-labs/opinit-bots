@@ -51,6 +51,7 @@ type Child struct {
 
 	nextOutputTime        time.Time
 	finalizingBlockHeight uint64
+	startTreeIndex        uint64
 
 	cfg    nodetypes.NodeConfig
 	db     types.DB
@@ -109,14 +110,14 @@ func GetCodec(bech32Prefix string) (codec.Codec, client.TxConfig, error) {
 	})
 }
 
-func (ch *Child) Initialize(startHeight uint64, host hostNode, bridgeInfo opchildtypes.BridgeInfo) error {
+func (ch *Child) Initialize(startHeight uint64, startOutputIndex uint64, host hostNode, bridgeInfo opchildtypes.BridgeInfo) error {
 	err := ch.node.Initialize(startHeight)
 	if err != nil {
 		return err
 	}
+	ch.startTreeIndex = startOutputIndex
 	ch.host = host
 	ch.bridgeInfo = bridgeInfo
-
 	ch.registerHandlers()
 	return nil
 }
