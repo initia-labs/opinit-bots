@@ -79,7 +79,7 @@ func (h Host) QueryHeightsOfOutputTxWithL2BlockNumber(bridgeId int64, l2BlockNum
 	}
 	if len(res.Txs) == 0 {
 		// no output tx found
-		return 0, 0, 0, nil
+		return 0, 0, 1, nil
 	}
 
 	l2StartHeight := uint64(0)
