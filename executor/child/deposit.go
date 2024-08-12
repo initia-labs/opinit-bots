@@ -1,6 +1,7 @@
 package child
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 
@@ -12,7 +13,7 @@ import (
 	"go.uber.org/zap"
 )
 
-func (ch *Child) finalizeDepositHandler(args nodetypes.EventHandlerArgs) error {
+func (ch *Child) finalizeDepositHandler(_ context.Context, args nodetypes.EventHandlerArgs) error {
 	var l1BlockHeight, l1Sequence uint64
 	var from, to, baseDenom string
 	var amount sdk.Coin

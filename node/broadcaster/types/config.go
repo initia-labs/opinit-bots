@@ -3,6 +3,7 @@ package types
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/cosmos/cosmos-sdk/codec"
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
@@ -19,6 +20,12 @@ type BroadcasterConfig struct {
 
 	// GasPrice is the gas price.
 	GasPrice string
+
+	// GasAdjustment is the gas adjustment.
+	GasAdjustment float64
+
+	// TxTimeout is the transaction timeout.
+	TxTimeout time.Duration
 
 	// Bech32Prefix is the Bech32 prefix.
 	Bech32Prefix string
@@ -61,6 +68,14 @@ func (bc BroadcasterConfig) Validate() error {
 
 	if bc.PendingTxToProcessedMsgs == nil {
 		return fmt.Errorf("pending tx to processed msgs is nil")
+	}
+
+	if bc.GasAdjustment == 0 {
+		return fmt.Errorf("gas adjustment is zero")
+	}
+
+	if bc.TxTimeout == 0 {
+		return fmt.Errorf("tx timeout is zero")
 	}
 
 	return bc.KeyringConfig.Validate()

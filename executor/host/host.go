@@ -26,7 +26,7 @@ type childNode interface {
 	HasKey() bool
 	BroadcastMsgs(btypes.ProcessedMsgs)
 	ProcessedMsgsToRawKV([]btypes.ProcessedMsgs, bool) ([]types.RawKV, error)
-	QueryNextL1Sequence() (uint64, error)
+	QueryNextL1Sequence(context.Context) (uint64, error)
 
 	GetMsgFinalizeTokenDeposit(string, string, sdk.Coin, uint64, uint64, string, []byte) (sdk.Msg, error)
 	GetMsgUpdateOracle(
@@ -111,7 +111,7 @@ func GetCodec(bech32Prefix string) (codec.Codec, client.TxConfig, error) {
 	})
 }
 
-func (h *Host) Initialize(startHeight uint64, child childNode, batch batchNode, bridgeId int64) error {
+func (h *Host) Initialize(ctx context.Context, startHeight uint64, child childNode, batch batchNode, bridgeId int64) error {
 	err := h.node.Initialize(startHeight)
 	if err != nil {
 		return err
@@ -120,7 +120,7 @@ func (h *Host) Initialize(startHeight uint64, child childNode, batch batchNode, 
 	h.batch = batch
 	h.bridgeId = bridgeId
 
-	h.initialL1Sequence, err = h.child.QueryNextL1Sequence()
+	h.initialL1Sequence, err = h.child.QueryNextL1Sequence(ctx)
 	if err != nil {
 		return err
 	}

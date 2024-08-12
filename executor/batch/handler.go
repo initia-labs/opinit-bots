@@ -2,6 +2,7 @@ package batch
 
 import (
 	"compress/gzip"
+	"context"
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
@@ -23,7 +24,7 @@ import (
 	"github.com/initia-labs/opinit-bots-go/types"
 )
 
-func (bs *BatchSubmitter) rawBlockHandler(args nodetypes.RawBlockArgs) error {
+func (bs *BatchSubmitter) rawBlockHandler(ctx context.Context, args nodetypes.RawBlockArgs) error {
 	if len(bs.processedMsgs) != 0 {
 		panic("must not happen, msgQueue should be empty")
 	}
@@ -34,7 +35,7 @@ func (bs *BatchSubmitter) rawBlockHandler(args nodetypes.RawBlockArgs) error {
 		return errors.Wrap(err, "failed to unmarshal block")
 	}
 
-	err = bs.prepareBatch(args.BlockHeight, pbb.Header.Time)
+	err = bs.prepareBatch(ctx, args.BlockHeight, pbb.Header.Time)
 	if err != nil {
 		return errors.Wrap(err, "failed to prepare batch")
 	}
@@ -79,7 +80,7 @@ func (bs *BatchSubmitter) rawBlockHandler(args nodetypes.RawBlockArgs) error {
 	return nil
 }
 
-func (bs *BatchSubmitter) prepareBatch(blockHeight uint64, blockTime time.Time) error {
+func (bs *BatchSubmitter) prepareBatch(ctx context.Context, blockHeight uint64, blockTime time.Time) error {
 	// check whether the requested block height is reached to the l2 block number of the next batch info.
 	if nextBatchInfo := bs.NextBatchInfo(); nextBatchInfo != nil && nextBatchInfo.Output.L2BlockNumber < blockHeight {
 		// if the next batch info is reached, finalize the current batch and update the batch info.
@@ -120,7 +121,7 @@ func (bs *BatchSubmitter) prepareBatch(blockHeight uint64, blockTime time.Time) 
 			return nil
 		}
 
-		err := bs.finalizeBatch(blockHeight)
+		err := bs.finalizeBatch(ctx, blockHeight)
 		if err != nil {
 			return errors.Wrap(err, "failed to finalize batch")
 		}
@@ -152,10 +153,10 @@ func (bs *BatchSubmitter) handleBatch(blockBytes []byte) error {
 }
 
 // finalize batch and create batch messages
-func (bs *BatchSubmitter) finalizeBatch(blockHeight uint64) error {
+func (bs *BatchSubmitter) finalizeBatch(ctx context.Context, blockHeight uint64) error {
 
 	// write last block's commit to batch file
-	rawCommit, err := bs.node.GetRPCClient().QueryRawCommit(int64(blockHeight))
+	rawCommit, err := bs.node.GetRPCClient().QueryRawCommit(ctx, int64(blockHeight))
 	if err != nil {
 		return errors.Wrap(err, "failed to query raw commit")
 	}

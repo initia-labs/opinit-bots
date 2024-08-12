@@ -1,6 +1,7 @@
 package host
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/hex"
 	"strconv"
@@ -10,7 +11,7 @@ import (
 	"go.uber.org/zap"
 )
 
-func (h *Host) proposeOutputHandler(args nodetypes.EventHandlerArgs) error {
+func (h *Host) proposeOutputHandler(_ context.Context, args nodetypes.EventHandlerArgs) error {
 	var bridgeId, l2BlockNumber, outputIndex uint64
 	var proposer string
 	var outputRoot []byte
@@ -58,7 +59,7 @@ func (h *Host) handleProposeOutput(bridgeId uint64, proposer string, outputIndex
 	)
 }
 
-func (h *Host) finalizeWithdrawalHandler(args nodetypes.EventHandlerArgs) error {
+func (h *Host) finalizeWithdrawalHandler(_ context.Context, args nodetypes.EventHandlerArgs) error {
 	var bridgeId uint64
 	var outputIndex, l2Sequence uint64
 	var from, to, l1Denom, l2Denom, amount string

@@ -20,7 +20,6 @@ func (b Broadcaster) GetHeight() uint64 {
 
 // HandleNewBlock is called when a new block is received.
 func (b *Broadcaster) HandleNewBlock(block *rpccoretypes.ResultBlock, blockResult *rpccoretypes.ResultBlockResults, latestChainHeight uint64) error {
-
 	// check pending txs first
 	for _, tx := range block.Block.Txs {
 		if b.lenLocalPendingTx() == 0 {
@@ -41,7 +40,7 @@ func (b *Broadcaster) HandleNewBlock(block *rpccoretypes.ResultBlock, blockResul
 	if length := b.lenLocalPendingTx(); length > 0 {
 		b.logger.Debug("remaining pending txs", zap.Int64("height", block.Block.Height), zap.Int("count", length))
 		pendingTxTime := time.Unix(0, b.peekLocalPendingTx().Timestamp)
-		if block.Block.Time.After(pendingTxTime.Add(btypes.TX_TIMEOUT)) {
+		if block.Block.Time.After(pendingTxTime.Add(b.cfg.TxTimeout)) {
 			panic(fmt.Errorf("something wrong, pending txs are not processed for a long time; current block time: %s, pending tx processing time: %s", block.Block.Time.UTC().String(), pendingTxTime.UTC().String()))
 		}
 	}
@@ -53,14 +52,14 @@ func (b *Broadcaster) HandleNewBlock(block *rpccoretypes.ResultBlock, blockResul
 }
 
 // CheckPendingTx query tx info to check if pending tx is processed.
-func (b *Broadcaster) CheckPendingTx() (*btypes.PendingTxInfo, *rpccoretypes.ResultTx, error) {
+func (b *Broadcaster) CheckPendingTx(ctx context.Context) (*btypes.PendingTxInfo, *rpccoretypes.ResultTx, error) {
 	if b.lenLocalPendingTx() == 0 {
 		return nil, nil, nil
 	}
 
 	pendingTx := b.peekLocalPendingTx()
 	pendingTxTime := time.Unix(0, b.peekLocalPendingTx().Timestamp)
-	if time.Now().After(pendingTxTime.Add(btypes.TX_TIMEOUT)) {
+	if time.Now().After(pendingTxTime.Add(b.cfg.TxTimeout)) {
 		// @sh-cha: should we rebroadcast pending txs? or rasing monitoring alert?
 		panic(fmt.Errorf("something wrong, pending txs are not processed for a long time; current block time: %s, pending tx processing time: %s", time.Now().UTC().String(), pendingTxTime.UTC().String()))
 	}
@@ -69,7 +68,7 @@ func (b *Broadcaster) CheckPendingTx() (*btypes.PendingTxInfo, *rpccoretypes.Res
 	if err != nil {
 		return nil, nil, err
 	}
-	res, err := b.rpcClient.QueryTx(txHash)
+	res, err := b.rpcClient.QueryTx(ctx, txHash)
 	if err != nil {
 		b.logger.Debug("failed to query tx", zap.String("txHash", pendingTx.TxHash), zap.String("error", err.Error()))
 		return nil, nil, nil

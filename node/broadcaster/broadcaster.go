@@ -134,7 +134,7 @@ func (b *Broadcaster) prepareBroadcaster(_ /*lastBlockHeight*/ uint64, lastBlock
 		WithAccountRetriever(b).
 		WithChainID(b.cfg.ChainID).
 		WithTxConfig(b.txConfig).
-		WithGasAdjustment(btypes.GAS_ADJUSTMENT).
+		WithGasAdjustment(b.cfg.GasAdjustment).
 		WithGasPrices(b.cfg.GasPrice).
 		WithKeybase(b.keyBase).
 		WithSignMode(signing.SignMode_SIGN_MODE_DIRECT)
@@ -156,7 +156,7 @@ func (b *Broadcaster) prepareBroadcaster(_ /*lastBlockHeight*/ uint64, lastBlock
 		pendingTxTime := time.Unix(0, loadedPendingTxs[0].Timestamp)
 
 		// if we have pending txs, wait until timeout
-		if timeoutTime := pendingTxTime.Add(btypes.TX_TIMEOUT); lastBlockTime.Before(timeoutTime) {
+		if timeoutTime := pendingTxTime.Add(b.cfg.TxTimeout); lastBlockTime.Before(timeoutTime) {
 			timer := time.NewTimer(timeoutTime.Sub(lastBlockTime))
 			<-timer.C
 		}

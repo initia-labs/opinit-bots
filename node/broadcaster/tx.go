@@ -191,7 +191,7 @@ func (b Broadcaster) adjustEstimatedGas(gasUsed uint64) (uint64, error) {
 		return gasUsed, nil
 	}
 
-	gas := btypes.GAS_ADJUSTMENT * float64(gasUsed)
+	gas := b.cfg.GasAdjustment * float64(gasUsed)
 	if math.IsInf(gas, 1) {
 		return 0, fmt.Errorf("infinite gas used")
 	}

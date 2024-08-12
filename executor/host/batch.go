@@ -1,6 +1,7 @@
 package host
 
 import (
+	"context"
 	"strconv"
 
 	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
@@ -8,7 +9,7 @@ import (
 	"go.uber.org/zap"
 )
 
-func (h *Host) recordBatchHandler(args nodetypes.EventHandlerArgs) error {
+func (h *Host) recordBatchHandler(_ context.Context, args nodetypes.EventHandlerArgs) error {
 	var submitter string
 	for _, attr := range args.EventAttributes {
 		switch attr.Key {
@@ -29,7 +30,7 @@ func (h *Host) recordBatchHandler(args nodetypes.EventHandlerArgs) error {
 	return nil
 }
 
-func (h *Host) updateBatchInfoHandler(args nodetypes.EventHandlerArgs) error {
+func (h *Host) updateBatchInfoHandler(_ context.Context, args nodetypes.EventHandlerArgs) error {
 	var bridgeId uint64
 	var submitter, chain string
 	var outputIndex, l2BlockNumber uint64

@@ -1,6 +1,7 @@
 package child
 
 import (
+	"context"
 	"encoding/json"
 
 	"cosmossdk.io/math"
@@ -19,9 +20,9 @@ func (ch Child) GetAddressStr() (string, error) {
 	return ch.node.MustGetBroadcaster().GetAddressString()
 }
 
-func (ch Child) QueryBridgeInfo() (opchildtypes.BridgeInfo, error) {
+func (ch Child) QueryBridgeInfo(ctx context.Context) (opchildtypes.BridgeInfo, error) {
 	req := &opchildtypes.QueryBridgeInfoRequest{}
-	ctx, cancel := rpcclient.GetQueryContext(0)
+	ctx, cancel := rpcclient.GetQueryContext(ctx, 0)
 	defer cancel()
 
 	res, err := ch.opchildQueryClient.BridgeInfo(ctx, req)
@@ -31,9 +32,9 @@ func (ch Child) QueryBridgeInfo() (opchildtypes.BridgeInfo, error) {
 	return res.BridgeInfo, nil
 }
 
-func (ch Child) QueryNextL1Sequence() (uint64, error) {
+func (ch Child) QueryNextL1Sequence(ctx context.Context) (uint64, error) {
 	req := &opchildtypes.QueryNextL1SequenceRequest{}
-	ctx, cancel := rpcclient.GetQueryContext(0)
+	ctx, cancel := rpcclient.GetQueryContext(ctx, 0)
 	defer cancel()
 
 	res, err := ch.opchildQueryClient.NextL1Sequence(ctx, req)
@@ -43,9 +44,9 @@ func (ch Child) QueryNextL1Sequence() (uint64, error) {
 	return res.NextL1Sequence, nil
 }
 
-func (ch Child) QueryNextL2Sequence(height uint64) (uint64, error) {
+func (ch Child) QueryNextL2Sequence(ctx context.Context, height uint64) (uint64, error) {
 	req := &opchildtypes.QueryNextL2SequenceRequest{}
-	ctx, cancel := rpcclient.GetQueryContext(height)
+	ctx, cancel := rpcclient.GetQueryContext(ctx, height)
 	defer cancel()
 
 	res, err := ch.opchildQueryClient.NextL2Sequence(ctx, req)

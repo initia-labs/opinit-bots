@@ -23,7 +23,7 @@ import (
 )
 
 type hostNode interface {
-	QueryBatchInfos(uint64) (*ophosttypes.QueryBatchInfosResponse, error)
+	QueryBatchInfos(context.Context, uint64) (*ophosttypes.QueryBatchInfosResponse, error)
 }
 
 type compressionFunc interface {
@@ -104,7 +104,7 @@ func NewBatchSubmitter(
 	return ch
 }
 
-func (bs *BatchSubmitter) Initialize(startHeight uint64, host hostNode, bridgeInfo opchildtypes.BridgeInfo) error {
+func (bs *BatchSubmitter) Initialize(ctx context.Context, startHeight uint64, host hostNode, bridgeInfo opchildtypes.BridgeInfo) error {
 	err := bs.node.Initialize(startHeight)
 	if err != nil {
 		return err
@@ -112,7 +112,7 @@ func (bs *BatchSubmitter) Initialize(startHeight uint64, host hostNode, bridgeIn
 	bs.host = host
 	bs.bridgeInfo = bridgeInfo
 
-	res, err := bs.host.QueryBatchInfos(bridgeInfo.BridgeId)
+	res, err := bs.host.QueryBatchInfos(ctx, bridgeInfo.BridgeId)
 	if err != nil {
 		return err
 	}

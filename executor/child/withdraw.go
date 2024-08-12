@@ -1,6 +1,7 @@
 package child
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -19,7 +20,7 @@ import (
 	nodetypes "github.com/initia-labs/opinit-bots-go/node/types"
 )
 
-func (ch *Child) initiateWithdrawalHandler(args nodetypes.EventHandlerArgs) error {
+func (ch *Child) initiateWithdrawalHandler(_ context.Context, args nodetypes.EventHandlerArgs) error {
 	var l2Sequence, amount uint64
 	var from, to, baseDenom string
 	var err error
@@ -108,12 +109,12 @@ func (ch *Child) prepareTree(blockHeight uint64) error {
 	return nil
 }
 
-func (ch *Child) prepareOutput() error {
+func (ch *Child) prepareOutput(ctx context.Context) error {
 	workingOutputIndex := ch.mk.GetWorkingTreeIndex()
 
 	// initialize next output time
 	if ch.nextOutputTime.IsZero() && workingOutputIndex > 1 {
-		output, err := ch.host.QueryOutput(ch.BridgeId(), workingOutputIndex-1)
+		output, err := ch.host.QueryOutput(ctx, ch.BridgeId(), workingOutputIndex-1)
 		if err != nil {
 			// TODO: maybe not return error here and roll back
 			return fmt.Errorf("output does not exist at index: %d", workingOutputIndex-1)
@@ -122,7 +123,7 @@ func (ch *Child) prepareOutput() error {
 		ch.nextOutputTime = output.OutputProposal.L1BlockTime.Add(ch.bridgeInfo.BridgeConfig.SubmissionInterval * 2 / 3)
 	}
 
-	output, err := ch.host.QueryOutput(ch.BridgeId(), ch.mk.GetWorkingTreeIndex())
+	output, err := ch.host.QueryOutput(ctx, ch.BridgeId(), ch.mk.GetWorkingTreeIndex())
 	if err != nil {
 		if strings.Contains(err.Error(), "collections: not found") {
 			return nil
