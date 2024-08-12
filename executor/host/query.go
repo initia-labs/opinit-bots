@@ -71,6 +71,9 @@ func (h Host) QueryOutputByL2BlockNumber(bridgeId uint64, l2BlockNumber uint64) 
 
 	for {
 		if start.OutputProposal.L2BlockNumber >= l2BlockNumber {
+			if start.OutputIndex != 1 {
+				return h.QueryOutput(bridgeId, start.OutputIndex-1)
+			}
 			return nil, nil
 		} else if end.OutputProposal.L2BlockNumber < l2BlockNumber {
 			return end, nil
@@ -84,9 +87,7 @@ func (h Host) QueryOutputByL2BlockNumber(bridgeId uint64, l2BlockNumber uint64) 
 			return nil, err
 		}
 
-		if output.OutputProposal.L2BlockNumber == l2BlockNumber {
-			return output, nil
-		} else if output.OutputProposal.L2BlockNumber < l2BlockNumber {
+		if output.OutputProposal.L2BlockNumber <= l2BlockNumber {
 			start = output
 		} else {
 			end = output
