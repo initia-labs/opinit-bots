@@ -14,49 +14,145 @@ To configure the Executor, fill in the values in the `~/.opinit/executor.json` f
 {
   // Version is the version used to build output root.
   "version": 1,
-
   // ListenAddress is the address to listen for incoming requests.
   "listen_address": "localhost:3000",
-
-  "l1_rpc_address": "tcp://localhost:26657",
-  "l2_rpc_address": "tcp://localhost:27657",
-  "da_rpc_address": "tcp://localhost:27657",
-
-  "l1_gas_price": "0.15uinit",
-  "l2_gas_price": "",
-  "da_gas_price": "",
-
-  "l1_chain_id": "testnet-l1-1",
-  "l2_chain_id": "testnet-l2-1",
-  "da_chain_id": "testnet-da-1",
-
-  "l1_bech32_prefix": "init",
-  "l2_bech32_prefix": "init",
-  "da_bech32_prefix": "init",
-
+  "l1_node": {
+    "chain_id": "testnet-l1-1",
+    "bech32_prefix": "init",
+    "rpc_address": "tcp://localhost:26657",
+    "gas_price": "0.15uinit",
+    "gas_adjustment": 1.5,
+    "tx_timeout": 60
+  },
+  "l2_node": {
+    "chain_id": "testnet-l2-1",
+    "bech32_prefix": "init",
+    "rpc_address": "tcp://localhost:27657",
+    "gas_price": "",
+    "gas_adjustment": 1.5,
+    "tx_timeout": 60
+  },
+  "da_node": {
+    "chain_id": "testnet-l1-1",
+    "bech32_prefix": "init",
+    "rpc_address": "tcp://localhost:26657",
+    "gas_price": "0.15uinit",
+    "gas_adjustment": 1.5,
+    "tx_timeout": 60
+  },
   // OutputSubmitter is the key name in the keyring for the output submitter,
   // which is used to relay the output transaction from l2 to l1.
   //
   // If you don't want to use the output submitter feature, you can leave it empty.
-  "output_submitter": "output_submitter",
+  "output_submitter": "",
 
   // BridgeExecutor is the key name in the keyring for the bridge executor,
   // which is used to relay initiate token bridge transaction from l1 to l2.
   //
   // If you don't want to use the bridge executor feature, you can leave it empty.
-  "bridge_executor": "bridge_executor",
-
+  "bridge_executor": "",
   // RelayOracle is the flag to enable the oracle relay feature.
   "relay_oracle": true,
-
   // MaxChunks is the maximum number of chunks in a batch.
   "max_chunks": 5000,
   // MaxChunkSize is the maximum size of a chunk in a batch.
   "max_chunk_size": 300000,
   // MaxSubmissionTime is the maximum time to submit a batch.
-  "max_submission_time": 3600, // seconds
+  "max_submission_time": 3600,
+  // L2StartHeight is the height to start the l2 node. If it is 0, it will start from the latest height.
+  // If the latest height stored in the db is not 0, this config is ignored.
+  // L2 starts from the last submitted output l2 block number + 1 before L2StartHeight.
+  // L1 starts from the block number of the output tx + 1
+  "l2_start_height": 0,
+  // BatchStartWithL2Height is the flag to start the batch same with the l2 height.
+  // If the latest height stored in the db is not 0, this config is ignored.
+  // If it is true, the batch will start from the last submitted output l2 block number + 1.
+  "batch_start_with_l2_height": false,
+  // StartBatchHeight is the height to start the batch. If it is 0, it will start from the latest height.
+  // If the latest height stored in the db is not 0, this config is ignored.
+  "batch_start_height": 0
 }
 ```
+
+### Start height config examples
+If the latest height stored in the db is not 0, start height config is ignored.
+
+```
+Output tx 1 
+- L1BlockNumber: 10
+- L2BlockNumber: 100
+
+Output tx 2
+- L1BlockNumber: 20
+- L2BlockNumber: 200
+
+InitializeTokenDeposit tx 1
+- Height: 5
+- L1Sequence: 1
+
+InitializeTokenDeposit tx 2
+- Height: 15
+- L1Sequence: 2
+
+FinalizedTokenDeposit tx 1
+- L1Sequence: 1
+
+FinalizedTokenDeposit tx 2
+- L1Sequence: 2
+```
+
+#### Config 1
+```json
+{
+  l2_start_height: 150, 
+  batch_start_with_l2_height: false, 
+  batch_start_height: 0
+}
+```
+When Child's last l1 Sequence is `2`,
+- L1 starts from the height 10 + 1 = 11
+- L2 starts from the height 100 + 1 = 101
+- Batch starts from the height 1
+
+#### Config 2
+```json
+{
+  l2_start_height: 150, 
+  batch_start_with_l2_height: false, 
+  batch_start_height: 150
+}
+```
+When Child's last l1 Sequence is `2`,
+- L1 starts from the height 10 + 1 = 11
+- L2 starts from the height 100 + 1 = 101
+- Batch starts from the height 150
+
+#### Config 3
+```json
+{
+  l2_start_height: 150, 
+  batch_start_with_l2_height: true, 
+  batch_start_height: 150
+}
+```
+When Child's last l1 Sequence is `2`,
+- L1 starts from the height 10 + 1 = 11
+- L2 starts from the height 100 + 1 = 101
+- Batch starts from the height 101
+
+#### Config 4
+```json
+{
+  l2_start_height: 150, 
+  batch_start_with_l2_height: true, 
+  batch_start_height: 150
+}
+```
+When Child's last l1 Sequence is `1`,
+- L1 starts from the height 5 + 1 = 6
+- L2 starts from the height 100 + 1 = 101
+- Batch starts from the height 101
+
 
 ## Handler rules for the components of the Executor
 For registered events or tx handlers, work processed in a block is atomically saved as ProcessedMsg. Therfore, if ProcessedMsgs or Txs cannot be processed due to an interrupt or error, it is guaranteed to be read from the DB and processed.
@@ -149,10 +245,11 @@ If the batch info registered in the chain is changed to change the account or DA
 
 ```go
 {
-	DARPCAddress string `json:"da_rpc_address"`
-	DAGasPrice string `json:"da_gas_price"`
-	DAChainID string `json:"da_chain_id"`
-	DABech32Prefix string `json:"da_bech32_prefix"`
+	RPCAddress string `json:"rpc_address"`
+	GasPrice string `json:"gas_price"`
+	GasAdjustment string `json:"gas_adjustment"`
+	ChainID string `json:"chain_id"`
+	Bech32Prefix string `json:"bech32_prefix"`
 }
 ```
 ## Sync from the beginning
