@@ -42,17 +42,19 @@ Currently supported bots:
 			}
 
 			cmdCtx, botDone := context.WithCancel(cmd.Context())
+			gracefulShutdown(botDone)
+
 			errGrp, ctx := errgroup.WithContext(cmdCtx)
 			ctx = types.WithErrGrp(ctx, errGrp)
 			interval, err := cmd.Flags().GetDuration(flagPollingInterval)
+			if err != nil {
+				return err
+			}
 			ctx = types.WithPollingInterval(ctx, interval)
-
 			err = bot.Initialize(ctx)
 			if err != nil {
 				return err
 			}
-
-			gracefulShutdown(botDone)
 			return bot.Start(ctx)
 		},
 	}
