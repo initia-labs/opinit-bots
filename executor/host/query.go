@@ -1,8 +1,9 @@
 package host
 
 import (
+	"errors"
 	"fmt"
-	"strconv"
+	"strings"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	query "github.com/cosmos/cosmos-sdk/types/query"
@@ -20,9 +21,9 @@ func (h Host) GetAddressStr() (string, error) {
 	return h.node.MustGetBroadcaster().GetAddressString()
 }
 
-func (h Host) QueryLastOutput() (*ophosttypes.QueryOutputProposalResponse, error) {
+func (h Host) QueryLastOutput(bridgeId uint64) (*ophosttypes.QueryOutputProposalResponse, error) {
 	req := &ophosttypes.QueryOutputProposalsRequest{
-		BridgeId: uint64(h.bridgeId),
+		BridgeId: bridgeId,
 		Pagination: &query.PageRequest{
 			Limit:   1,
 			Reverse: true,
@@ -41,9 +42,9 @@ func (h Host) QueryLastOutput() (*ophosttypes.QueryOutputProposalResponse, error
 	return &res.OutputProposals[0], nil
 }
 
-func (h Host) QueryOutput(outputIndex uint64) (*ophosttypes.QueryOutputProposalResponse, error) {
+func (h Host) QueryOutput(bridgeId uint64, outputIndex uint64) (*ophosttypes.QueryOutputProposalResponse, error) {
 	req := &ophosttypes.QueryOutputProposalRequest{
-		BridgeId:    uint64(h.bridgeId),
+		BridgeId:    bridgeId,
 		OutputIndex: outputIndex,
 	}
 	ctx, cancel := rpcclient.GetQueryContext(0)
@@ -52,57 +53,73 @@ func (h Host) QueryOutput(outputIndex uint64) (*ophosttypes.QueryOutputProposalR
 	return h.ophostQueryClient.OutputProposal(ctx, req)
 }
 
-func (h Host) QueryBatchInfos() (*ophosttypes.QueryBatchInfosResponse, error) {
-	req := &ophosttypes.QueryBatchInfosRequest{
-		BridgeId: uint64(h.bridgeId),
+// QueryOutputByL2BlockNumber queries the last output proposal before the given L2 block number
+func (h Host) QueryOutputByL2BlockNumber(bridgeId uint64, l2BlockNumber uint64) (*ophosttypes.QueryOutputProposalResponse, error) {
+	start, err := h.QueryOutput(bridgeId, 1)
+	if err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			return nil, nil
+		}
+		return nil, err
 	}
-	ctx, cancel := rpcclient.GetQueryContext(0)
-	defer cancel()
-	return h.ophostQueryClient.BatchInfos(ctx, req)
+	end, err := h.QueryLastOutput(bridgeId)
+	if err != nil {
+		return nil, err
+	} else if end == nil {
+		return nil, nil
+	}
+
+	for {
+		if start.OutputProposal.L2BlockNumber >= l2BlockNumber {
+			return nil, nil
+		} else if end.OutputProposal.L2BlockNumber < l2BlockNumber {
+			return end, nil
+		} else if end.OutputIndex-start.OutputIndex <= 1 {
+			return start, nil
+		}
+
+		midIndex := (start.OutputIndex + end.OutputIndex) / 2
+		output, err := h.QueryOutput(bridgeId, midIndex)
+		if err != nil {
+			return nil, err
+		}
+
+		if output.OutputProposal.L2BlockNumber == l2BlockNumber {
+			return output, nil
+		} else if output.OutputProposal.L2BlockNumber < l2BlockNumber {
+			start = output
+		} else {
+			end = output
+		}
+	}
 }
 
-func (h Host) QueryHeightsOfOutputTxWithL2BlockNumber(bridgeId int64, l2BlockNumber uint64) (uint64, uint64, uint64, error) {
+func (h Host) QueryCreateBridgeHeight(bridgeId uint64) (uint64, error) {
 	ctx, cancel := rpcclient.GetQueryContext(0)
 	defer cancel()
 
-	query := fmt.Sprintf("%s.%s = %d AND %s.%s <= %d", ophosttypes.EventTypeProposeOutput,
+	query := fmt.Sprintf("%s.%s = %d",
+		ophosttypes.EventTypeCreateBridge,
 		ophosttypes.AttributeKeyBridgeId,
 		bridgeId,
-		ophosttypes.EventTypeProposeOutput,
-		ophosttypes.AttributeKeyL2BlockNumber,
-		l2BlockNumber,
 	)
 	perPage := 1
 	res, err := h.node.GetRPCClient().TxSearch(ctx, query, false, nil, &perPage, "desc")
 	if err != nil {
-		return 0, 0, 0, err
+		return 0, err
 	}
 	if len(res.Txs) == 0 {
-		// no output tx found
-		return 0, 0, 1, nil
+		// bridge not found
+		return 0, errors.New("bridge not found")
 	}
+	return uint64(res.Txs[0].Height), nil
+}
 
-	l2StartHeight := uint64(0)
-	outputIndex := uint64(0)
-	for _, event := range res.Txs[0].TxResult.Events {
-		if event.Type == ophosttypes.EventTypeProposeOutput {
-			for _, attr := range event.Attributes {
-				if attr.Key == ophosttypes.AttributeKeyL2BlockNumber {
-					l2StartHeight, err = strconv.ParseUint(attr.Value, 10, 64)
-					if err != nil {
-						return 0, 0, 0, err
-					}
-				} else if attr.Key == ophosttypes.AttributeKeyOutputIndex {
-					outputIndex, err = strconv.ParseUint(attr.Value, 10, 64)
-					if err != nil {
-						return 0, 0, 0, err
-					}
-				}
-			}
-		}
+func (h Host) QueryBatchInfos(bridgeId uint64) (*ophosttypes.QueryBatchInfosResponse, error) {
+	req := &ophosttypes.QueryBatchInfosRequest{
+		BridgeId: bridgeId,
 	}
-	if l2StartHeight == 0 || outputIndex == 0 {
-		return 0, 0, 0, fmt.Errorf("something wrong: l2 block number not found in the output tx")
-	}
-	return uint64(res.Txs[0].Height), l2StartHeight, outputIndex + 1, nil
+	ctx, cancel := rpcclient.GetQueryContext(0)
+	defer cancel()
+	return h.ophostQueryClient.BatchInfos(ctx, req)
 }

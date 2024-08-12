@@ -36,6 +36,7 @@ type Node struct {
 	rawBlockHandler   nodetypes.RawBlockHandlerFn
 
 	// status info
+	startHeightInitialized   bool
 	lastProcessedBlockHeight uint64
 	running                  bool
 }
@@ -94,6 +95,10 @@ func NewNode(cfg nodetypes.NodeConfig, db types.DB, logger *zap.Logger, cdc code
 func (n *Node) Initialize(startHeight uint64) error {
 	// load sync info
 	return n.loadSyncInfo(startHeight)
+}
+
+func (n *Node) HeightInitialized() bool {
+	return n.startHeightInitialized
 }
 
 func (n *Node) Start(ctx context.Context) {

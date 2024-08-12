@@ -113,7 +113,7 @@ func (ch *Child) prepareOutput() error {
 
 	// initialize next output time
 	if ch.nextOutputTime.IsZero() && workingOutputIndex > 1 {
-		output, err := ch.host.QueryOutput(workingOutputIndex - 1)
+		output, err := ch.host.QueryOutput(ch.BridgeId(), workingOutputIndex-1)
 		if err != nil {
 			// TODO: maybe not return error here and roll back
 			return fmt.Errorf("output does not exist at index: %d", workingOutputIndex-1)
@@ -122,7 +122,7 @@ func (ch *Child) prepareOutput() error {
 		ch.nextOutputTime = output.OutputProposal.L1BlockTime.Add(ch.bridgeInfo.BridgeConfig.SubmissionInterval * 2 / 3)
 	}
 
-	output, err := ch.host.QueryOutput(ch.mk.GetWorkingTreeIndex())
+	output, err := ch.host.QueryOutput(ch.BridgeId(), ch.mk.GetWorkingTreeIndex())
 	if err != nil {
 		if strings.Contains(err.Error(), "collections: not found") {
 			return nil

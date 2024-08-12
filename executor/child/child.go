@@ -29,8 +29,8 @@ type hostNode interface {
 	HasKey() bool
 	BroadcastMsgs(btypes.ProcessedMsgs)
 	ProcessedMsgsToRawKV([]btypes.ProcessedMsgs, bool) ([]types.RawKV, error)
-	QueryLastOutput() (*ophosttypes.QueryOutputProposalResponse, error)
-	QueryOutput(uint64) (*ophosttypes.QueryOutputProposalResponse, error)
+	QueryLastOutput(uint64) (*ophosttypes.QueryOutputProposalResponse, error)
+	QueryOutput(uint64, uint64) (*ophosttypes.QueryOutputProposalResponse, error)
 
 	GetMsgProposeOutput(
 		bridgeId uint64,
