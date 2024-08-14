@@ -62,6 +62,9 @@ type BatchSubmitter struct {
 	homePath string
 
 	lastSubmissionTime time.Time
+
+	// status info
+	LastBatchEndBlockNumber uint64
 }
 
 func NewBatchSubmitter(

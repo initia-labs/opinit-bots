@@ -169,6 +169,7 @@ func (ch *Child) handleTree(blockHeight uint64, latestHeight uint64, blockId []b
 
 		ch.finalizingBlockHeight = 0
 		ch.nextOutputTime = blockHeader.Time.Add(ch.bridgeInfo.BridgeConfig.SubmissionInterval * 2 / 3)
+		ch.lastOutputTime = blockHeader.Time
 	}
 
 	err = ch.mk.SaveWorkingTree(blockHeight)

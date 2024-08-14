@@ -28,7 +28,7 @@ func (ch *Child) updateOracleHandler(_ context.Context, args nodetypes.EventHand
 	}
 
 	ch.handleUpdateOracle(l1BlockHeight, from)
-
+	ch.lastUpdatedOracleL1Height = l1BlockHeight
 	return nil
 }
 

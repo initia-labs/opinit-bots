@@ -163,14 +163,7 @@ func (ex *Executor) RegisterQuerier() {
 	})
 
 	ex.server.RegisterQuerier("/status", func(c *fiber.Ctx) error {
-		childHeight := ex.child.GetHeight()
-		hostHeight := ex.host.GetHeight()
-		res := map[string]uint64{
-			"child": childHeight,
-			"host":  hostHeight,
-		}
-
-		return c.JSON(res)
+		return c.JSON(ex.GetStatus())
 	})
 }
 

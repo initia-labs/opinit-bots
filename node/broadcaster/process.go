@@ -22,7 +22,7 @@ func (b Broadcaster) GetHeight() uint64 {
 func (b *Broadcaster) HandleNewBlock(block *rpccoretypes.ResultBlock, blockResult *rpccoretypes.ResultBlockResults, latestChainHeight uint64) error {
 	// check pending txs first
 	for _, tx := range block.Block.Txs {
-		if b.lenLocalPendingTx() == 0 {
+		if b.LenLocalPendingTx() == 0 {
 			break
 		}
 
@@ -37,7 +37,7 @@ func (b *Broadcaster) HandleNewBlock(block *rpccoretypes.ResultBlock, blockResul
 
 	// check timeout of pending txs
 	// @sh-cha: should we rebroadcast pending txs? or rasing monitoring alert?
-	if length := b.lenLocalPendingTx(); length > 0 {
+	if length := b.LenLocalPendingTx(); length > 0 {
 		b.logger.Debug("remaining pending txs", zap.Int64("height", block.Block.Height), zap.Int("count", length))
 		pendingTxTime := time.Unix(0, b.peekLocalPendingTx().Timestamp)
 		if block.Block.Time.After(pendingTxTime.Add(b.cfg.TxTimeout)) {
@@ -53,7 +53,7 @@ func (b *Broadcaster) HandleNewBlock(block *rpccoretypes.ResultBlock, blockResul
 
 // CheckPendingTx query tx info to check if pending tx is processed.
 func (b *Broadcaster) CheckPendingTx(ctx context.Context) (*btypes.PendingTxInfo, *rpccoretypes.ResultTx, error) {
-	if b.lenLocalPendingTx() == 0 {
+	if b.LenLocalPendingTx() == 0 {
 		return nil, nil, nil
 	}
 

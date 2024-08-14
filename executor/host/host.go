@@ -60,6 +60,10 @@ type Host struct {
 
 	processedMsgs []btypes.ProcessedMsgs
 	msgQueue      []sdk.Msg
+
+	// status info
+	lastProposedOutputIndex         uint64
+	lastProposedOutputL2BlockNumber uint64
 }
 
 func NewHost(

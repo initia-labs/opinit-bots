@@ -244,7 +244,7 @@ func (b *Broadcaster) peekLocalPendingTx() btypes.PendingTxInfo {
 	return b.pendingTxs[0]
 }
 
-func (b Broadcaster) lenLocalPendingTx() int {
+func (b Broadcaster) LenLocalPendingTx() int {
 	b.pendingTxMu.Lock()
 	defer b.pendingTxMu.Unlock()
 

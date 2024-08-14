@@ -129,6 +129,7 @@ func (bs *BatchSubmitter) prepareBatch(ctx context.Context, blockHeight uint64, 
 
 		// update last submission time
 		bs.lastSubmissionTime = blockTime
+		bs.LastBatchEndBlockNumber = blockHeight
 	}
 
 	// reset batch header
@@ -237,9 +238,9 @@ func (bs *BatchSubmitter) finalizeBatch(ctx context.Context, blockHeight uint64)
 }
 
 func (bs *BatchSubmitter) checkBatch(blockHeight uint64, blockTime time.Time) error {
-	info, err := bs.batchFile.Stat()
+	fileSize, err := bs.batchFileSize()
 	if err != nil {
-		return errors.Wrap(err, "failed to get batch file stat")
+		return err
 	}
 
 	// if the block time is after the last submission time + submission interval * 2/3
@@ -248,13 +249,24 @@ func (bs *BatchSubmitter) checkBatch(blockHeight uint64, blockTime time.Time) er
 	// then finalize the batch
 	if blockTime.After(bs.lastSubmissionTime.Add(bs.bridgeInfo.BridgeConfig.SubmissionInterval*2/3)) ||
 		blockTime.After(bs.lastSubmissionTime.Add(time.Duration(bs.batchCfg.MaxSubmissionTime)*time.Second)) ||
-		info.Size() > (bs.batchCfg.MaxChunks-1)*bs.batchCfg.MaxChunkSize {
+		fileSize > (bs.batchCfg.MaxChunks-1)*bs.batchCfg.MaxChunkSize {
 
 		// finalize the batch
 		bs.batchHeader.End = blockHeight
 	}
 
 	return nil
+}
+
+func (bs *BatchSubmitter) batchFileSize() (int64, error) {
+	if bs.batchFile == nil {
+		return 0, errors.New("batch file is not initialized")
+	}
+	info, err := bs.batchFile.Stat()
+	if err != nil {
+		return 0, errors.Wrap(err, "failed to get batch file stat")
+	}
+	return info.Size(), nil
 }
 
 // UpdateBatchInfo appends the batch info with the given chain, submitter, output index, and l2 block number

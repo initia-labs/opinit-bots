@@ -49,6 +49,8 @@ func (ch *Child) finalizeDepositHandler(_ context.Context, args nodetypes.EventH
 		}
 	}
 	ch.handleFinalizeDeposit(l1BlockHeight, l1Sequence, from, to, amount, baseDenom)
+	ch.lastFinalizedDepositL1BlockHeight = l1BlockHeight
+	ch.lastFinalizedDepositL1Sequence = l1Sequence
 	return nil
 }
 

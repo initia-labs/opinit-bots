@@ -61,6 +61,12 @@ type Child struct {
 
 	processedMsgs []btypes.ProcessedMsgs
 	msgQueue      []sdk.Msg
+
+	// status info
+	lastUpdatedOracleL1Height         uint64
+	lastFinalizedDepositL1BlockHeight uint64
+	lastFinalizedDepositL1Sequence    uint64
+	lastOutputTime                    time.Time
 }
 
 func NewChild(

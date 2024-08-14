@@ -45,7 +45,8 @@ func (h *Host) proposeOutputHandler(_ context.Context, args nodetypes.EventHandl
 	}
 
 	h.handleProposeOutput(bridgeId, proposer, outputIndex, l2BlockNumber, outputRoot)
-
+	h.lastProposedOutputIndex = outputIndex
+	h.lastProposedOutputL2BlockNumber = l2BlockNumber
 	return nil
 }
 

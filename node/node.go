@@ -188,6 +188,20 @@ func (n Node) MustGetBroadcaster() *broadcaster.Broadcaster {
 	return n.broadcaster
 }
 
+func (n Node) GetStatus() nodetypes.Status {
+	pendingTxs := 0
+	sequence := uint64(0)
+	if n.broadcaster != nil {
+		pendingTxs = n.broadcaster.LenLocalPendingTx()
+		sequence = n.broadcaster.GetTxf().Sequence()
+	}
+	return nodetypes.Status{
+		LastProcessedBlockHeight: n.GetHeight(),
+		PendingTxs:               pendingTxs,
+		Sequence:                 sequence,
+	}
+}
+
 func (n Node) GetRPCClient() *rpcclient.RPCClient {
 	return n.rpcClient
 }

@@ -5,6 +5,7 @@ import (
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	btypes "github.com/initia-labs/opinit-bots-go/node/broadcaster/types"
+	nodetypes "github.com/initia-labs/opinit-bots-go/node/types"
 	"github.com/initia-labs/opinit-bots-go/types"
 )
 
@@ -14,6 +15,7 @@ type DANode interface {
 	CreateBatchMsg([]byte) (sdk.Msg, error)
 	BroadcastMsgs(btypes.ProcessedMsgs)
 	ProcessedMsgsToRawKV(processedMsgs []btypes.ProcessedMsgs, delete bool) ([]types.RawKV, error)
+	GetNodeStatus() nodetypes.Status
 }
 
 // BatchHeader is the header of a batch

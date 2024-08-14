@@ -170,6 +170,11 @@ func (m *Merkle) GetWorkingTreeLeafCount() uint64 {
 	return m.workingTree.LeafCount
 }
 
+// GetStartLeafIndex returns the start leaf index of the working tree.
+func (m *Merkle) GetStartLeafIndex() uint64 {
+	return m.workingTree.StartLeafIndex
+}
+
 func (m *Merkle) saveNode(height uint8, localNodeIndex uint64, data []byte) error {
 	return m.db.Set(merkletypes.PrefixedNodeKey(m.GetWorkingTreeIndex(), height, localNodeIndex), data)
 }
