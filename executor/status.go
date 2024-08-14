@@ -9,18 +9,27 @@ import (
 
 type Status struct {
 	BridgeId int64            `json:"bridge_id"`
-	Host     host.Status      `json:"host"`
-	Child    child.Status     `json:"child"`
-	Batch    batch.Status     `json:"batch"`
-	DA       nodetypes.Status `json:"da"`
+	Host     host.Status      `json:"host,omitempty"`
+	Child    child.Status     `json:"child,omitempty"`
+	Batch    batch.Status     `json:"batch,omitempty"`
+	DA       nodetypes.Status `json:"da,omitempty"`
 }
 
-func (e Executor) GetStatus() Status {
-	return Status{
-		BridgeId: e.host.BridgeId(),
-		Host:     e.host.GetStatus(),
-		Child:    e.child.GetStatus(),
-		Batch:    e.batch.GetStatus(),
-		DA:       e.batch.DA().GetNodeStatus(),
+func (ex Executor) GetStatus() Status {
+	s := Status{
+		BridgeId: ex.host.BridgeId(),
 	}
+	if ex.host != nil {
+		s.Host = ex.host.GetStatus()
+	}
+	if ex.child != nil {
+		s.Child = ex.child.GetStatus()
+	}
+	if ex.batch != nil {
+		s.Batch = ex.batch.GetStatus()
+		if ex.batch.DA() != nil {
+			s.DA = ex.batch.DA().GetNodeStatus()
+		}
+	}
+	return s
 }

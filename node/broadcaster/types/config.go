@@ -5,10 +5,11 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/initia-labs/opinit-bots-go/keys"
+
 	"github.com/cosmos/cosmos-sdk/codec"
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	"github.com/initia-labs/opinit-bots-go/keys"
 )
 
 type BuildTxWithMessagesFn func(context.Context, []sdk.Msg) ([]byte, string, error)

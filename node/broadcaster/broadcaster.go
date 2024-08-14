@@ -8,13 +8,14 @@ import (
 
 	rpccoretypes "github.com/cometbft/cometbft/rpc/core/types"
 
+	"github.com/pkg/errors"
+
 	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/client/tx"
 	"github.com/cosmos/cosmos-sdk/codec"
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/tx/signing"
-	"github.com/pkg/errors"
 
 	btypes "github.com/initia-labs/opinit-bots-go/node/broadcaster/types"
 	"github.com/initia-labs/opinit-bots-go/node/rpcclient"

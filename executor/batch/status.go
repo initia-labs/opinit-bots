@@ -15,14 +15,14 @@ type Status struct {
 	LastBatchSubmissionTime time.Time             `json:"last_batch_submission_time"`
 }
 
-func (b BatchSubmitter) GetStatus() Status {
-	fileSize, _ := b.batchFileSize()
+func (bs BatchSubmitter) GetStatus() Status {
+	fileSize, _ := bs.batchFileSize()
 
 	return Status{
-		Node:                    b.node.GetStatus(),
-		BatchInfo:               b.BatchInfo().BatchInfo,
+		Node:                    bs.node.GetStatus(),
+		BatchInfo:               bs.BatchInfo().BatchInfo,
 		CurrentBatchFileSize:    fileSize,
-		LastBatchEndBlockNumber: b.LastBatchEndBlockNumber,
-		LastBatchSubmissionTime: b.lastSubmissionTime,
+		LastBatchEndBlockNumber: bs.LastBatchEndBlockNumber,
+		LastBatchSubmissionTime: bs.lastSubmissionTime,
 	}
 }

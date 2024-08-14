@@ -1,8 +1,9 @@
 package host
 
 import (
-	sdk "github.com/cosmos/cosmos-sdk/types"
 	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
+
+	sdk "github.com/cosmos/cosmos-sdk/types"
 )
 
 func (h Host) GetMsgProposeOutput(

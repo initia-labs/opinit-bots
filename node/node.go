@@ -7,14 +7,15 @@ import (
 	"github.com/pkg/errors"
 
 	"cosmossdk.io/core/address"
-	"github.com/cosmos/cosmos-sdk/client"
-	"github.com/cosmos/cosmos-sdk/codec"
 	"github.com/initia-labs/opinit-bots-go/node/broadcaster"
 	"github.com/initia-labs/opinit-bots-go/node/rpcclient"
 	nodetypes "github.com/initia-labs/opinit-bots-go/node/types"
 	"github.com/initia-labs/opinit-bots-go/types"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
+
+	"github.com/cosmos/cosmos-sdk/client"
+	"github.com/cosmos/cosmos-sdk/codec"
 )
 
 type Node struct {
@@ -189,17 +190,14 @@ func (n Node) MustGetBroadcaster() *broadcaster.Broadcaster {
 }
 
 func (n Node) GetStatus() nodetypes.Status {
-	pendingTxs := 0
-	sequence := uint64(0)
-	if n.broadcaster != nil {
-		pendingTxs = n.broadcaster.LenLocalPendingTx()
-		sequence = n.broadcaster.GetTxf().Sequence()
-	}
-	return nodetypes.Status{
+	s := nodetypes.Status{
 		LastProcessedBlockHeight: n.GetHeight(),
-		PendingTxs:               pendingTxs,
-		Sequence:                 sequence,
 	}
+	if n.broadcaster != nil {
+		s.PendingTxs = n.broadcaster.LenLocalPendingTx()
+		s.Sequence = n.broadcaster.GetTxf().Sequence()
+	}
+	return s
 }
 
 func (n Node) GetRPCClient() *rpcclient.RPCClient {

@@ -7,6 +7,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/cometbft/cometbft/crypto/merkle"
+
 	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/codec"
 	sdk "github.com/cosmos/cosmos-sdk/types"

@@ -17,11 +17,12 @@ import (
 	abci "github.com/cometbft/cometbft/abci/types"
 	client2 "github.com/cometbft/cometbft/rpc/client"
 	coretypes "github.com/cometbft/cometbft/rpc/core/types"
+	gogogrpc "github.com/cosmos/gogoproto/grpc"
+
 	"github.com/cosmos/cosmos-sdk/codec"
 	"github.com/cosmos/cosmos-sdk/codec/types"
 	legacyerrors "github.com/cosmos/cosmos-sdk/types/errors"
 	grpctypes "github.com/cosmos/cosmos-sdk/types/grpc"
-	gogogrpc "github.com/cosmos/gogoproto/grpc"
 
 	clienthttp "github.com/initia-labs/opinit-bots-go/client"
 )

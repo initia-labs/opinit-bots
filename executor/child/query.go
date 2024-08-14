@@ -5,8 +5,9 @@ import (
 	"encoding/json"
 
 	"cosmossdk.io/math"
-	sdk "github.com/cosmos/cosmos-sdk/types"
 	opchildtypes "github.com/initia-labs/OPinit/x/opchild/types"
+
+	sdk "github.com/cosmos/cosmos-sdk/types"
 
 	executortypes "github.com/initia-labs/opinit-bots-go/executor/types"
 	"github.com/initia-labs/opinit-bots-go/node/rpcclient"

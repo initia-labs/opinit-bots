@@ -6,8 +6,9 @@ import (
 	"strconv"
 
 	"cosmossdk.io/math"
-	sdk "github.com/cosmos/cosmos-sdk/types"
 	opchildtypes "github.com/initia-labs/OPinit/x/opchild/types"
+
+	sdk "github.com/cosmos/cosmos-sdk/types"
 
 	nodetypes "github.com/initia-labs/opinit-bots-go/node/types"
 	"go.uber.org/zap"

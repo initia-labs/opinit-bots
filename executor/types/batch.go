@@ -3,10 +3,11 @@ package types
 import (
 	"context"
 
-	sdk "github.com/cosmos/cosmos-sdk/types"
 	btypes "github.com/initia-labs/opinit-bots-go/node/broadcaster/types"
 	nodetypes "github.com/initia-labs/opinit-bots-go/node/types"
 	"github.com/initia-labs/opinit-bots-go/types"
+
+	sdk "github.com/cosmos/cosmos-sdk/types"
 )
 
 type DANode interface {
