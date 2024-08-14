@@ -100,7 +100,6 @@ func (ch *Child) prepareTree(blockHeight uint64) error {
 	err := ch.mk.LoadWorkingTree(blockHeight - 1)
 	if err == dbtypes.ErrNotFound {
 		// must not happened
-		// TODO: if user want to start from a specific height, we need to provide a way to do so
 		panic(fmt.Errorf("working tree not found at height: %d, current: %d", blockHeight-1, blockHeight))
 	} else if err != nil {
 		return err

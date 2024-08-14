@@ -85,7 +85,7 @@ func (b *Broadcaster) RemovePendingTx(blockHeight int64, txHash string, sequence
 		return err
 	}
 
-	b.logger.Debug("tx inserted", zap.Int64("height", blockHeight), zap.Uint64("sequence", sequence), zap.String("txHash", txHash))
+	b.logger.Info("tx inserted", zap.Int64("height", blockHeight), zap.Uint64("sequence", sequence), zap.String("txHash", txHash))
 	b.dequeueLocalPendingTx()
 
 	return nil

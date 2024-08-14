@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"go.uber.org/zap"
 
 	cmtproto "github.com/cometbft/cometbft/proto/tendermint/types"
 
@@ -226,6 +227,12 @@ func (bs *BatchSubmitter) finalizeBatch(ctx context.Context, blockHeight uint64)
 		return err
 	}
 
+	bs.logger.Info("finalize batch",
+		zap.Uint64("height", blockHeight),
+		zap.Uint64("batch end", bs.batchHeader.End),
+		zap.Int("chunks", len(checksums)),
+		zap.Int("txs", len(bs.processedMsgs)),
+	)
 	return nil
 }
 
@@ -242,8 +249,6 @@ func (bs *BatchSubmitter) checkBatch(blockHeight uint64, blockTime time.Time) er
 	if blockTime.After(bs.lastSubmissionTime.Add(bs.bridgeInfo.BridgeConfig.SubmissionInterval*2/3)) ||
 		blockTime.After(bs.lastSubmissionTime.Add(time.Duration(bs.batchCfg.MaxSubmissionTime)*time.Second)) ||
 		info.Size() > (bs.batchCfg.MaxChunks-1)*bs.batchCfg.MaxChunkSize {
-
-		// finalize the batch
 
 		// finalize the batch
 		bs.batchHeader.End = blockHeight
