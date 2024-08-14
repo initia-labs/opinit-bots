@@ -3,6 +3,7 @@ package types
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/cosmos/cosmos-sdk/codec"
@@ -10,11 +11,12 @@ import (
 )
 
 type PendingTxInfo struct {
-	ProcessedHeight uint64 `json:"height"`
-	Sequence        uint64 `json:"sequence"`
-	Tx              []byte `json:"tx"`
-	TxHash          string `json:"tx_hash"`
-	Timestamp       int64  `json:"timestamp"`
+	ProcessedHeight uint64   `json:"height"`
+	Sequence        uint64   `json:"sequence"`
+	Tx              []byte   `json:"tx"`
+	TxHash          string   `json:"tx_hash"`
+	Timestamp       int64    `json:"timestamp"`
+	MsgTypes        []string `json:"msg_types"`
 
 	// Save is true if the pending tx should be saved until processed.
 	// Save is false if the pending tx can be discarded even if it is not processed
@@ -32,7 +34,7 @@ func (p *PendingTxInfo) Unmarshal(data []byte) error {
 
 func (p PendingTxInfo) String() string {
 	tsStr := time.Unix(0, p.Timestamp).UTC().String()
-	return fmt.Sprintf("Pending tx: %s, sequence: %d at height: %d, %s", p.TxHash, p.Sequence, p.ProcessedHeight, tsStr)
+	return fmt.Sprintf("Pending tx: %s, msgs: %s, sequence: %d at height: %d, %s", p.TxHash, strings.Join(p.MsgTypes, ","), p.Sequence, p.ProcessedHeight, tsStr)
 }
 
 type ProcessedMsgs struct {
@@ -91,10 +93,14 @@ func (p *ProcessedMsgs) UnmarshalInterfaceJSON(cdc codec.Codec, data []byte) err
 }
 
 func (p ProcessedMsgs) String() string {
-	msgStr := ""
-	for _, msg := range p.Msgs {
-		msgStr += sdk.MsgTypeURL(msg) + ","
-	}
 	tsStr := time.Unix(0, p.Timestamp).UTC().String()
-	return fmt.Sprintf("Pending msgs: %s at %s", msgStr, tsStr)
+	return fmt.Sprintf("Pending msgs: %s at %s", strings.Join(p.GetMsgTypes(), ","), tsStr)
+}
+
+func (p ProcessedMsgs) GetMsgTypes() []string {
+	msgTypes := make([]string, 0, len(p.Msgs))
+	for _, msg := range p.Msgs {
+		msgTypes = append(msgTypes, sdk.MsgTypeURL(msg))
+	}
+	return msgTypes
 }

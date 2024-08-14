@@ -28,7 +28,7 @@ func (b *Broadcaster) HandleNewBlock(block *rpccoretypes.ResultBlock, blockResul
 
 		// check if the first pending tx is included in the block
 		if pendingTx := b.peekLocalPendingTx(); btypes.TxHash(tx) == pendingTx.TxHash {
-			err := b.RemovePendingTx(block.Block.Height, pendingTx.TxHash, pendingTx.Sequence)
+			err := b.RemovePendingTx(block.Block.Height, pendingTx.TxHash, pendingTx.Sequence, pendingTx.MsgTypes)
 			if err != nil {
 				return err
 			}
@@ -70,7 +70,7 @@ func (b *Broadcaster) CheckPendingTx(ctx context.Context) (*btypes.PendingTxInfo
 	}
 	res, err := b.rpcClient.QueryTx(ctx, txHash)
 	if err != nil {
-		b.logger.Debug("failed to query tx", zap.String("txHash", pendingTx.TxHash), zap.String("error", err.Error()))
+		b.logger.Debug("failed to query tx", zap.String("tx_hash", pendingTx.TxHash), zap.String("error", err.Error()))
 		return nil, nil, nil
 	}
 
@@ -79,13 +79,13 @@ func (b *Broadcaster) CheckPendingTx(ctx context.Context) (*btypes.PendingTxInfo
 
 // RemovePendingTx remove pending tx from local pending txs.
 // It is called when the pending tx is included in the block.
-func (b *Broadcaster) RemovePendingTx(blockHeight int64, txHash string, sequence uint64) error {
+func (b *Broadcaster) RemovePendingTx(blockHeight int64, txHash string, sequence uint64, msgTypes []string) error {
 	err := b.deletePendingTx(sequence)
 	if err != nil {
 		return err
 	}
 
-	b.logger.Info("tx inserted", zap.Int64("height", blockHeight), zap.Uint64("sequence", sequence), zap.String("txHash", txHash))
+	b.logger.Info("tx inserted", zap.Int64("height", blockHeight), zap.Uint64("sequence", sequence), zap.String("tx_hash", txHash), zap.Strings("msg_types", msgTypes))
 	b.dequeueLocalPendingTx()
 
 	return nil

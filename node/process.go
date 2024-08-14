@@ -227,13 +227,13 @@ func (n *Node) txChecker(ctx context.Context) error {
 
 				err := n.handleEvent(ctx, uint64(res.Height), 0, event)
 				if err != nil {
-					n.logger.Error("failed to handle event", zap.String("txHash", pendingTx.TxHash), zap.Int("event_index", eventIndex), zap.String("error", err.Error()))
+					n.logger.Error("failed to handle event", zap.String("tx_hash", pendingTx.TxHash), zap.Int("event_index", eventIndex), zap.String("error", err.Error()))
 					break
 				}
 			}
 		}
 
-		err = n.broadcaster.RemovePendingTx(res.Height, pendingTx.TxHash, pendingTx.Sequence)
+		err = n.broadcaster.RemovePendingTx(res.Height, pendingTx.TxHash, pendingTx.Sequence, pendingTx.MsgTypes)
 		if err != nil {
 			return err
 		}

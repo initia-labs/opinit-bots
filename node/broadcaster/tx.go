@@ -119,6 +119,7 @@ func (b *Broadcaster) handleProcessedMsgs(ctx context.Context, data btypes.Proce
 		Tx:              txBytes,
 		TxHash:          txHash,
 		Timestamp:       data.Timestamp,
+		MsgTypes:        data.GetMsgTypes(),
 		Save:            data.Save,
 	}
 
