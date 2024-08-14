@@ -190,12 +190,16 @@ func (n Node) MustGetBroadcaster() *broadcaster.Broadcaster {
 }
 
 func (n Node) GetStatus() nodetypes.Status {
-	s := nodetypes.Status{
-		LastProcessedBlockHeight: n.GetHeight(),
+	s := nodetypes.Status{}
+	if n.cfg.ProcessType != nodetypes.PROCESS_TYPE_ONLY_BROADCAST {
+		s.LastProcessedBlockHeight = n.GetHeight()
 	}
+
 	if n.broadcaster != nil {
-		s.PendingTxs = n.broadcaster.LenLocalPendingTx()
-		s.Sequence = n.broadcaster.GetTxf().Sequence()
+		s.Broadcaster = nodetypes.BroadcasterStatus{
+			PendingTxs: n.broadcaster.LenLocalPendingTx(),
+			Sequence:   n.broadcaster.GetTxf().Sequence(),
+		}
 	}
 	return s
 }
