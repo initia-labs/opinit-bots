@@ -71,11 +71,7 @@ type Config struct {
 	// L2 starts from the last submitted output l2 block number + 1 before L2StartHeight.
 	// L1 starts from the block number of the output tx + 1
 	L2StartHeight int64 `json:"l2_start_height"`
-	// BatchStartWithL2Height is the flag to start the batch same with the l2 height.
-	// If the latest height stored in the db is not 0, this config is ignored.
-	// If it is true, the batch will start from the last submitted output l2 block number + 1.
-	BatchStartWithL2Height bool `json:"batch_start_with_l2_height"`
-	// StartBatchHeight is the height to start the batch. If it is 0, it will start from the latest height.
+	// BatchStartHeight is the height to start the batch. If it is 0, it will start from the latest height.
 	// If the latest height stored in the db is not 0, this config is ignored.
 	BatchStartHeight int64 `json:"batch_start_height"`
 }
@@ -121,9 +117,8 @@ func DefaultConfig() *Config {
 		MaxChunkSize:      300000,  // 300KB
 		MaxSubmissionTime: 60 * 60, // 1 hour
 
-		L2StartHeight:          0,
-		BatchStartWithL2Height: false,
-		BatchStartHeight:       0,
+		L2StartHeight:    0,
+		BatchStartHeight: 0,
 	}
 }
 

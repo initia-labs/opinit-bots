@@ -239,11 +239,6 @@ func (ex *Executor) getStartHeights(ctx context.Context, bridgeId uint64) (l1Sta
 	if l1StartHeight > depositTxHeight {
 		l1StartHeight = depositTxHeight
 	}
-
-	if ex.cfg.BatchStartWithL2Height {
-		batchStartHeight = l2StartHeight
-	} else {
-		batchStartHeight = uint64(ex.cfg.BatchStartHeight) - 1
-	}
+	batchStartHeight = uint64(ex.cfg.BatchStartHeight) - 1
 	return l1StartHeight, l2StartHeight, startOutputIndex, batchStartHeight, err
 }

@@ -64,10 +64,6 @@ To configure the Executor, fill in the values in the `~/.opinit/executor.json` f
   // L2 starts from the last submitted output l2 block number + 1 before L2StartHeight.
   // L1 starts from the block number of the output tx + 1
   "l2_start_height": 0,
-  // BatchStartWithL2Height is the flag to start the batch same with the l2 height.
-  // If the latest height stored in the db is not 0, this config is ignored.
-  // If it is true, the batch will start from the last submitted output l2 block number + 1.
-  "batch_start_with_l2_height": false,
   // StartBatchHeight is the height to start the batch. If it is 0, it will start from the latest height.
   // If the latest height stored in the db is not 0, this config is ignored.
   "batch_start_height": 0
@@ -105,7 +101,6 @@ FinalizedTokenDeposit tx 2
 ```json
 {
   l2_start_height: 150, 
-  batch_start_with_l2_height: false, 
   batch_start_height: 0
 }
 ```
@@ -118,7 +113,6 @@ When Child's last l1 Sequence is `2`,
 ```json
 {
   l2_start_height: 150, 
-  batch_start_with_l2_height: false, 
   batch_start_height: 150
 }
 ```
@@ -131,27 +125,13 @@ When Child's last l1 Sequence is `2`,
 ```json
 {
   l2_start_height: 150, 
-  batch_start_with_l2_height: true, 
-  batch_start_height: 150
-}
-```
-When Child's last l1 Sequence is `2`,
-- L1 starts from the height 10 + 1 = 11
-- L2 starts from the height 100 + 1 = 101
-- Batch starts from the height 101
-
-#### Config 4
-```json
-{
-  l2_start_height: 150, 
-  batch_start_with_l2_height: true, 
   batch_start_height: 150
 }
 ```
 When Child's last l1 Sequence is `1`,
 - L1 starts from the height 5 + 1 = 6
 - L2 starts from the height 100 + 1 = 101
-- Batch starts from the height 101
+- Batch starts from the height 150
 
 
 ## Handler rules for the components of the Executor
