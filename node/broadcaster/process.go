@@ -102,11 +102,6 @@ func (b *Broadcaster) Start(ctx context.Context) error {
 		case data := <-b.txChannel:
 			var err error
 			for retry := 1; retry <= 10; retry++ {
-				select {
-				case <-ctx.Done():
-					return nil
-				default:
-				}
 				err = b.handleProcessedMsgs(ctx, data)
 				if err == nil {
 					break
@@ -119,7 +114,12 @@ func (b *Broadcaster) Start(ctx context.Context) error {
 				}
 				b.logger.Warn("retry", zap.Int("count", retry), zap.String("error", err.Error()))
 
-				time.Sleep(30 * time.Second)
+				timer := time.NewTimer(30 * time.Second)
+				select {
+				case <-ctx.Done():
+					return nil
+				case <-timer.C:
+				}
 			}
 			if err != nil {
 				return errors.Wrap(err, "failed to handle processed msgs")
