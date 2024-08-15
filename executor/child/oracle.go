@@ -1,6 +1,7 @@
 package child
 
 import (
+	"context"
 	"strconv"
 
 	opchildtypes "github.com/initia-labs/OPinit/x/opchild/types"
@@ -9,7 +10,7 @@ import (
 	"go.uber.org/zap"
 )
 
-func (ch *Child) updateOracleHandler(args nodetypes.EventHandlerArgs) error {
+func (ch *Child) updateOracleHandler(_ context.Context, args nodetypes.EventHandlerArgs) error {
 	var l1BlockHeight uint64
 	var from string
 	var err error
@@ -27,7 +28,7 @@ func (ch *Child) updateOracleHandler(args nodetypes.EventHandlerArgs) error {
 	}
 
 	ch.handleUpdateOracle(l1BlockHeight, from)
-
+	ch.lastUpdatedOracleL1Height = l1BlockHeight
 	return nil
 }
 

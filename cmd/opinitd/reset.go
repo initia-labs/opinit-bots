@@ -25,7 +25,7 @@ func resetDBCmd(ctx *cmdContext) *cobra.Command {
 				if err != nil {
 					return err
 				}
-				err = os.Remove(path.Join(ctx.homePath, "batch"))
+				err = os.RemoveAll(path.Join(ctx.homePath, "batch"))
 				if err != nil {
 					return err
 				}

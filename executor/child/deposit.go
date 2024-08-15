@@ -1,18 +1,20 @@
 package child
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 
 	"cosmossdk.io/math"
-	sdk "github.com/cosmos/cosmos-sdk/types"
 	opchildtypes "github.com/initia-labs/OPinit/x/opchild/types"
+
+	sdk "github.com/cosmos/cosmos-sdk/types"
 
 	nodetypes "github.com/initia-labs/opinit-bots-go/node/types"
 	"go.uber.org/zap"
 )
 
-func (ch *Child) finalizeDepositHandler(args nodetypes.EventHandlerArgs) error {
+func (ch *Child) finalizeDepositHandler(_ context.Context, args nodetypes.EventHandlerArgs) error {
 	var l1BlockHeight, l1Sequence uint64
 	var from, to, baseDenom string
 	var amount sdk.Coin
@@ -48,6 +50,8 @@ func (ch *Child) finalizeDepositHandler(args nodetypes.EventHandlerArgs) error {
 		}
 	}
 	ch.handleFinalizeDeposit(l1BlockHeight, l1Sequence, from, to, amount, baseDenom)
+	ch.lastFinalizedDepositL1BlockHeight = l1BlockHeight
+	ch.lastFinalizedDepositL1Sequence = l1Sequence
 	return nil
 }
 

@@ -7,6 +7,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/cometbft/cometbft/crypto/merkle"
+
 	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/codec"
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -93,9 +94,13 @@ func createCodec(bech32Prefix string) (codec.Codec, client.TxConfig, error) {
 }
 
 func (c *Celestia) Initialize(batch batchNode, bridgeId int64) error {
+	err := c.node.Initialize(0)
+	if err != nil {
+		return err
+	}
+
 	c.batch = batch
 	c.bridgeId = bridgeId
-	var err error
 	c.namespace, err = sh.NewV0Namespace(c.NamespaceID())
 	if err != nil {
 		return err

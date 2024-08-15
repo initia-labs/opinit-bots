@@ -1,11 +1,13 @@
 package celestia
 
 import (
+	"context"
+
 	nodetypes "github.com/initia-labs/opinit-bots-go/node/types"
 	"go.uber.org/zap"
 )
 
-func (c *Celestia) payForBlobsHandler(args nodetypes.EventHandlerArgs) error {
+func (c *Celestia) payForBlobsHandler(_ context.Context, args nodetypes.EventHandlerArgs) error {
 	var signer string
 	var blobSizes string
 	var namespaces string

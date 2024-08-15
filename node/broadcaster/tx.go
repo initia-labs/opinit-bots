@@ -119,6 +119,7 @@ func (b *Broadcaster) handleProcessedMsgs(ctx context.Context, data btypes.Proce
 		Tx:              txBytes,
 		TxHash:          txHash,
 		Timestamp:       data.Timestamp,
+		MsgTypes:        data.GetMsgTypes(),
 		Save:            data.Save,
 	}
 
@@ -191,7 +192,7 @@ func (b Broadcaster) adjustEstimatedGas(gasUsed uint64) (uint64, error) {
 		return gasUsed, nil
 	}
 
-	gas := btypes.GAS_ADJUSTMENT * float64(gasUsed)
+	gas := b.cfg.GasAdjustment * float64(gasUsed)
 	if math.IsInf(gas, 1) {
 		return 0, fmt.Errorf("infinite gas used")
 	}
@@ -243,7 +244,7 @@ func (b *Broadcaster) peekLocalPendingTx() btypes.PendingTxInfo {
 	return b.pendingTxs[0]
 }
 
-func (b Broadcaster) lenLocalPendingTx() int {
+func (b Broadcaster) LenLocalPendingTx() int {
 	b.pendingTxMu.Lock()
 	defer b.pendingTxMu.Unlock()
 

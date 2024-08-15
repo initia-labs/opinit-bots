@@ -2,6 +2,7 @@ package batch
 
 import (
 	"compress/gzip"
+	"context"
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
@@ -9,11 +10,13 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"go.uber.org/zap"
 
 	cmtproto "github.com/cometbft/cometbft/proto/tendermint/types"
 
-	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/gogoproto/proto"
+
+	sdk "github.com/cosmos/cosmos-sdk/types"
 
 	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
 
@@ -23,7 +26,7 @@ import (
 	"github.com/initia-labs/opinit-bots-go/types"
 )
 
-func (bs *BatchSubmitter) rawBlockHandler(args nodetypes.RawBlockArgs) error {
+func (bs *BatchSubmitter) rawBlockHandler(ctx context.Context, args nodetypes.RawBlockArgs) error {
 	if len(bs.processedMsgs) != 0 {
 		panic("must not happen, msgQueue should be empty")
 	}
@@ -34,7 +37,7 @@ func (bs *BatchSubmitter) rawBlockHandler(args nodetypes.RawBlockArgs) error {
 		return errors.Wrap(err, "failed to unmarshal block")
 	}
 
-	err = bs.prepareBatch(args.BlockHeight, pbb.Header.Time)
+	err = bs.prepareBatch(ctx, args.BlockHeight, pbb.Header.Time)
 	if err != nil {
 		return errors.Wrap(err, "failed to prepare batch")
 	}
@@ -79,7 +82,7 @@ func (bs *BatchSubmitter) rawBlockHandler(args nodetypes.RawBlockArgs) error {
 	return nil
 }
 
-func (bs *BatchSubmitter) prepareBatch(blockHeight uint64, blockTime time.Time) error {
+func (bs *BatchSubmitter) prepareBatch(ctx context.Context, blockHeight uint64, blockTime time.Time) error {
 	// check whether the requested block height is reached to the l2 block number of the next batch info.
 	if nextBatchInfo := bs.NextBatchInfo(); nextBatchInfo != nil && nextBatchInfo.Output.L2BlockNumber < blockHeight {
 		// if the next batch info is reached, finalize the current batch and update the batch info.
@@ -120,13 +123,14 @@ func (bs *BatchSubmitter) prepareBatch(blockHeight uint64, blockTime time.Time) 
 			return nil
 		}
 
-		err := bs.finalizeBatch(blockHeight)
+		err := bs.finalizeBatch(ctx, blockHeight)
 		if err != nil {
 			return errors.Wrap(err, "failed to finalize batch")
 		}
 
 		// update last submission time
 		bs.lastSubmissionTime = blockTime
+		bs.LastBatchEndBlockNumber = blockHeight
 	}
 
 	// reset batch header
@@ -152,10 +156,10 @@ func (bs *BatchSubmitter) handleBatch(blockBytes []byte) error {
 }
 
 // finalize batch and create batch messages
-func (bs *BatchSubmitter) finalizeBatch(blockHeight uint64) error {
+func (bs *BatchSubmitter) finalizeBatch(ctx context.Context, blockHeight uint64) error {
 
 	// write last block's commit to batch file
-	rawCommit, err := bs.node.GetRPCClient().QueryRawCommit(int64(blockHeight))
+	rawCommit, err := bs.node.GetRPCClient().QueryRawCommit(ctx, int64(blockHeight))
 	if err != nil {
 		return errors.Wrap(err, "failed to query raw commit")
 	}
@@ -225,13 +229,19 @@ func (bs *BatchSubmitter) finalizeBatch(blockHeight uint64) error {
 		return err
 	}
 
+	bs.logger.Info("finalize batch",
+		zap.Uint64("height", blockHeight),
+		zap.Uint64("batch end", bs.batchHeader.End),
+		zap.Int("chunks", len(checksums)),
+		zap.Int("txs", len(bs.processedMsgs)),
+	)
 	return nil
 }
 
 func (bs *BatchSubmitter) checkBatch(blockHeight uint64, blockTime time.Time) error {
-	info, err := bs.batchFile.Stat()
+	fileSize, err := bs.batchFileSize()
 	if err != nil {
-		return errors.Wrap(err, "failed to get batch file stat")
+		return err
 	}
 
 	// if the block time is after the last submission time + submission interval * 2/3
@@ -240,9 +250,7 @@ func (bs *BatchSubmitter) checkBatch(blockHeight uint64, blockTime time.Time) er
 	// then finalize the batch
 	if blockTime.After(bs.lastSubmissionTime.Add(bs.bridgeInfo.BridgeConfig.SubmissionInterval*2/3)) ||
 		blockTime.After(bs.lastSubmissionTime.Add(time.Duration(bs.batchCfg.MaxSubmissionTime)*time.Second)) ||
-		info.Size() > (bs.batchCfg.MaxChunks-1)*bs.batchCfg.MaxChunkSize {
-
-		// finalize the batch
+		fileSize > (bs.batchCfg.MaxChunks-1)*bs.batchCfg.MaxChunkSize {
 
 		// finalize the batch
 		bs.batchHeader.End = blockHeight
@@ -251,10 +259,26 @@ func (bs *BatchSubmitter) checkBatch(blockHeight uint64, blockTime time.Time) er
 	return nil
 }
 
+func (bs *BatchSubmitter) batchFileSize() (int64, error) {
+	if bs.batchFile == nil {
+		return 0, errors.New("batch file is not initialized")
+	}
+	info, err := bs.batchFile.Stat()
+	if err != nil {
+		return 0, errors.Wrap(err, "failed to get batch file stat")
+	}
+	return info.Size(), nil
+}
+
 // UpdateBatchInfo appends the batch info with the given chain, submitter, output index, and l2 block number
 func (bs *BatchSubmitter) UpdateBatchInfo(chain string, submitter string, outputIndex uint64, l2BlockNumber uint64) {
 	bs.batchInfoMu.Lock()
 	defer bs.batchInfoMu.Unlock()
+
+	// check if the batch info is already updated
+	if bs.batchInfos[len(bs.batchInfos)-1].Output.L2BlockNumber >= l2BlockNumber {
+		return
+	}
 
 	bs.batchInfos = append(bs.batchInfos, ophosttypes.BatchInfoWithOutput{
 		BatchInfo: ophosttypes.BatchInfo{

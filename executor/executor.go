@@ -20,7 +20,6 @@ import (
 	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
 	"github.com/initia-labs/opinit-bots-go/types"
 	"go.uber.org/zap"
-	"golang.org/x/sync/errgroup"
 )
 
 var _ bottypes.Bot = &Executor{}
@@ -47,22 +46,22 @@ func NewExecutor(cfg *executortypes.Config, db types.DB, sv *server.Server, logg
 		panic(err)
 	}
 
-	executor := &Executor{
+	return &Executor{
 		host: host.NewHost(
 			cfg.Version, cfg.RelayOracle, cfg.L1NodeConfig(homePath),
 			db.WithPrefix([]byte(executortypes.HostNodeName)),
-			logger.Named(executortypes.HostNodeName), cfg.L1Bech32Prefix, "",
+			logger.Named(executortypes.HostNodeName), cfg.L1Node.Bech32Prefix, "",
 		),
 		child: child.NewChild(
 			cfg.Version, cfg.L2NodeConfig(homePath),
 			db.WithPrefix([]byte(executortypes.ChildNodeName)),
-			logger.Named(executortypes.ChildNodeName), cfg.L2Bech32Prefix,
+			logger.Named(executortypes.ChildNodeName), cfg.L2Node.Bech32Prefix,
 		),
 		batch: batch.NewBatchSubmitter(
 			cfg.Version, cfg.L2NodeConfig(homePath),
 			cfg.BatchConfig(), db.WithPrefix([]byte(executortypes.BatchNodeName)),
-			logger.Named(executortypes.BatchNodeName), cfg.L2ChainID, homePath,
-			cfg.DABech32Prefix,
+			logger.Named(executortypes.BatchNodeName), cfg.L2Node.ChainID, homePath,
+			cfg.L2Node.Bech32Prefix,
 		),
 
 		cfg:    cfg,
@@ -72,52 +71,58 @@ func NewExecutor(cfg *executortypes.Config, db types.DB, sv *server.Server, logg
 
 		homePath: homePath,
 	}
+}
 
-	bridgeInfo, err := executor.child.QueryBridgeInfo()
+func (ex *Executor) Initialize(ctx context.Context) error {
+	bridgeInfo, err := ex.child.QueryBridgeInfo(ctx)
 	if err != nil {
-		panic(err)
+		return err
 	}
 	if bridgeInfo.BridgeId == 0 {
-		panic("bridge info is not set")
+		return errors.New("bridge info is not set")
 	}
 
-	executor.logger.Info(
+	ex.logger.Info(
 		"bridge info",
 		zap.Uint64("id", bridgeInfo.BridgeId),
 		zap.Duration("submission_interval", bridgeInfo.BridgeConfig.SubmissionInterval),
 	)
 
-	err = executor.host.Initialize(executor.child, executor.batch, int64(bridgeInfo.BridgeId))
+	hostStartHeight, childStartHeight, startOutputIndex, batchStartHeight, err := ex.getStartHeights(ctx, bridgeInfo.BridgeId)
 	if err != nil {
-		panic(err)
-	}
-	err = executor.child.Initialize(executor.host, bridgeInfo)
-	if err != nil {
-		panic(err)
-	}
-	err = executor.batch.Initialize(executor.host, bridgeInfo)
-	if err != nil {
-		panic(err)
+		return err
 	}
 
-	da, err := executor.makeDANode(int64(bridgeInfo.BridgeId))
+	err = ex.host.Initialize(ctx, hostStartHeight, ex.child, ex.batch, int64(bridgeInfo.BridgeId))
 	if err != nil {
-		panic(err)
+		return err
 	}
-	err = executor.batch.SetDANode(da)
+	err = ex.child.Initialize(childStartHeight, startOutputIndex, ex.host, bridgeInfo)
 	if err != nil {
-		panic(err)
+		return err
+	}
+	err = ex.batch.Initialize(ctx, batchStartHeight, ex.host, bridgeInfo)
+	if err != nil {
+		return err
 	}
 
-	executor.RegisterQuerier()
-	return executor
+	da, err := ex.makeDANode(int64(bridgeInfo.BridgeId))
+	if err != nil {
+		return err
+	}
+	err = ex.batch.SetDANode(da)
+	if err != nil {
+		return err
+	}
+
+	ex.RegisterQuerier()
+	return nil
 }
 
-func (ex *Executor) Start(cmdCtx context.Context) error {
+func (ex *Executor) Start(ctx context.Context) error {
 	defer ex.Close()
-	errGrp, ctx := errgroup.WithContext(cmdCtx)
-	ctx = context.WithValue(ctx, types.ContextKeyErrGrp, errGrp)
 
+	errGrp := types.ErrGrp(ctx)
 	errGrp.Go(func() (err error) {
 		<-ctx.Done()
 		return ex.server.Shutdown()
@@ -158,14 +163,7 @@ func (ex *Executor) RegisterQuerier() {
 	})
 
 	ex.server.RegisterQuerier("/status", func(c *fiber.Ctx) error {
-		childHeight := ex.child.GetHeight()
-		hostHeight := ex.host.GetHeight()
-		res := map[string]uint64{
-			"child": childHeight,
-			"host":  hostHeight,
-		}
-
-		return c.JSON(res)
+		return c.JSON(ex.GetStatus())
 	})
 }
 
@@ -177,7 +175,7 @@ func (ex *Executor) makeDANode(bridgeId int64) (executortypes.DANode, error) {
 			ex.cfg.Version, false, ex.cfg.DANodeConfig(ex.homePath),
 			ex.db.WithPrefix([]byte(executortypes.DAHostNodeName)),
 			ex.logger.Named(executortypes.DAHostNodeName),
-			ex.cfg.DABech32Prefix, batchInfo.BatchInfo.Submitter,
+			ex.cfg.DANode.Bech32Prefix, batchInfo.BatchInfo.Submitter,
 		)
 		if ex.host.GetAddress().Equals(da.GetAddress()) {
 			return ex.host, nil
@@ -189,7 +187,7 @@ func (ex *Executor) makeDANode(bridgeId int64) (executortypes.DANode, error) {
 		da := celestia.NewDACelestia(ex.cfg.Version, ex.cfg.DANodeConfig(ex.homePath),
 			ex.db.WithPrefix([]byte(executortypes.DACelestiaNodeName)),
 			ex.logger.Named(executortypes.DACelestiaNodeName),
-			ex.cfg.DABech32Prefix, batchInfo.BatchInfo.Submitter,
+			ex.cfg.DANode.Bech32Prefix, batchInfo.BatchInfo.Submitter,
 		)
 		err := da.Initialize(ex.batch, bridgeId)
 		if err != nil {
@@ -200,4 +198,40 @@ func (ex *Executor) makeDANode(bridgeId int64) (executortypes.DANode, error) {
 	}
 
 	return nil, fmt.Errorf("unsupported chain id for DA: %s", ophosttypes.BatchInfo_ChainType_name[int32(batchInfo.BatchInfo.ChainType)])
+}
+
+func (ex *Executor) getStartHeights(ctx context.Context, bridgeId uint64) (l1StartHeight uint64, l2StartHeight uint64, startOutputIndex uint64, batchStartHeight uint64, err error) {
+	// get the bridge start height from the host
+	l1StartHeight, err = ex.host.QueryCreateBridgeHeight(ctx, bridgeId)
+	if err != nil {
+		return 0, 0, 0, 0, err
+	}
+
+	// get the last submitted output height before the start height from the host
+	if ex.cfg.L2StartHeight != 0 {
+		output, err := ex.host.QueryOutputByL2BlockNumber(ctx, bridgeId, uint64(ex.cfg.L2StartHeight))
+		if err != nil {
+			return 0, 0, 0, 0, err
+		} else if output != nil {
+			l1StartHeight = output.OutputProposal.L1BlockNumber
+			l2StartHeight = output.OutputProposal.L2BlockNumber
+			startOutputIndex = output.OutputIndex + 1
+		} else {
+			startOutputIndex = 1
+		}
+	}
+	// get the last deposit tx height from the host
+	l1Sequence, err := ex.child.QueryNextL1Sequence(ctx)
+	if err != nil {
+		return 0, 0, 0, 0, err
+	}
+	depositTxHeight, err := ex.host.QueryDepositTxHeight(ctx, bridgeId, l1Sequence-1)
+	if err != nil {
+		return 0, 0, 0, 0, err
+	}
+	if l1StartHeight > depositTxHeight {
+		l1StartHeight = depositTxHeight
+	}
+	batchStartHeight = uint64(ex.cfg.BatchStartHeight) - 1
+	return l1StartHeight, l2StartHeight, startOutputIndex, batchStartHeight, err
 }

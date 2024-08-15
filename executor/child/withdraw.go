@@ -1,6 +1,7 @@
 package child
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -19,7 +20,7 @@ import (
 	nodetypes "github.com/initia-labs/opinit-bots-go/node/types"
 )
 
-func (ch *Child) initiateWithdrawalHandler(args nodetypes.EventHandlerArgs) error {
+func (ch *Child) initiateWithdrawalHandler(_ context.Context, args nodetypes.EventHandlerArgs) error {
 	var l2Sequence, amount uint64
 	var from, to, baseDenom string
 	var err error
@@ -86,14 +87,17 @@ func (ch *Child) handleInitiateWithdrawal(l2Sequence uint64, from string, to str
 }
 
 func (ch *Child) prepareTree(blockHeight uint64) error {
-	if blockHeight == 1 {
-		return ch.mk.InitializeWorkingTree(1, 1)
+	if ch.initializeTreeFn != nil {
+		var err error
+		ch.initializeTree.Do(func() {
+			err = ch.initializeTreeFn()
+		})
+		return err
 	}
 
 	err := ch.mk.LoadWorkingTree(blockHeight - 1)
 	if err == dbtypes.ErrNotFound {
 		// must not happened
-		// TODO: if user want to start from a specific height, we need to provide a way to do so
 		panic(fmt.Errorf("working tree not found at height: %d, current: %d", blockHeight-1, blockHeight))
 	} else if err != nil {
 		return err
@@ -102,12 +106,12 @@ func (ch *Child) prepareTree(blockHeight uint64) error {
 	return nil
 }
 
-func (ch *Child) prepareOutput() error {
+func (ch *Child) prepareOutput(ctx context.Context) error {
 	workingOutputIndex := ch.mk.GetWorkingTreeIndex()
 
 	// initialize next output time
 	if ch.nextOutputTime.IsZero() && workingOutputIndex > 1 {
-		output, err := ch.host.QueryOutput(workingOutputIndex - 1)
+		output, err := ch.host.QueryOutput(ctx, ch.BridgeId(), workingOutputIndex-1)
 		if err != nil {
 			// TODO: maybe not return error here and roll back
 			return fmt.Errorf("output does not exist at index: %d", workingOutputIndex-1)
@@ -116,7 +120,7 @@ func (ch *Child) prepareOutput() error {
 		ch.nextOutputTime = output.OutputProposal.L1BlockTime.Add(ch.bridgeInfo.BridgeConfig.SubmissionInterval * 2 / 3)
 	}
 
-	output, err := ch.host.QueryOutput(ch.mk.GetWorkingTreeIndex())
+	output, err := ch.host.QueryOutput(ctx, ch.BridgeId(), ch.mk.GetWorkingTreeIndex())
 	if err != nil {
 		if strings.Contains(err.Error(), "collections: not found") {
 			return nil
@@ -163,6 +167,7 @@ func (ch *Child) handleTree(blockHeight uint64, latestHeight uint64, blockId []b
 
 		ch.finalizingBlockHeight = 0
 		ch.nextOutputTime = blockHeader.Time.Add(ch.bridgeInfo.BridgeConfig.SubmissionInterval * 2 / 3)
+		ch.lastOutputTime = blockHeader.Time
 	}
 
 	err = ch.mk.SaveWorkingTree(blockHeight)

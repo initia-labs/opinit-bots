@@ -7,14 +7,15 @@ import (
 	"github.com/pkg/errors"
 
 	"cosmossdk.io/core/address"
-	"github.com/cosmos/cosmos-sdk/client"
-	"github.com/cosmos/cosmos-sdk/codec"
 	"github.com/initia-labs/opinit-bots-go/node/broadcaster"
 	"github.com/initia-labs/opinit-bots-go/node/rpcclient"
 	nodetypes "github.com/initia-labs/opinit-bots-go/node/types"
 	"github.com/initia-labs/opinit-bots-go/types"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
+
+	"github.com/cosmos/cosmos-sdk/client"
+	"github.com/cosmos/cosmos-sdk/codec"
 )
 
 type Node struct {
@@ -36,6 +37,7 @@ type Node struct {
 	rawBlockHandler   nodetypes.RawBlockHandlerFn
 
 	// status info
+	startHeightInitialized   bool
 	lastProcessedBlockHeight uint64
 	running                  bool
 }
@@ -62,39 +64,42 @@ func NewNode(cfg nodetypes.NodeConfig, db types.DB, logger *zap.Logger, cdc code
 		cdc:      cdc,
 		txConfig: txConfig,
 	}
-
 	// check if node is catching up
-	status, err := rpcClient.Status(context.Background())
+	status, err := n.rpcClient.Status(context.Background())
 	if err != nil {
 		return nil, err
 	}
 	if status.SyncInfo.CatchingUp {
 		return nil, errors.New("node is catching up")
 	}
-
 	// create broadcaster
-	if cfg.BroadcasterConfig != nil {
+	if n.cfg.BroadcasterConfig != nil {
 		n.broadcaster, err = broadcaster.NewBroadcaster(
-			*cfg.BroadcasterConfig,
-			db,
-			logger,
-			cdc,
-			txConfig,
-			rpcClient,
+			*n.cfg.BroadcasterConfig,
+			n.db,
+			n.logger,
+			n.cdc,
+			n.txConfig,
+			n.rpcClient,
 			status,
 		)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to create broadcaster")
 		}
 	}
-
-	// load sync info
-	err = n.loadSyncInfo()
-	if err != nil {
-		return nil, err
-	}
-
 	return n, nil
+}
+
+// StartHeight is the height to start processing.
+// If it is 0, the latest height is used.
+// If the latest height exists in the database, this is ignored.
+func (n *Node) Initialize(startHeight uint64) error {
+	// load sync info
+	return n.loadSyncInfo(startHeight)
+}
+
+func (n *Node) HeightInitialized() bool {
+	return n.startHeightInitialized
 }
 
 func (n *Node) Start(ctx context.Context) {
@@ -182,6 +187,21 @@ func (n Node) MustGetBroadcaster() *broadcaster.Broadcaster {
 	}
 
 	return n.broadcaster
+}
+
+func (n Node) GetStatus() nodetypes.Status {
+	s := nodetypes.Status{}
+	if n.cfg.ProcessType != nodetypes.PROCESS_TYPE_ONLY_BROADCAST {
+		s.LastProcessedBlockHeight = n.GetHeight()
+	}
+
+	if n.broadcaster != nil {
+		s.Broadcaster = nodetypes.BroadcasterStatus{
+			PendingTxs: n.broadcaster.LenLocalPendingTx(),
+			Sequence:   n.broadcaster.GetTxf().Sequence(),
+		}
+	}
+	return s
 }
 
 func (n Node) GetRPCClient() *rpcclient.RPCClient {

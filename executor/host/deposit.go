@@ -1,6 +1,7 @@
 package host
 
 import (
+	"context"
 	"encoding/hex"
 	"errors"
 	"strconv"
@@ -12,7 +13,7 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 )
 
-func (h *Host) initiateDepositHandler(args nodetypes.EventHandlerArgs) error {
+func (h *Host) initiateDepositHandler(_ context.Context, args nodetypes.EventHandlerArgs) error {
 	var bridgeId uint64
 	var l1Sequence uint64
 	var from, to, l1Denom, l2Denom, amount string

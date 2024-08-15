@@ -1,6 +1,8 @@
 package types
 
 import (
+	"context"
+
 	abcitypes "github.com/cometbft/cometbft/abci/types"
 	cmtproto "github.com/cometbft/cometbft/proto/tendermint/types"
 	comettypes "github.com/cometbft/cometbft/types"
@@ -13,7 +15,7 @@ type EventHandlerArgs struct {
 	EventAttributes []abcitypes.EventAttribute
 }
 
-type EventHandlerFn func(EventHandlerArgs) error
+type EventHandlerFn func(context.Context, EventHandlerArgs) error
 
 type TxHandlerArgs struct {
 	BlockHeight  uint64
@@ -22,7 +24,7 @@ type TxHandlerArgs struct {
 	Tx           comettypes.Tx
 }
 
-type TxHandlerFn func(TxHandlerArgs) error
+type TxHandlerFn func(context.Context, TxHandlerArgs) error
 
 type BeginBlockArgs struct {
 	BlockID      []byte
@@ -30,7 +32,7 @@ type BeginBlockArgs struct {
 	LatestHeight uint64
 }
 
-type BeginBlockHandlerFn func(BeginBlockArgs) error
+type BeginBlockHandlerFn func(context.Context, BeginBlockArgs) error
 
 type EndBlockArgs struct {
 	BlockID      []byte
@@ -38,11 +40,11 @@ type EndBlockArgs struct {
 	LatestHeight uint64
 }
 
-type EndBlockHandlerFn func(EndBlockArgs) error
+type EndBlockHandlerFn func(context.Context, EndBlockArgs) error
 
 type RawBlockArgs struct {
 	BlockHeight uint64
 	BlockBytes  []byte
 }
 
-type RawBlockHandlerFn func(RawBlockArgs) error
+type RawBlockHandlerFn func(context.Context, RawBlockArgs) error

@@ -6,11 +6,18 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/spf13/cobra"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/initia-labs/opinit-bots-go/bot"
 	bottypes "github.com/initia-labs/opinit-bots-go/bot/types"
+	"github.com/initia-labs/opinit-bots-go/types"
+)
+
+const (
+	flagPollingInterval = "polling-interval"
 )
 
 func startCmd(ctx *cmdContext) *cobra.Command {
@@ -37,11 +44,23 @@ Currently supported bots:
 			cmdCtx, botDone := context.WithCancel(cmd.Context())
 			gracefulShutdown(botDone)
 
-			return bot.Start(cmdCtx)
+			errGrp, ctx := errgroup.WithContext(cmdCtx)
+			ctx = types.WithErrGrp(ctx, errGrp)
+			interval, err := cmd.Flags().GetDuration(flagPollingInterval)
+			if err != nil {
+				return err
+			}
+			ctx = types.WithPollingInterval(ctx, interval)
+			err = bot.Initialize(ctx)
+			if err != nil {
+				return err
+			}
+			return bot.Start(ctx)
 		},
 	}
 
 	cmd = configFlag(ctx.v, cmd)
+	cmd.Flags().Duration(flagPollingInterval, 100*time.Millisecond, "Polling interval in milliseconds")
 	return cmd
 }
 

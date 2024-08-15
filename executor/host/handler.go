@@ -1,6 +1,7 @@
 package host
 
 import (
+	"context"
 	"time"
 
 	"github.com/initia-labs/opinit-bots-go/types"
@@ -11,7 +12,7 @@ import (
 	nodetypes "github.com/initia-labs/opinit-bots-go/node/types"
 )
 
-func (h *Host) beginBlockHandler(args nodetypes.BeginBlockArgs) error {
+func (h *Host) beginBlockHandler(_ context.Context, args nodetypes.BeginBlockArgs) error {
 	blockHeight := uint64(args.Block.Header.Height)
 	// just to make sure that childMsgQueue is empty
 	if blockHeight == args.LatestHeight && len(h.msgQueue) != 0 && len(h.processedMsgs) != 0 {
@@ -20,7 +21,7 @@ func (h *Host) beginBlockHandler(args nodetypes.BeginBlockArgs) error {
 	return nil
 }
 
-func (h *Host) endBlockHandler(args nodetypes.EndBlockArgs) error {
+func (h *Host) endBlockHandler(_ context.Context, args nodetypes.EndBlockArgs) error {
 	// temporary 50 limit for msg queue
 	// collect more msgs if block height is not latest
 	blockHeight := uint64(args.Block.Header.Height)
@@ -61,7 +62,7 @@ func (h *Host) endBlockHandler(args nodetypes.EndBlockArgs) error {
 	return nil
 }
 
-func (h *Host) txHandler(args nodetypes.TxHandlerArgs) error {
+func (h *Host) txHandler(_ context.Context, args nodetypes.TxHandlerArgs) error {
 	if args.BlockHeight == args.LatestHeight && args.TxIndex == 0 {
 		if msg, err := h.oracleTxHandler(args.BlockHeight, args.Tx); err != nil {
 			return err

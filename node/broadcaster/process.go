@@ -20,16 +20,15 @@ func (b Broadcaster) GetHeight() uint64 {
 
 // HandleNewBlock is called when a new block is received.
 func (b *Broadcaster) HandleNewBlock(block *rpccoretypes.ResultBlock, blockResult *rpccoretypes.ResultBlockResults, latestChainHeight uint64) error {
-
 	// check pending txs first
 	for _, tx := range block.Block.Txs {
-		if b.lenLocalPendingTx() == 0 {
+		if b.LenLocalPendingTx() == 0 {
 			break
 		}
 
 		// check if the first pending tx is included in the block
 		if pendingTx := b.peekLocalPendingTx(); btypes.TxHash(tx) == pendingTx.TxHash {
-			err := b.RemovePendingTx(block.Block.Height, pendingTx.TxHash, pendingTx.Sequence)
+			err := b.RemovePendingTx(block.Block.Height, pendingTx.TxHash, pendingTx.Sequence, pendingTx.MsgTypes)
 			if err != nil {
 				return err
 			}
@@ -38,10 +37,10 @@ func (b *Broadcaster) HandleNewBlock(block *rpccoretypes.ResultBlock, blockResul
 
 	// check timeout of pending txs
 	// @sh-cha: should we rebroadcast pending txs? or rasing monitoring alert?
-	if length := b.lenLocalPendingTx(); length > 0 {
+	if length := b.LenLocalPendingTx(); length > 0 {
 		b.logger.Debug("remaining pending txs", zap.Int64("height", block.Block.Height), zap.Int("count", length))
 		pendingTxTime := time.Unix(0, b.peekLocalPendingTx().Timestamp)
-		if block.Block.Time.After(pendingTxTime.Add(btypes.TX_TIMEOUT)) {
+		if block.Block.Time.After(pendingTxTime.Add(b.cfg.TxTimeout)) {
 			panic(fmt.Errorf("something wrong, pending txs are not processed for a long time; current block time: %s, pending tx processing time: %s", block.Block.Time.UTC().String(), pendingTxTime.UTC().String()))
 		}
 	}
@@ -53,14 +52,14 @@ func (b *Broadcaster) HandleNewBlock(block *rpccoretypes.ResultBlock, blockResul
 }
 
 // CheckPendingTx query tx info to check if pending tx is processed.
-func (b *Broadcaster) CheckPendingTx() (*btypes.PendingTxInfo, *rpccoretypes.ResultTx, error) {
-	if b.lenLocalPendingTx() == 0 {
+func (b *Broadcaster) CheckPendingTx(ctx context.Context) (*btypes.PendingTxInfo, *rpccoretypes.ResultTx, error) {
+	if b.LenLocalPendingTx() == 0 {
 		return nil, nil, nil
 	}
 
 	pendingTx := b.peekLocalPendingTx()
 	pendingTxTime := time.Unix(0, b.peekLocalPendingTx().Timestamp)
-	if time.Now().After(pendingTxTime.Add(btypes.TX_TIMEOUT)) {
+	if time.Now().After(pendingTxTime.Add(b.cfg.TxTimeout)) {
 		// @sh-cha: should we rebroadcast pending txs? or rasing monitoring alert?
 		panic(fmt.Errorf("something wrong, pending txs are not processed for a long time; current block time: %s, pending tx processing time: %s", time.Now().UTC().String(), pendingTxTime.UTC().String()))
 	}
@@ -69,9 +68,9 @@ func (b *Broadcaster) CheckPendingTx() (*btypes.PendingTxInfo, *rpccoretypes.Res
 	if err != nil {
 		return nil, nil, err
 	}
-	res, err := b.rpcClient.QueryTx(txHash)
+	res, err := b.rpcClient.QueryTx(ctx, txHash)
 	if err != nil {
-		b.logger.Debug("failed to query tx", zap.String("txHash", pendingTx.TxHash), zap.String("error", err.Error()))
+		b.logger.Debug("failed to query tx", zap.String("tx_hash", pendingTx.TxHash), zap.String("error", err.Error()))
 		return nil, nil, nil
 	}
 
@@ -80,13 +79,13 @@ func (b *Broadcaster) CheckPendingTx() (*btypes.PendingTxInfo, *rpccoretypes.Res
 
 // RemovePendingTx remove pending tx from local pending txs.
 // It is called when the pending tx is included in the block.
-func (b *Broadcaster) RemovePendingTx(blockHeight int64, txHash string, sequence uint64) error {
+func (b *Broadcaster) RemovePendingTx(blockHeight int64, txHash string, sequence uint64, msgTypes []string) error {
 	err := b.deletePendingTx(sequence)
 	if err != nil {
 		return err
 	}
 
-	b.logger.Debug("tx inserted", zap.Int64("height", blockHeight), zap.Uint64("sequence", sequence), zap.String("txHash", txHash))
+	b.logger.Info("tx inserted", zap.Int64("height", blockHeight), zap.Uint64("sequence", sequence), zap.String("tx_hash", txHash), zap.Strings("msg_types", msgTypes))
 	b.dequeueLocalPendingTx()
 
 	return nil
@@ -103,11 +102,6 @@ func (b *Broadcaster) Start(ctx context.Context) error {
 		case data := <-b.txChannel:
 			var err error
 			for retry := 1; retry <= 10; retry++ {
-				select {
-				case <-ctx.Done():
-					return nil
-				default:
-				}
 				err = b.handleProcessedMsgs(ctx, data)
 				if err == nil {
 					break
@@ -115,11 +109,16 @@ func (b *Broadcaster) Start(ctx context.Context) error {
 					break
 				} else if !data.Save {
 					// if the message does not need to be saved, we can skip retry
+					err = nil
 					break
 				}
-				b.logger.Warn("retry", zap.Int("count", retry), zap.String("error", err.Error()))
-
-				time.Sleep(30 * time.Second)
+				b.logger.Warn("retry to handle processed msgs after 30 seconds", zap.Int("count", retry), zap.String("error", err.Error()))
+				timer := time.NewTimer(30 * time.Second)
+				select {
+				case <-ctx.Done():
+					return nil
+				case <-timer.C:
+				}
 			}
 			if err != nil {
 				return errors.Wrap(err, "failed to handle processed msgs")

@@ -8,13 +8,14 @@ import (
 
 	rpccoretypes "github.com/cometbft/cometbft/rpc/core/types"
 
+	"github.com/pkg/errors"
+
 	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/client/tx"
 	"github.com/cosmos/cosmos-sdk/codec"
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/tx/signing"
-	"github.com/pkg/errors"
 
 	btypes "github.com/initia-labs/opinit-bots-go/node/broadcaster/types"
 	"github.com/initia-labs/opinit-bots-go/node/rpcclient"
@@ -134,7 +135,7 @@ func (b *Broadcaster) prepareBroadcaster(_ /*lastBlockHeight*/ uint64, lastBlock
 		WithAccountRetriever(b).
 		WithChainID(b.cfg.ChainID).
 		WithTxConfig(b.txConfig).
-		WithGasAdjustment(btypes.GAS_ADJUSTMENT).
+		WithGasAdjustment(b.cfg.GasAdjustment).
 		WithGasPrices(b.cfg.GasPrice).
 		WithKeybase(b.keyBase).
 		WithSignMode(signing.SignMode_SIGN_MODE_DIRECT)
@@ -156,8 +157,10 @@ func (b *Broadcaster) prepareBroadcaster(_ /*lastBlockHeight*/ uint64, lastBlock
 		pendingTxTime := time.Unix(0, loadedPendingTxs[0].Timestamp)
 
 		// if we have pending txs, wait until timeout
-		if timeoutTime := pendingTxTime.Add(btypes.TX_TIMEOUT); lastBlockTime.Before(timeoutTime) {
-			timer := time.NewTimer(timeoutTime.Sub(lastBlockTime))
+		if timeoutTime := pendingTxTime.Add(b.cfg.TxTimeout); lastBlockTime.Before(timeoutTime) {
+			waitingTime := timeoutTime.Sub(lastBlockTime)
+			timer := time.NewTimer(waitingTime)
+			b.logger.Info("waiting for pending txs to be processed", zap.Duration("waiting_time", waitingTime))
 			<-timer.C
 		}
 

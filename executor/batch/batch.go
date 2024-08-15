@@ -23,7 +23,7 @@ import (
 )
 
 type hostNode interface {
-	QueryBatchInfos() (*ophosttypes.QueryBatchInfosResponse, error)
+	QueryBatchInfos(context.Context, uint64) (*ophosttypes.QueryBatchInfosResponse, error)
 }
 
 type compressionFunc interface {
@@ -62,6 +62,9 @@ type BatchSubmitter struct {
 	homePath string
 
 	lastSubmissionTime time.Time
+
+	// status info
+	LastBatchEndBlockNumber uint64
 }
 
 func NewBatchSubmitter(
@@ -104,11 +107,15 @@ func NewBatchSubmitter(
 	return ch
 }
 
-func (bs *BatchSubmitter) Initialize(host hostNode, bridgeInfo opchildtypes.BridgeInfo) error {
+func (bs *BatchSubmitter) Initialize(ctx context.Context, startHeight uint64, host hostNode, bridgeInfo opchildtypes.BridgeInfo) error {
+	err := bs.node.Initialize(startHeight)
+	if err != nil {
+		return err
+	}
 	bs.host = host
 	bs.bridgeInfo = bridgeInfo
 
-	res, err := bs.host.QueryBatchInfos()
+	res, err := bs.host.QueryBatchInfos(ctx, bridgeInfo.BridgeId)
 	if err != nil {
 		return err
 	}
@@ -123,7 +130,13 @@ func (bs *BatchSubmitter) Initialize(host hostNode, bridgeInfo opchildtypes.Brid
 		bs.DequeueBatchInfo()
 	}
 
-	bs.batchFile, err = os.OpenFile(bs.homePath+"/batch", os.O_CREATE|os.O_APPEND|os.O_RDWR, 0666)
+	fileFlag := os.O_CREATE | os.O_RDWR
+	// if the node has already processed blocks, append to the file
+	if !bs.node.HeightInitialized() {
+		fileFlag |= os.O_APPEND
+	}
+
+	bs.batchFile, err = os.OpenFile(bs.homePath+"/batch", fileFlag, 0666)
 	if err != nil {
 		return err
 	}

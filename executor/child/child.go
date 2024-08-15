@@ -2,6 +2,7 @@ package child
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	"go.uber.org/zap"
@@ -29,8 +30,8 @@ type hostNode interface {
 	HasKey() bool
 	BroadcastMsgs(btypes.ProcessedMsgs)
 	ProcessedMsgsToRawKV([]btypes.ProcessedMsgs, bool) ([]types.RawKV, error)
-	QueryLastOutput() (*ophosttypes.QueryOutputProposalResponse, error)
-	QueryOutput(uint64) (*ophosttypes.QueryOutputProposalResponse, error)
+	QueryLastOutput(context.Context, uint64) (*ophosttypes.QueryOutputProposalResponse, error)
+	QueryOutput(context.Context, uint64, uint64) (*ophosttypes.QueryOutputProposalResponse, error)
 
 	GetMsgProposeOutput(
 		bridgeId uint64,
@@ -52,6 +53,9 @@ type Child struct {
 	nextOutputTime        time.Time
 	finalizingBlockHeight uint64
 
+	initializeTree   *sync.Once
+	initializeTreeFn func() error
+
 	cfg    nodetypes.NodeConfig
 	db     types.DB
 	logger *zap.Logger
@@ -60,6 +64,12 @@ type Child struct {
 
 	processedMsgs []btypes.ProcessedMsgs
 	msgQueue      []sdk.Msg
+
+	// status info
+	lastUpdatedOracleL1Height         uint64
+	lastFinalizedDepositL1BlockHeight uint64
+	lastFinalizedDepositL1Sequence    uint64
+	lastOutputTime                    time.Time
 }
 
 func NewChild(
@@ -87,6 +97,8 @@ func NewChild(
 		node: node,
 		mk:   mk,
 
+		initializeTree: &sync.Once{},
+
 		cfg:    cfg,
 		db:     db,
 		logger: logger,
@@ -109,10 +121,24 @@ func GetCodec(bech32Prefix string) (codec.Codec, client.TxConfig, error) {
 	})
 }
 
-func (ch *Child) Initialize(host hostNode, bridgeInfo opchildtypes.BridgeInfo) error {
+func (ch *Child) Initialize(startHeight uint64, startOutputIndex uint64, host hostNode, bridgeInfo opchildtypes.BridgeInfo) error {
+	err := ch.node.Initialize(startHeight)
+	if err != nil {
+		return err
+	}
+
+	if startOutputIndex != 0 {
+		ch.initializeTreeFn = func() error {
+			ch.logger.Info("initialize tree", zap.Uint64("index", startOutputIndex))
+			err := ch.mk.InitializeWorkingTree(startOutputIndex, 1)
+			if err != nil {
+				return err
+			}
+			return nil
+		}
+	}
 	ch.host = host
 	ch.bridgeInfo = bridgeInfo
-
 	ch.registerHandlers()
 	return nil
 }
