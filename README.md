@@ -18,7 +18,7 @@ To ensure compatibility with the node version, check the following versions:
 
 | L1 Node | MiniMove | MiniWasm | MiniEVM | 
 | ------- | -------- | -------- | ------- | 
-| v0.4.1  | v0.4.1   | v0.4.1   | v0.4.1  | 
+| v0.4.2  | v0.4.0   | v0.4.0   | v0.4.0  | 
 
 ### Build and Configure
 
