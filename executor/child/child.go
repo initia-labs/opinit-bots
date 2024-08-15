@@ -2,6 +2,7 @@ package child
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	"go.uber.org/zap"
@@ -51,7 +52,9 @@ type Child struct {
 
 	nextOutputTime        time.Time
 	finalizingBlockHeight uint64
-	startTreeIndex        uint64
+
+	initializeTree   sync.Once
+	initializeTreeFn func() error
 
 	cfg    nodetypes.NodeConfig
 	db     types.DB
@@ -94,6 +97,8 @@ func NewChild(
 		node: node,
 		mk:   mk,
 
+		initializeTree: sync.Once{},
+
 		cfg:    cfg,
 		db:     db,
 		logger: logger,
@@ -121,7 +126,17 @@ func (ch *Child) Initialize(startHeight uint64, startOutputIndex uint64, host ho
 	if err != nil {
 		return err
 	}
-	ch.startTreeIndex = startOutputIndex
+
+	if startOutputIndex != 0 {
+		ch.initializeTreeFn = func() error {
+			ch.logger.Info("initialize tree", zap.Uint64("index", startOutputIndex))
+			err := ch.mk.InitializeWorkingTree(startOutputIndex, 1)
+			if err != nil {
+				return err
+			}
+			return nil
+		}
+	}
 	ch.host = host
 	ch.bridgeInfo = bridgeInfo
 	ch.registerHandlers()
