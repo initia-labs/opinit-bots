@@ -181,7 +181,7 @@ func (bs *BatchSubmitter) finalizeBatch(ctx context.Context, blockHeight uint64)
 		Save:      true,
 	})
 
-	for offset := int64(0); ; offset += bs.batchCfg.MaxChunkSize {
+	for offset := int64(0); ; offset += int64(bs.batchCfg.MaxChunkSize) {
 		readLength, err := bs.batchFile.ReadAt(batchBuffer, offset)
 		if err != nil && err != io.EOF {
 			return err
@@ -202,7 +202,7 @@ func (bs *BatchSubmitter) finalizeBatch(ctx context.Context, blockHeight uint64)
 		})
 		checksum := sha256.Sum256(batchBuffer)
 		checksums = append(checksums, checksum[:])
-		if int64(readLength) < bs.batchCfg.MaxChunkSize {
+		if uint64(readLength) < bs.batchCfg.MaxChunkSize {
 			break
 		}
 	}
@@ -250,7 +250,7 @@ func (bs *BatchSubmitter) checkBatch(blockHeight uint64, blockTime time.Time) er
 	// then finalize the batch
 	if blockTime.After(bs.lastSubmissionTime.Add(bs.bridgeInfo.BridgeConfig.SubmissionInterval*2/3)) ||
 		blockTime.After(bs.lastSubmissionTime.Add(time.Duration(bs.batchCfg.MaxSubmissionTime)*time.Second)) ||
-		fileSize > (bs.batchCfg.MaxChunks-1)*bs.batchCfg.MaxChunkSize {
+		uint64(fileSize) > (bs.batchCfg.MaxChunks-1)*bs.batchCfg.MaxChunkSize {
 
 		// finalize the batch
 		bs.batchHeader.End = blockHeight
