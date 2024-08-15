@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -39,10 +38,6 @@ const (
 	flagMnemonicSrc  = "source"
 	flagBech32Prefix = "bech32"
 )
-
-func keyDir(homePath string) string {
-	return path.Join(homePath, ".keys")
-}
 
 // keysCmd represents the keys command
 func keysCmd(ctx *cmdContext) *cobra.Command {
@@ -88,7 +83,7 @@ $ keys add l2 key2 --recover --source mnemonic.txt`),
 			if err != nil {
 				return err
 			}
-			keyBase, err := keys.GetKeyBase(chainId, keyDir(ctx.homePath), cdc, cmd.InOrStdin())
+			keyBase, err := keys.GetKeyBase(chainId, ctx.homePath, cdc, cmd.InOrStdin())
 			if err != nil {
 				return err
 			}
@@ -175,7 +170,7 @@ $ k l l2`),
 			if err != nil {
 				return err
 			}
-			keyBase, err := keys.GetKeyBase(chainId, keyDir(ctx.homePath), cdc, cmd.InOrStdin())
+			keyBase, err := keys.GetKeyBase(chainId, ctx.homePath, cdc, cmd.InOrStdin())
 			if err != nil {
 				return err
 			}
@@ -235,7 +230,7 @@ $ k s l2 key2`),
 			if err != nil {
 				return err
 			}
-			keyBase, err := keys.GetKeyBase(chainId, keyDir(ctx.homePath), cdc, cmd.InOrStdin())
+			keyBase, err := keys.GetKeyBase(chainId, ctx.homePath, cdc, cmd.InOrStdin())
 			if err != nil {
 				return err
 			}
@@ -286,7 +281,7 @@ $ k sa l2 key2`),
 			if err != nil {
 				return err
 			}
-			keyBase, err := keys.GetKeyBase(chainId, keyDir(ctx.homePath), cdc, cmd.InOrStdin())
+			keyBase, err := keys.GetKeyBase(chainId, ctx.homePath, cdc, cmd.InOrStdin())
 			if err != nil {
 				return err
 			}
@@ -334,7 +329,7 @@ $ k d l2 key2`),
 			if err != nil {
 				return err
 			}
-			keyBase, err := keys.GetKeyBase(chainId, keyDir(ctx.homePath), cdc, cmd.InOrStdin())
+			keyBase, err := keys.GetKeyBase(chainId, ctx.homePath, cdc, cmd.InOrStdin())
 			if err != nil {
 				return err
 			}
