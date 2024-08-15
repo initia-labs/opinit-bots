@@ -195,7 +195,7 @@ func (n *Node) handleEvent(ctx context.Context, blockHeight uint64, latestHeight
 
 // txChecker checks pending txs and handle events if the tx is included in the block
 func (n *Node) txChecker(ctx context.Context) error {
-	if n.broadcaster != nil {
+	if n.broadcaster == nil {
 		return nil
 	}
 
