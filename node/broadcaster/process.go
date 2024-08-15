@@ -112,8 +112,7 @@ func (b *Broadcaster) Start(ctx context.Context) error {
 					err = nil
 					break
 				}
-				b.logger.Warn("retry", zap.Int("count", retry), zap.String("error", err.Error()))
-
+				b.logger.Warn("retry to handle processed msgs after 30 seconds", zap.Int("count", retry), zap.String("error", err.Error()))
 				timer := time.NewTimer(30 * time.Second)
 				select {
 				case <-ctx.Done():
