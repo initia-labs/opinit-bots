@@ -158,7 +158,9 @@ func (b *Broadcaster) prepareBroadcaster(_ /*lastBlockHeight*/ uint64, lastBlock
 
 		// if we have pending txs, wait until timeout
 		if timeoutTime := pendingTxTime.Add(b.cfg.TxTimeout); lastBlockTime.Before(timeoutTime) {
-			timer := time.NewTimer(timeoutTime.Sub(lastBlockTime))
+			waitingTime := timeoutTime.Sub(lastBlockTime)
+			timer := time.NewTimer(waitingTime)
+			b.logger.Info("waiting for pending txs to be processed", zap.Duration("waiting_time", waitingTime))
 			<-timer.C
 		}
 
