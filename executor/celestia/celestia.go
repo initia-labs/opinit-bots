@@ -69,7 +69,6 @@ func NewDACelestia(
 		panic(err)
 	}
 
-	cfg.ProcessType = nodetypes.PROCESS_TYPE_ONLY_BROADCAST
 	cfg.BroadcasterConfig.KeyringConfig.Address = batchSubmitter
 	cfg.BroadcasterConfig.BuildTxWithMessages = c.BuildTxWithMessages
 	cfg.BroadcasterConfig.PendingTxToProcessedMsgs = c.PendingTxToProcessedMsgs

@@ -76,7 +76,6 @@ func NewHost(
 	}
 
 	if batchSubmitter != "" {
-		cfg.ProcessType = nodetypes.PROCESS_TYPE_ONLY_BROADCAST
 		cfg.BroadcasterConfig.Bech32Prefix = bech32Prefix
 		cfg.BroadcasterConfig.KeyringConfig.Address = batchSubmitter
 	}
