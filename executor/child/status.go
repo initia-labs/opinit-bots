@@ -13,8 +13,10 @@ type Status struct {
 	LastFinalizedDepositL1Sequence    uint64           `json:"last_finalized_deposit_l1_sequence"`
 	LastWithdrawalL2Sequence          uint64           `json:"last_withdrawal_l2_sequence"`
 	WorkingTreeIndex                  uint64           `json:"working_tree_index"`
-	LastOutputSubmissionTime          time.Time        `json:"last_output_submission_time"`
-	NextOutputSubmissionTime          time.Time        `json:"next_output_submission_time"`
+	// if it is not 0, we are syncing
+	FinalizingBlockHeight    uint64    `json:"finalizing_block_height"`
+	LastOutputSubmissionTime time.Time `json:"last_output_submission_time"`
+	NextOutputSubmissionTime time.Time `json:"next_output_submission_time"`
 }
 
 func (ch Child) GetStatus() Status {
@@ -25,6 +27,7 @@ func (ch Child) GetStatus() Status {
 		LastFinalizedDepositL1Sequence:    ch.lastFinalizedDepositL1Sequence,
 		LastWithdrawalL2Sequence:          ch.mk.GetWorkingTreeLeafCount() + ch.mk.GetStartLeafIndex() - 1,
 		WorkingTreeIndex:                  ch.mk.GetWorkingTreeIndex(),
+		FinalizingBlockHeight:             ch.finalizingBlockHeight,
 		LastOutputSubmissionTime:          ch.lastOutputTime,
 		NextOutputSubmissionTime:          ch.nextOutputTime,
 	}
