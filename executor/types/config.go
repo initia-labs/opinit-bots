@@ -60,20 +60,20 @@ type Config struct {
 	RelayOracle bool `json:"relay_oracle"`
 
 	// MaxChunks is the maximum number of chunks in a batch.
-	MaxChunks int64 `json:"max_chunks"`
+	MaxChunks uint64 `json:"max_chunks"`
 	// MaxChunkSize is the maximum size of a chunk in a batch.
-	MaxChunkSize int64 `json:"max_chunk_size"`
+	MaxChunkSize uint64 `json:"max_chunk_size"`
 	// MaxSubmissionTime is the maximum time to submit a batch.
-	MaxSubmissionTime int64 `json:"max_submission_time"` // seconds
+	MaxSubmissionTime uint64 `json:"max_submission_time"` // seconds
 
 	// L2StartHeight is the height to start the l2 node. If it is 0, it will start from the latest height.
 	// If the latest height stored in the db is not 0, this config is ignored.
 	// L2 starts from the last submitted output l2 block number + 1 before L2StartHeight.
 	// L1 starts from the block number of the output tx + 1
-	L2StartHeight int64 `json:"l2_start_height"`
+	L2StartHeight uint64 `json:"l2_start_height"`
 	// BatchStartHeight is the height to start the batch. If it is 0, it will start from the latest height.
 	// If the latest height stored in the db is not 0, this config is ignored.
-	BatchStartHeight int64 `json:"batch_start_height"`
+	BatchStartHeight uint64 `json:"batch_start_height"`
 }
 
 func DefaultConfig() *Config {
@@ -219,7 +219,7 @@ func (cfg Config) BatchConfig() BatchConfig {
 }
 
 type BatchConfig struct {
-	MaxChunks         int64 `json:"max_chunks"`
-	MaxChunkSize      int64 `json:"max_chunk_size"`
-	MaxSubmissionTime int64 `json:"max_submission_time"` // seconds
+	MaxChunks         uint64 `json:"max_chunks"`
+	MaxChunkSize      uint64 `json:"max_chunk_size"`
+	MaxSubmissionTime uint64 `json:"max_submission_time"` // seconds
 }

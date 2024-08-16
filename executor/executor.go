@@ -209,15 +209,13 @@ func (ex *Executor) getStartHeights(ctx context.Context, bridgeId uint64) (l1Sta
 
 	// get the last submitted output height before the start height from the host
 	if ex.cfg.L2StartHeight != 0 {
-		output, err := ex.host.QueryOutputByL2BlockNumber(ctx, bridgeId, uint64(ex.cfg.L2StartHeight))
+		output, err := ex.host.QueryOutputByL2BlockNumber(ctx, bridgeId, ex.cfg.L2StartHeight)
 		if err != nil {
 			return 0, 0, 0, 0, err
 		} else if output != nil {
 			l1StartHeight = output.OutputProposal.L1BlockNumber
 			l2StartHeight = output.OutputProposal.L2BlockNumber
 			startOutputIndex = output.OutputIndex + 1
-		} else {
-			startOutputIndex = 1
 		}
 	}
 	// get the last deposit tx height from the host
@@ -232,6 +230,11 @@ func (ex *Executor) getStartHeights(ctx context.Context, bridgeId uint64) (l1Sta
 	if l1StartHeight > depositTxHeight {
 		l1StartHeight = depositTxHeight
 	}
-	batchStartHeight = uint64(ex.cfg.BatchStartHeight) - 1
+	if l2StartHeight == 0 {
+		startOutputIndex = 1
+	}
+	if ex.cfg.BatchStartHeight > 0 {
+		batchStartHeight = ex.cfg.BatchStartHeight - 1
+	}
 	return l1StartHeight, l2StartHeight, startOutputIndex, batchStartHeight, err
 }
