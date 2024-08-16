@@ -11,12 +11,12 @@ import (
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
 )
 
-func GetKeyDir(homePath string) string {
-	return path.Join(homePath, ".keys")
+func GetKeyDir(homePath string, chainId string) string {
+	return path.Join(homePath, chainId)
 }
 
 func GetKeyBase(chainId string, dir string, cdc codec.Codec, userInput io.Reader) (keyring.Keyring, error) {
-	return keyring.New(chainId, "os", GetKeyDir(dir), userInput, cdc)
+	return keyring.New(chainId, "test", GetKeyDir(dir, chainId), userInput, cdc)
 }
 
 // CreateMnemonic generates a new mnemonic.
