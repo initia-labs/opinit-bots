@@ -26,6 +26,10 @@ func (h *Host) proposeOutputHandler(_ context.Context, args nodetypes.EventHandl
 			if err != nil {
 				return err
 			}
+			if bridgeId != uint64(h.bridgeId) {
+				// pass other bridge output proposal event
+				return nil
+			}
 		case ophosttypes.AttributeKeyOutputIndex:
 			outputIndex, err = strconv.ParseUint(attr.Value, 10, 64)
 			if err != nil {
@@ -74,7 +78,7 @@ func (h *Host) finalizeWithdrawalHandler(_ context.Context, args nodetypes.Event
 				return err
 			}
 			if bridgeId != uint64(h.bridgeId) {
-				// pass other bridge deposit event
+				// pass other bridge withdrawal event
 				return nil
 			}
 		case ophosttypes.AttributeKeyOutputIndex:
