@@ -86,16 +86,17 @@ func (ch *Child) handleInitiateWithdrawal(l2Sequence uint64, from string, to str
 	return nil
 }
 
-func (ch *Child) prepareTree(blockHeight uint64) error {
-	if ch.initializeTreeFn != nil {
-		var err error
-		ch.initializeTree.Do(func() {
+func (ch *Child) prepareTree(blockHeight uint64) (err error) {
+	ch.initializeTree.Do(func() {
+		if ch.initializeTreeFn != nil {
 			err = ch.initializeTreeFn()
-		})
+		}
+	})
+	if err != nil {
 		return err
 	}
 
-	err := ch.mk.LoadWorkingTree(blockHeight - 1)
+	err = ch.mk.LoadWorkingTree(blockHeight - 1)
 	if err == dbtypes.ErrNotFound {
 		// must not happened
 		panic(fmt.Errorf("working tree not found at height: %d, current: %d", blockHeight-1, blockHeight))
@@ -116,7 +117,7 @@ func (ch *Child) prepareOutput(ctx context.Context) error {
 			// TODO: maybe not return error here and roll back
 			return fmt.Errorf("output does not exist at index: %d", workingOutputIndex-1)
 		}
-
+		ch.lastOutputTime = output.OutputProposal.L1BlockTime
 		ch.nextOutputTime = output.OutputProposal.L1BlockTime.Add(ch.bridgeInfo.BridgeConfig.SubmissionInterval * 2 / 3)
 	}
 
@@ -134,6 +135,12 @@ func (ch *Child) prepareOutput(ctx context.Context) error {
 }
 
 func (ch *Child) handleTree(blockHeight uint64, latestHeight uint64, blockId []byte, blockHeader cmtproto.Header) (kvs []types.RawKV, storageRoot []byte, err error) {
+	// panic if we are syncing and passed the finalizing block height
+	// this must not happened
+	if ch.finalizingBlockHeight != 0 && ch.finalizingBlockHeight < blockHeight {
+		panic(fmt.Errorf("working tree not found at height: %d, current: %d", blockHeight-1, blockHeight))
+	}
+
 	// finalize working tree if we are fully synced or block time is over next output time
 	if ch.finalizingBlockHeight == blockHeight ||
 		(ch.finalizingBlockHeight == 0 &&
@@ -166,8 +173,8 @@ func (ch *Child) handleTree(blockHeight uint64, latestHeight uint64, blockId []b
 		}
 
 		ch.finalizingBlockHeight = 0
-		ch.nextOutputTime = blockHeader.Time.Add(ch.bridgeInfo.BridgeConfig.SubmissionInterval * 2 / 3)
 		ch.lastOutputTime = blockHeader.Time
+		ch.nextOutputTime = blockHeader.Time.Add(ch.bridgeInfo.BridgeConfig.SubmissionInterval * 2 / 3)
 	}
 
 	err = ch.mk.SaveWorkingTree(blockHeight)
