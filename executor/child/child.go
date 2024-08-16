@@ -53,8 +53,8 @@ type Child struct {
 	nextOutputTime        time.Time
 	finalizingBlockHeight uint64
 
-	initializeTree   *sync.Once
-	initializeTreeFn func() error
+	initializeTreeOnce *sync.Once
+	initializeTreeFn   func() error
 
 	cfg    nodetypes.NodeConfig
 	db     types.DB
@@ -97,7 +97,7 @@ func NewChild(
 		node: node,
 		mk:   mk,
 
-		initializeTree: &sync.Once{},
+		initializeTreeOnce: &sync.Once{},
 
 		cfg:    cfg,
 		db:     db,

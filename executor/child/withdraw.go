@@ -86,17 +86,25 @@ func (ch *Child) handleInitiateWithdrawal(l2Sequence uint64, from string, to str
 	return nil
 }
 
-func (ch *Child) prepareTree(blockHeight uint64) (err error) {
-	ch.initializeTree.Do(func() {
+func (ch *Child) initializeTree() (executed bool) {
+	ch.initializeTreeOnce.Do(func() {
 		if ch.initializeTreeFn != nil {
-			err = ch.initializeTreeFn()
+			executed = true
+			err := ch.initializeTreeFn()
+			if err != nil {
+				panic("failed to initialize working tree: " + err.Error())
+			}
 		}
 	})
-	if err != nil {
-		return err
+	return executed
+}
+
+func (ch *Child) prepareTree(blockHeight uint64) error {
+	if ch.initializeTree() {
+		return nil
 	}
 
-	err = ch.mk.LoadWorkingTree(blockHeight - 1)
+	err := ch.mk.LoadWorkingTree(blockHeight - 1)
 	if err == dbtypes.ErrNotFound {
 		// must not happened
 		panic(fmt.Errorf("working tree not found at height: %d, current: %d", blockHeight-1, blockHeight))
