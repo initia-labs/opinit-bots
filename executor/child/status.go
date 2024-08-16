@@ -23,7 +23,7 @@ func (ch Child) GetStatus() Status {
 		LastUpdatedOracleL1Height:         ch.lastUpdatedOracleL1Height,
 		LastFinalizedDepositL1BlockHeight: ch.lastFinalizedDepositL1BlockHeight,
 		LastFinalizedDepositL1Sequence:    ch.lastFinalizedDepositL1Sequence,
-		LastWithdrawalL2Sequence:          ch.mk.GetWorkingTreeLeafCount() + ch.mk.GetStartLeafIndex(),
+		LastWithdrawalL2Sequence:          ch.mk.GetWorkingTreeLeafCount() + ch.mk.GetStartLeafIndex() - 1,
 		WorkingTreeIndex:                  ch.mk.GetWorkingTreeIndex(),
 		LastOutputSubmissionTime:          ch.lastOutputTime,
 		NextOutputSubmissionTime:          ch.nextOutputTime,

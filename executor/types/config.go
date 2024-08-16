@@ -194,7 +194,7 @@ func (cfg Config) L2NodeConfig(homePath string) nodetypes.NodeConfig {
 func (cfg Config) DANodeConfig(homePath string) nodetypes.NodeConfig {
 	nc := nodetypes.NodeConfig{
 		RPC:         cfg.DANode.RPCAddress,
-		ProcessType: nodetypes.PROCESS_TYPE_DEFAULT,
+		ProcessType: nodetypes.PROCESS_TYPE_ONLY_BROADCAST,
 		BroadcasterConfig: &btypes.BroadcasterConfig{
 			ChainID:       cfg.DANode.ChainID,
 			GasPrice:      cfg.DANode.GasPrice,

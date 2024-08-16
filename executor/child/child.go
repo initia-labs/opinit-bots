@@ -127,7 +127,7 @@ func (ch *Child) Initialize(startHeight uint64, startOutputIndex uint64, host ho
 		return err
 	}
 
-	if startOutputIndex != 0 {
+	if ch.node.HeightInitialized() && startOutputIndex != 0 {
 		ch.initializeTreeFn = func() error {
 			ch.logger.Info("initialize tree", zap.Uint64("index", startOutputIndex))
 			err := ch.mk.InitializeWorkingTree(startOutputIndex, 1)
