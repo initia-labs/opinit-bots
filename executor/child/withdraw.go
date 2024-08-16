@@ -146,7 +146,7 @@ func (ch *Child) handleTree(blockHeight uint64, latestHeight uint64, blockId []b
 	// panic if we are syncing and passed the finalizing block height
 	// this must not happened
 	if ch.finalizingBlockHeight != 0 && ch.finalizingBlockHeight < blockHeight {
-		panic(fmt.Errorf("working tree not found at height: %d, current: %d", blockHeight-1, blockHeight))
+		panic(fmt.Errorf("INVARIANT failed; handleTree expect to finalize tree at block `%d` but we got block `%d`", blockHeight-1, blockHeight))
 	}
 
 	// finalize working tree if we are fully synced or block time is over next output time
