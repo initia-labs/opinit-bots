@@ -1,4 +1,4 @@
-# OPinit Bots Go
+# OPinit Bots
 
 This repository contains the Go implementation of OPinit bots.
 
