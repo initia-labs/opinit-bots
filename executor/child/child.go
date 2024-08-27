@@ -2,7 +2,6 @@ package child
 
 import (
 	"context"
-	"sync"
 	"time"
 
 	"go.uber.org/zap"
@@ -43,9 +42,6 @@ type Child struct {
 	nextOutputTime        time.Time
 	finalizingBlockHeight uint64
 
-	initializeTreeOnce *sync.Once
-	initializeTreeFn   func() error
-
 	// status info
 	lastUpdatedOracleL1Height         uint64
 	lastFinalizedDepositL1BlockHeight uint64
@@ -58,29 +54,16 @@ func NewChildV0(
 	db types.DB, logger *zap.Logger, bech32Prefix string,
 ) *Child {
 	return &Child{
-		BaseChild:          childprovider.NewBaseChildV0(cfg, db, logger, bech32Prefix),
-		initializeTreeOnce: &sync.Once{},
+		BaseChild: childprovider.NewBaseChildV0(cfg, db, logger, bech32Prefix),
 	}
 }
 
 func (ch *Child) Initialize(startHeight uint64, startOutputIndex uint64, host hostNode, bridgeInfo opchildtypes.BridgeInfo) error {
-	err := ch.Node().Initialize(startHeight)
+	err := ch.BaseChild.Initialize(startHeight, startOutputIndex, bridgeInfo)
 	if err != nil {
 		return err
 	}
-
-	if ch.Node().HeightInitialized() && startOutputIndex != 0 {
-		ch.initializeTreeFn = func() error {
-			ch.Logger().Info("initialize tree", zap.Uint64("index", startOutputIndex))
-			err := ch.Merkle().InitializeWorkingTree(startOutputIndex, 1)
-			if err != nil {
-				return err
-			}
-			return nil
-		}
-	}
 	ch.host = host
-	ch.SetBridgeInfo(bridgeInfo)
 	ch.registerHandlers()
 	return nil
 }

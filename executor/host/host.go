@@ -66,19 +66,16 @@ func NewHostV0(
 }
 
 func (h *Host) Initialize(ctx context.Context, startHeight uint64, child childNode, batch batchNode, bridgeId int64) error {
-	err := h.BaseHost.Node().Initialize(startHeight)
+	err := h.BaseHost.Initialize(ctx, startHeight, bridgeId)
 	if err != nil {
 		return err
 	}
 	h.child = child
 	h.batch = batch
-	h.SetBridgeId(bridgeId)
-
 	h.initialL1Sequence, err = h.child.QueryNextL1Sequence(ctx)
 	if err != nil {
 		return err
 	}
-
 	h.registerHandlers()
 	return nil
 }

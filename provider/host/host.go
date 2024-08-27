@@ -78,6 +78,15 @@ func GetCodec(bech32Prefix string) (codec.Codec, client.TxConfig, error) {
 	})
 }
 
+func (b *BaseHost) Initialize(ctx context.Context, startHeight uint64, bridgeId int64) error {
+	err := b.node.Initialize(startHeight)
+	if err != nil {
+		return err
+	}
+	b.SetBridgeId(bridgeId)
+	return nil
+}
+
 func (b *BaseHost) Start(ctx context.Context) {
 	b.logger.Info("host start", zap.Uint64("height", b.node.GetHeight()))
 	b.node.Start(ctx)

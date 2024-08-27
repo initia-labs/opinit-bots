@@ -2,6 +2,7 @@ package child
 
 import (
 	"context"
+	"sync"
 
 	"go.uber.org/zap"
 
@@ -29,6 +30,9 @@ type BaseChild struct {
 	mk   *merkle.Merkle
 
 	bridgeInfo opchildtypes.BridgeInfo
+
+	initializeTreeOnce *sync.Once
+	initializeTreeFn   func() error
 
 	cfg    nodetypes.NodeConfig
 	db     types.DB
@@ -65,6 +69,8 @@ func NewBaseChildV0(
 		node: node,
 		mk:   mk,
 
+		initializeTreeOnce: &sync.Once{},
+
 		cfg:    cfg,
 		db:     db,
 		logger: logger,
@@ -85,6 +91,26 @@ func GetCodec(bech32Prefix string) (codec.Codec, client.TxConfig, error) {
 		auth.AppModuleBasic{}.RegisterInterfaces,
 		opchild.AppModuleBasic{}.RegisterInterfaces,
 	})
+}
+
+func (b *BaseChild) Initialize(startHeight uint64, startOutputIndex uint64, bridgeInfo opchildtypes.BridgeInfo) error {
+	err := b.node.Initialize(startHeight)
+	if err != nil {
+		return err
+	}
+
+	if b.node.HeightInitialized() && startOutputIndex != 0 {
+		b.initializeTreeFn = func() error {
+			b.logger.Info("initialize tree", zap.Uint64("index", startOutputIndex))
+			err := b.mk.InitializeWorkingTree(startOutputIndex, 1)
+			if err != nil {
+				return err
+			}
+			return nil
+		}
+	}
+	b.SetBridgeInfo(bridgeInfo)
+	return nil
 }
 
 func (b *BaseChild) Start(ctx context.Context) {

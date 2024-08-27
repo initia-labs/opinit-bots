@@ -86,21 +86,8 @@ func (ch *Child) handleInitiateWithdrawal(l2Sequence uint64, from string, to str
 	return nil
 }
 
-func (ch *Child) initializeTree() (executed bool) {
-	ch.initializeTreeOnce.Do(func() {
-		if ch.initializeTreeFn != nil {
-			executed = true
-			err := ch.initializeTreeFn()
-			if err != nil {
-				panic("failed to initialize working tree: " + err.Error())
-			}
-		}
-	})
-	return executed
-}
-
 func (ch *Child) prepareTree(blockHeight uint64) error {
-	if ch.initializeTree() {
+	if ch.InitializeTree() {
 		return nil
 	}
 
