@@ -10,11 +10,11 @@ import (
 
 	"go.uber.org/zap"
 
-	bottypes "github.com/initia-labs/opinit-bots-go/bot/types"
-	"github.com/initia-labs/opinit-bots-go/db"
-	"github.com/initia-labs/opinit-bots-go/executor"
-	executortypes "github.com/initia-labs/opinit-bots-go/executor/types"
-	"github.com/initia-labs/opinit-bots-go/server"
+	bottypes "github.com/initia-labs/opinit-bots/bot/types"
+	"github.com/initia-labs/opinit-bots/db"
+	"github.com/initia-labs/opinit-bots/executor"
+	executortypes "github.com/initia-labs/opinit-bots/executor/types"
+	"github.com/initia-labs/opinit-bots/server"
 )
 
 func LoadJsonConfig(path string, config bottypes.Config) error {

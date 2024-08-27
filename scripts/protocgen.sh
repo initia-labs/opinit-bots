@@ -21,5 +21,5 @@ for dir in $proto_dirs; do
 done
 
 # move proto files to the right places
-cp -r github.com/initia-labs/opinit-bots-go/types/* ../types/
+cp -r github.com/initia-labs/opinit-bots/types/* ../types/
 rm -rf github.com

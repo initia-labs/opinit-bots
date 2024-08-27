@@ -4,8 +4,8 @@ import (
 	"errors"
 	"time"
 
-	btypes "github.com/initia-labs/opinit-bots-go/node/broadcaster/types"
-	nodetypes "github.com/initia-labs/opinit-bots-go/node/types"
+	btypes "github.com/initia-labs/opinit-bots/node/broadcaster/types"
+	nodetypes "github.com/initia-labs/opinit-bots/node/types"
 )
 
 type NodeConfig struct {

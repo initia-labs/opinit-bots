@@ -7,7 +7,7 @@ import (
 	"strconv"
 
 	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
-	nodetypes "github.com/initia-labs/opinit-bots-go/node/types"
+	nodetypes "github.com/initia-labs/opinit-bots/node/types"
 	"go.uber.org/zap"
 )
 
@@ -26,7 +26,7 @@ func (h *Host) proposeOutputHandler(_ context.Context, args nodetypes.EventHandl
 			if err != nil {
 				return err
 			}
-			if bridgeId != uint64(h.bridgeId) {
+			if bridgeId != uint64(h.BridgeId()) {
 				// pass other bridge output proposal event
 				return nil
 			}
@@ -55,7 +55,7 @@ func (h *Host) proposeOutputHandler(_ context.Context, args nodetypes.EventHandl
 }
 
 func (h *Host) handleProposeOutput(bridgeId uint64, proposer string, outputIndex uint64, l2BlockNumber uint64, outputRoot []byte) {
-	h.logger.Info("propose output",
+	h.Logger().Info("propose output",
 		zap.Uint64("bridge_id", bridgeId),
 		zap.String("proposer", proposer),
 		zap.Uint64("output_index", outputIndex),
@@ -77,7 +77,7 @@ func (h *Host) finalizeWithdrawalHandler(_ context.Context, args nodetypes.Event
 			if err != nil {
 				return err
 			}
-			if bridgeId != uint64(h.bridgeId) {
+			if bridgeId != uint64(h.BridgeId()) {
 				// pass other bridge withdrawal event
 				return nil
 			}
@@ -108,7 +108,7 @@ func (h *Host) finalizeWithdrawalHandler(_ context.Context, args nodetypes.Event
 }
 
 func (h *Host) handleFinalizeWithdrawal(bridgeId uint64, outputIndex uint64, l2Sequence uint64, from string, to string, l1Denom string, l2Denom string, amount string) {
-	h.logger.Info("finalize withdrawal",
+	h.Logger().Info("finalize withdrawal",
 		zap.Uint64("bridge_id", bridgeId),
 		zap.Uint64("output_index", outputIndex),
 		zap.Uint64("l2_sequence", l2Sequence),

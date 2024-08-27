@@ -5,20 +5,16 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/cosmos/cosmos-sdk/client"
-	"github.com/cosmos/cosmos-sdk/codec"
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	"github.com/cosmos/cosmos-sdk/x/auth"
 
-	"github.com/initia-labs/OPinit/x/ophost"
 	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
 
-	executortypes "github.com/initia-labs/opinit-bots-go/executor/types"
-	"github.com/initia-labs/opinit-bots-go/keys"
-	"github.com/initia-labs/opinit-bots-go/node"
-	btypes "github.com/initia-labs/opinit-bots-go/node/broadcaster/types"
-	nodetypes "github.com/initia-labs/opinit-bots-go/node/types"
-	"github.com/initia-labs/opinit-bots-go/types"
+	executortypes "github.com/initia-labs/opinit-bots/executor/types"
+	btypes "github.com/initia-labs/opinit-bots/node/broadcaster/types"
+	nodetypes "github.com/initia-labs/opinit-bots/node/types"
+	"github.com/initia-labs/opinit-bots/types"
+
+	hostprovider "github.com/initia-labs/opinit-bots/provider/host"
 )
 
 type childNode interface {
@@ -42,86 +38,41 @@ type batchNode interface {
 var _ executortypes.DANode = &Host{}
 
 type Host struct {
-	version     uint8
-	relayOracle bool
+	*hostprovider.BaseHost
 
-	node  *node.Node
 	child childNode
 	batch batchNode
 
-	bridgeId          int64
+	relayOracle       bool
 	initialL1Sequence uint64
-
-	cfg    nodetypes.NodeConfig
-	db     types.DB
-	logger *zap.Logger
-
-	ophostQueryClient ophosttypes.QueryClient
-
-	processedMsgs []btypes.ProcessedMsgs
-	msgQueue      []sdk.Msg
 
 	// status info
 	lastProposedOutputIndex         uint64
 	lastProposedOutputL2BlockNumber uint64
 }
 
-func NewHost(
-	version uint8, relayOracle bool, cfg nodetypes.NodeConfig,
+func NewHostV0(
+	relayOracle bool, cfg nodetypes.NodeConfig,
 	db types.DB, logger *zap.Logger, bech32Prefix, batchSubmitter string,
 ) *Host {
-	appCodec, txConfig, err := GetCodec(bech32Prefix)
-	if err != nil {
-		panic(err)
-	}
-
 	if batchSubmitter != "" {
 		cfg.BroadcasterConfig.Bech32Prefix = bech32Prefix
 		cfg.BroadcasterConfig.KeyringConfig.Address = batchSubmitter
 	}
-
-	node, err := node.NewNode(cfg, db, logger, appCodec, txConfig)
-	if err != nil {
-		panic(err)
-	}
-
-	h := &Host{
-		version:     version,
+	return &Host{
 		relayOracle: relayOracle,
-
-		node: node,
-
-		cfg:    cfg,
-		db:     db,
-		logger: logger,
-
-		ophostQueryClient: ophosttypes.NewQueryClient(node.GetRPCClient()),
-
-		processedMsgs: make([]btypes.ProcessedMsgs, 0),
-		msgQueue:      make([]sdk.Msg, 0),
+		BaseHost:    hostprovider.NewBaseHostV0(cfg, db, logger, bech32Prefix),
 	}
-
-	return h
-}
-
-func GetCodec(bech32Prefix string) (codec.Codec, client.TxConfig, error) {
-	unlock := keys.SetSDKConfigContext(bech32Prefix)
-	defer unlock()
-
-	return keys.CreateCodec([]keys.RegisterInterfaces{
-		auth.AppModuleBasic{}.RegisterInterfaces,
-		ophost.AppModuleBasic{}.RegisterInterfaces,
-	})
 }
 
 func (h *Host) Initialize(ctx context.Context, startHeight uint64, child childNode, batch batchNode, bridgeId int64) error {
-	err := h.node.Initialize(startHeight)
+	err := h.BaseHost.Node().Initialize(startHeight)
 	if err != nil {
 		return err
 	}
 	h.child = child
 	h.batch = batch
-	h.bridgeId = bridgeId
+	h.SetBridgeId(bridgeId)
 
 	h.initialL1Sequence, err = h.child.QueryNextL1Sequence(ctx)
 	if err != nil {
@@ -132,54 +83,17 @@ func (h *Host) Initialize(ctx context.Context, startHeight uint64, child childNo
 	return nil
 }
 
-func (h *Host) Start(ctx context.Context) {
-	h.logger.Info("host start", zap.Uint64("height", h.node.GetHeight()))
-	h.node.Start(ctx)
-}
-
 func (h *Host) registerHandlers() {
-	h.node.RegisterBeginBlockHandler(h.beginBlockHandler)
-	h.node.RegisterTxHandler(h.txHandler)
-	h.node.RegisterEventHandler(ophosttypes.EventTypeInitiateTokenDeposit, h.initiateDepositHandler)
-	h.node.RegisterEventHandler(ophosttypes.EventTypeProposeOutput, h.proposeOutputHandler)
-	h.node.RegisterEventHandler(ophosttypes.EventTypeFinalizeTokenWithdrawal, h.finalizeWithdrawalHandler)
-	h.node.RegisterEventHandler(ophosttypes.EventTypeRecordBatch, h.recordBatchHandler)
-	h.node.RegisterEventHandler(ophosttypes.EventTypeUpdateBatchInfo, h.updateBatchInfoHandler)
-	h.node.RegisterEndBlockHandler(h.endBlockHandler)
+	h.Node().RegisterBeginBlockHandler(h.beginBlockHandler)
+	h.Node().RegisterTxHandler(h.txHandler)
+	h.Node().RegisterEventHandler(ophosttypes.EventTypeInitiateTokenDeposit, h.initiateDepositHandler)
+	h.Node().RegisterEventHandler(ophosttypes.EventTypeProposeOutput, h.proposeOutputHandler)
+	h.Node().RegisterEventHandler(ophosttypes.EventTypeFinalizeTokenWithdrawal, h.finalizeWithdrawalHandler)
+	h.Node().RegisterEventHandler(ophosttypes.EventTypeRecordBatch, h.recordBatchHandler)
+	h.Node().RegisterEventHandler(ophosttypes.EventTypeUpdateBatchInfo, h.updateBatchInfoHandler)
+	h.Node().RegisterEndBlockHandler(h.endBlockHandler)
 }
 
 func (h *Host) RegisterDAHandlers() {
-	h.node.RegisterEventHandler(ophosttypes.EventTypeRecordBatch, h.recordBatchHandler)
-}
-
-func (h Host) BroadcastMsgs(msgs btypes.ProcessedMsgs) {
-	if len(msgs.Msgs) == 0 {
-		return
-	}
-
-	h.node.MustGetBroadcaster().BroadcastMsgs(msgs)
-}
-
-func (h Host) ProcessedMsgsToRawKV(msgs []btypes.ProcessedMsgs, delete bool) ([]types.RawKV, error) {
-	if len(msgs) == 0 {
-		return nil, nil
-	}
-
-	return h.node.MustGetBroadcaster().ProcessedMsgsToRawKV(msgs, delete)
-}
-
-func (h *Host) SetBridgeId(bridgeId int64) {
-	h.bridgeId = bridgeId
-}
-
-func (h Host) BridgeId() int64 {
-	return h.bridgeId
-}
-
-func (h Host) HasKey() bool {
-	return h.node.HasBroadcaster()
-}
-
-func (h Host) GetHeight() uint64 {
-	return h.node.GetHeight()
+	h.Node().RegisterEventHandler(ophosttypes.EventTypeRecordBatch, h.recordBatchHandler)
 }

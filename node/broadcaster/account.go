@@ -13,7 +13,7 @@ import (
 	grpctypes "github.com/cosmos/cosmos-sdk/types/grpc"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 
-	"github.com/initia-labs/opinit-bots-go/keys"
+	"github.com/initia-labs/opinit-bots/keys"
 )
 
 var _ client.AccountRetriever = &Broadcaster{}

@@ -7,8 +7,8 @@ import (
 
 	abcitypes "github.com/cometbft/cometbft/abci/types"
 	rpccoretypes "github.com/cometbft/cometbft/rpc/core/types"
-	nodetypes "github.com/initia-labs/opinit-bots-go/node/types"
-	"github.com/initia-labs/opinit-bots-go/types"
+	nodetypes "github.com/initia-labs/opinit-bots/node/types"
+	"github.com/initia-labs/opinit-bots/types"
 	"go.uber.org/zap"
 )
 

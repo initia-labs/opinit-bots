@@ -6,8 +6,8 @@ import (
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/util"
 
-	dbtypes "github.com/initia-labs/opinit-bots-go/db/types"
-	"github.com/initia-labs/opinit-bots-go/types"
+	dbtypes "github.com/initia-labs/opinit-bots/db/types"
+	"github.com/initia-labs/opinit-bots/types"
 )
 
 var _ types.DB = (*LevelDB)(nil)

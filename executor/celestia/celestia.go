@@ -16,13 +16,13 @@ import (
 	inclusion "github.com/celestiaorg/go-square/v2/inclusion"
 	sh "github.com/celestiaorg/go-square/v2/share"
 
-	executortypes "github.com/initia-labs/opinit-bots-go/executor/types"
-	"github.com/initia-labs/opinit-bots-go/keys"
-	"github.com/initia-labs/opinit-bots-go/node"
-	btypes "github.com/initia-labs/opinit-bots-go/node/broadcaster/types"
-	nodetypes "github.com/initia-labs/opinit-bots-go/node/types"
-	"github.com/initia-labs/opinit-bots-go/types"
-	celestiatypes "github.com/initia-labs/opinit-bots-go/types/celestia"
+	executortypes "github.com/initia-labs/opinit-bots/executor/types"
+	"github.com/initia-labs/opinit-bots/keys"
+	"github.com/initia-labs/opinit-bots/node"
+	btypes "github.com/initia-labs/opinit-bots/node/broadcaster/types"
+	nodetypes "github.com/initia-labs/opinit-bots/node/types"
+	"github.com/initia-labs/opinit-bots/types"
+	celestiatypes "github.com/initia-labs/opinit-bots/types/celestia"
 )
 
 type batchNode interface {

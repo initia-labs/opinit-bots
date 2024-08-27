@@ -7,10 +7,10 @@ import (
 	"github.com/pkg/errors"
 
 	"cosmossdk.io/core/address"
-	"github.com/initia-labs/opinit-bots-go/node/broadcaster"
-	"github.com/initia-labs/opinit-bots-go/node/rpcclient"
-	nodetypes "github.com/initia-labs/opinit-bots-go/node/types"
-	"github.com/initia-labs/opinit-bots-go/types"
+	"github.com/initia-labs/opinit-bots/node/broadcaster"
+	"github.com/initia-labs/opinit-bots/node/rpcclient"
+	nodetypes "github.com/initia-labs/opinit-bots/node/types"
+	"github.com/initia-labs/opinit-bots/types"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 

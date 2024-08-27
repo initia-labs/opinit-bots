@@ -3,8 +3,8 @@ package host
 // import (
 // 	"testing"
 
-// 	"github.com/initia-labs/opinit-bots-go/db"
-// 	"github.com/initia-labs/opinit-bots-go/node/types"
+// 	"github.com/initia-labs/opinit-bots/db"
+// 	"github.com/initia-labs/opinit-bots/node/types"
 // 	"github.com/stretchr/testify/require"
 // 	"go.uber.org/zap"
 // 	"go.uber.org/zap/zaptest/observer"

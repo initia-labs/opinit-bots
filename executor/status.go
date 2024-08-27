@@ -1,10 +1,10 @@
 package executor
 
 import (
-	"github.com/initia-labs/opinit-bots-go/executor/batch"
-	"github.com/initia-labs/opinit-bots-go/executor/child"
-	"github.com/initia-labs/opinit-bots-go/executor/host"
-	nodetypes "github.com/initia-labs/opinit-bots-go/node/types"
+	"github.com/initia-labs/opinit-bots/executor/batch"
+	"github.com/initia-labs/opinit-bots/executor/child"
+	"github.com/initia-labs/opinit-bots/executor/host"
+	nodetypes "github.com/initia-labs/opinit-bots/node/types"
 )
 
 type Status struct {

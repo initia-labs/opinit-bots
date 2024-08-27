@@ -6,7 +6,7 @@ import (
 
 	opchildtypes "github.com/initia-labs/OPinit/x/opchild/types"
 
-	nodetypes "github.com/initia-labs/opinit-bots-go/node/types"
+	nodetypes "github.com/initia-labs/opinit-bots/node/types"
 	"go.uber.org/zap"
 )
 
@@ -33,7 +33,7 @@ func (ch *Child) updateOracleHandler(_ context.Context, args nodetypes.EventHand
 }
 
 func (ch *Child) handleUpdateOracle(l1BlockHeight uint64, from string) {
-	ch.logger.Info("update oracle",
+	ch.Logger().Info("update oracle",
 		zap.Uint64("l1_blockHeight", l1BlockHeight),
 		zap.String("from", from),
 	)

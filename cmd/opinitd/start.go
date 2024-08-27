@@ -11,9 +11,9 @@ import (
 	"github.com/spf13/cobra"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/initia-labs/opinit-bots-go/bot"
-	bottypes "github.com/initia-labs/opinit-bots-go/bot/types"
-	"github.com/initia-labs/opinit-bots-go/types"
+	"github.com/initia-labs/opinit-bots/bot"
+	bottypes "github.com/initia-labs/opinit-bots/bot/types"
+	"github.com/initia-labs/opinit-bots/types"
 )
 
 const (

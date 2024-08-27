@@ -6,13 +6,13 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 )
 
-func (h Host) GetMsgProposeOutput(
+func (b BaseHost) GetMsgProposeOutput(
 	bridgeId uint64,
 	outputIndex uint64,
 	l2BlockNumber uint64,
 	outputRoot []byte,
 ) (sdk.Msg, error) {
-	sender, err := h.Node().MustGetBroadcaster().GetAddressString()
+	sender, err := b.node.MustGetBroadcaster().GetAddressString()
 	if err != nil {
 		return nil, err
 	}
@@ -24,25 +24,25 @@ func (h Host) GetMsgProposeOutput(
 		l2BlockNumber,
 		outputRoot,
 	)
-	err = msg.Validate(h.Node().AccountCodec())
+	err = msg.Validate(b.node.AccountCodec())
 	if err != nil {
 		return nil, err
 	}
 	return msg, nil
 }
 
-func (h Host) CreateBatchMsg(batchBytes []byte) (sdk.Msg, error) {
-	submitter, err := h.Node().MustGetBroadcaster().GetAddressString()
+func (b BaseHost) CreateBatchMsg(batchBytes []byte) (sdk.Msg, error) {
+	submitter, err := b.node.MustGetBroadcaster().GetAddressString()
 	if err != nil {
 		return nil, err
 	}
 
 	msg := ophosttypes.NewMsgRecordBatch(
 		submitter,
-		uint64(h.BridgeId()),
+		uint64(b.bridgeId),
 		batchBytes,
 	)
-	err = msg.Validate(h.Node().AccountCodec())
+	err = msg.Validate(b.node.AccountCodec())
 	if err != nil {
 		return nil, err
 	}

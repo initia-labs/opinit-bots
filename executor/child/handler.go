@@ -4,15 +4,15 @@ import (
 	"context"
 	"time"
 
-	btypes "github.com/initia-labs/opinit-bots-go/node/broadcaster/types"
-	nodetypes "github.com/initia-labs/opinit-bots-go/node/types"
-	"github.com/initia-labs/opinit-bots-go/types"
+	btypes "github.com/initia-labs/opinit-bots/node/broadcaster/types"
+	nodetypes "github.com/initia-labs/opinit-bots/node/types"
+	"github.com/initia-labs/opinit-bots/types"
 )
 
 func (ch *Child) beginBlockHandler(ctx context.Context, args nodetypes.BeginBlockArgs) (err error) {
 	blockHeight := uint64(args.Block.Header.Height)
 	// just to make sure that childMsgQueue is empty
-	if blockHeight == args.LatestHeight && len(ch.msgQueue) != 0 && len(ch.processedMsgs) != 0 {
+	if blockHeight == args.LatestHeight && len(ch.GetMsgQueue()) != 0 && len(ch.GetProcessedMsgs()) != 0 {
 		panic("must not happen, msgQueue should be empty")
 	}
 
@@ -39,7 +39,7 @@ func (ch *Child) endBlockHandler(_ context.Context, args nodetypes.EndBlockArgs)
 	batchKVs = append(batchKVs, treeKVs...)
 
 	if storageRoot != nil {
-		err = ch.handleOutput(blockHeight, ch.version, args.BlockID, ch.mk.GetWorkingTreeIndex(), storageRoot)
+		err = ch.handleOutput(blockHeight, ch.Version(), args.BlockID, ch.Merkle().GetWorkingTreeIndex(), storageRoot)
 		if err != nil {
 			return err
 		}
@@ -47,40 +47,39 @@ func (ch *Child) endBlockHandler(_ context.Context, args nodetypes.EndBlockArgs)
 
 	// if we are in sync and we have a small number of messages, less than 10,
 	// then store the current updates in the database and process the next block.
-	if blockHeight < args.LatestHeight && len(ch.msgQueue) > 0 && len(ch.msgQueue) <= 10 {
-		return ch.db.RawBatchSet(batchKVs...)
+	if blockHeight < args.LatestHeight && len(ch.GetMsgQueue()) > 0 && len(ch.GetMsgQueue()) <= 10 {
+		return ch.DB().RawBatchSet(batchKVs...)
 	}
 
 	// update the sync info
-	batchKVs = append(batchKVs, ch.node.SyncInfoToRawKV(blockHeight))
+	batchKVs = append(batchKVs, ch.Node().SyncInfoToRawKV(blockHeight))
 
 	// if has key, then process the messages
 	if ch.host.HasKey() {
-		if len(ch.msgQueue) != 0 {
-			ch.processedMsgs = append(ch.processedMsgs, btypes.ProcessedMsgs{
-				Msgs:      ch.msgQueue,
+		if len(ch.GetMsgQueue()) != 0 {
+			ch.AppendProcessedMsgs(btypes.ProcessedMsgs{
+				Msgs:      ch.GetMsgQueue(),
 				Timestamp: time.Now().UnixNano(),
 				Save:      true,
 			})
 		}
-		msgKVs, err := ch.host.ProcessedMsgsToRawKV(ch.processedMsgs, false)
+		msgKVs, err := ch.host.ProcessedMsgsToRawKV(ch.GetProcessedMsgs(), false)
 		if err != nil {
 			return err
 		}
 		batchKVs = append(batchKVs, msgKVs...)
 	}
 
-	err = ch.db.RawBatchSet(batchKVs...)
+	err = ch.DB().RawBatchSet(batchKVs...)
 	if err != nil {
 		return err
 	}
 
-	for _, processedMsg := range ch.processedMsgs {
+	for _, processedMsg := range ch.GetProcessedMsgs() {
 		ch.host.BroadcastMsgs(processedMsg)
 	}
 
-	ch.msgQueue = ch.msgQueue[:0]
-	ch.processedMsgs = ch.processedMsgs[:0]
-
+	ch.EmptyMsgQueue()
+	ch.EmptyProcessedMsgs()
 	return nil
 }

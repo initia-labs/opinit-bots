@@ -7,7 +7,7 @@ import (
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 
-	"github.com/initia-labs/opinit-bots-go/version"
+	"github.com/initia-labs/opinit-bots/version"
 )
 
 func NewRootCmd() *cobra.Command {

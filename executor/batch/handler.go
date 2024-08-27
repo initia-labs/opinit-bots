@@ -20,10 +20,10 @@ import (
 
 	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
 
-	executortypes "github.com/initia-labs/opinit-bots-go/executor/types"
-	btypes "github.com/initia-labs/opinit-bots-go/node/broadcaster/types"
-	nodetypes "github.com/initia-labs/opinit-bots-go/node/types"
-	"github.com/initia-labs/opinit-bots-go/types"
+	executortypes "github.com/initia-labs/opinit-bots/executor/types"
+	btypes "github.com/initia-labs/opinit-bots/node/broadcaster/types"
+	nodetypes "github.com/initia-labs/opinit-bots/node/types"
+	"github.com/initia-labs/opinit-bots/types"
 )
 
 func (bs *BatchSubmitter) rawBlockHandler(ctx context.Context, args nodetypes.RawBlockArgs) error {

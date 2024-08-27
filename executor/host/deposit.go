@@ -8,7 +8,7 @@ import (
 
 	"cosmossdk.io/math"
 	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
-	nodetypes "github.com/initia-labs/opinit-bots-go/node/types"
+	nodetypes "github.com/initia-labs/opinit-bots/node/types"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 )
@@ -27,7 +27,7 @@ func (h *Host) initiateDepositHandler(_ context.Context, args nodetypes.EventHan
 			if err != nil {
 				return err
 			}
-			if bridgeId != uint64(h.bridgeId) {
+			if bridgeId != uint64(h.BridgeId()) {
 				// pass other bridge deposit event
 				return nil
 			}
@@ -72,7 +72,7 @@ func (h *Host) initiateDepositHandler(_ context.Context, args nodetypes.EventHan
 		return err
 	}
 
-	h.msgQueue = append(h.msgQueue, msg)
+	h.AppendMsgQueue(msg)
 	return nil
 }
 

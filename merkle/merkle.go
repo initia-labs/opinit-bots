@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"math/bits"
 
-	merkletypes "github.com/initia-labs/opinit-bots-go/merkle/types"
-	types "github.com/initia-labs/opinit-bots-go/types"
+	merkletypes "github.com/initia-labs/opinit-bots/merkle/types"
+	types "github.com/initia-labs/opinit-bots/types"
 )
 
 // NodeGeneratorFn is a function type that generates parent node from two child nodes.

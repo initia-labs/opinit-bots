@@ -17,9 +17,9 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/tx/signing"
 
-	btypes "github.com/initia-labs/opinit-bots-go/node/broadcaster/types"
-	"github.com/initia-labs/opinit-bots-go/node/rpcclient"
-	"github.com/initia-labs/opinit-bots-go/types"
+	btypes "github.com/initia-labs/opinit-bots/node/broadcaster/types"
+	"github.com/initia-labs/opinit-bots/node/rpcclient"
+	"github.com/initia-labs/opinit-bots/types"
 )
 
 type Broadcaster struct {

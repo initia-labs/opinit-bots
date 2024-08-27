@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/initia-labs/opinit-bots-go/db/types"
+	"github.com/initia-labs/opinit-bots/db/types"
 	"github.com/stretchr/testify/require"
 )
 

@@ -10,7 +10,7 @@ import (
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 
-	nodetypes "github.com/initia-labs/opinit-bots-go/node/types"
+	nodetypes "github.com/initia-labs/opinit-bots/node/types"
 	"go.uber.org/zap"
 )
 

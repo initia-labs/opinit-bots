@@ -4,7 +4,7 @@ import (
 	"time"
 
 	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
-	nodetypes "github.com/initia-labs/opinit-bots-go/node/types"
+	nodetypes "github.com/initia-labs/opinit-bots/node/types"
 )
 
 type Status struct {

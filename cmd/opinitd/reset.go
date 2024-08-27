@@ -6,7 +6,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	bottypes "github.com/initia-labs/opinit-bots-go/bot/types"
+	bottypes "github.com/initia-labs/opinit-bots/bot/types"
 )
 
 func resetDBCmd(ctx *cmdContext) *cobra.Command {

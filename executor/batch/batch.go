@@ -13,13 +13,13 @@ import (
 	opchildtypes "github.com/initia-labs/OPinit/x/opchild/types"
 	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
 
-	dbtypes "github.com/initia-labs/opinit-bots-go/db/types"
-	"github.com/initia-labs/opinit-bots-go/executor/child"
-	executortypes "github.com/initia-labs/opinit-bots-go/executor/types"
-	"github.com/initia-labs/opinit-bots-go/node"
-	btypes "github.com/initia-labs/opinit-bots-go/node/broadcaster/types"
-	nodetypes "github.com/initia-labs/opinit-bots-go/node/types"
-	"github.com/initia-labs/opinit-bots-go/types"
+	dbtypes "github.com/initia-labs/opinit-bots/db/types"
+	executortypes "github.com/initia-labs/opinit-bots/executor/types"
+	"github.com/initia-labs/opinit-bots/node"
+	btypes "github.com/initia-labs/opinit-bots/node/broadcaster/types"
+	nodetypes "github.com/initia-labs/opinit-bots/node/types"
+	childprovider "github.com/initia-labs/opinit-bots/provider/child"
+	"github.com/initia-labs/opinit-bots/types"
 )
 
 type hostNode interface {
@@ -67,13 +67,13 @@ type BatchSubmitter struct {
 	LastBatchEndBlockNumber uint64
 }
 
-func NewBatchSubmitter(
-	version uint8, cfg nodetypes.NodeConfig,
+func NewBatchSubmitterV0(
+	cfg nodetypes.NodeConfig,
 	batchCfg executortypes.BatchConfig,
 	db types.DB, logger *zap.Logger,
 	chainID, homePath, bech32Prefix string,
 ) *BatchSubmitter {
-	appCodec, txConfig, err := child.GetCodec(bech32Prefix)
+	appCodec, txConfig, err := childprovider.GetCodec(bech32Prefix)
 	if err != nil {
 		panic(err)
 	}
@@ -86,7 +86,7 @@ func NewBatchSubmitter(
 	}
 
 	ch := &BatchSubmitter{
-		version: version,
+		version: 0,
 
 		node: node,
 

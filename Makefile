@@ -22,8 +22,8 @@ build_tags = netgo
 build_tags += $(BUILD_TAGS)
 build_tags := $(strip $(build_tags))
 
-ldflags = -X github.com/initia-labs/opinit-bots-go/version.Version=$(VERSION) \
-		  -X github.com/initia-labs/opinit-bots-go/version.GitCommit=$(COMMIT)
+ldflags = -X github.com/initia-labs/opinit-bots/version.Version=$(VERSION) \
+		  -X github.com/initia-labs/opinit-bots/version.GitCommit=$(COMMIT)
 
 ldflags += $(LDFLAGS)
 ldflags := $(strip $(ldflags))

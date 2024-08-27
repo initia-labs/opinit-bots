@@ -11,7 +11,7 @@ import (
 
 	rpccoretypes "github.com/cometbft/cometbft/rpc/core/types"
 
-	btypes "github.com/initia-labs/opinit-bots-go/node/broadcaster/types"
+	btypes "github.com/initia-labs/opinit-bots/node/broadcaster/types"
 )
 
 func (b Broadcaster) GetHeight() uint64 {

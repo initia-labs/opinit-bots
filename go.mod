@@ -1,4 +1,4 @@
-module github.com/initia-labs/opinit-bots-go
+module github.com/initia-labs/opinit-bots
 
 go 1.22.5
 

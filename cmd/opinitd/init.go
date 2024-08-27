@@ -8,8 +8,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	bottypes "github.com/initia-labs/opinit-bots-go/bot/types"
-	executortypes "github.com/initia-labs/opinit-bots-go/executor/types"
+	bottypes "github.com/initia-labs/opinit-bots/bot/types"
+	executortypes "github.com/initia-labs/opinit-bots/executor/types"
 )
 
 func initCmd(ctx *cmdContext) *cobra.Command {

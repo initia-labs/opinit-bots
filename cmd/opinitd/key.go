@@ -30,7 +30,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/crypto/hd"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 
-	"github.com/initia-labs/opinit-bots-go/keys"
+	"github.com/initia-labs/opinit-bots/keys"
 )
 
 const (

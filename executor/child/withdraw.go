@@ -11,13 +11,13 @@ import (
 	"cosmossdk.io/math"
 	opchildtypes "github.com/initia-labs/OPinit/x/opchild/types"
 	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
-	executortypes "github.com/initia-labs/opinit-bots-go/executor/types"
-	"github.com/initia-labs/opinit-bots-go/types"
+	executortypes "github.com/initia-labs/opinit-bots/executor/types"
+	"github.com/initia-labs/opinit-bots/types"
 	"go.uber.org/zap"
 
 	cmtproto "github.com/cometbft/cometbft/proto/tendermint/types"
-	dbtypes "github.com/initia-labs/opinit-bots-go/db/types"
-	nodetypes "github.com/initia-labs/opinit-bots-go/node/types"
+	dbtypes "github.com/initia-labs/opinit-bots/db/types"
+	nodetypes "github.com/initia-labs/opinit-bots/node/types"
 )
 
 func (ch *Child) initiateWithdrawalHandler(_ context.Context, args nodetypes.EventHandlerArgs) error {
@@ -69,12 +69,12 @@ func (ch *Child) handleInitiateWithdrawal(l2Sequence uint64, from string, to str
 	}
 
 	// generate merkle tree
-	err = ch.mk.InsertLeaf(withdrawalHash[:])
+	err = ch.Merkle().InsertLeaf(withdrawalHash[:])
 	if err != nil {
 		return err
 	}
 
-	ch.logger.Info("initiate token withdrawal",
+	ch.Logger().Info("initiate token withdrawal",
 		zap.Uint64("l2_sequence", l2Sequence),
 		zap.String("from", from),
 		zap.String("to", to),
@@ -104,7 +104,7 @@ func (ch *Child) prepareTree(blockHeight uint64) error {
 		return nil
 	}
 
-	err := ch.mk.LoadWorkingTree(blockHeight - 1)
+	err := ch.Merkle().LoadWorkingTree(blockHeight - 1)
 	if err == dbtypes.ErrNotFound {
 		// must not happened
 		panic(fmt.Errorf("working tree not found at height: %d, current: %d", blockHeight-1, blockHeight))
@@ -116,7 +116,7 @@ func (ch *Child) prepareTree(blockHeight uint64) error {
 }
 
 func (ch *Child) prepareOutput(ctx context.Context) error {
-	workingOutputIndex := ch.mk.GetWorkingTreeIndex()
+	workingOutputIndex := ch.Merkle().GetWorkingTreeIndex()
 
 	// initialize next output time
 	if ch.nextOutputTime.IsZero() && workingOutputIndex > 1 {
@@ -126,10 +126,10 @@ func (ch *Child) prepareOutput(ctx context.Context) error {
 			return fmt.Errorf("output does not exist at index: %d", workingOutputIndex-1)
 		}
 		ch.lastOutputTime = output.OutputProposal.L1BlockTime
-		ch.nextOutputTime = output.OutputProposal.L1BlockTime.Add(ch.bridgeInfo.BridgeConfig.SubmissionInterval * 2 / 3)
+		ch.nextOutputTime = output.OutputProposal.L1BlockTime.Add(ch.BridgeInfo().BridgeConfig.SubmissionInterval * 2 / 3)
 	}
 
-	output, err := ch.host.QueryOutput(ctx, ch.BridgeId(), ch.mk.GetWorkingTreeIndex())
+	output, err := ch.host.QueryOutput(ctx, ch.BridgeId(), ch.Merkle().GetWorkingTreeIndex())
 	if err != nil {
 		if strings.Contains(err.Error(), "collections: not found") {
 			return nil
@@ -163,15 +163,15 @@ func (ch *Child) handleTree(blockHeight uint64, latestHeight uint64, blockId []b
 			return nil, nil, err
 		}
 
-		kvs, storageRoot, err = ch.mk.FinalizeWorkingTree(data)
+		kvs, storageRoot, err = ch.Merkle().FinalizeWorkingTree(data)
 		if err != nil {
 			return nil, nil, err
 		}
 
-		ch.logger.Info("finalize working tree",
-			zap.Uint64("tree_index", ch.mk.GetWorkingTreeIndex()),
+		ch.Logger().Info("finalize working tree",
+			zap.Uint64("tree_index", ch.Merkle().GetWorkingTreeIndex()),
 			zap.Uint64("height", blockHeight),
-			zap.Uint64("num_leaves", ch.mk.GetWorkingTreeLeafCount()),
+			zap.Uint64("num_leaves", ch.Merkle().GetWorkingTreeLeafCount()),
 			zap.String("storage_root", base64.StdEncoding.EncodeToString(storageRoot)),
 		)
 
@@ -182,10 +182,10 @@ func (ch *Child) handleTree(blockHeight uint64, latestHeight uint64, blockId []b
 
 		ch.finalizingBlockHeight = 0
 		ch.lastOutputTime = blockHeader.Time
-		ch.nextOutputTime = blockHeader.Time.Add(ch.bridgeInfo.BridgeConfig.SubmissionInterval * 2 / 3)
+		ch.nextOutputTime = blockHeader.Time.Add(ch.BridgeInfo().BridgeConfig.SubmissionInterval * 2 / 3)
 	}
 
-	err = ch.mk.SaveWorkingTree(blockHeight)
+	err = ch.Merkle().SaveWorkingTree(blockHeight)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -204,13 +204,13 @@ func (ch *Child) handleOutput(blockHeight uint64, version uint8, blockId []byte,
 	if err != nil {
 		return err
 	}
-	ch.msgQueue = append(ch.msgQueue, msg)
+	ch.AppendMsgQueue(msg)
 	return nil
 }
 
 // GetWithdrawal returns the withdrawal data for the given sequence from the database
 func (ch *Child) GetWithdrawal(sequence uint64) (executortypes.WithdrawalData, error) {
-	dataBytes, err := ch.db.Get(executortypes.PrefixedWithdrawalKey(sequence))
+	dataBytes, err := ch.DB().Get(executortypes.PrefixedWithdrawalKey(sequence))
 	if err != nil {
 		return executortypes.WithdrawalData{}, err
 	}
@@ -226,5 +226,5 @@ func (ch *Child) SetWithdrawal(sequence uint64, data executortypes.WithdrawalDat
 		return err
 	}
 
-	return ch.db.Set(executortypes.PrefixedWithdrawalKey(sequence), dataBytes)
+	return ch.DB().Set(executortypes.PrefixedWithdrawalKey(sequence), dataBytes)
 }

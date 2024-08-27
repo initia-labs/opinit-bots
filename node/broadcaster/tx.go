@@ -20,8 +20,8 @@ import (
 	txtypes "github.com/cosmos/cosmos-sdk/types/tx"
 	"github.com/cosmos/cosmos-sdk/types/tx/signing"
 
-	btypes "github.com/initia-labs/opinit-bots-go/node/broadcaster/types"
-	"github.com/initia-labs/opinit-bots-go/txutils"
+	btypes "github.com/initia-labs/opinit-bots/node/broadcaster/types"
+	"github.com/initia-labs/opinit-bots/txutils"
 
 	opchildtypes "github.com/initia-labs/OPinit/x/opchild/types"
 )

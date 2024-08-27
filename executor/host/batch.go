@@ -5,7 +5,7 @@ import (
 	"strconv"
 
 	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
-	nodetypes "github.com/initia-labs/opinit-bots-go/node/types"
+	nodetypes "github.com/initia-labs/opinit-bots/node/types"
 	"go.uber.org/zap"
 )
 
@@ -24,7 +24,7 @@ func (h *Host) recordBatchHandler(_ context.Context, args nodetypes.EventHandler
 			}
 		}
 	}
-	h.logger.Info("record batch",
+	h.Logger().Info("record batch",
 		zap.String("submitter", submitter),
 	)
 	return nil
@@ -42,7 +42,7 @@ func (h *Host) updateBatchInfoHandler(_ context.Context, args nodetypes.EventHan
 			if err != nil {
 				return err
 			}
-			if bridgeId != uint64(h.bridgeId) {
+			if bridgeId != uint64(h.BridgeId()) {
 				// pass other bridge deposit event
 				return nil
 			}
@@ -62,7 +62,7 @@ func (h *Host) updateBatchInfoHandler(_ context.Context, args nodetypes.EventHan
 			}
 		}
 	}
-	h.logger.Info("update batch info",
+	h.Logger().Info("update batch info",
 		zap.String("chain", chain),
 		zap.String("submitter", submitter),
 		zap.Uint64("output_index", outputIndex),

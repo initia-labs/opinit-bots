@@ -7,8 +7,8 @@ import (
 	"golang.org/x/crypto/sha3"
 
 	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
-	"github.com/initia-labs/opinit-bots-go/db"
-	merkletypes "github.com/initia-labs/opinit-bots-go/merkle/types"
+	"github.com/initia-labs/opinit-bots/db"
+	merkletypes "github.com/initia-labs/opinit-bots/merkle/types"
 	"github.com/stretchr/testify/require"
 )
 
