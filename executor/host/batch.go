@@ -2,27 +2,23 @@ package host
 
 import (
 	"context"
-	"strconv"
 
-	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
 	nodetypes "github.com/initia-labs/opinit-bots/node/types"
+	hostprovider "github.com/initia-labs/opinit-bots/provider/host"
 	"go.uber.org/zap"
 )
 
 func (h *Host) recordBatchHandler(_ context.Context, args nodetypes.EventHandlerArgs) error {
-	var submitter string
-	for _, attr := range args.EventAttributes {
-		switch attr.Key {
-		case ophosttypes.AttributeKeySubmitter:
-			submitter = attr.Value
-			hostAddress, err := h.GetAddressStr()
-			if err != nil {
-				return nil
-			}
-			if submitter != hostAddress {
-				return nil
-			}
-		}
+	submitter, err := hostprovider.ParseMsgRecordBatch(args.EventAttributes)
+	if err != nil {
+		return err
+	}
+	hostAddress, err := h.GetAddressStr()
+	if err != nil {
+		return nil
+	}
+	if submitter != hostAddress {
+		return nil
 	}
 	h.Logger().Info("record batch",
 		zap.String("submitter", submitter),
@@ -31,37 +27,15 @@ func (h *Host) recordBatchHandler(_ context.Context, args nodetypes.EventHandler
 }
 
 func (h *Host) updateBatchInfoHandler(_ context.Context, args nodetypes.EventHandlerArgs) error {
-	var bridgeId uint64
-	var submitter, chain string
-	var outputIndex, l2BlockNumber uint64
-	var err error
-	for _, attr := range args.EventAttributes {
-		switch attr.Key {
-		case ophosttypes.AttributeKeyBridgeId:
-			bridgeId, err = strconv.ParseUint(attr.Value, 10, 64)
-			if err != nil {
-				return err
-			}
-			if bridgeId != uint64(h.BridgeId()) {
-				// pass other bridge deposit event
-				return nil
-			}
-		case ophosttypes.AttributeKeyBatchChainType:
-			chain = attr.Value
-		case ophosttypes.AttributeKeyBatchSubmitter:
-			submitter = attr.Value
-		case ophosttypes.AttributeKeyFinalizedOutputIndex:
-			outputIndex, err = strconv.ParseUint(attr.Value, 10, 64)
-			if err != nil {
-				return err
-			}
-		case ophosttypes.AttributeKeyFinalizedL2BlockNumber:
-			l2BlockNumber, err = strconv.ParseUint(attr.Value, 10, 64)
-			if err != nil {
-				return err
-			}
-		}
+	bridgeId, submitter, chain, outputIndex, l2BlockNumber, err := hostprovider.ParseMsgUpdateBatchInfo(args.EventAttributes)
+	if err != nil {
+		return err
 	}
+	if bridgeId != uint64(h.BridgeId()) {
+		// pass other bridge deposit event
+		return nil
+	}
+
 	h.Logger().Info("update batch info",
 		zap.String("chain", chain),
 		zap.String("submitter", submitter),

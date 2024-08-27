@@ -5,11 +5,8 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"strconv"
 	"strings"
 
-	"cosmossdk.io/math"
-	opchildtypes "github.com/initia-labs/OPinit/x/opchild/types"
 	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
 	executortypes "github.com/initia-labs/opinit-bots/executor/types"
 	"github.com/initia-labs/opinit-bots/types"
@@ -18,36 +15,14 @@ import (
 	cmtproto "github.com/cometbft/cometbft/proto/tendermint/types"
 	dbtypes "github.com/initia-labs/opinit-bots/db/types"
 	nodetypes "github.com/initia-labs/opinit-bots/node/types"
+	childprovider "github.com/initia-labs/opinit-bots/provider/child"
 )
 
 func (ch *Child) initiateWithdrawalHandler(_ context.Context, args nodetypes.EventHandlerArgs) error {
-	var l2Sequence, amount uint64
-	var from, to, baseDenom string
-	var err error
-
-	for _, attr := range args.EventAttributes {
-		switch attr.Key {
-		case opchildtypes.AttributeKeyL2Sequence:
-			l2Sequence, err = strconv.ParseUint(attr.Value, 10, 64)
-			if err != nil {
-				return err
-			}
-		case opchildtypes.AttributeKeyFrom:
-			from = attr.Value
-		case opchildtypes.AttributeKeyTo:
-			to = attr.Value
-		case opchildtypes.AttributeKeyBaseDenom:
-			baseDenom = attr.Value
-		case opchildtypes.AttributeKeyAmount:
-			coinAmount, ok := math.NewIntFromString(attr.Value)
-			if !ok {
-				return fmt.Errorf("invalid amount %s", attr.Value)
-			}
-
-			amount = coinAmount.Uint64()
-		}
+	l2Sequence, amount, from, to, baseDenom, err := childprovider.ParseInitiateWithdrawal(args.EventAttributes)
+	if err != nil {
+		return err
 	}
-
 	return ch.handleInitiateWithdrawal(l2Sequence, from, to, baseDenom, amount)
 }
 
