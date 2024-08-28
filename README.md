@@ -16,9 +16,9 @@ Before running OPinit bots, make sure you have the following prerequisites insta
 
 To ensure compatibility with the node version, check the following versions:
 
-| L1 Node | MiniMove | MiniWasm | MiniEVM | 
-| ------- | -------- | -------- | ------- | 
-| v0.4.2  | v0.4.0   | v0.4.0   | v0.4.0  | 
+| L1 Node | MiniMove | MiniWasm | MiniEVM |
+| ------- | -------- | -------- | ------- |
+| v0.4.2  | v0.4.0   | v0.4.0   | v0.4.0  |
 
 ### Build and Configure
 
@@ -30,13 +30,16 @@ opinitd init [bot-name]
 ```
 
 Default config path is `~/.opinit/[bot-name].json`
+
 - Customize home dir with `--home ~/.opinit-custom-path`
 - Customize config name with `--config [bot-custom-name].json`
 
 Supported bot names
+
 - `executor`
 
 ### Register keys
+
 ```bash
 opinitd keys add [chain-id] [key-name]
 ### with mnemonic file
@@ -54,6 +57,7 @@ To start the bot, use the following command:
 ```bash
 opinitd start [bot-name]
 ```
+
 log level can be set by using `--log-level` flag. Default log level is `info`.
 
 ### Reset Bot DB
@@ -65,11 +69,13 @@ opinitd reset-db [bot-name]
 ```
 
 ### Query status
+
 ```bash
 curl localhost:3000/status
 ```
 
-### Query withdrawals 
+### Query withdrawals
+
 ```bash
 curl localhost:3000/withdrawal/{sequence} | jq . > ./withdrawal-info.json
 initiad tx ophost finalize-token-withdrawal ./withdrawal-info.json --gas= --gas-prices= --chain-id= --from=
