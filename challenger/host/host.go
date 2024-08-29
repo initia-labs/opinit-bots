@@ -22,13 +22,13 @@ type Host struct {
 	elemQueue []challengertypes.ChallengeElem
 }
 
-func NewHostV0(
+func NewHostV1(
 	cfg nodetypes.NodeConfig,
 	db types.DB, logger *zap.Logger, bech32Prefix string,
 	elemCh chan<- challengertypes.ChallengeElem,
 ) *Host {
 	return &Host{
-		BaseHost:  hostprovider.NewBaseHostV0(cfg, db, logger, bech32Prefix),
+		BaseHost:  hostprovider.NewBaseHostV1(cfg, db, logger, bech32Prefix),
 		elemCh:    elemCh,
 		elemQueue: make([]challengertypes.ChallengeElem, 0),
 	}

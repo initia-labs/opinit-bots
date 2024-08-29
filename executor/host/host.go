@@ -51,7 +51,7 @@ type Host struct {
 	lastProposedOutputL2BlockNumber uint64
 }
 
-func NewHostV0(
+func NewHostV1(
 	relayOracle bool, cfg nodetypes.NodeConfig,
 	db types.DB, logger *zap.Logger, bech32Prefix, batchSubmitter string,
 ) *Host {
@@ -61,7 +61,7 @@ func NewHostV0(
 	}
 	return &Host{
 		relayOracle: relayOracle,
-		BaseHost:    hostprovider.NewBaseHostV0(cfg, db, logger, bech32Prefix),
+		BaseHost:    hostprovider.NewBaseHostV1(cfg, db, logger, bech32Prefix),
 	}
 }
 

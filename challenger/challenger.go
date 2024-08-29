@@ -45,13 +45,13 @@ func NewChallenger(cfg *challengertypes.Config, db types.DB, sv *server.Server, 
 
 	elemCh := make(chan challengertypes.ChallengeElem)
 	return &Challenger{
-		host: host.NewHostV0(
+		host: host.NewHostV1(
 			cfg.L1NodeConfig(homePath),
 			db.WithPrefix([]byte(types.HostName)),
 			logger.Named(types.HostName), cfg.L1Node.Bech32Prefix,
 			elemCh,
 		),
-		child: child.NewChildV0(
+		child: child.NewChildV1(
 			cfg.L2NodeConfig(homePath),
 			db.WithPrefix([]byte(types.ChildName)),
 			logger.Named(types.ChildName), cfg.L2Node.Bech32Prefix,

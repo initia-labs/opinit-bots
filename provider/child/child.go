@@ -44,7 +44,7 @@ type BaseChild struct {
 	msgQueue      []sdk.Msg
 }
 
-func NewBaseChildV0(
+func NewBaseChildV1(
 	cfg nodetypes.NodeConfig,
 	db types.DB, logger *zap.Logger, bech32Prefix string,
 ) *BaseChild {
@@ -64,7 +64,7 @@ func NewBaseChildV0(
 	}
 
 	ch := &BaseChild{
-		version: 0,
+		version: 1,
 
 		node: node,
 		mk:   mk,

@@ -49,12 +49,12 @@ type Child struct {
 	lastOutputTime                    time.Time
 }
 
-func NewChildV0(
+func NewChildV1(
 	cfg nodetypes.NodeConfig,
 	db types.DB, logger *zap.Logger, bech32Prefix string,
 ) *Child {
 	return &Child{
-		BaseChild: childprovider.NewBaseChildV0(cfg, db, logger, bech32Prefix),
+		BaseChild: childprovider.NewBaseChildV1(cfg, db, logger, bech32Prefix),
 	}
 }
 

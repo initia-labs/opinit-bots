@@ -127,6 +127,10 @@ func (cfg Config) Validate() error {
 		return errors.New("version is required")
 	}
 
+	if cfg.Version != 1 {
+		return errors.New("only version 1 is supported")
+	}
+
 	if cfg.ListenAddress == "" {
 		return errors.New("listen address is required")
 	}

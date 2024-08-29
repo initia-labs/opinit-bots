@@ -37,7 +37,7 @@ type BaseHost struct {
 	msgQueue      []sdk.Msg
 }
 
-func NewBaseHostV0(cfg nodetypes.NodeConfig,
+func NewBaseHostV1(cfg nodetypes.NodeConfig,
 	db types.DB, logger *zap.Logger, bech32Prefix string,
 ) *BaseHost {
 	appCodec, txConfig, err := GetCodec(bech32Prefix)
@@ -51,7 +51,7 @@ func NewBaseHostV0(cfg nodetypes.NodeConfig,
 	}
 
 	h := &BaseHost{
-		version: 0,
+		version: 1,
 
 		node: node,
 

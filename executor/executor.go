@@ -47,12 +47,12 @@ func NewExecutor(cfg *executortypes.Config, db types.DB, sv *server.Server, logg
 	}
 
 	return &Executor{
-		host: host.NewHostV0(
+		host: host.NewHostV1(
 			cfg.RelayOracle, cfg.L1NodeConfig(homePath),
 			db.WithPrefix([]byte(types.HostName)),
 			logger.Named(types.HostName), cfg.L1Node.Bech32Prefix, "",
 		),
-		child: child.NewChildV0(
+		child: child.NewChildV1(
 			cfg.L2NodeConfig(homePath),
 			db.WithPrefix([]byte(types.ChildName)),
 			logger.Named(types.ChildName), cfg.L2Node.Bech32Prefix,
@@ -171,7 +171,7 @@ func (ex *Executor) makeDANode(bridgeId int64) (executortypes.DANode, error) {
 	batchInfo := ex.batch.BatchInfo()
 	switch batchInfo.BatchInfo.ChainType {
 	case ophosttypes.BatchInfo_CHAIN_TYPE_INITIA:
-		da := host.NewHostV0(
+		da := host.NewHostV1(
 			false, ex.cfg.DANodeConfig(ex.homePath),
 			ex.db.WithPrefix([]byte(types.DAHostName)),
 			ex.logger.Named(types.DAHostName),

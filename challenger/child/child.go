@@ -39,13 +39,13 @@ type Child struct {
 	elemQueue []challengertypes.ChallengeElem
 }
 
-func NewChildV0(
+func NewChildV1(
 	cfg nodetypes.NodeConfig,
 	db types.DB, logger *zap.Logger, bech32Prefix string,
 	elemCh chan<- challengertypes.ChallengeElem,
 ) *Child {
 	return &Child{
-		BaseChild: childprovider.NewBaseChildV0(cfg, db, logger, bech32Prefix),
+		BaseChild: childprovider.NewBaseChildV1(cfg, db, logger, bech32Prefix),
 		elemCh:    elemCh,
 		elemQueue: make([]challengertypes.ChallengeElem, 0),
 	}
