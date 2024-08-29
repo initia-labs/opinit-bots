@@ -3,10 +3,11 @@ package child
 import (
 	"context"
 
-	sdk "github.com/cosmos/cosmos-sdk/types"
 	nodetypes "github.com/initia-labs/opinit-bots/node/types"
 	childprovider "github.com/initia-labs/opinit-bots/provider/child"
 	"go.uber.org/zap"
+
+	sdk "github.com/cosmos/cosmos-sdk/types"
 )
 
 func (ch *Child) finalizeDepositHandler(_ context.Context, args nodetypes.EventHandlerArgs) error {

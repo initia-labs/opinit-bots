@@ -6,8 +6,9 @@ import (
 
 	"cosmossdk.io/math"
 	abcitypes "github.com/cometbft/cometbft/abci/types"
-	sdk "github.com/cosmos/cosmos-sdk/types"
 	opchildtypes "github.com/initia-labs/OPinit/x/opchild/types"
+
+	sdk "github.com/cosmos/cosmos-sdk/types"
 )
 
 func ParseFinalizeDeposit(eventAttrs []abcitypes.EventAttribute) (

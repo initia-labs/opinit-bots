@@ -6,9 +6,10 @@ import (
 	"time"
 
 	"cosmossdk.io/math"
-	sdk "github.com/cosmos/cosmos-sdk/types"
 	nodetypes "github.com/initia-labs/opinit-bots/node/types"
 	hostprovider "github.com/initia-labs/opinit-bots/provider/host"
+
+	sdk "github.com/cosmos/cosmos-sdk/types"
 
 	challengertypes "github.com/initia-labs/opinit-bots/challenger/types"
 )

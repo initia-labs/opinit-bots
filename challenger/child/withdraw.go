@@ -22,6 +22,9 @@ import (
 
 func (ch *Child) initiateWithdrawalHandler(_ context.Context, args nodetypes.EventHandlerArgs) error {
 	l2Sequence, amount, from, to, baseDenom, err := childprovider.ParseInitiateWithdrawal(args.EventAttributes)
+	if err != nil {
+		return err
+	}
 
 	for _, attr := range args.EventAttributes {
 		switch attr.Key {
