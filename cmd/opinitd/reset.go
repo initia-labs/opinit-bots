@@ -18,13 +18,17 @@ func resetDBCmd(ctx *cmdContext) *cobra.Command {
 `,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			botType := bottypes.BotTypeFromString(args[0])
-			switch botType {
-			case bottypes.BotTypeExecutor:
-				dbPath := path.Join(ctx.homePath, string(botType))
-				err := os.RemoveAll(dbPath + ".db")
-				if err != nil {
-					return err
-				}
+			if err := botType.Validate(); err != nil {
+				return err
+			}
+
+			dbPath := path.Join(ctx.homePath, string(botType))
+			err := os.RemoveAll(dbPath + ".db")
+			if err != nil {
+				return err
+			}
+
+			if botType == bottypes.BotTypeExecutor {
 				err = os.RemoveAll(path.Join(ctx.homePath, "batch"))
 				if err != nil {
 					return err
