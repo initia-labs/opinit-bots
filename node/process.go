@@ -9,6 +9,7 @@ import (
 	rpccoretypes "github.com/cometbft/cometbft/rpc/core/types"
 	nodetypes "github.com/initia-labs/opinit-bots/node/types"
 	"github.com/initia-labs/opinit-bots/types"
+	"github.com/pkg/errors"
 	"go.uber.org/zap"
 )
 
@@ -53,7 +54,16 @@ func (n *Node) blockProcessLooper(ctx context.Context, processType nodetypes.Blo
 
 				err = n.handleNewBlock(ctx, block, blockResult, latestChainHeight)
 				if err != nil {
-					// TODO: handle error
+					if errors.Is(err, nodetypes.ErrIgnoreAndTryLater) {
+						sleep := time.NewTimer(time.Minute)
+						n.logger.Debug("failed to handle event", zap.String("error", err.Error()))
+						select {
+						case <-ctx.Done():
+							return nil
+						case <-sleep.C:
+						}
+						break
+					}
 					n.logger.Error("failed to handle new block", zap.String("error", err.Error()))
 					break
 				}

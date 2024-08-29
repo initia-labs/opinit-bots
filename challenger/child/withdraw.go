@@ -12,6 +12,7 @@ import (
 	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
 	challengertypes "github.com/initia-labs/opinit-bots/challenger/types"
 	"github.com/initia-labs/opinit-bots/types"
+	"github.com/pkg/errors"
 	"go.uber.org/zap"
 
 	cmtproto "github.com/cometbft/cometbft/proto/tendermint/types"
@@ -83,7 +84,6 @@ func (ch *Child) prepareTree(blockHeight uint64) error {
 	} else if err != nil {
 		return err
 	}
-
 	return nil
 }
 
@@ -104,8 +104,7 @@ func (ch *Child) prepareOutput(ctx context.Context) error {
 	if err != nil {
 		if strings.Contains(err.Error(), "collections: not found") {
 			// should check the existing output.
-			// TODO: waiting for the next output
-			return err
+			return errors.Wrap(nodetypes.ErrIgnoreAndTryLater, fmt.Sprintf("output does not exist: %d", ch.Merkle().GetWorkingTreeIndex()))
 		}
 		return err
 	} else {
@@ -116,13 +115,12 @@ func (ch *Child) prepareOutput(ctx context.Context) error {
 }
 
 func (ch *Child) handleTree(blockHeight uint64, blockHeader cmtproto.Header) (kvs []types.RawKV, storageRoot []byte, err error) {
-	// panic if we are syncing and passed the finalizing block height
+	// panic if we passed the finalizing block height
 	// this must not happened
 	if ch.finalizingBlockHeight != 0 && ch.finalizingBlockHeight < blockHeight {
 		panic(fmt.Errorf("INVARIANT failed; handleTree expect to finalize tree at block `%d` but we got block `%d`", blockHeight-1, blockHeight))
 	}
 
-	// finalize working tree if we are fully synced or block time is over next output time
 	if ch.finalizingBlockHeight == blockHeight {
 		kvs, storageRoot, err = ch.Merkle().FinalizeWorkingTree(nil)
 		if err != nil {
