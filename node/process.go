@@ -152,7 +152,7 @@ func (n *Node) handleNewBlock(ctx context.Context, block *rpccoretypes.ResultBlo
 		if len(n.eventHandlers) != 0 {
 			events := blockResult.TxsResults[txIndex].GetEvents()
 			for eventIndex, event := range events {
-				err := n.handleEvent(ctx, uint64(block.Block.Height), latestChainHeight, event)
+				err := n.handleEvent(ctx, uint64(block.Block.Height), block.Block.Time, latestChainHeight, event)
 				if err != nil {
 					return fmt.Errorf("failed to handle event: tx_index: %d, event_index: %d; %w", txIndex, eventIndex, err)
 				}
@@ -161,7 +161,7 @@ func (n *Node) handleNewBlock(ctx context.Context, block *rpccoretypes.ResultBlo
 	}
 
 	for eventIndex, event := range blockResult.FinalizeBlockEvents {
-		err := n.handleEvent(ctx, uint64(block.Block.Height), latestChainHeight, event)
+		err := n.handleEvent(ctx, uint64(block.Block.Height), block.Block.Time, latestChainHeight, event)
 		if err != nil {
 			return fmt.Errorf("failed to handle event: finalize block, event_index: %d; %w", eventIndex, err)
 		}
@@ -180,7 +180,7 @@ func (n *Node) handleNewBlock(ctx context.Context, block *rpccoretypes.ResultBlo
 	return nil
 }
 
-func (n *Node) handleEvent(ctx context.Context, blockHeight uint64, latestHeight uint64, event abcitypes.Event) error {
+func (n *Node) handleEvent(ctx context.Context, blockHeight uint64, blockTime time.Time, latestHeight uint64, event abcitypes.Event) error {
 	if n.eventHandlers[event.GetType()] == nil {
 		return nil
 	}
@@ -188,6 +188,7 @@ func (n *Node) handleEvent(ctx context.Context, blockHeight uint64, latestHeight
 	n.logger.Debug("handle event", zap.Uint64("height", blockHeight), zap.String("type", event.GetType()))
 	return n.eventHandlers[event.Type](ctx, nodetypes.EventHandlerArgs{
 		BlockHeight:     blockHeight,
+		BlockTime:       blockTime,
 		LatestHeight:    latestHeight,
 		EventAttributes: event.GetAttributes(),
 	})
@@ -208,7 +209,7 @@ func (n *Node) txChecker(ctx context.Context) error {
 		case <-timer.C:
 		}
 
-		pendingTx, res, err := n.broadcaster.CheckPendingTx(ctx)
+		pendingTx, res, blockTime, err := n.broadcaster.CheckPendingTx(ctx)
 		if err != nil {
 			return err
 		} else if pendingTx == nil || res == nil {
@@ -225,7 +226,7 @@ func (n *Node) txChecker(ctx context.Context) error {
 				default:
 				}
 
-				err := n.handleEvent(ctx, uint64(res.Height), 0, event)
+				err := n.handleEvent(ctx, uint64(res.Height), blockTime, 0, event)
 				if err != nil {
 					n.logger.Error("failed to handle event", zap.String("tx_hash", pendingTx.TxHash), zap.Int("event_index", eventIndex), zap.String("error", err.Error()))
 					break

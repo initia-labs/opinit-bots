@@ -52,29 +52,38 @@ func (b *Broadcaster) HandleNewBlock(block *rpccoretypes.ResultBlock, blockResul
 }
 
 // CheckPendingTx query tx info to check if pending tx is processed.
-func (b *Broadcaster) CheckPendingTx(ctx context.Context) (*btypes.PendingTxInfo, *rpccoretypes.ResultTx, error) {
+func (b *Broadcaster) CheckPendingTx(ctx context.Context) (*btypes.PendingTxInfo, *rpccoretypes.ResultTx, time.Time, error) {
 	if b.LenLocalPendingTx() == 0 {
-		return nil, nil, nil
+		return nil, nil, time.Time{}, nil
 	}
 
 	pendingTx := b.peekLocalPendingTx()
 	pendingTxTime := time.Unix(0, b.peekLocalPendingTx().Timestamp)
-	if time.Now().After(pendingTxTime.Add(b.cfg.TxTimeout)) {
+
+	lastBlockResult, err := b.rpcClient.Block(ctx, nil)
+	if err != nil {
+		return nil, nil, time.Time{}, err
+	}
+	if lastBlockResult.Block.Time.After(pendingTxTime.Add(b.cfg.TxTimeout)) {
 		// @sh-cha: should we rebroadcast pending txs? or rasing monitoring alert?
 		panic(fmt.Errorf("something wrong, pending txs are not processed for a long time; current block time: %s, pending tx processing time: %s", time.Now().UTC().String(), pendingTxTime.UTC().String()))
 	}
 
 	txHash, err := hex.DecodeString(pendingTx.TxHash)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, time.Time{}, err
 	}
 	res, err := b.rpcClient.QueryTx(ctx, txHash)
 	if err != nil {
 		b.logger.Debug("failed to query tx", zap.String("tx_hash", pendingTx.TxHash), zap.String("error", err.Error()))
-		return nil, nil, nil
+		return nil, nil, time.Time{}, nil
 	}
 
-	return &pendingTx, res, nil
+	blockResult, err := b.rpcClient.Block(ctx, &res.Height)
+	if err != nil {
+		return nil, nil, time.Time{}, err
+	}
+	return &pendingTx, res, blockResult.Block.Time, nil
 }
 
 // RemovePendingTx remove pending tx from local pending txs.

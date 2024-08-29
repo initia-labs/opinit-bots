@@ -25,6 +25,23 @@ func (b BaseHost) GetAddressStr() (string, error) {
 	return b.node.MustGetBroadcaster().GetAddressString()
 }
 
+func (b BaseHost) QueryLastFinalizedOutput(ctx context.Context, bridgeId uint64) (*ophosttypes.QueryLastFinalizedOutputResponse, error) {
+	req := &ophosttypes.QueryLastFinalizedOutputRequest{
+		BridgeId: bridgeId,
+	}
+	ctx, cancel := rpcclient.GetQueryContext(ctx, 0)
+	defer cancel()
+
+	res, err := b.ophostQueryClient.LastFinalizedOutput(ctx, req)
+	if err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return res, nil
+}
+
 func (b BaseHost) QueryLastOutput(ctx context.Context, bridgeId uint64) (*ophosttypes.QueryOutputProposalResponse, error) {
 	req := &ophosttypes.QueryOutputProposalsRequest{
 		BridgeId: bridgeId,

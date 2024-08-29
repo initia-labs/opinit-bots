@@ -22,7 +22,7 @@ type childNode interface {
 	HasKey() bool
 	BroadcastMsgs(btypes.ProcessedMsgs)
 	ProcessedMsgsToRawKV([]btypes.ProcessedMsgs, bool) ([]types.RawKV, error)
-	QueryNextL1Sequence(context.Context) (uint64, error)
+	QueryNextL1Sequence(context.Context, uint64) (uint64, error)
 
 	GetMsgFinalizeTokenDeposit(string, string, sdk.Coin, uint64, uint64, string, []byte) (sdk.Msg, error)
 	GetMsgUpdateOracle(
@@ -72,7 +72,7 @@ func (h *Host) Initialize(ctx context.Context, startHeight uint64, child childNo
 	}
 	h.child = child
 	h.batch = batch
-	h.initialL1Sequence, err = h.child.QueryNextL1Sequence(ctx)
+	h.initialL1Sequence, err = h.child.QueryNextL1Sequence(ctx, 0)
 	if err != nil {
 		return err
 	}

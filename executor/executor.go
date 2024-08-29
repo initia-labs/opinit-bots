@@ -219,7 +219,7 @@ func (ex *Executor) getStartHeights(ctx context.Context, bridgeId uint64) (l1Sta
 		}
 	}
 	// get the last deposit tx height from the host
-	l1Sequence, err := ex.child.QueryNextL1Sequence(ctx)
+	l1Sequence, err := ex.child.QueryNextL1Sequence(ctx, 0)
 	if err != nil {
 		return 0, 0, 0, 0, err
 	}

@@ -30,9 +30,9 @@ func (b BaseChild) QueryBridgeInfo(ctx context.Context) (opchildtypes.BridgeInfo
 	return res.BridgeInfo, nil
 }
 
-func (b BaseChild) QueryNextL1Sequence(ctx context.Context) (uint64, error) {
+func (b BaseChild) QueryNextL1Sequence(ctx context.Context, height uint64) (uint64, error) {
 	req := &opchildtypes.QueryNextL1SequenceRequest{}
-	ctx, cancel := rpcclient.GetQueryContext(ctx, 0)
+	ctx, cancel := rpcclient.GetQueryContext(ctx, height)
 	defer cancel()
 
 	res, err := b.opchildQueryClient.NextL1Sequence(ctx, req)

@@ -2,6 +2,7 @@ package types
 
 import (
 	"context"
+	"time"
 
 	abcitypes "github.com/cometbft/cometbft/abci/types"
 	cmtproto "github.com/cometbft/cometbft/proto/tendermint/types"
@@ -10,6 +11,7 @@ import (
 
 type EventHandlerArgs struct {
 	BlockHeight     uint64
+	BlockTime       time.Time
 	LatestHeight    uint64
 	TxIndex         uint64
 	EventAttributes []abcitypes.EventAttribute
