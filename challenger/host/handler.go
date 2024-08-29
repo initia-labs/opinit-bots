@@ -39,5 +39,6 @@ func (h *Host) endBlockHandler(_ context.Context, args nodetypes.EndBlockArgs) e
 	for _, elem := range h.elemQueue {
 		h.elemCh <- elem
 	}
+	h.elemQueue = h.elemQueue[:0]
 	return nil
 }

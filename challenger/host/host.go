@@ -39,6 +39,7 @@ func (h *Host) Initialize(ctx context.Context, startHeight uint64, bridgeId int6
 	if err != nil {
 		return err
 	}
+	// TODO: ignore l1Sequence less than child's last l1 sequence
 	h.registerHandlers()
 	return nil
 }

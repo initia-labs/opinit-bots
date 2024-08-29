@@ -160,17 +160,19 @@ func (c *Challenger) getStartHeights(ctx context.Context, bridgeId uint64) (l1St
 			startOutputIndex = output.OutputIndex + 1
 		}
 	}
-	// get the last deposit tx height from the host
-	l1Sequence, err := c.child.QueryNextL1Sequence(ctx, l2StartHeight-1)
-	if err != nil {
-		return 0, 0, 0, err
-	}
-	depositTxHeight, err := c.host.QueryDepositTxHeight(ctx, bridgeId, l1Sequence-1)
-	if err != nil {
-		return 0, 0, 0, err
-	}
-	if l1StartHeight > depositTxHeight {
-		l1StartHeight = depositTxHeight
+	if l2StartHeight > 0 {
+		// get the last deposit tx height from the host
+		l1Sequence, err := c.child.QueryNextL1Sequence(ctx, l2StartHeight-1)
+		if err != nil {
+			return 0, 0, 0, err
+		}
+		depositTxHeight, err := c.host.QueryDepositTxHeight(ctx, bridgeId, l1Sequence-1)
+		if err != nil {
+			return 0, 0, 0, err
+		}
+		if l1StartHeight > depositTxHeight {
+			l1StartHeight = depositTxHeight
+		}
 	}
 	if l2StartHeight == 0 {
 		startOutputIndex = 1

@@ -24,6 +24,6 @@ func (c *Challenger) checkValue(cid challengertypes.ChallengeId) ([]challengerty
 
 		return []challengertypes.Challenge{challenge}, nil
 	}
-
+	c.logger.Info("challenge passed", zap.String("id", cid.String()))
 	return nil, nil
 }

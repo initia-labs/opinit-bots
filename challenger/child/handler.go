@@ -65,5 +65,6 @@ func (ch *Child) endBlockHandler(_ context.Context, args nodetypes.EndBlockArgs)
 	for _, elem := range ch.elemQueue {
 		ch.elemCh <- elem
 	}
+	ch.elemQueue = ch.elemQueue[:0]
 	return nil
 }
