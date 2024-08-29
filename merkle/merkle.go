@@ -128,6 +128,7 @@ func (m *Merkle) LoadWorkingTree(version uint64) error {
 
 	var workingTree merkletypes.TreeInfo
 	err = json.Unmarshal(data, &workingTree)
+	m.workingTree = &workingTree
 	if err != nil {
 		return err
 	} else if workingTree.Done {
@@ -135,8 +136,6 @@ func (m *Merkle) LoadWorkingTree(version uint64) error {
 		nextStartLeafIndex := workingTree.StartLeafIndex + workingTree.LeafCount
 		return m.InitializeWorkingTree(nextTreeIndex, nextStartLeafIndex)
 	}
-
-	m.workingTree = &workingTree
 	return nil
 }
 
