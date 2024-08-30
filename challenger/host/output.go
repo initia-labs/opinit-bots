@@ -2,6 +2,7 @@ package host
 
 import (
 	"context"
+	"time"
 
 	nodetypes "github.com/initia-labs/opinit-bots/node/types"
 	hostprovider "github.com/initia-labs/opinit-bots/provider/host"
@@ -18,11 +19,11 @@ func (h *Host) proposeOutputHandler(_ context.Context, args nodetypes.EventHandl
 		// pass other bridge output proposal event
 		return nil
 	}
-	return h.handleProposeOutput(outputIndex, l2BlockNumber, outputRoot)
+	return h.handleProposeOutput(outputIndex, l2BlockNumber, outputRoot, args.BlockTime)
 }
 
-func (h *Host) handleProposeOutput(outputIndex uint64, l2BlockNumber uint64, outputRoot []byte) error {
-	output := challengertypes.NewOutput(l2BlockNumber, outputIndex, outputRoot[:])
+func (h *Host) handleProposeOutput(outputIndex uint64, l2BlockNumber uint64, outputRoot []byte, blockTime time.Time) error {
+	output := challengertypes.NewOutput(l2BlockNumber, outputIndex, outputRoot[:], blockTime)
 
 	h.elemQueue = append(h.elemQueue, challengertypes.ChallengeElem{
 		Node:  h.NodeType(),

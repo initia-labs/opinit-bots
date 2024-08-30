@@ -8,7 +8,7 @@ import (
 )
 
 type Status struct {
-	BridgeId int64            `json:"bridge_id"`
+	BridgeId uint64           `json:"bridge_id"`
 	Host     host.Status      `json:"host,omitempty"`
 	Child    child.Status     `json:"child,omitempty"`
 	Batch    batch.Status     `json:"batch,omitempty"`

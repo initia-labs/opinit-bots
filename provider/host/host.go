@@ -10,6 +10,7 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/x/auth"
 
+	opchildtypes "github.com/initia-labs/OPinit/x/opchild/types"
 	"github.com/initia-labs/OPinit/x/ophost"
 	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
 
@@ -25,7 +26,7 @@ type BaseHost struct {
 
 	node *node.Node
 
-	bridgeId int64
+	bridgeInfo opchildtypes.BridgeInfo
 
 	cfg    nodetypes.NodeConfig
 	db     types.DB
@@ -78,12 +79,12 @@ func GetCodec(bech32Prefix string) (codec.Codec, client.TxConfig, error) {
 	})
 }
 
-func (b *BaseHost) Initialize(ctx context.Context, startHeight uint64, bridgeId int64) error {
+func (b *BaseHost) Initialize(ctx context.Context, startHeight uint64, bridgeInfo opchildtypes.BridgeInfo) error {
 	err := b.node.Initialize(startHeight)
 	if err != nil {
 		return err
 	}
-	b.SetBridgeId(bridgeId)
+	b.SetBridgeInfo(bridgeInfo)
 	return nil
 }
 
@@ -108,12 +109,20 @@ func (b BaseHost) ProcessedMsgsToRawKV(msgs []btypes.ProcessedMsgs, delete bool)
 	return b.node.MustGetBroadcaster().ProcessedMsgsToRawKV(msgs, delete)
 }
 
-func (b *BaseHost) SetBridgeId(bridgeId int64) {
-	b.bridgeId = bridgeId
+func (b BaseHost) BridgeId() uint64 {
+	return b.bridgeInfo.BridgeId
 }
 
-func (b BaseHost) BridgeId() int64 {
-	return b.bridgeId
+func (b BaseHost) OracleEnabled() bool {
+	return b.bridgeInfo.BridgeConfig.OracleEnabled
+}
+
+func (b *BaseHost) SetBridgeInfo(bridgeInfo opchildtypes.BridgeInfo) {
+	b.bridgeInfo = bridgeInfo
+}
+
+func (b BaseHost) BridgeInfo() opchildtypes.BridgeInfo {
+	return b.bridgeInfo
 }
 
 func (b BaseHost) HasKey() bool {

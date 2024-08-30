@@ -42,3 +42,10 @@ func (h *Host) endBlockHandler(_ context.Context, args nodetypes.EndBlockArgs) e
 	h.elemQueue = h.elemQueue[:0]
 	return nil
 }
+
+func (h *Host) txHandler(_ context.Context, args nodetypes.TxHandlerArgs) error {
+	if args.TxIndex == 0 {
+		h.oracleTxHandler(args.BlockHeight, args.BlockTime, args.Tx)
+	}
+	return nil
+}

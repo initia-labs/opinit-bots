@@ -21,6 +21,7 @@ type EventHandlerFn func(context.Context, EventHandlerArgs) error
 
 type TxHandlerArgs struct {
 	BlockHeight  uint64
+	BlockTime    time.Time
 	LatestHeight uint64
 	TxIndex      uint64
 	Tx           comettypes.Tx

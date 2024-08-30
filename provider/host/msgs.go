@@ -39,7 +39,7 @@ func (b BaseHost) CreateBatchMsg(batchBytes []byte) (sdk.Msg, error) {
 
 	msg := ophosttypes.NewMsgRecordBatch(
 		submitter,
-		uint64(b.bridgeId),
+		b.BridgeId(),
 		batchBytes,
 	)
 	err = msg.Validate(b.node.AccountCodec())

@@ -38,7 +38,7 @@ type Celestia struct {
 	node  *node.Node
 	batch batchNode
 
-	bridgeId  int64
+	bridgeId  uint64
 	namespace sh.Namespace
 
 	cfg    nodetypes.NodeConfig
@@ -92,7 +92,7 @@ func createCodec(bech32Prefix string) (codec.Codec, client.TxConfig, error) {
 	})
 }
 
-func (c *Celestia) Initialize(batch batchNode, bridgeId int64) error {
+func (c *Celestia) Initialize(batch batchNode, bridgeId uint64) error {
 	err := c.node.Initialize(0)
 	if err != nil {
 		return err
@@ -128,7 +128,7 @@ func (c Celestia) ProcessedMsgsToRawKV(msgs []btypes.ProcessedMsgs, delete bool)
 	return c.node.MustGetBroadcaster().ProcessedMsgsToRawKV(msgs, delete)
 }
 
-func (c *Celestia) SetBridgeId(brigeId int64) {
+func (c *Celestia) SetBridgeId(brigeId uint64) {
 	c.bridgeId = brigeId
 }
 

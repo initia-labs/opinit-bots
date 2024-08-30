@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	"cosmossdk.io/math"
 	opchildtypes "github.com/initia-labs/OPinit/x/opchild/types"
@@ -146,9 +147,9 @@ func (ch *Child) handleTree(blockHeight uint64, blockHeader cmtproto.Header) (kv
 	return kvs, storageRoot, nil
 }
 
-func (ch *Child) handleOutput(blockHeight uint64, version uint8, blockId []byte, outputIndex uint64, storageRoot []byte) error {
+func (ch *Child) handleOutput(blockTime time.Time, blockHeight uint64, version uint8, blockId []byte, outputIndex uint64, storageRoot []byte) error {
 	outputRoot := ophosttypes.GenerateOutputRoot(version, storageRoot, blockId)
-	output := challengertypes.NewOutput(blockHeight, outputIndex, outputRoot[:])
+	output := challengertypes.NewOutput(blockHeight, outputIndex, outputRoot[:], blockTime)
 
 	ch.elemQueue = append(ch.elemQueue, challengertypes.ChallengeElem{
 		Node:  ch.NodeType(),

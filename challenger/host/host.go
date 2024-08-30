@@ -5,6 +5,7 @@ import (
 
 	"go.uber.org/zap"
 
+	opchildtypes "github.com/initia-labs/OPinit/x/opchild/types"
 	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
 
 	nodetypes "github.com/initia-labs/opinit-bots/node/types"
@@ -34,8 +35,8 @@ func NewHostV1(
 	}
 }
 
-func (h *Host) Initialize(ctx context.Context, startHeight uint64, bridgeId int64) error {
-	err := h.BaseHost.Initialize(ctx, startHeight, bridgeId)
+func (h *Host) Initialize(ctx context.Context, startHeight uint64, bridgeInfo opchildtypes.BridgeInfo) error {
+	err := h.BaseHost.Initialize(ctx, startHeight, bridgeInfo)
 	if err != nil {
 		return err
 	}
@@ -46,6 +47,7 @@ func (h *Host) Initialize(ctx context.Context, startHeight uint64, bridgeId int6
 
 func (h *Host) registerHandlers() {
 	h.Node().RegisterBeginBlockHandler(h.beginBlockHandler)
+	h.Node().RegisterTxHandler(h.txHandler)
 	h.Node().RegisterEventHandler(ophosttypes.EventTypeInitiateTokenDeposit, h.initiateDepositHandler)
 	h.Node().RegisterEventHandler(ophosttypes.EventTypeProposeOutput, h.proposeOutputHandler)
 	h.Node().RegisterEndBlockHandler(h.endBlockHandler)

@@ -2,6 +2,7 @@ package types
 
 import (
 	"bytes"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"time"
@@ -90,7 +91,15 @@ type EventType uint8
 const (
 	EventTypeDeposit EventType = iota
 	EventTypeOutput
+	EventTypeOracle
 )
+
+func (e EventType) Validate() error {
+	if e != EventTypeDeposit && e != EventTypeOutput && e != EventTypeOracle {
+		return fmt.Errorf("invalid event type: %d", e)
+	}
+	return nil
+}
 
 func (e EventType) String() string {
 	switch e {
@@ -98,6 +107,8 @@ func (e EventType) String() string {
 		return "Deposit"
 	case EventTypeOutput:
 		return "Output"
+	case EventTypeOracle:
+		return "Oracle"
 	default:
 		return "Unknown"
 	}
@@ -106,24 +117,24 @@ func (e EventType) String() string {
 type Deposit struct {
 	Sequence      uint64    `json:"sequence"`
 	L1BlockHeight uint64    `json:"l1_block_height"`
-	EventTime     time.Time `json:"event_time"`
 	From          string    `json:"from"`
 	To            string    `json:"to"`
 	L1Denom       string    `json:"l1_denom"`
 	Amount        string    `json:"amount"`
+	EventTime     time.Time `json:"event_time"`
 }
 
 var _ ChallengeEvent = &Deposit{}
 
-func NewDeposit(sequence, l1BlockHeight uint64, eventTime time.Time, from, to, l1Denom, amount string) *Deposit {
+func NewDeposit(sequence, l1BlockHeight uint64, from, to, l1Denom, amount string, eventTime time.Time) *Deposit {
 	return &Deposit{
 		Sequence:      sequence,
 		L1BlockHeight: l1BlockHeight,
-		EventTime:     eventTime,
 		From:          from,
 		To:            to,
 		L1Denom:       l1Denom,
 		Amount:        amount,
+		EventTime:     eventTime,
 	}
 }
 
@@ -158,18 +169,19 @@ func (d Deposit) Type() EventType {
 
 type Output struct {
 	L2BlockNumber uint64    `json:"l2_block_number"`
-	EventTime     time.Time `json:"event_time"`
 	OutputIndex   uint64    `json:"output_index"`
 	OutputRoot    []byte    `json:"output_root"`
+	EventTime     time.Time `json:"event_time"`
 }
 
 var _ ChallengeEvent = &Output{}
 
-func NewOutput(l2BlockNumber, outputIndex uint64, outputRoot []byte) *Output {
+func NewOutput(l2BlockNumber, outputIndex uint64, outputRoot []byte, eventTime time.Time) *Output {
 	return &Output{
 		L2BlockNumber: l2BlockNumber,
 		OutputIndex:   outputIndex,
 		OutputRoot:    outputRoot,
+		EventTime:     eventTime,
 	}
 }
 
@@ -197,4 +209,43 @@ func (o Output) String() string {
 
 func (o Output) Type() EventType {
 	return EventTypeOutput
+}
+
+type Oracle struct {
+	L1Height  uint64    `json:"l1_height"`
+	Data      []byte    `json:"data"`
+	EventTime time.Time `json:"event_time"`
+}
+
+func NewOracle(l1Height uint64, data []byte, eventTime time.Time) *Oracle {
+	return &Oracle{
+		L1Height:  l1Height,
+		Data:      data,
+		EventTime: eventTime,
+	}
+}
+
+func (o Oracle) Marshal() ([]byte, error) {
+	return json.Marshal(&o)
+}
+
+func (o *Oracle) Unmarshal(data []byte) error {
+	return json.Unmarshal(data, o)
+}
+
+func (o Oracle) Equal(another ChallengeEvent) (bool, error) {
+	anotherOracle, ok := another.(*Oracle)
+	if !ok {
+		return false, fmt.Errorf("invalid type: %T", another)
+	}
+	return o.L1Height == anotherOracle.L1Height &&
+		bytes.Equal(o.Data, anotherOracle.Data), nil
+}
+
+func (o Oracle) String() string {
+	return fmt.Sprintf("Oracle{L1Height: %d, Data: %s, EventTime: %s}", o.L1Height, base64.RawStdEncoding.EncodeToString(o.Data), o.EventTime)
+}
+
+func (o Oracle) Type() EventType {
+	return EventTypeOracle
 }

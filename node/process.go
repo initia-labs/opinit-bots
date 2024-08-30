@@ -150,6 +150,7 @@ func (n *Node) handleNewBlock(ctx context.Context, block *rpccoretypes.ResultBlo
 		if n.txHandler != nil {
 			err := n.txHandler(ctx, nodetypes.TxHandlerArgs{
 				BlockHeight:  uint64(block.Block.Height),
+				BlockTime:    block.Block.Time,
 				LatestHeight: latestChainHeight,
 				TxIndex:      uint64(txIndex),
 				Tx:           tx,

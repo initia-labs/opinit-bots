@@ -5,7 +5,10 @@ import (
 
 	challengertypes "github.com/initia-labs/opinit-bots/challenger/types"
 	nodetypes "github.com/initia-labs/opinit-bots/node/types"
+	"github.com/initia-labs/opinit-bots/txutils"
 	"github.com/initia-labs/opinit-bots/types"
+
+	opchildtypes "github.com/initia-labs/OPinit/x/opchild/types"
 )
 
 func (ch *Child) beginBlockHandler(ctx context.Context, args nodetypes.BeginBlockArgs) (err error) {
@@ -37,7 +40,7 @@ func (ch *Child) endBlockHandler(_ context.Context, args nodetypes.EndBlockArgs)
 
 	batchKVs = append(batchKVs, treeKVs...)
 	if storageRoot != nil {
-		err = ch.handleOutput(blockHeight, ch.Version(), args.BlockID, ch.Merkle().GetWorkingTreeIndex(), storageRoot)
+		err = ch.handleOutput(args.Block.Header.Time, blockHeight, ch.Version(), args.BlockID, ch.Merkle().GetWorkingTreeIndex(), storageRoot)
 		if err != nil {
 			return err
 		}
@@ -66,5 +69,24 @@ func (ch *Child) endBlockHandler(_ context.Context, args nodetypes.EndBlockArgs)
 		ch.elemCh <- elem
 	}
 	ch.elemQueue = ch.elemQueue[:0]
+	return nil
+}
+
+func (ch *Child) txHandler(_ context.Context, args nodetypes.TxHandlerArgs) error {
+	txConfig := ch.Node().GetTxConfig()
+	tx, err := txutils.DecodeTx(txConfig, args.Tx)
+	if err != nil {
+		return err
+	}
+	msgs := tx.GetMsgs()
+	if len(msgs) > 1 {
+		// we only expect one message for oracle tx
+		return nil
+	}
+	msg, ok := msgs[0].(*opchildtypes.MsgUpdateOracle)
+	if !ok {
+		return nil
+	}
+	ch.oracleTxHandler(args.BlockTime, msg.Height, msg.Data)
 	return nil
 }

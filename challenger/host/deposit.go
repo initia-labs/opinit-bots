@@ -52,7 +52,7 @@ func (h *Host) handleInitiateDeposit(
 	}
 	coin := sdk.NewCoin(l2Denom, coinAmount)
 
-	deposit := challengertypes.NewDeposit(l1Sequence, blockHeight, blockTime, from, to, l1Denom, coin.String())
+	deposit := challengertypes.NewDeposit(l1Sequence, blockHeight, from, to, l1Denom, coin.String(), blockTime)
 	h.elemQueue = append(h.elemQueue, challengertypes.ChallengeElem{
 		Node:  h.NodeType(),
 		Id:    deposit.Sequence,

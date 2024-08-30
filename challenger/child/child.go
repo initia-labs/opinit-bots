@@ -63,8 +63,8 @@ func (ch *Child) Initialize(startHeight uint64, startOutputIndex uint64, host ho
 
 func (ch *Child) registerHandlers() {
 	ch.Node().RegisterBeginBlockHandler(ch.beginBlockHandler)
+	ch.Node().RegisterTxHandler(ch.txHandler)
 	ch.Node().RegisterEventHandler(opchildtypes.EventTypeFinalizeTokenDeposit, ch.finalizeDepositHandler)
-	ch.Node().RegisterEventHandler(opchildtypes.EventTypeUpdateOracle, ch.updateOracleHandler)
 	ch.Node().RegisterEventHandler(opchildtypes.EventTypeInitiateTokenWithdrawal, ch.initiateWithdrawalHandler)
 	ch.Node().RegisterEndBlockHandler(ch.endBlockHandler)
 }

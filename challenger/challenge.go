@@ -5,7 +5,6 @@ import (
 
 	challengertypes "github.com/initia-labs/opinit-bots/challenger/types"
 	"github.com/initia-labs/opinit-bots/types"
-	"github.com/pkg/errors"
 	"go.uber.org/zap"
 )
 
@@ -58,14 +57,10 @@ func (c *Challenger) registerElem(elem challengertypes.ChallengeElem) {
 }
 
 func (c *Challenger) handleElem(cid challengertypes.ChallengeId) ([]challengertypes.Challenge, error) {
-	switch cid.Type {
-	case challengertypes.EventTypeDeposit:
-		return c.checkValue(cid)
-	case challengertypes.EventTypeOutput:
-		return c.checkValue(cid)
-	default:
-		return nil, errors.New("unknown challenge event")
+	if err := cid.Type.Validate(); err != nil {
+		return nil, err
 	}
+	return c.checkValue(cid)
 }
 
 func (c *Challenger) saveChallenge(challenge challengertypes.Challenge) (types.RawKV, error) {

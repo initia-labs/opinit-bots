@@ -17,6 +17,7 @@ import (
 	bottypes "github.com/initia-labs/opinit-bots/bot/types"
 	executortypes "github.com/initia-labs/opinit-bots/executor/types"
 
+	opchildtypes "github.com/initia-labs/OPinit/x/opchild/types"
 	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
 	"github.com/initia-labs/opinit-bots/types"
 	"go.uber.org/zap"
@@ -48,7 +49,7 @@ func NewExecutor(cfg *executortypes.Config, db types.DB, sv *server.Server, logg
 
 	return &Executor{
 		host: host.NewHostV1(
-			cfg.RelayOracle, cfg.L1NodeConfig(homePath),
+			cfg.L1NodeConfig(homePath),
 			db.WithPrefix([]byte(types.HostName)),
 			logger.Named(types.HostName), cfg.L1Node.Bech32Prefix, "",
 		),
@@ -93,7 +94,7 @@ func (ex *Executor) Initialize(ctx context.Context) error {
 		return err
 	}
 
-	err = ex.host.Initialize(ctx, hostStartHeight, ex.child, ex.batch, int64(bridgeInfo.BridgeId))
+	err = ex.host.Initialize(ctx, hostStartHeight, ex.child, ex.batch, bridgeInfo)
 	if err != nil {
 		return err
 	}
@@ -106,7 +107,7 @@ func (ex *Executor) Initialize(ctx context.Context) error {
 		return err
 	}
 
-	da, err := ex.makeDANode(int64(bridgeInfo.BridgeId))
+	da, err := ex.makeDANode(bridgeInfo)
 	if err != nil {
 		return err
 	}
@@ -167,12 +168,12 @@ func (ex *Executor) RegisterQuerier() {
 	})
 }
 
-func (ex *Executor) makeDANode(bridgeId int64) (executortypes.DANode, error) {
+func (ex *Executor) makeDANode(bridgeInfo opchildtypes.BridgeInfo) (executortypes.DANode, error) {
 	batchInfo := ex.batch.BatchInfo()
 	switch batchInfo.BatchInfo.ChainType {
 	case ophosttypes.BatchInfo_CHAIN_TYPE_INITIA:
 		da := host.NewHostV1(
-			false, ex.cfg.DANodeConfig(ex.homePath),
+			ex.cfg.DANodeConfig(ex.homePath),
 			ex.db.WithPrefix([]byte(types.DAHostName)),
 			ex.logger.Named(types.DAHostName),
 			ex.cfg.DANode.Bech32Prefix, batchInfo.BatchInfo.Submitter,
@@ -180,7 +181,7 @@ func (ex *Executor) makeDANode(bridgeId int64) (executortypes.DANode, error) {
 		if ex.host.GetAddress().Equals(da.GetAddress()) {
 			return ex.host, nil
 		}
-		da.SetBridgeId(bridgeId)
+		da.SetBridgeInfo(bridgeInfo)
 		da.RegisterDAHandlers()
 		return da, nil
 	case ophosttypes.BatchInfo_CHAIN_TYPE_CELESTIA:
@@ -189,7 +190,7 @@ func (ex *Executor) makeDANode(bridgeId int64) (executortypes.DANode, error) {
 			ex.logger.Named(types.DACelestiaName),
 			ex.cfg.DANode.Bech32Prefix, batchInfo.BatchInfo.Submitter,
 		)
-		err := da.Initialize(ex.batch, bridgeId)
+		err := da.Initialize(ex.batch, bridgeInfo.BridgeId)
 		if err != nil {
 			return nil, err
 		}

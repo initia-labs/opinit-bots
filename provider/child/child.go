@@ -138,6 +138,10 @@ func (b BaseChild) BridgeId() uint64 {
 	return b.bridgeInfo.BridgeId
 }
 
+func (b BaseChild) OracleEnabled() bool {
+	return b.bridgeInfo.BridgeConfig.OracleEnabled
+}
+
 func (b BaseChild) HasKey() bool {
 	return b.node.HasBroadcaster()
 }

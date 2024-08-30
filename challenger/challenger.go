@@ -90,7 +90,7 @@ func (c *Challenger) Initialize(ctx context.Context) error {
 		return err
 	}
 
-	err = c.host.Initialize(ctx, hostStartHeight, int64(bridgeInfo.BridgeId))
+	err = c.host.Initialize(ctx, hostStartHeight, bridgeInfo)
 	if err != nil {
 		return err
 	}

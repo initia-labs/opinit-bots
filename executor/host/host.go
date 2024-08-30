@@ -7,6 +7,7 @@ import (
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 
+	opchildtypes "github.com/initia-labs/OPinit/x/opchild/types"
 	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
 
 	executortypes "github.com/initia-labs/opinit-bots/executor/types"
@@ -43,7 +44,6 @@ type Host struct {
 	child childNode
 	batch batchNode
 
-	relayOracle       bool
 	initialL1Sequence uint64
 
 	// status info
@@ -52,7 +52,7 @@ type Host struct {
 }
 
 func NewHostV1(
-	relayOracle bool, cfg nodetypes.NodeConfig,
+	cfg nodetypes.NodeConfig,
 	db types.DB, logger *zap.Logger, bech32Prefix, batchSubmitter string,
 ) *Host {
 	if batchSubmitter != "" {
@@ -60,13 +60,12 @@ func NewHostV1(
 		cfg.BroadcasterConfig.KeyringConfig.Address = batchSubmitter
 	}
 	return &Host{
-		relayOracle: relayOracle,
-		BaseHost:    hostprovider.NewBaseHostV1(cfg, db, logger, bech32Prefix),
+		BaseHost: hostprovider.NewBaseHostV1(cfg, db, logger, bech32Prefix),
 	}
 }
 
-func (h *Host) Initialize(ctx context.Context, startHeight uint64, child childNode, batch batchNode, bridgeId int64) error {
-	err := h.BaseHost.Initialize(ctx, startHeight, bridgeId)
+func (h *Host) Initialize(ctx context.Context, startHeight uint64, child childNode, batch batchNode, bridgeInfo opchildtypes.BridgeInfo) error {
+	err := h.BaseHost.Initialize(ctx, startHeight, bridgeInfo)
 	if err != nil {
 		return err
 	}

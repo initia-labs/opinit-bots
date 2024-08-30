@@ -24,7 +24,7 @@ func (ch *Child) finalizeDepositHandler(_ context.Context, args nodetypes.EventH
 }
 
 func (ch *Child) handleFinalizeDeposit(l2BlockTime time.Time, l1BlockHeight uint64, l1Sequence uint64, from string, to string, amount sdk.Coin, baseDenom string) {
-	deposit := challengertypes.NewDeposit(l1Sequence, l1BlockHeight, l2BlockTime, from, to, baseDenom, amount.String())
+	deposit := challengertypes.NewDeposit(l1Sequence, l1BlockHeight, from, to, baseDenom, amount.String(), l2BlockTime)
 	ch.elemQueue = append(ch.elemQueue, challengertypes.ChallengeElem{
 		Node:  ch.NodeType(),
 		Id:    deposit.Sequence,
