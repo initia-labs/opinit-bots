@@ -6,35 +6,28 @@ import (
 
 var (
 	// Keys
-	ChallengeElemKey = []byte("challenge_elem")
-	ChallengeKey     = []byte("challenge")
+	PendingEventKey = []byte("pending_event")
+	ChallengeKey    = []byte("challenge")
 )
 
-func PrefixedElemId(id uint64) []byte {
+func PrefixedEventId(id uint64) []byte {
 	return append(dbtypes.FromUint64Key(id), dbtypes.Splitter)
 }
 
-func PrefixedElemEventType(eventType EventType) []byte {
+func PrefixedEventType(eventType EventType) []byte {
 	return append([]byte{byte(eventType)}, dbtypes.Splitter)
 }
 
-func PrefixedElemEventTypeId(eventType EventType, id uint64) []byte {
-	return append(PrefixedElemEventType(eventType), PrefixedElemId(id)...)
+func PrefixedEventTypeId(eventType EventType, id uint64) []byte {
+	return append(PrefixedEventType(eventType), PrefixedEventId(id)...)
 }
 
-func PrefixedElemKeyEventTypeId(eventType EventType, id uint64) []byte {
-	return append(append(ChallengeElemKey, dbtypes.Splitter),
-		PrefixedElemEventTypeId(eventType, id)...)
-}
-
-func PrefixedChallengeElem(elem ChallengeElem) []byte {
-	return append(
-		PrefixedElemKeyEventTypeId(elem.Event.Type(), elem.Id),
-		byte(elem.Node),
-	)
+func PrefixedPendingEvent(id ChallengeId) []byte {
+	return append(append(PendingEventKey, dbtypes.Splitter),
+		PrefixedEventTypeId(id.Type, id.Id)...)
 }
 
 func PrefixedChallenge(id ChallengeId) []byte {
 	return append(append(ChallengeKey, dbtypes.Splitter),
-		PrefixedElemEventTypeId(id.Type, id.Id)...)
+		PrefixedEventTypeId(id.Type, id.Id)...)
 }

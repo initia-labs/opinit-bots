@@ -1,14 +1,12 @@
 package child
 
-func (b *BaseChild) InitializeTree() (executed bool) {
-	b.initializeTreeOnce.Do(func() {
-		if b.initializeTreeFn != nil {
-			executed = true
-			err := b.initializeTreeFn()
-			if err != nil {
-				panic("failed to initialize working tree: " + err.Error())
-			}
+func (ch *BaseChild) InitializeTree(blockHeight uint64) bool {
+	if ch.initializeTreeFn != nil {
+		ok, err := ch.initializeTreeFn(blockHeight)
+		if err != nil {
+			panic("failed to initialize working tree: " + err.Error())
 		}
-	})
-	return executed
+		return ok
+	}
+	return false
 }

@@ -16,30 +16,34 @@ import (
 	challengertypes "github.com/initia-labs/opinit-bots/challenger/types"
 )
 
+type childNode interface {
+	PendingEventsToRawKV([]challengertypes.ChallengeEvent, bool) ([]types.RawKV, error)
+	SetPendingEvents([]challengertypes.ChallengeEvent)
+}
+
 type Host struct {
 	*hostprovider.BaseHost
 
-	elemCh    chan<- challengertypes.ChallengeElem
-	elemQueue []challengertypes.ChallengeElem
+	child      childNode
+	eventQueue []challengertypes.ChallengeEvent
 }
 
 func NewHostV1(
 	cfg nodetypes.NodeConfig,
 	db types.DB, logger *zap.Logger, bech32Prefix string,
-	elemCh chan<- challengertypes.ChallengeElem,
 ) *Host {
 	return &Host{
-		BaseHost:  hostprovider.NewBaseHostV1(cfg, db, logger, bech32Prefix),
-		elemCh:    elemCh,
-		elemQueue: make([]challengertypes.ChallengeElem, 0),
+		BaseHost:   hostprovider.NewBaseHostV1(cfg, db, logger, bech32Prefix),
+		eventQueue: make([]challengertypes.ChallengeEvent, 0),
 	}
 }
 
-func (h *Host) Initialize(ctx context.Context, startHeight uint64, bridgeInfo opchildtypes.BridgeInfo) error {
+func (h *Host) Initialize(ctx context.Context, startHeight uint64, child childNode, bridgeInfo opchildtypes.BridgeInfo) error {
 	err := h.BaseHost.Initialize(ctx, startHeight, bridgeInfo)
 	if err != nil {
 		return err
 	}
+	h.child = child
 	// TODO: ignore l1Sequence less than child's last l1 sequence
 	h.registerHandlers()
 	return nil
@@ -53,6 +57,6 @@ func (h *Host) registerHandlers() {
 	h.Node().RegisterEndBlockHandler(h.endBlockHandler)
 }
 
-func (h Host) NodeType() challengertypes.NodeType {
-	return challengertypes.NodeTypeHost
+func (h *Host) QuerySyncedOutput(ctx context.Context, bridgeId uint64, outputIndex uint64) (*ophosttypes.QueryOutputProposalResponse, error) {
+	return h.BaseHost.QueryOutput(ctx, bridgeId, outputIndex, h.Height()-1)
 }

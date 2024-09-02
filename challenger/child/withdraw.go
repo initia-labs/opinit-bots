@@ -74,7 +74,7 @@ func (ch *Child) handleInitiateWithdrawal(l2Sequence uint64, from string, to str
 }
 
 func (ch *Child) prepareTree(blockHeight uint64) error {
-	if ch.InitializeTree() {
+	if ch.InitializeTree(blockHeight) {
 		return nil
 	}
 
@@ -93,7 +93,7 @@ func (ch *Child) prepareOutput(ctx context.Context) error {
 
 	// initialize next output time
 	if ch.nextOutputTime.IsZero() && workingOutputIndex > 1 {
-		output, err := ch.host.QueryOutput(ctx, ch.BridgeId(), workingOutputIndex-1)
+		output, err := ch.host.QuerySyncedOutput(ctx, ch.BridgeId(), workingOutputIndex-1)
 		if err != nil {
 			// TODO: maybe not return error here and roll back
 			return fmt.Errorf("output does not exist at index: %d", workingOutputIndex-1)
@@ -101,7 +101,7 @@ func (ch *Child) prepareOutput(ctx context.Context) error {
 		ch.lastOutputTime = output.OutputProposal.L1BlockTime
 	}
 
-	output, err := ch.host.QueryOutput(ctx, ch.BridgeId(), ch.Merkle().GetWorkingTreeIndex())
+	output, err := ch.host.QuerySyncedOutput(ctx, ch.BridgeId(), ch.Merkle().GetWorkingTreeIndex())
 	if err != nil {
 		if strings.Contains(err.Error(), "collections: not found") {
 			// should check the existing output.
@@ -151,10 +151,6 @@ func (ch *Child) handleOutput(blockTime time.Time, blockHeight uint64, version u
 	outputRoot := ophosttypes.GenerateOutputRoot(version, storageRoot, blockId)
 	output := challengertypes.NewOutput(blockHeight, outputIndex, outputRoot[:], blockTime)
 
-	ch.elemQueue = append(ch.elemQueue, challengertypes.ChallengeElem{
-		Node:  ch.NodeType(),
-		Id:    output.OutputIndex,
-		Event: output,
-	})
+	ch.eventQueue = append(ch.eventQueue, output)
 	return nil
 }

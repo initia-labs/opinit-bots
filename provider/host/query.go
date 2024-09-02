@@ -73,12 +73,12 @@ func (b BaseHost) QueryLastOutput(ctx context.Context, bridgeId uint64) (*ophost
 	return &res.OutputProposals[0], nil
 }
 
-func (b BaseHost) QueryOutput(ctx context.Context, bridgeId uint64, outputIndex uint64) (*ophosttypes.QueryOutputProposalResponse, error) {
+func (b BaseHost) QueryOutput(ctx context.Context, bridgeId uint64, outputIndex uint64, height uint64) (*ophosttypes.QueryOutputProposalResponse, error) {
 	req := &ophosttypes.QueryOutputProposalRequest{
 		BridgeId:    bridgeId,
 		OutputIndex: outputIndex,
 	}
-	ctx, cancel := rpcclient.GetQueryContext(ctx, 0)
+	ctx, cancel := rpcclient.GetQueryContext(ctx, height)
 	defer cancel()
 
 	return b.ophostQueryClient.OutputProposal(ctx, req)
@@ -86,7 +86,7 @@ func (b BaseHost) QueryOutput(ctx context.Context, bridgeId uint64, outputIndex 
 
 // QueryOutputByL2BlockNumber queries the last output proposal before the given L2 block number
 func (b BaseHost) QueryOutputByL2BlockNumber(ctx context.Context, bridgeId uint64, l2BlockNumber uint64) (*ophosttypes.QueryOutputProposalResponse, error) {
-	start, err := b.QueryOutput(ctx, bridgeId, 1)
+	start, err := b.QueryOutput(ctx, bridgeId, 1, 0)
 	if err != nil {
 		if strings.Contains(err.Error(), "not found") {
 			return nil, nil
@@ -103,7 +103,7 @@ func (b BaseHost) QueryOutputByL2BlockNumber(ctx context.Context, bridgeId uint6
 	for {
 		if start.OutputProposal.L2BlockNumber >= l2BlockNumber {
 			if start.OutputIndex != 1 {
-				return b.QueryOutput(ctx, bridgeId, start.OutputIndex-1)
+				return b.QueryOutput(ctx, bridgeId, start.OutputIndex-1, 0)
 			}
 			return nil, nil
 		} else if end.OutputProposal.L2BlockNumber < l2BlockNumber {
@@ -113,7 +113,7 @@ func (b BaseHost) QueryOutputByL2BlockNumber(ctx context.Context, bridgeId uint6
 		}
 
 		midIndex := (start.OutputIndex + end.OutputIndex) / 2
-		output, err := b.QueryOutput(ctx, bridgeId, midIndex)
+		output, err := b.QueryOutput(ctx, bridgeId, midIndex, 0)
 		if err != nil {
 			return nil, err
 		}

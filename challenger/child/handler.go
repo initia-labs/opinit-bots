@@ -3,7 +3,6 @@ package child
 import (
 	"context"
 
-	challengertypes "github.com/initia-labs/opinit-bots/challenger/types"
 	nodetypes "github.com/initia-labs/opinit-bots/node/types"
 	"github.com/initia-labs/opinit-bots/txutils"
 	"github.com/initia-labs/opinit-bots/types"
@@ -14,7 +13,7 @@ import (
 func (ch *Child) beginBlockHandler(ctx context.Context, args nodetypes.BeginBlockArgs) (err error) {
 	blockHeight := uint64(args.Block.Header.Height)
 	// just to make sure that childMsgQueue is empty
-	if len(ch.elemQueue) != 0 {
+	if len(ch.eventQueue) != 0 {
 		panic("must not happen, eventQueue should be empty")
 	}
 
@@ -49,34 +48,30 @@ func (ch *Child) endBlockHandler(_ context.Context, args nodetypes.EndBlockArgs)
 	// update the sync info
 	batchKVs = append(batchKVs, ch.Node().SyncInfoToRawKV(blockHeight))
 
-	for _, elem := range ch.elemQueue {
-		value, err := elem.Event.Marshal()
-		if err != nil {
-			return err
-		}
-		batchKVs = append(batchKVs, types.RawKV{
-			Key:   ch.DB().PrefixedKey(challengertypes.PrefixedChallengeElem(elem)),
-			Value: value,
-		})
+	challenges, eventKVs, err := ch.checkPendingEvents(ch.eventQueue)
+	if err != nil {
+		return err
 	}
+	batchKVs = append(batchKVs, eventKVs...)
 
 	err = ch.DB().RawBatchSet(batchKVs...)
 	if err != nil {
 		return err
 	}
 
-	for _, elem := range ch.elemQueue {
-		ch.elemCh <- elem
-	}
-	ch.elemQueue = ch.elemQueue[:0]
+	ch.handleChallenges(challenges)
+	ch.eventQueue = ch.eventQueue[:0]
 	return nil
 }
 
 func (ch *Child) txHandler(_ context.Context, args nodetypes.TxHandlerArgs) error {
 	txConfig := ch.Node().GetTxConfig()
+
 	tx, err := txutils.DecodeTx(txConfig, args.Tx)
 	if err != nil {
-		return err
+		// if tx is not oracle tx, tx parse error is expected
+		// ignore decoding error
+		return nil
 	}
 	msgs := tx.GetMsgs()
 	if len(msgs) > 1 {

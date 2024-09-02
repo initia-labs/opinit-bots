@@ -2,6 +2,7 @@ package child
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	"go.uber.org/zap"
@@ -17,8 +18,7 @@ import (
 )
 
 type hostNode interface {
-	QueryLastOutput(context.Context, uint64) (*ophosttypes.QueryOutputProposalResponse, error)
-	QueryOutput(context.Context, uint64, uint64) (*ophosttypes.QueryOutputProposalResponse, error)
+	QuerySyncedOutput(context.Context, uint64, uint64) (*ophosttypes.QueryOutputProposalResponse, error)
 }
 
 type Child struct {
@@ -26,7 +26,14 @@ type Child struct {
 
 	host hostNode
 
+	pendingEventsMu *sync.Mutex
+	pendingEvents   map[challengertypes.ChallengeId]challengertypes.ChallengeEvent
+
+	eventQueue []challengertypes.ChallengeEvent
+
 	finalizingBlockHeight uint64
+
+	challengeCh chan<- challengertypes.Challenge
 
 	// status info
 	lastUpdatedOracleL1Height         uint64
@@ -34,20 +41,20 @@ type Child struct {
 	lastFinalizedDepositL1Sequence    uint64
 	lastOutputTime                    time.Time
 	nextOutputTime                    time.Time
-
-	elemCh    chan<- challengertypes.ChallengeElem
-	elemQueue []challengertypes.ChallengeElem
 }
 
 func NewChildV1(
 	cfg nodetypes.NodeConfig,
 	db types.DB, logger *zap.Logger, bech32Prefix string,
-	elemCh chan<- challengertypes.ChallengeElem,
+	challengeCh chan<- challengertypes.Challenge,
 ) *Child {
 	return &Child{
-		BaseChild: childprovider.NewBaseChildV1(cfg, db, logger, bech32Prefix),
-		elemCh:    elemCh,
-		elemQueue: make([]challengertypes.ChallengeElem, 0),
+		BaseChild:       childprovider.NewBaseChildV1(cfg, db, logger, bech32Prefix),
+		pendingEventsMu: &sync.Mutex{},
+		pendingEvents:   make(map[challengertypes.ChallengeId]challengertypes.ChallengeEvent),
+		eventQueue:      make([]challengertypes.ChallengeEvent, 0),
+
+		challengeCh: challengeCh,
 	}
 }
 
@@ -69,6 +76,22 @@ func (ch *Child) registerHandlers() {
 	ch.Node().RegisterEndBlockHandler(ch.endBlockHandler)
 }
 
-func (ch Child) NodeType() challengertypes.NodeType {
-	return challengertypes.NodeTypeChild
+func (ch *Child) PendingEventsToRawKV(events []challengertypes.ChallengeEvent, delete bool) ([]types.RawKV, error) {
+	kvs := make([]types.RawKV, 0, len(events))
+	for _, event := range events {
+		var data []byte
+		var err error
+
+		if !delete {
+			data, err = event.Marshal()
+			if err != nil {
+				return nil, err
+			}
+		}
+		kvs = append(kvs, types.RawKV{
+			Key:   ch.DB().PrefixedKey(challengertypes.PrefixedPendingEvent(event.Id())),
+			Value: data,
+		})
+	}
+	return kvs, nil
 }

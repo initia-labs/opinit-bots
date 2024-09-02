@@ -15,9 +15,5 @@ func (h *Host) oracleTxHandler(blockHeight uint64, blockTime time.Time, oracleDa
 	checksum := challengertypes.OracleChecksum(oracleDataBytes)
 	oracle := challengertypes.NewOracle(blockHeight, checksum, blockTime)
 
-	h.elemQueue = append(h.elemQueue, challengertypes.ChallengeElem{
-		Node:  h.NodeType(),
-		Id:    oracle.L1Height,
-		Event: oracle,
-	})
+	h.eventQueue = append(h.eventQueue, oracle)
 }

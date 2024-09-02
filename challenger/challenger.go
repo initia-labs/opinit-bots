@@ -33,8 +33,7 @@ type Challenger struct {
 
 	homePath string
 
-	elemCh chan challengertypes.ChallengeElem
-	elems  map[challengertypes.ChallengeId]map[challengertypes.NodeType]challengertypes.ChallengeElem
+	challengeCh chan challengertypes.Challenge
 }
 
 func NewChallenger(cfg *challengertypes.Config, db types.DB, sv *server.Server, logger *zap.Logger, homePath string) *Challenger {
@@ -43,19 +42,18 @@ func NewChallenger(cfg *challengertypes.Config, db types.DB, sv *server.Server, 
 		panic(err)
 	}
 
-	elemCh := make(chan challengertypes.ChallengeElem)
+	challengeCh := make(chan challengertypes.Challenge)
 	return &Challenger{
 		host: host.NewHostV1(
 			cfg.L1NodeConfig(homePath),
 			db.WithPrefix([]byte(types.HostName)),
 			logger.Named(types.HostName), cfg.L1Node.Bech32Prefix,
-			elemCh,
 		),
 		child: child.NewChildV1(
 			cfg.L2NodeConfig(homePath),
 			db.WithPrefix([]byte(types.ChildName)),
 			logger.Named(types.ChildName), cfg.L2Node.Bech32Prefix,
-			elemCh,
+			challengeCh,
 		),
 
 		cfg:    cfg,
@@ -65,8 +63,7 @@ func NewChallenger(cfg *challengertypes.Config, db types.DB, sv *server.Server, 
 
 		homePath: homePath,
 
-		elemCh: elemCh,
-		elems:  make(map[challengertypes.ChallengeId]map[challengertypes.NodeType]challengertypes.ChallengeElem),
+		challengeCh: challengeCh,
 	}
 }
 
@@ -90,7 +87,7 @@ func (c *Challenger) Initialize(ctx context.Context) error {
 		return err
 	}
 
-	err = c.host.Initialize(ctx, hostStartHeight, bridgeInfo)
+	err = c.host.Initialize(ctx, hostStartHeight, c.child, bridgeInfo)
 	if err != nil {
 		return err
 	}

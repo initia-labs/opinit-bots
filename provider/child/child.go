@@ -2,7 +2,6 @@ package child
 
 import (
 	"context"
-	"sync"
 
 	"go.uber.org/zap"
 
@@ -31,8 +30,7 @@ type BaseChild struct {
 
 	bridgeInfo opchildtypes.BridgeInfo
 
-	initializeTreeOnce *sync.Once
-	initializeTreeFn   func() error
+	initializeTreeFn func(uint64) (bool, error)
 
 	cfg    nodetypes.NodeConfig
 	db     types.DB
@@ -69,8 +67,6 @@ func NewBaseChildV1(
 		node: node,
 		mk:   mk,
 
-		initializeTreeOnce: &sync.Once{},
-
 		cfg:    cfg,
 		db:     db,
 		logger: logger,
@@ -100,13 +96,16 @@ func (b *BaseChild) Initialize(startHeight uint64, startOutputIndex uint64, brid
 	}
 
 	if b.node.HeightInitialized() && startOutputIndex != 0 {
-		b.initializeTreeFn = func() error {
-			b.logger.Info("initialize tree", zap.Uint64("index", startOutputIndex))
-			err := b.mk.InitializeWorkingTree(startOutputIndex, 1)
-			if err != nil {
-				return err
+		b.initializeTreeFn = func(blockHeight uint64) (bool, error) {
+			if startHeight+1 == blockHeight {
+				b.logger.Info("initialize tree", zap.Uint64("index", startOutputIndex))
+				err := b.mk.InitializeWorkingTree(startOutputIndex, 1)
+				if err != nil {
+					return false, err
+				}
+				return true, nil
 			}
-			return nil
+			return false, nil
 		}
 	}
 	b.SetBridgeInfo(bridgeInfo)

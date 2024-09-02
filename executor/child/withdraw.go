@@ -62,7 +62,7 @@ func (ch *Child) handleInitiateWithdrawal(l2Sequence uint64, from string, to str
 }
 
 func (ch *Child) prepareTree(blockHeight uint64) error {
-	if ch.InitializeTree() {
+	if ch.InitializeTree(blockHeight) {
 		return nil
 	}
 
@@ -82,7 +82,7 @@ func (ch *Child) prepareOutput(ctx context.Context) error {
 
 	// initialize next output time
 	if ch.nextOutputTime.IsZero() && workingOutputIndex > 1 {
-		output, err := ch.host.QueryOutput(ctx, ch.BridgeId(), workingOutputIndex-1)
+		output, err := ch.host.QueryOutput(ctx, ch.BridgeId(), workingOutputIndex-1, 0)
 		if err != nil {
 			// TODO: maybe not return error here and roll back
 			return fmt.Errorf("output does not exist at index: %d", workingOutputIndex-1)
@@ -91,7 +91,7 @@ func (ch *Child) prepareOutput(ctx context.Context) error {
 		ch.nextOutputTime = output.OutputProposal.L1BlockTime.Add(ch.BridgeInfo().BridgeConfig.SubmissionInterval * 2 / 3)
 	}
 
-	output, err := ch.host.QueryOutput(ctx, ch.BridgeId(), ch.Merkle().GetWorkingTreeIndex())
+	output, err := ch.host.QueryOutput(ctx, ch.BridgeId(), ch.Merkle().GetWorkingTreeIndex(), 0)
 	if err != nil {
 		if strings.Contains(err.Error(), "collections: not found") {
 			return nil

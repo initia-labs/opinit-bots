@@ -13,32 +13,8 @@ type Challenge struct {
 	Log string      `json:"log"`
 }
 
-func NewChallenge(id ChallengeId, log string) Challenge {
-	return Challenge{
-		Id:  id,
-		Log: log,
-	}
-}
-
 func (c Challenge) Marshal() ([]byte, error) {
 	return json.Marshal(&c)
-}
-
-func (c *Challenge) Unmarshal(data []byte) error {
-	return json.Unmarshal(data, c)
-}
-
-type ChallengeElem struct {
-	Node  NodeType       `json:"node"`
-	Id    uint64         `json:"id"`
-	Event ChallengeEvent `json:"event"`
-}
-
-func (e ChallengeElem) ChallengeId() ChallengeId {
-	return ChallengeId{
-		Type: e.Event.Type(),
-		Id:   e.Id,
-	}
 }
 
 type ChallengeId struct {
@@ -56,35 +32,9 @@ type ChallengeEvent interface {
 	Marshal() ([]byte, error)
 	Unmarshal([]byte) error
 	Type() EventType
+	EventTime() time.Time
+	Id() ChallengeId
 }
-
-type ChallengeState uint8
-
-const (
-	ChallengeStatePending ChallengeState = iota
-	ChallengeStateFailed
-	ChallengeStatePassed
-)
-
-func (c ChallengeState) String() string {
-	switch c {
-	case ChallengeStatePending:
-		return "Pending"
-	case ChallengeStateFailed:
-		return "Failed"
-	case ChallengeStatePassed:
-		return "Passed"
-	default:
-		return "Unknown"
-	}
-}
-
-type NodeType uint8
-
-const (
-	NodeTypeHost NodeType = iota
-	NodeTypeChild
-)
 
 type EventType uint8
 
@@ -121,12 +71,12 @@ type Deposit struct {
 	To            string    `json:"to"`
 	L1Denom       string    `json:"l1_denom"`
 	Amount        string    `json:"amount"`
-	EventTime     time.Time `json:"event_time"`
+	Time          time.Time `json:"time"`
 }
 
 var _ ChallengeEvent = &Deposit{}
 
-func NewDeposit(sequence, l1BlockHeight uint64, from, to, l1Denom, amount string, eventTime time.Time) *Deposit {
+func NewDeposit(sequence, l1BlockHeight uint64, from, to, l1Denom, amount string, time time.Time) *Deposit {
 	return &Deposit{
 		Sequence:      sequence,
 		L1BlockHeight: l1BlockHeight,
@@ -134,7 +84,7 @@ func NewDeposit(sequence, l1BlockHeight uint64, from, to, l1Denom, amount string
 		To:            to,
 		L1Denom:       l1Denom,
 		Amount:        amount,
-		EventTime:     eventTime,
+		Time:          time,
 	}
 }
 
@@ -160,28 +110,39 @@ func (d Deposit) Equal(another ChallengeEvent) (bool, error) {
 }
 
 func (d Deposit) String() string {
-	return fmt.Sprintf("Deposit{Sequence: %d, L1BlockHeight: %d, From: %s, To: %s, L1Denom: %s, Amount: %s, EventTime: %s}", d.Sequence, d.L1BlockHeight, d.From, d.To, d.L1Denom, d.Amount, d.EventTime)
+	return fmt.Sprintf("Deposit{Sequence: %d, L1BlockHeight: %d, From: %s, To: %s, L1Denom: %s, Amount: %s, Time: %s}", d.Sequence, d.L1BlockHeight, d.From, d.To, d.L1Denom, d.Amount, d.Time)
 }
 
 func (d Deposit) Type() EventType {
 	return EventTypeDeposit
 }
 
+func (d Deposit) EventTime() time.Time {
+	return d.Time
+}
+
+func (d Deposit) Id() ChallengeId {
+	return ChallengeId{
+		Type: EventTypeDeposit,
+		Id:   d.Sequence,
+	}
+}
+
 type Output struct {
 	L2BlockNumber uint64    `json:"l2_block_number"`
 	OutputIndex   uint64    `json:"output_index"`
 	OutputRoot    []byte    `json:"output_root"`
-	EventTime     time.Time `json:"event_time"`
+	Time          time.Time `json:"time"`
 }
 
 var _ ChallengeEvent = &Output{}
 
-func NewOutput(l2BlockNumber, outputIndex uint64, outputRoot []byte, eventTime time.Time) *Output {
+func NewOutput(l2BlockNumber, outputIndex uint64, outputRoot []byte, time time.Time) *Output {
 	return &Output{
 		L2BlockNumber: l2BlockNumber,
 		OutputIndex:   outputIndex,
 		OutputRoot:    outputRoot,
-		EventTime:     eventTime,
+		Time:          time,
 	}
 }
 
@@ -204,24 +165,35 @@ func (o Output) Equal(another ChallengeEvent) (bool, error) {
 }
 
 func (o Output) String() string {
-	return fmt.Sprintf("Output{L2BlockNumber: %d, OutputIndex: %d, OutputRoot: %s, EventTime: %s}", o.L2BlockNumber, o.OutputIndex, o.OutputRoot, o.EventTime)
+	return fmt.Sprintf("Output{L2BlockNumber: %d, OutputIndex: %d, OutputRoot: %s, Time: %s}", o.L2BlockNumber, o.OutputIndex, base64.RawStdEncoding.EncodeToString(o.OutputRoot), o.Time)
 }
 
 func (o Output) Type() EventType {
 	return EventTypeOutput
 }
 
-type Oracle struct {
-	L1Height  uint64    `json:"l1_height"`
-	Data      []byte    `json:"data"`
-	EventTime time.Time `json:"event_time"`
+func (o Output) EventTime() time.Time {
+	return o.Time
 }
 
-func NewOracle(l1Height uint64, data []byte, eventTime time.Time) *Oracle {
+func (o Output) Id() ChallengeId {
+	return ChallengeId{
+		Type: EventTypeOutput,
+		Id:   o.OutputIndex,
+	}
+}
+
+type Oracle struct {
+	L1Height uint64    `json:"l1_height"`
+	Data     []byte    `json:"data"`
+	Time     time.Time `json:"time"`
+}
+
+func NewOracle(l1Height uint64, data []byte, time time.Time) *Oracle {
 	return &Oracle{
-		L1Height:  l1Height,
-		Data:      data,
-		EventTime: eventTime,
+		L1Height: l1Height,
+		Data:     data,
+		Time:     time,
 	}
 }
 
@@ -243,9 +215,20 @@ func (o Oracle) Equal(another ChallengeEvent) (bool, error) {
 }
 
 func (o Oracle) String() string {
-	return fmt.Sprintf("Oracle{L1Height: %d, Data: %s, EventTime: %s}", o.L1Height, base64.RawStdEncoding.EncodeToString(o.Data), o.EventTime)
+	return fmt.Sprintf("Oracle{L1Height: %d, Data: %s, Time: %s}", o.L1Height, base64.RawStdEncoding.EncodeToString(o.Data), o.Time)
 }
 
 func (o Oracle) Type() EventType {
 	return EventTypeOracle
+}
+
+func (o Oracle) EventTime() time.Time {
+	return o.Time
+}
+
+func (o Oracle) Id() ChallengeId {
+	return ChallengeId{
+		Type: EventTypeOracle,
+		Id:   o.L1Height,
+	}
 }
