@@ -9,12 +9,17 @@ import (
 )
 
 type Challenge struct {
-	Id  ChallengeId `json:"id"`
-	Log string      `json:"log"`
+	Id   ChallengeId `json:"id"`
+	Log  string      `json:"log"`
+	Time time.Time   `json:"timestamp"`
 }
 
 func (c Challenge) Marshal() ([]byte, error) {
 	return json.Marshal(&c)
+}
+
+func (c *Challenge) Unmarshal(value []byte) error {
+	return json.Unmarshal(value, c)
 }
 
 type ChallengeId struct {

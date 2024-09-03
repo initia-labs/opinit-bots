@@ -65,6 +65,12 @@ func (ch *Child) Initialize(startHeight uint64, startOutputIndex uint64, host ho
 	}
 	ch.host = host
 	ch.registerHandlers()
+
+	pendingEvents, err := ch.loadPendingEvents()
+	if err != nil {
+		return err
+	}
+	ch.SetPendingEvents(pendingEvents)
 	return nil
 }
 

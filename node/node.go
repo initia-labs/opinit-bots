@@ -192,7 +192,7 @@ func (n Node) MustGetBroadcaster() *broadcaster.Broadcaster {
 func (n Node) GetStatus() nodetypes.Status {
 	s := nodetypes.Status{}
 	if n.cfg.ProcessType != nodetypes.PROCESS_TYPE_ONLY_BROADCAST {
-		s.LastProcessedBlockHeight = n.GetHeight()
+		s.LastBlockHeight = n.GetHeight()
 	}
 
 	if n.broadcaster != nil {

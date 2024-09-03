@@ -2,6 +2,7 @@ package challenger
 
 import (
 	"context"
+	"sync"
 
 	"github.com/pkg/errors"
 
@@ -33,7 +34,12 @@ type Challenger struct {
 
 	homePath string
 
-	challengeCh chan challengertypes.Challenge
+	challengeCh       chan challengertypes.Challenge
+	pendingChallenges []challengertypes.Challenge
+
+	// status info
+	latestChallengesMu *sync.Mutex
+	latestChallenges   []challengertypes.Challenge
 }
 
 func NewChallenger(cfg *challengertypes.Config, db types.DB, sv *server.Server, logger *zap.Logger, homePath string) *Challenger {
@@ -63,7 +69,11 @@ func NewChallenger(cfg *challengertypes.Config, db types.DB, sv *server.Server, 
 
 		homePath: homePath,
 
-		challengeCh: challengeCh,
+		challengeCh:       challengeCh,
+		pendingChallenges: make([]challengertypes.Challenge, 0),
+
+		latestChallengesMu: &sync.Mutex{},
+		latestChallenges:   make([]challengertypes.Challenge, 0),
 	}
 }
 
@@ -96,6 +106,17 @@ func (c *Challenger) Initialize(ctx context.Context) error {
 		return err
 	}
 	c.RegisterQuerier()
+
+	c.pendingChallenges, err = c.loadPendingChallenges()
+	if err != nil {
+		return err
+	}
+
+	c.latestChallenges, err = c.loadChallenges()
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -115,14 +136,19 @@ func (c *Challenger) Start(ctx context.Context) error {
 		return c.server.Start(c.cfg.ListenAddress)
 	})
 
+	errGrp.Go(func() error {
+		for _, ch := range c.pendingChallenges {
+			c.challengeCh <- ch
+		}
+		return nil
+	})
+
 	errGrp.Go(func() (err error) {
 		defer func() {
 			c.logger.Info("challenge handler stopped")
 		}()
 		return c.challengeHandler(ctx)
 	})
-
-	// TODO: load elems and send them to elemch first
 
 	c.host.Start(ctx)
 	c.child.Start(ctx)

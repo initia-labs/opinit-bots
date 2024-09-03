@@ -101,6 +101,26 @@ func (db *LevelDB) PrefixedIterate(prefix []byte, cb func(key, value []byte) (st
 	return iter.Error()
 }
 
+func (db *LevelDB) PrefixedReverseIterate(prefix []byte, cb func(key, value []byte) (stop bool, err error)) error {
+	iter := db.db.NewIterator(util.BytesPrefix(db.PrefixedKey(prefix)), nil)
+	if iter.Last() {
+		for {
+			key := db.UnprefixedKey(iter.Key())
+			if stop, err := cb(key, iter.Value()); err != nil {
+				return err
+			} else if stop {
+				break
+			}
+
+			if !iter.Prev() {
+				break
+			}
+		}
+	}
+	iter.Release()
+	return iter.Error()
+}
+
 // SeekPrevInclusiveKey seeks the previous key-value pair in the database with prefixing the keys.
 //
 // @dev: `LevelDB.prefix + prefix` is used as the prefix for the iteration.

@@ -1,7 +1,9 @@
 package child
 
 import (
+	"encoding/json"
 	"fmt"
+	"sort"
 
 	challengertypes "github.com/initia-labs/opinit-bots/challenger/types"
 	"github.com/initia-labs/opinit-bots/types"
@@ -33,8 +35,9 @@ func (ch *Child) checkPendingEvents(events []challengertypes.ChallengeEvent) ([]
 			return nil, nil, err
 		} else if !ok {
 			challenges = append(challenges, challengertypes.Challenge{
-				Id:  event.Id(),
-				Log: fmt.Sprintf("pending event does not match; expected: %s, got: %s", pendingEvent.String(), event.String()),
+				Id:   event.Id(),
+				Log:  fmt.Sprintf("pending event does not match; expected: %s, got: %s", pendingEvent.String(), event.String()),
+				Time: event.EventTime(),
 			})
 		} else {
 			ch.Logger().Info("pending event matched", zap.String("event", pendingEvent.String()))
@@ -57,7 +60,7 @@ func (ch *Child) checkPendingEvents(events []challengertypes.ChallengeEvent) ([]
 		}
 
 		kvs = append(kvs, types.RawKV{
-			Key:   ch.DB().PrefixedKey(challengertypes.PrefixedChallenge(challenge.Id)),
+			Key:   ch.DB().PrefixedKey(challengertypes.PrefixedPendingChallenge(challenge.Id)),
 			Value: value,
 		})
 	}
@@ -93,6 +96,24 @@ func (ch *Child) getOraclePendingEvents(l1BlockHeight uint64) []challengertypes.
 	return events
 }
 
+func (ch *Child) GetAllPendingEvents() []challengertypes.ChallengeEvent {
+	ch.pendingEventsMu.Lock()
+	defer ch.pendingEventsMu.Unlock()
+
+	events := make([]challengertypes.ChallengeEvent, 0, len(ch.pendingEvents))
+
+	for _, event := range ch.pendingEvents {
+		events = append(events, event)
+	}
+	sort.Slice(events, func(i, j int) bool {
+		if events[i].Type() == events[j].Type() {
+			return events[i].Id().Id < events[j].Id().Id
+		}
+		return events[i].Type() < events[j].Type()
+	})
+	return events
+}
+
 func (ch *Child) SetPendingEvents(events []challengertypes.ChallengeEvent) {
 	ch.pendingEventsMu.Lock()
 	defer ch.pendingEventsMu.Unlock()
@@ -100,4 +121,20 @@ func (ch *Child) SetPendingEvents(events []challengertypes.ChallengeEvent) {
 	for _, event := range events {
 		ch.pendingEvents[event.Id()] = event
 	}
+}
+
+func (ch *Child) loadPendingEvents() (events []challengertypes.ChallengeEvent, err error) {
+	iterErr := ch.DB().PrefixedIterate(challengertypes.PendingEventKey, func(_, value []byte) (stop bool, err error) {
+		var event challengertypes.ChallengeEvent
+		err = json.Unmarshal(value, &event)
+		if err != nil {
+			return true, err
+		}
+		events = append(events, event)
+		return false, nil
+	})
+	if iterErr != nil {
+		return nil, iterErr
+	}
+	return
 }

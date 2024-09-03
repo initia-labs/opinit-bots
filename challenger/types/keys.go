@@ -1,13 +1,16 @@
 package types
 
 import (
+	"time"
+
 	dbtypes "github.com/initia-labs/opinit-bots/db/types"
 )
 
 var (
 	// Keys
-	PendingEventKey = []byte("pending_event")
-	ChallengeKey    = []byte("challenge")
+	PendingEventKey     = []byte("pending_event")
+	PendingChallengeKey = []byte("pending_challenge")
+	ChallengeKey        = []byte("challenge")
 )
 
 func PrefixedEventId(id uint64) []byte {
@@ -27,7 +30,17 @@ func PrefixedPendingEvent(id ChallengeId) []byte {
 		PrefixedEventTypeId(id.Type, id.Id)...)
 }
 
-func PrefixedChallenge(id ChallengeId) []byte {
-	return append(append(ChallengeKey, dbtypes.Splitter),
+func PrefixedPendingChallenge(id ChallengeId) []byte {
+	return append(append(PendingChallengeKey, dbtypes.Splitter),
 		PrefixedEventTypeId(id.Type, id.Id)...)
+}
+
+func PrefixedTimeEvnetTypeId(eventTime time.Time, id ChallengeId) []byte {
+	return append(append(dbtypes.FromUint64Key(uint64(eventTime.UnixNano())), dbtypes.Splitter),
+		PrefixedEventTypeId(id.Type, id.Id)...)
+}
+
+func PrefixedChallenge(eventTime time.Time, id ChallengeId) []byte {
+	return append(append(ChallengeKey, dbtypes.Splitter),
+		PrefixedTimeEvnetTypeId(eventTime, id)...)
 }

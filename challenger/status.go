@@ -3,12 +3,15 @@ package challenger
 import (
 	"github.com/initia-labs/opinit-bots/challenger/child"
 	"github.com/initia-labs/opinit-bots/challenger/host"
+	challengertypes "github.com/initia-labs/opinit-bots/challenger/types"
 )
 
 type Status struct {
-	BridgeId uint64       `json:"bridge_id"`
-	Host     host.Status  `json:"host,omitempty"`
-	Child    child.Status `json:"child,omitempty"`
+	BridgeId         uint64                           `json:"bridge_id"`
+	Host             host.Status                      `json:"host,omitempty"`
+	Child            child.Status                     `json:"child,omitempty"`
+	PendingEvents    []challengertypes.ChallengeEvent `json:"pending_events"`
+	LatestChallenges []challengertypes.Challenge      `json:"latest_challenges"`
 }
 
 func (c Challenger) GetStatus() Status {
@@ -21,5 +24,8 @@ func (c Challenger) GetStatus() Status {
 	if c.child != nil {
 		s.Child = c.child.GetStatus()
 	}
+
+	s.PendingEvents = c.child.GetAllPendingEvents()
+	s.LatestChallenges = c.getLatestChallenges()
 	return s
 }

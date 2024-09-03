@@ -59,6 +59,9 @@ func (ch *Child) endBlockHandler(_ context.Context, args nodetypes.EndBlockArgs)
 		return err
 	}
 
+	for _, event := range ch.eventQueue {
+		ch.deletePendingEvent(event.Id())
+	}
 	ch.handleChallenges(challenges)
 	ch.eventQueue = ch.eventQueue[:0]
 	return nil
