@@ -58,7 +58,7 @@ func (ch *ChallengeEventHandler) CheckTimeout(blockTime time.Time, events []chal
 
 	for _, pendingEvent := range events {
 		timeout := pendingEvent.EventTime().Add(ch.timeoutDuration)
-		if !pendingEvent.EventTime().IsZero() && blockTime.After(timeout) {
+		if !pendingEvent.EventTime().IsZero() && !pendingEvent.IsTimeout() && blockTime.After(timeout) {
 			challenges = append(challenges, challengertypes.Challenge{
 				EventType: pendingEvent.Type().String(),
 				Id:        pendingEvent.Id(),
