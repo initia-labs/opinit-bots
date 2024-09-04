@@ -54,17 +54,15 @@ func (n *Node) blockProcessLooper(ctx context.Context, processType nodetypes.Blo
 
 				err = n.handleNewBlock(ctx, block, blockResult, latestChainHeight)
 				if err != nil {
+					n.logger.Error("failed to handle new block", zap.String("error", err.Error()))
 					if errors.Is(err, nodetypes.ErrIgnoreAndTryLater) {
 						sleep := time.NewTimer(time.Minute)
-						n.logger.Debug("failed to handle event", zap.String("error", err.Error()))
 						select {
 						case <-ctx.Done():
 							return nil
 						case <-sleep.C:
 						}
-						break
 					}
-					n.logger.Error("failed to handle new block", zap.String("error", err.Error()))
 					break
 				}
 				n.lastProcessedBlockHeight = queryHeight

@@ -13,11 +13,8 @@ import (
 )
 
 func (h *Host) beginBlockHandler(_ context.Context, args nodetypes.BeginBlockArgs) error {
-	blockHeight := uint64(args.Block.Header.Height)
-	// just to make sure that childMsgQueue is empty
-	if blockHeight == args.LatestHeight && len(h.GetMsgQueue()) != 0 && len(h.GetProcessedMsgs()) != 0 {
-		panic("must not happen, msgQueue should be empty")
-	}
+	h.EmptyMsgQueue()
+	h.EmptyProcessedMsgs()
 	return nil
 }
 
@@ -56,9 +53,6 @@ func (h *Host) endBlockHandler(_ context.Context, args nodetypes.EndBlockArgs) e
 	for _, processedMsg := range h.GetProcessedMsgs() {
 		h.child.BroadcastMsgs(processedMsg)
 	}
-
-	h.EmptyMsgQueue()
-	h.EmptyProcessedMsgs()
 	return nil
 }
 

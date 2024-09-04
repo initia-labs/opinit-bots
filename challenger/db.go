@@ -7,6 +7,26 @@ import (
 	"github.com/initia-labs/opinit-bots/types"
 )
 
+func (c *Challenger) PendingChallengeToRawKVs(challenges []challengertypes.Challenge, delete bool) ([]types.RawKV, error) {
+	kvs := make([]types.RawKV, 0, len(challenges))
+	for _, challenge := range challenges {
+		var value []byte
+		var err error
+
+		if !delete {
+			value, err = challenge.Marshal()
+			if err != nil {
+				return nil, err
+			}
+		}
+		kvs = append(kvs, types.RawKV{
+			Key:   c.db.PrefixedKey(challengertypes.PrefixedPendingChallenge(challenge.Id)),
+			Value: value,
+		})
+	}
+	return kvs, nil
+}
+
 func (c *Challenger) deletePendingChallenge(challenge challengertypes.Challenge) types.RawKV {
 	return types.RawKV{
 		Key:   c.db.PrefixedKey(challengertypes.PrefixedPendingChallenge(challenge.Id)),

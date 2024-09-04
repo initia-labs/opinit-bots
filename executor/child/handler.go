@@ -11,10 +11,8 @@ import (
 
 func (ch *Child) beginBlockHandler(ctx context.Context, args nodetypes.BeginBlockArgs) (err error) {
 	blockHeight := uint64(args.Block.Header.Height)
-	// just to make sure that childMsgQueue is empty
-	if blockHeight == args.LatestHeight && len(ch.GetMsgQueue()) != 0 && len(ch.GetProcessedMsgs()) != 0 {
-		panic("must not happen, msgQueue should be empty")
-	}
+	ch.EmptyMsgQueue()
+	ch.EmptyProcessedMsgs()
 
 	err = ch.prepareTree(blockHeight)
 	if err != nil {
@@ -45,12 +43,6 @@ func (ch *Child) endBlockHandler(_ context.Context, args nodetypes.EndBlockArgs)
 		}
 	}
 
-	// if we are in sync and we have a small number of messages, less than 10,
-	// then store the current updates in the database and process the next block.
-	if blockHeight < args.LatestHeight && len(ch.GetMsgQueue()) > 0 && len(ch.GetMsgQueue()) <= 10 {
-		return ch.DB().RawBatchSet(batchKVs...)
-	}
-
 	// update the sync info
 	batchKVs = append(batchKVs, ch.Node().SyncInfoToRawKV(blockHeight))
 
@@ -78,8 +70,5 @@ func (ch *Child) endBlockHandler(_ context.Context, args nodetypes.EndBlockArgs)
 	for _, processedMsg := range ch.GetProcessedMsgs() {
 		ch.host.BroadcastMsgs(processedMsg)
 	}
-
-	ch.EmptyMsgQueue()
-	ch.EmptyProcessedMsgs()
 	return nil
 }

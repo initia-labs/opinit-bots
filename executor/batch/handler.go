@@ -27,9 +27,8 @@ import (
 )
 
 func (bs *BatchSubmitter) rawBlockHandler(ctx context.Context, args nodetypes.RawBlockArgs) error {
-	if len(bs.processedMsgs) != 0 {
-		panic("must not happen, msgQueue should be empty")
-	}
+	// clear processed messages
+	bs.processedMsgs = bs.processedMsgs[:0]
 
 	pbb := new(cmtproto.Block)
 	err := proto.Unmarshal(args.BlockBytes, pbb)
@@ -76,9 +75,6 @@ func (bs *BatchSubmitter) rawBlockHandler(ctx context.Context, args nodetypes.Ra
 	for _, processedMsg := range bs.processedMsgs {
 		bs.da.BroadcastMsgs(processedMsg)
 	}
-
-	// clear processed messages
-	bs.processedMsgs = bs.processedMsgs[:0]
 	return nil
 }
 

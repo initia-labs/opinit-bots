@@ -3,6 +3,7 @@ package child
 import (
 	"time"
 
+	challengertypes "github.com/initia-labs/opinit-bots/challenger/types"
 	nodetypes "github.com/initia-labs/opinit-bots/node/types"
 )
 
@@ -17,6 +18,8 @@ type Status struct {
 	FinalizingBlockHeight    uint64    `json:"finalizing_block_height"`
 	LastOutputSubmissionTime time.Time `json:"last_output_submission_time"`
 	NextOutputSubmissionTime time.Time `json:"next_output_submission_time"`
+
+	PendingEvents []challengertypes.ChallengeEvent `json:"pending_events"`
 }
 
 func (ch Child) GetStatus() Status {
@@ -30,5 +33,6 @@ func (ch Child) GetStatus() Status {
 		FinalizingBlockHeight:             ch.finalizingBlockHeight,
 		LastOutputSubmissionTime:          ch.lastOutputTime,
 		NextOutputSubmissionTime:          ch.nextOutputTime,
+		PendingEvents:                     ch.eventHandler.GetAllSortedPendingEvents(),
 	}
 }

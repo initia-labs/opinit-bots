@@ -9,9 +9,10 @@ import (
 )
 
 type Challenge struct {
-	Id   ChallengeId `json:"id"`
-	Log  string      `json:"log"`
-	Time time.Time   `json:"timestamp"`
+	EventType string      `json:"event_type"`
+	Id        ChallengeId `json:"id"`
+	Log       string      `json:"log"`
+	Time      time.Time   `json:"timestamp"`
 }
 
 func (c Challenge) Marshal() ([]byte, error) {
@@ -38,7 +39,28 @@ type ChallengeEvent interface {
 	Unmarshal([]byte) error
 	Type() EventType
 	EventTime() time.Time
+	SetTimeout()
+	IsTimeout() bool
 	Id() ChallengeId
+}
+
+func UnmarshalChallengeEvent(eventType EventType, data []byte) (ChallengeEvent, error) {
+	var event ChallengeEvent
+
+	switch eventType {
+	case EventTypeDeposit:
+		event = &Deposit{}
+	case EventTypeOutput:
+		event = &Output{}
+	case EventTypeOracle:
+		event = &Oracle{}
+	default:
+		return nil, fmt.Errorf("invalid event type: %d", eventType)
+	}
+	if err := event.Unmarshal(data); err != nil {
+		return nil, err
+	}
+	return event, nil
 }
 
 type EventType uint8
@@ -70,6 +92,7 @@ func (e EventType) String() string {
 }
 
 type Deposit struct {
+	EventType     string    `json:"event_type"`
 	Sequence      uint64    `json:"sequence"`
 	L1BlockHeight uint64    `json:"l1_block_height"`
 	From          string    `json:"from"`
@@ -77,12 +100,13 @@ type Deposit struct {
 	L1Denom       string    `json:"l1_denom"`
 	Amount        string    `json:"amount"`
 	Time          time.Time `json:"time"`
+	Timeout       bool      `json:"timeout"`
 }
 
 var _ ChallengeEvent = &Deposit{}
 
 func NewDeposit(sequence, l1BlockHeight uint64, from, to, l1Denom, amount string, time time.Time) *Deposit {
-	return &Deposit{
+	d := &Deposit{
 		Sequence:      sequence,
 		L1BlockHeight: l1BlockHeight,
 		From:          from,
@@ -91,6 +115,8 @@ func NewDeposit(sequence, l1BlockHeight uint64, from, to, l1Denom, amount string
 		Amount:        amount,
 		Time:          time,
 	}
+	d.EventType = d.Type().String()
+	return d
 }
 
 func (d Deposit) Marshal() ([]byte, error) {
@@ -133,22 +159,34 @@ func (d Deposit) Id() ChallengeId {
 	}
 }
 
+func (d *Deposit) SetTimeout() {
+	d.Timeout = true
+}
+
+func (d Deposit) IsTimeout() bool {
+	return d.Timeout
+}
+
 type Output struct {
+	EventType     string    `json:"event_type"`
 	L2BlockNumber uint64    `json:"l2_block_number"`
 	OutputIndex   uint64    `json:"output_index"`
 	OutputRoot    []byte    `json:"output_root"`
 	Time          time.Time `json:"time"`
+	Timeout       bool      `json:"timeout"`
 }
 
 var _ ChallengeEvent = &Output{}
 
 func NewOutput(l2BlockNumber, outputIndex uint64, outputRoot []byte, time time.Time) *Output {
-	return &Output{
+	o := &Output{
 		L2BlockNumber: l2BlockNumber,
 		OutputIndex:   outputIndex,
 		OutputRoot:    outputRoot,
 		Time:          time,
 	}
+	o.EventType = o.Type().String()
+	return o
 }
 
 func (o Output) Marshal() ([]byte, error) {
@@ -187,19 +225,30 @@ func (o Output) Id() ChallengeId {
 		Id:   o.OutputIndex,
 	}
 }
+func (o *Output) SetTimeout() {
+	o.Timeout = true
+}
+
+func (o Output) IsTimeout() bool {
+	return o.Timeout
+}
 
 type Oracle struct {
-	L1Height uint64    `json:"l1_height"`
-	Data     []byte    `json:"data"`
-	Time     time.Time `json:"time"`
+	EventType string    `json:"event_type"`
+	L1Height  uint64    `json:"l1_height"`
+	Data      []byte    `json:"data"`
+	Time      time.Time `json:"time"`
+	Timeout   bool      `json:"timeout"`
 }
 
 func NewOracle(l1Height uint64, data []byte, time time.Time) *Oracle {
-	return &Oracle{
+	o := &Oracle{
 		L1Height: l1Height,
 		Data:     data,
 		Time:     time,
 	}
+	o.EventType = o.Type().String()
+	return o
 }
 
 func (o Oracle) Marshal() ([]byte, error) {
@@ -236,4 +285,12 @@ func (o Oracle) Id() ChallengeId {
 		Type: EventTypeOracle,
 		Id:   o.L1Height,
 	}
+}
+
+func (o *Oracle) SetTimeout() {
+	o.Timeout = true
+}
+
+func (o Oracle) IsTimeout() bool {
+	return o.Timeout
 }

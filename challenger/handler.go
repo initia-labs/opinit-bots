@@ -9,6 +9,7 @@ import (
 )
 
 func (c *Challenger) challengeHandler(ctx context.Context) error {
+	defer close(c.challengeChStopped)
 	for {
 		select {
 		case <-ctx.Done():
@@ -62,4 +63,14 @@ func (c *Challenger) handleChallenge(challenge challengertypes.Challenge) error 
 	c.logger.Error("challenge", zap.Any("challenge", challenge))
 
 	return nil
+}
+
+func (c *Challenger) SendPendingChallenges(challenges []challengertypes.Challenge) {
+	for _, challenge := range challenges {
+		select {
+		case <-c.challengeChStopped:
+			return
+		case c.challengeCh <- challenge:
+		}
+	}
 }

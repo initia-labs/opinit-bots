@@ -24,6 +24,9 @@ func (h *Host) proposeOutputHandler(_ context.Context, args nodetypes.EventHandl
 
 func (h *Host) handleProposeOutput(outputIndex uint64, l2BlockNumber uint64, outputRoot []byte, blockTime time.Time) error {
 	output := challengertypes.NewOutput(l2BlockNumber, outputIndex, outputRoot[:], blockTime)
+	h.lastOutputIndex = outputIndex
+	h.lastOutputTime = blockTime
 	h.eventQueue = append(h.eventQueue, output)
+	h.outputPendingEventQueue = append(h.outputPendingEventQueue, output)
 	return nil
 }

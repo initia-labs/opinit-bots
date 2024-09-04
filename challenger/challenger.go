@@ -2,6 +2,7 @@ package challenger
 
 import (
 	"context"
+	"strconv"
 	"sync"
 
 	"github.com/pkg/errors"
@@ -34,7 +35,9 @@ type Challenger struct {
 
 	homePath string
 
-	challengeCh       chan challengertypes.Challenge
+	challengeCh        chan challengertypes.Challenge
+	challengeChStopped chan struct{}
+
 	pendingChallenges []challengertypes.Challenge
 
 	// status info
@@ -59,7 +62,6 @@ func NewChallenger(cfg *challengertypes.Config, db types.DB, sv *server.Server, 
 			cfg.L2NodeConfig(homePath),
 			db.WithPrefix([]byte(types.ChildName)),
 			logger.Named(types.ChildName), cfg.L2Node.Bech32Prefix,
-			challengeCh,
 		),
 
 		cfg:    cfg,
@@ -69,7 +71,9 @@ func NewChallenger(cfg *challengertypes.Config, db types.DB, sv *server.Server, 
 
 		homePath: homePath,
 
-		challengeCh:       challengeCh,
+		challengeCh:        challengeCh,
+		challengeChStopped: make(chan struct{}),
+
 		pendingChallenges: make([]challengertypes.Challenge, 0),
 
 		latestChallengesMu: &sync.Mutex{},
@@ -97,11 +101,11 @@ func (c *Challenger) Initialize(ctx context.Context) error {
 		return err
 	}
 
-	err = c.host.Initialize(ctx, hostStartHeight, c.child, bridgeInfo)
+	err = c.host.Initialize(ctx, hostStartHeight, c.child, bridgeInfo, c)
 	if err != nil {
 		return err
 	}
-	err = c.child.Initialize(childStartHeight, startOutputIndex, c.host, bridgeInfo)
+	err = c.child.Initialize(childStartHeight, startOutputIndex, c.host, bridgeInfo, c)
 	if err != nil {
 		return err
 	}
@@ -162,6 +166,21 @@ func (c *Challenger) Close() {
 func (c *Challenger) RegisterQuerier() {
 	c.server.RegisterQuerier("/status", func(ctx *fiber.Ctx) error {
 		return ctx.JSON(c.GetStatus())
+	})
+	c.server.RegisterQuerier("/challenges/:page", func(ctx *fiber.Ctx) error {
+		pageStr := ctx.Params("page")
+		if pageStr == "" {
+			pageStr = "1"
+		}
+		page, err := strconv.ParseUint(pageStr, 10, 64)
+		if err != nil {
+			return err
+		}
+		res, err := c.QueryChallenges(page)
+		if err != nil {
+			return err
+		}
+		return ctx.JSON(res)
 	})
 }
 
