@@ -69,7 +69,7 @@ func (c *Challenger) loadChallenges() (challenges []challengertypes.Challenge, e
 			return true, err
 		}
 		challenges = append(challenges, challenge)
-		if len(challenges) >= 5 {
+		if len(challenges) >= 10 {
 			return true, nil
 		}
 		return false, nil

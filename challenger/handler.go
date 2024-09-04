@@ -2,6 +2,7 @@ package challenger
 
 import (
 	"context"
+	"sort"
 
 	challengertypes "github.com/initia-labs/opinit-bots/challenger/types"
 	"github.com/initia-labs/opinit-bots/types"
@@ -44,7 +45,16 @@ func (c *Challenger) insertLatestChallenges(challenge challengertypes.Challenge)
 	defer c.latestChallengesMu.Unlock()
 
 	c.latestChallenges = append(c.latestChallenges, challenge)
-	if len(c.latestChallenges) > 5 {
+	sort.Slice(c.latestChallenges, func(i, j int) bool {
+		if c.latestChallenges[i].Time.Equal(c.latestChallenges[j].Time) {
+			if c.latestChallenges[i].Id.Type == c.latestChallenges[j].Id.Type {
+				return c.latestChallenges[i].Id.Type < c.latestChallenges[j].Id.Type
+			}
+			return c.latestChallenges[i].Id.Id < c.latestChallenges[j].Id.Id
+		}
+		return c.latestChallenges[i].Time.Before(c.latestChallenges[j].Time)
+	})
+	if len(c.latestChallenges) > 10 {
 		c.latestChallenges = c.latestChallenges[1:]
 	}
 }
