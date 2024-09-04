@@ -31,7 +31,7 @@ func (h *Host) updateBatchInfoHandler(_ context.Context, args nodetypes.EventHan
 	if err != nil {
 		return err
 	}
-	if bridgeId != uint64(h.BridgeId()) {
+	if bridgeId != h.BridgeId() {
 		// pass other bridge deposit event
 		return nil
 	}

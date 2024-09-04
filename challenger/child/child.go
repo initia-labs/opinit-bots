@@ -37,8 +37,6 @@ type Child struct {
 
 	finalizingBlockHeight uint64
 
-	challengeCh chan<- challengertypes.Challenge
-
 	// status info
 	lastUpdatedOracleL1Height         uint64
 	lastFinalizedDepositL1BlockHeight uint64

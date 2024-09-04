@@ -17,7 +17,7 @@ func (ch *ChallengeEventHandler) CheckValue(events []challengertypes.ChallengeEv
 	for _, event := range events {
 		pendingEvent, ok := ch.GetPendingEvent(event.Id())
 		if !ok {
-			// might not happend because child always syncs later than host.
+			// might not happened because child always syncs later than host.
 			return nil, nil, errors.Wrap(nodetypes.ErrIgnoreAndTryLater, fmt.Sprintf("pending event not found: %s", event.String()))
 		}
 

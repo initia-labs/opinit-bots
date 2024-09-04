@@ -1,7 +1,6 @@
 package types
 
 import (
-	"errors"
 	"fmt"
 )
 
@@ -14,7 +13,7 @@ const (
 
 func (b BotType) Validate() error {
 	if b != BotTypeExecutor && b != BotTypeChallenger {
-		return errors.New(fmt.Sprintf("invalid bot type: %s", b))
+		return fmt.Errorf("invalid bot type: %s", b)
 	}
 	return nil
 }

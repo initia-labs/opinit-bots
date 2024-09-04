@@ -15,7 +15,7 @@ func (h *Host) proposeOutputHandler(_ context.Context, args nodetypes.EventHandl
 	if err != nil {
 		return err
 	}
-	if bridgeId != uint64(h.BridgeId()) {
+	if bridgeId != h.BridgeId() {
 		// pass other bridge output proposal event
 		return nil
 	}
