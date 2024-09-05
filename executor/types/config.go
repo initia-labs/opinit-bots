@@ -56,9 +56,6 @@ type Config struct {
 	// If you don't want to use the bridge executor feature, you can leave it empty.
 	BridgeExecutor string `json:"bridge_executor"`
 
-	// RelayOracle is the flag to enable the oracle relay feature.
-	RelayOracle bool `json:"relay_oracle"`
-
 	// MaxChunks is the maximum number of chunks in a batch.
 	MaxChunks uint64 `json:"max_chunks"`
 	// MaxChunkSize is the maximum size of a chunk in a batch.
@@ -110,8 +107,6 @@ func DefaultConfig() *Config {
 
 		OutputSubmitter: "",
 		BridgeExecutor:  "",
-
-		RelayOracle: true,
 
 		MaxChunks:         5000,
 		MaxChunkSize:      300000,  // 300KB
