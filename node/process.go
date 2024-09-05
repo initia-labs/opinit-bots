@@ -89,8 +89,9 @@ func (n *Node) blockProcessLooper(ctx context.Context, processType nodetypes.Blo
 				default:
 				}
 				err := n.rawBlockHandler(ctx, nodetypes.RawBlockArgs{
-					BlockHeight: i,
-					BlockBytes:  blockBulk[i-start],
+					BlockHeight:  i,
+					LatestHeight: latestChainHeight,
+					BlockBytes:   blockBulk[i-start],
 				})
 				if err != nil {
 					n.logger.Error("failed to handle raw block", zap.String("error", err.Error()))
