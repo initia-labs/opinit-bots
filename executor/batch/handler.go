@@ -1,8 +1,8 @@
 package batch
 
 import (
+	"bytes"
 	"context"
-	"crypto/sha256"
 	"fmt"
 	"io"
 	"time"
@@ -138,6 +138,8 @@ func (bs *BatchSubmitter) prepareBatch(blockHeight uint64) error {
 		bs.localBatchInfo.BatchFileSize = 0
 		bs.localBatchInfo.Start = blockHeight
 		bs.localBatchInfo.End = 0
+
+		bs.batchWriter.Reset(bs.batchFile)
 	}
 	return nil
 }
@@ -158,7 +160,11 @@ func (bs *BatchSubmitter) finalizeBatch(ctx context.Context, blockHeight uint64)
 	if err != nil {
 		return errors.Wrap(err, "failed to write raw commit")
 	}
-	fileSize, err := bs.batchFileSize()
+	err = bs.batchWriter.Close()
+	if err != nil {
+		return errors.Wrap(err, "failed to close batch writer")
+	}
+	fileSize, err := bs.batchFileSize(false)
 	if err != nil {
 		return err
 	}
@@ -169,7 +175,7 @@ func (bs *BatchSubmitter) finalizeBatch(ctx context.Context, blockHeight uint64)
 
 	// TODO: improve this logic to avoid hold all the batch data in memory
 	chunks := make([][]byte, 0)
-	for offset := int64(0); ; offset += int64(bs.batchCfg.MaxChunkSize) {
+	for offset := int64(0); ; {
 		readLength, err := bs.batchFile.ReadAt(batchBuffer, offset)
 		if err != nil && err != io.EOF {
 			return err
@@ -178,15 +184,15 @@ func (bs *BatchSubmitter) finalizeBatch(ctx context.Context, blockHeight uint64)
 		}
 
 		// trim the buffer to the actual read length
-		chunk := make([]byte, readLength)
-		copy(chunk, batchBuffer[:readLength])
+		chunk := bytes.Clone(batchBuffer[:readLength])
 		chunks = append(chunks, chunk)
 
-		checksum := sha256.Sum256(batchBuffer)
+		checksum := executortypes.GetChecksumFromChunk(chunk)
 		checksums = append(checksums, checksum[:])
 		if uint64(readLength) < bs.batchCfg.MaxChunkSize {
 			break
 		}
+		offset += int64(readLength)
 	}
 
 	headerData := executortypes.MarshalBatchDataHeader(
@@ -236,7 +242,7 @@ func (bs *BatchSubmitter) finalizeBatch(ctx context.Context, blockHeight uint64)
 }
 
 func (bs *BatchSubmitter) checkBatch(ctx context.Context, blockHeight uint64, latestHeight uint64, blockTime time.Time) error {
-	fileSize, err := bs.batchFileSize()
+	fileSize, err := bs.batchFileSize(true)
 	if err != nil {
 		return err
 	}
@@ -263,13 +269,15 @@ func (bs *BatchSubmitter) checkBatch(ctx context.Context, blockHeight uint64, la
 	return nil
 }
 
-func (bs *BatchSubmitter) batchFileSize() (int64, error) {
+func (bs *BatchSubmitter) batchFileSize(flush bool) (int64, error) {
 	if bs.batchFile == nil {
 		return 0, errors.New("batch file is not initialized")
 	}
-	err := bs.batchWriter.Flush()
-	if err != nil {
-		return 0, errors.Wrap(err, "failed to flush batch writer")
+	if flush {
+		err := bs.batchWriter.Flush()
+		if err != nil {
+			return 0, errors.Wrap(err, "failed to flush batch writer")
+		}
 	}
 
 	info, err := bs.batchFile.Stat()
