@@ -44,6 +44,17 @@ func (ch *ChallengeEventHandler) getOraclePendingEvents(l1BlockHeight uint64) []
 	return events
 }
 
+func (ch *ChallengeEventHandler) NumPendingEvents() map[string]int64 {
+	ch.pendingEventsMu.Lock()
+	defer ch.pendingEventsMu.Unlock()
+
+	numPendingEvents := make(map[string]int64)
+	for _, event := range ch.pendingEvents {
+		numPendingEvents[event.Type().String()]++
+	}
+	return numPendingEvents
+}
+
 func (ch *ChallengeEventHandler) GetAllPendingEvents() []challengertypes.ChallengeEvent {
 	return ch.GetUnprocessedPendingEvents(nil)
 }

@@ -19,7 +19,7 @@ type Status struct {
 	LastOutputSubmissionTime time.Time `json:"last_output_submission_time"`
 	NextOutputSubmissionTime time.Time `json:"next_output_submission_time"`
 
-	PendingEvents []challengertypes.ChallengeEvent `json:"pending_events"`
+	NumPendingEvents map[string]int64 `json:"num_pending_events"`
 }
 
 func (ch Child) GetStatus() Status {
@@ -33,6 +33,10 @@ func (ch Child) GetStatus() Status {
 		FinalizingBlockHeight:             ch.finalizingBlockHeight,
 		LastOutputSubmissionTime:          ch.lastOutputTime,
 		NextOutputSubmissionTime:          ch.nextOutputTime,
-		PendingEvents:                     ch.eventHandler.GetAllSortedPendingEvents(),
+		NumPendingEvents:                  ch.eventHandler.NumPendingEvents(),
 	}
+}
+
+func (ch Child) GetAllPendingEvents() []challengertypes.ChallengeEvent {
+	return ch.eventHandler.GetAllSortedPendingEvents()
 }

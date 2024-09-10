@@ -54,7 +54,7 @@ func (c *Challenger) insertLatestChallenges(challenge challengertypes.Challenge)
 		}
 		return c.latestChallenges[i].Time.Before(c.latestChallenges[j].Time)
 	})
-	if len(c.latestChallenges) > 10 {
+	if len(c.latestChallenges) > 5 {
 		c.latestChallenges = c.latestChallenges[1:]
 	}
 }

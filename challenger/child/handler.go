@@ -109,6 +109,6 @@ func (ch *Child) txHandler(_ context.Context, args nodetypes.TxHandlerArgs) erro
 	if !ok {
 		return nil
 	}
-	ch.oracleTxHandler(args.BlockTime, msg.Height, msg.Data)
+	ch.oracleTxHandler(args.BlockTime, msg.Sender, msg.Height, msg.Data)
 	return nil
 }

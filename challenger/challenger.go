@@ -182,6 +182,14 @@ func (c *Challenger) RegisterQuerier() {
 		}
 		return ctx.JSON(res)
 	})
+
+	c.server.RegisterQuerier("/pending_events/host", func(ctx *fiber.Ctx) error {
+		return ctx.JSON(c.host.GetAllPendingEvents())
+	})
+
+	c.server.RegisterQuerier("/pending_events/child", func(ctx *fiber.Ctx) error {
+		return ctx.JSON(c.child.GetAllPendingEvents())
+	})
 }
 
 func (c *Challenger) getStartHeights(ctx context.Context, bridgeId uint64) (l1StartHeight uint64, l2StartHeight uint64, startOutputIndex uint64, err error) {
