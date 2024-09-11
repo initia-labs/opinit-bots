@@ -46,8 +46,9 @@ type EndBlockArgs struct {
 type EndBlockHandlerFn func(context.Context, EndBlockArgs) error
 
 type RawBlockArgs struct {
-	BlockHeight uint64
-	BlockBytes  []byte
+	BlockHeight  uint64
+	LatestHeight uint64
+	BlockBytes   []byte
 }
 
 type RawBlockHandlerFn func(context.Context, RawBlockArgs) error
