@@ -89,8 +89,8 @@ func GetCodec(bech32Prefix string) (codec.Codec, client.TxConfig, error) {
 	})
 }
 
-func (b *BaseChild) Initialize(startHeight uint64, startOutputIndex uint64, bridgeInfo opchildtypes.BridgeInfo) error {
-	err := b.node.Initialize(startHeight)
+func (b *BaseChild) Initialize(ctx context.Context, startHeight uint64, startOutputIndex uint64, bridgeInfo opchildtypes.BridgeInfo) error {
+	err := b.node.Initialize(ctx, startHeight)
 	if err != nil {
 		return err
 	}

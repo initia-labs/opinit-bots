@@ -105,7 +105,7 @@ func (c *Challenger) Initialize(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	err = c.child.Initialize(childStartHeight, startOutputIndex, c.host, bridgeInfo, c)
+	err = c.child.Initialize(ctx, childStartHeight, startOutputIndex, c.host, bridgeInfo, c)
 	if err != nil {
 		return err
 	}

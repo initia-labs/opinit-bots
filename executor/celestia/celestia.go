@@ -92,8 +92,8 @@ func createCodec(bech32Prefix string) (codec.Codec, client.TxConfig, error) {
 	})
 }
 
-func (c *Celestia) Initialize(batch batchNode, bridgeId uint64) error {
-	err := c.node.Initialize(0)
+func (c *Celestia) Initialize(ctx context.Context, batch batchNode, bridgeId uint64) error {
+	err := c.node.Initialize(ctx, 0)
 	if err != nil {
 		return err
 	}

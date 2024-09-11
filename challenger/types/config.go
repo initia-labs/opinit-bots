@@ -42,14 +42,12 @@ type Config struct {
 	// L2 starts from the last submitted output l2 block number + 1 before L2StartHeight.
 	// L1 starts from the block number of the output tx + 1
 	L2StartHeight uint64 `json:"l2_start_height"`
-
-	WarningThreshold float64 `json:"warning_threshold"`
 }
 
 func DefaultConfig() *Config {
 	return &Config{
 		Version:       1,
-		ListenAddress: "localhost:3000",
+		ListenAddress: "localhost:3001",
 
 		L1Node: NodeConfig{
 			ChainID:      "testnet-l1-1",
@@ -63,8 +61,6 @@ func DefaultConfig() *Config {
 			RPCAddress:   "tcp://localhost:27657",
 		},
 		L2StartHeight: 0,
-
-		WarningThreshold: 0.8,
 	}
 }
 
@@ -105,14 +101,4 @@ func (cfg Config) L2NodeConfig(homePath string) nodetypes.NodeConfig {
 		ProcessType: nodetypes.PROCESS_TYPE_DEFAULT,
 	}
 	return nc
-}
-
-type ChallengeConfig struct {
-	WarningThreshold float64
-}
-
-func (cfg Config) ChallengeConfig() ChallengeConfig {
-	return ChallengeConfig{
-		WarningThreshold: cfg.WarningThreshold,
-	}
 }

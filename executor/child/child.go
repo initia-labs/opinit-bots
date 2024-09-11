@@ -58,8 +58,8 @@ func NewChildV1(
 	}
 }
 
-func (ch *Child) Initialize(startHeight uint64, startOutputIndex uint64, host hostNode, bridgeInfo opchildtypes.BridgeInfo) error {
-	err := ch.BaseChild.Initialize(startHeight, startOutputIndex, bridgeInfo)
+func (ch *Child) Initialize(ctx context.Context, startHeight uint64, startOutputIndex uint64, host hostNode, bridgeInfo opchildtypes.BridgeInfo) error {
+	err := ch.BaseChild.Initialize(ctx, startHeight, startOutputIndex, bridgeInfo)
 	if err != nil {
 		return err
 	}

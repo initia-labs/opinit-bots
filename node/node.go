@@ -64,14 +64,6 @@ func NewNode(cfg nodetypes.NodeConfig, db types.DB, logger *zap.Logger, cdc code
 		cdc:      cdc,
 		txConfig: txConfig,
 	}
-	// check if node is catching up
-	status, err := n.rpcClient.Status(context.Background())
-	if err != nil {
-		return nil, err
-	}
-	if status.SyncInfo.CatchingUp {
-		return nil, errors.New("node is catching up")
-	}
 	// create broadcaster
 	if n.cfg.BroadcasterConfig != nil {
 		n.broadcaster, err = broadcaster.NewBroadcaster(
@@ -81,19 +73,34 @@ func NewNode(cfg nodetypes.NodeConfig, db types.DB, logger *zap.Logger, cdc code
 			n.cdc,
 			n.txConfig,
 			n.rpcClient,
-			status,
 		)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to create broadcaster")
 		}
 	}
+
 	return n, nil
 }
 
 // StartHeight is the height to start processing.
 // If it is 0, the latest height is used.
 // If the latest height exists in the database, this is ignored.
-func (n *Node) Initialize(startHeight uint64) error {
+func (n *Node) Initialize(ctx context.Context, startHeight uint64) (err error) {
+	// check if node is catching up
+	status, err := n.rpcClient.Status(ctx)
+	if err != nil {
+		return err
+	}
+	if status.SyncInfo.CatchingUp {
+		return errors.New("node is catching up")
+	}
+	if n.broadcaster != nil {
+		err = n.broadcaster.Initialize(ctx, status)
+		if err != nil {
+			return err
+		}
+	}
+
 	// load sync info
 	return n.loadSyncInfo(startHeight)
 }

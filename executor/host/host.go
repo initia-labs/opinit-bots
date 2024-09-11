@@ -79,6 +79,15 @@ func (h *Host) Initialize(ctx context.Context, startHeight uint64, child childNo
 	return nil
 }
 
+func (h *Host) InitializeDA(ctx context.Context, bridgeInfo opchildtypes.BridgeInfo) error {
+	err := h.BaseHost.Initialize(ctx, 0, bridgeInfo)
+	if err != nil {
+		return err
+	}
+	h.registerDAHandlers()
+	return nil
+}
+
 func (h *Host) registerHandlers() {
 	h.Node().RegisterBeginBlockHandler(h.beginBlockHandler)
 	h.Node().RegisterTxHandler(h.txHandler)
@@ -90,6 +99,6 @@ func (h *Host) registerHandlers() {
 	h.Node().RegisterEndBlockHandler(h.endBlockHandler)
 }
 
-func (h *Host) RegisterDAHandlers() {
+func (h *Host) registerDAHandlers() {
 	h.Node().RegisterEventHandler(ophosttypes.EventTypeRecordBatch, h.recordBatchHandler)
 }

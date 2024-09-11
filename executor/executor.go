@@ -98,7 +98,7 @@ func (ex *Executor) Initialize(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	err = ex.child.Initialize(childStartHeight, startOutputIndex, ex.host, bridgeInfo)
+	err = ex.child.Initialize(ctx, childStartHeight, startOutputIndex, ex.host, bridgeInfo)
 	if err != nil {
 		return err
 	}
@@ -107,7 +107,7 @@ func (ex *Executor) Initialize(ctx context.Context) error {
 		return err
 	}
 
-	da, err := ex.makeDANode(bridgeInfo)
+	da, err := ex.makeDANode(ctx, bridgeInfo)
 	if err != nil {
 		return err
 	}
@@ -168,7 +168,7 @@ func (ex *Executor) RegisterQuerier() {
 	})
 }
 
-func (ex *Executor) makeDANode(bridgeInfo opchildtypes.BridgeInfo) (executortypes.DANode, error) {
+func (ex *Executor) makeDANode(ctx context.Context, bridgeInfo opchildtypes.BridgeInfo) (executortypes.DANode, error) {
 	batchInfo := ex.batch.BatchInfo()
 	switch batchInfo.BatchInfo.ChainType {
 	case ophosttypes.BatchInfo_CHAIN_TYPE_INITIA:
@@ -181,16 +181,15 @@ func (ex *Executor) makeDANode(bridgeInfo opchildtypes.BridgeInfo) (executortype
 		if ex.host.GetAddress().Equals(da.GetAddress()) {
 			return ex.host, nil
 		}
-		da.SetBridgeInfo(bridgeInfo)
-		da.RegisterDAHandlers()
-		return da, nil
+		err := da.InitializeDA(ctx, bridgeInfo)
+		return da, err
 	case ophosttypes.BatchInfo_CHAIN_TYPE_CELESTIA:
 		da := celestia.NewDACelestia(ex.cfg.Version, ex.cfg.DANodeConfig(ex.homePath),
 			ex.db.WithPrefix([]byte(types.DACelestiaName)),
 			ex.logger.Named(types.DACelestiaName),
 			ex.cfg.DANode.Bech32Prefix, batchInfo.BatchInfo.Submitter,
 		)
-		err := da.Initialize(ex.batch, bridgeInfo.BridgeId)
+		err := da.Initialize(ctx, ex.batch, bridgeInfo.BridgeId)
 		if err != nil {
 			return nil, err
 		}
@@ -224,13 +223,16 @@ func (ex *Executor) getStartHeights(ctx context.Context, bridgeId uint64) (l1Sta
 	if err != nil {
 		return 0, 0, 0, 0, err
 	}
-	depositTxHeight, err := ex.host.QueryDepositTxHeight(ctx, bridgeId, l1Sequence-1)
-	if err != nil {
-		return 0, 0, 0, 0, err
+	if l1Sequence > 1 {
+		depositTxHeight, err := ex.host.QueryDepositTxHeight(ctx, bridgeId, l1Sequence-1)
+		if err != nil {
+			return 0, 0, 0, 0, err
+		}
+		if l1StartHeight > depositTxHeight {
+			l1StartHeight = depositTxHeight
+		}
 	}
-	if l1StartHeight > depositTxHeight {
-		l1StartHeight = depositTxHeight
-	}
+
 	if l2StartHeight == 0 {
 		startOutputIndex = 1
 	}

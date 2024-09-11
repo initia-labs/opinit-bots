@@ -80,7 +80,7 @@ func GetCodec(bech32Prefix string) (codec.Codec, client.TxConfig, error) {
 }
 
 func (b *BaseHost) Initialize(ctx context.Context, startHeight uint64, bridgeInfo opchildtypes.BridgeInfo) error {
-	err := b.node.Initialize(startHeight)
+	err := b.node.Initialize(ctx, startHeight)
 	if err != nil {
 		return err
 	}
