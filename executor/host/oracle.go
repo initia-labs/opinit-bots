@@ -9,7 +9,7 @@ import (
 // If the relay oracle is enabled and the extended commit info contains votes, create a new MsgUpdateOracle message.
 // Else return nil.
 func (h *Host) oracleTxHandler(blockHeight uint64, extCommitBz comettypes.Tx) (sdk.Msg, error) {
-	if !h.relayOracle {
+	if !h.OracleEnabled() {
 		return nil, nil
 	}
 	return h.child.GetMsgUpdateOracle(

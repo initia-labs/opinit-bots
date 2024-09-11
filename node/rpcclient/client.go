@@ -24,7 +24,7 @@ import (
 	legacyerrors "github.com/cosmos/cosmos-sdk/types/errors"
 	grpctypes "github.com/cosmos/cosmos-sdk/types/grpc"
 
-	clienthttp "github.com/initia-labs/opinit-bots-go/client"
+	clienthttp "github.com/initia-labs/opinit-bots/client"
 )
 
 var _ gogogrpc.ClientConn = &RPCClient{}

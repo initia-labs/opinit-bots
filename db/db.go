@@ -6,8 +6,8 @@ import (
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/util"
 
-	dbtypes "github.com/initia-labs/opinit-bots-go/db/types"
-	"github.com/initia-labs/opinit-bots-go/types"
+	dbtypes "github.com/initia-labs/opinit-bots/db/types"
+	"github.com/initia-labs/opinit-bots/types"
 )
 
 var _ types.DB = (*LevelDB)(nil)
@@ -95,6 +95,26 @@ func (db *LevelDB) PrefixedIterate(prefix []byte, cb func(key, value []byte) (st
 			return err
 		} else if stop {
 			break
+		}
+	}
+	iter.Release()
+	return iter.Error()
+}
+
+func (db *LevelDB) PrefixedReverseIterate(prefix []byte, cb func(key, value []byte) (stop bool, err error)) error {
+	iter := db.db.NewIterator(util.BytesPrefix(db.PrefixedKey(prefix)), nil)
+	if iter.Last() {
+		for {
+			key := db.UnprefixedKey(iter.Key())
+			if stop, err := cb(key, iter.Value()); err != nil {
+				return err
+			} else if stop {
+				break
+			}
+
+			if !iter.Prev() {
+				break
+			}
 		}
 	}
 	iter.Release()

@@ -8,17 +8,18 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/initia-labs/opinit-bots-go/executor/batch"
-	"github.com/initia-labs/opinit-bots-go/executor/celestia"
-	"github.com/initia-labs/opinit-bots-go/executor/child"
-	"github.com/initia-labs/opinit-bots-go/executor/host"
-	"github.com/initia-labs/opinit-bots-go/server"
+	"github.com/initia-labs/opinit-bots/executor/batch"
+	"github.com/initia-labs/opinit-bots/executor/celestia"
+	"github.com/initia-labs/opinit-bots/executor/child"
+	"github.com/initia-labs/opinit-bots/executor/host"
+	"github.com/initia-labs/opinit-bots/server"
 
-	bottypes "github.com/initia-labs/opinit-bots-go/bot/types"
-	executortypes "github.com/initia-labs/opinit-bots-go/executor/types"
+	bottypes "github.com/initia-labs/opinit-bots/bot/types"
+	executortypes "github.com/initia-labs/opinit-bots/executor/types"
 
+	opchildtypes "github.com/initia-labs/OPinit/x/opchild/types"
 	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
-	"github.com/initia-labs/opinit-bots-go/types"
+	"github.com/initia-labs/opinit-bots/types"
 	"go.uber.org/zap"
 )
 
@@ -47,20 +48,20 @@ func NewExecutor(cfg *executortypes.Config, db types.DB, sv *server.Server, logg
 	}
 
 	return &Executor{
-		host: host.NewHost(
-			cfg.Version, cfg.RelayOracle, cfg.L1NodeConfig(homePath),
-			db.WithPrefix([]byte(executortypes.HostNodeName)),
-			logger.Named(executortypes.HostNodeName), cfg.L1Node.Bech32Prefix, "",
+		host: host.NewHostV1(
+			cfg.L1NodeConfig(homePath),
+			db.WithPrefix([]byte(types.HostName)),
+			logger.Named(types.HostName), cfg.L1Node.Bech32Prefix, "",
 		),
-		child: child.NewChild(
-			cfg.Version, cfg.L2NodeConfig(homePath),
-			db.WithPrefix([]byte(executortypes.ChildNodeName)),
-			logger.Named(executortypes.ChildNodeName), cfg.L2Node.Bech32Prefix,
+		child: child.NewChildV1(
+			cfg.L2NodeConfig(homePath),
+			db.WithPrefix([]byte(types.ChildName)),
+			logger.Named(types.ChildName), cfg.L2Node.Bech32Prefix,
 		),
-		batch: batch.NewBatchSubmitter(
-			cfg.Version, cfg.L2NodeConfig(homePath),
-			cfg.BatchConfig(), db.WithPrefix([]byte(executortypes.BatchNodeName)),
-			logger.Named(executortypes.BatchNodeName), cfg.L2Node.ChainID, homePath,
+		batch: batch.NewBatchSubmitterV0(
+			cfg.L2NodeConfig(homePath),
+			cfg.BatchConfig(), db.WithPrefix([]byte(types.BatchName)),
+			logger.Named(types.BatchName), cfg.L2Node.ChainID, homePath,
 			cfg.L2Node.Bech32Prefix,
 		),
 
@@ -93,11 +94,11 @@ func (ex *Executor) Initialize(ctx context.Context) error {
 		return err
 	}
 
-	err = ex.host.Initialize(ctx, hostStartHeight, ex.child, ex.batch, int64(bridgeInfo.BridgeId))
+	err = ex.host.Initialize(ctx, hostStartHeight, ex.child, ex.batch, bridgeInfo)
 	if err != nil {
 		return err
 	}
-	err = ex.child.Initialize(childStartHeight, startOutputIndex, ex.host, bridgeInfo)
+	err = ex.child.Initialize(ctx, childStartHeight, startOutputIndex, ex.host, bridgeInfo)
 	if err != nil {
 		return err
 	}
@@ -106,7 +107,7 @@ func (ex *Executor) Initialize(ctx context.Context) error {
 		return err
 	}
 
-	da, err := ex.makeDANode(int64(bridgeInfo.BridgeId))
+	da, err := ex.makeDANode(ctx, bridgeInfo)
 	if err != nil {
 		return err
 	}
@@ -167,29 +168,28 @@ func (ex *Executor) RegisterQuerier() {
 	})
 }
 
-func (ex *Executor) makeDANode(bridgeId int64) (executortypes.DANode, error) {
+func (ex *Executor) makeDANode(ctx context.Context, bridgeInfo opchildtypes.BridgeInfo) (executortypes.DANode, error) {
 	batchInfo := ex.batch.BatchInfo()
 	switch batchInfo.BatchInfo.ChainType {
 	case ophosttypes.BatchInfo_CHAIN_TYPE_INITIA:
-		da := host.NewHost(
-			ex.cfg.Version, false, ex.cfg.DANodeConfig(ex.homePath),
-			ex.db.WithPrefix([]byte(executortypes.DAHostNodeName)),
-			ex.logger.Named(executortypes.DAHostNodeName),
+		da := host.NewHostV1(
+			ex.cfg.DANodeConfig(ex.homePath),
+			ex.db.WithPrefix([]byte(types.DAHostName)),
+			ex.logger.Named(types.DAHostName),
 			ex.cfg.DANode.Bech32Prefix, batchInfo.BatchInfo.Submitter,
 		)
 		if ex.host.GetAddress().Equals(da.GetAddress()) {
 			return ex.host, nil
 		}
-		da.SetBridgeId(bridgeId)
-		da.RegisterDAHandlers()
-		return da, nil
+		err := da.InitializeDA(ctx, bridgeInfo)
+		return da, err
 	case ophosttypes.BatchInfo_CHAIN_TYPE_CELESTIA:
 		da := celestia.NewDACelestia(ex.cfg.Version, ex.cfg.DANodeConfig(ex.homePath),
-			ex.db.WithPrefix([]byte(executortypes.DACelestiaNodeName)),
-			ex.logger.Named(executortypes.DACelestiaNodeName),
+			ex.db.WithPrefix([]byte(types.DACelestiaName)),
+			ex.logger.Named(types.DACelestiaName),
 			ex.cfg.DANode.Bech32Prefix, batchInfo.BatchInfo.Submitter,
 		)
-		err := da.Initialize(ex.batch, bridgeId)
+		err := da.Initialize(ctx, ex.batch, bridgeInfo.BridgeId)
 		if err != nil {
 			return nil, err
 		}
@@ -219,17 +219,20 @@ func (ex *Executor) getStartHeights(ctx context.Context, bridgeId uint64) (l1Sta
 		}
 	}
 	// get the last deposit tx height from the host
-	l1Sequence, err := ex.child.QueryNextL1Sequence(ctx)
+	l1Sequence, err := ex.child.QueryNextL1Sequence(ctx, 0)
 	if err != nil {
 		return 0, 0, 0, 0, err
 	}
-	depositTxHeight, err := ex.host.QueryDepositTxHeight(ctx, bridgeId, l1Sequence-1)
-	if err != nil {
-		return 0, 0, 0, 0, err
+	if l1Sequence > 1 {
+		depositTxHeight, err := ex.host.QueryDepositTxHeight(ctx, bridgeId, l1Sequence-1)
+		if err != nil {
+			return 0, 0, 0, 0, err
+		}
+		if l1StartHeight > depositTxHeight {
+			l1StartHeight = depositTxHeight
+		}
 	}
-	if l1StartHeight > depositTxHeight {
-		l1StartHeight = depositTxHeight
-	}
+
 	if l2StartHeight == 0 {
 		startOutputIndex = 1
 	}

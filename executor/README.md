@@ -51,8 +51,6 @@ To configure the Executor, fill in the values in the `~/.opinit/executor.json` f
   //
   // If you don't want to use the bridge executor feature, you can leave it empty.
   "bridge_executor": "",
-  // RelayOracle is the flag to enable the oracle relay feature.
-  "relay_oracle": true,
   // MaxChunks is the maximum number of chunks in a batch.
   "max_chunks": 5000,
   // MaxChunkSize is the maximum size of a chunk in a batch.
@@ -135,28 +133,29 @@ When Child's last l1 Sequence is `1`,
 
 
 ## Handler rules for the components of the Executor
-For registered events or tx handlers, work processed in a block is atomically saved as ProcessedMsg. Therfore, if ProcessedMsgs or Txs cannot be processed due to an interrupt or error, it is guaranteed to be read from the DB and processed.
+For registered events or tx handlers, work processed in a block is atomically saved as ProcessedMsg. Therefore, if ProcessedMsgs or Txs cannot be processed due to an interrupt or error, it is guaranteed to be read from the DB and processed.
 
 ## Deposit
 When the `initiate_token_deposit` event is detected in l1, `bridge_executor` submits a tx containing the `MsgFinalizeTokenDeposit` msg to l2. 
 
 ## Withdrawal
-`Child` always has a merkle tree. A working tree is stored for each block, and if the working tree of the previous block does not exist, a `panic` occurs. When it detects an `initiate_token_withdrawal` event, it adds it as a leaf node to the current working tree. The leaf index of the current working tree corresponding to the requested withdrawal is `l2 sequence of the withdrawal - start index of the working tree`. To add a leaf node, it calculates the leaf node with the withdrawal hash such as the [opinit spec](https://github.com/initia-labs/OPinit/blob/main/x/ophost/types/output.go#L30) and stores the withdrawal info corresponding to the l2 sequence. For rules on creating trees, refer [this](../merkle).
+`Child` always has a merkle tree. A working tree is stored for each block, and if the working tree of the previous block does not exist, a `panic` occurs. When it detects an `initiate_token_withdrawal` event, it adds it as a leaf node to the current working tree. The leaf index of the current working tree corresponding to the requested withdrawal is `l2 sequence of the withdrawal - start index of the working tree`. To add a leaf node, it calculates the leaf node with the withdrawal hash such as the [opinit spec](https://github.com/initia-labs/OPinit/blob/v0.4.3/x/ophost/types/output.go#L30) and stores the withdrawal info corresponding to the l2 sequence. For rules on creating trees, refer [this](../merkle).
 ```go
 func GenerateWithdrawalHash(bridgeId uint64, l2Sequence uint64, sender string, receiver string, denom string, amount uint64) [32]byte {
 	var withdrawalHash [32]byte
 	seed := []byte{}
 	seed = binary.BigEndian.AppendUint64(seed, bridgeId)
 	seed = binary.BigEndian.AppendUint64(seed, l2Sequence)
+
 	// variable length
-	seed = append(seed, sender...) // put utf8 encoded address
-	seed = append(seed, Splitter)
+	senderDigest := sha3.Sum256([]byte(sender))
+	seed = append(seed, senderDigest[:]...) // put utf8 encoded address
 	// variable length
-	seed = append(seed, receiver...) // put utf8 encoded address
-	seed = append(seed, Splitter)
+	receiverDigest := sha3.Sum256([]byte(receiver))
+	seed = append(seed, receiverDigest[:]...) // put utf8 encoded address
 	// variable length
-	seed = append(seed, denom...)
-	seed = append(seed, Splitter)
+	denomDigest := sha3.Sum256([]byte(denom))
+	seed = append(seed, denomDigest[:]...)
 	seed = binary.BigEndian.AppendUint64(seed, amount)
 
 	// double hash the leaf node
@@ -199,26 +198,63 @@ type QueryWithdrawalResponse struct {
 This data contains all the data needed to finalize withdrawal.
 
 ## Oracle
-Initia uses slinky to bring oracle data into the chain, which is stored in the 0th tx of each block. The bridge executor submits a `MsgUpdateOracle` containing the 0th Tx of l1 block to l2 when a block in l1 is created. Since oracle data always needs to be the latest, old oracles are discarded or ignored. To relay oracle, `relay_oracle` option in config must be set to true.
-```go
-{
-  // RelayOracle is the flag to enable the oracle relay feature.
-  RelayOracle bool `json:"relay_oracle"`
-}
-```
+Initia uses slinky to bring oracle data into the chain, which is stored in the 0th tx of each block. The bridge executor submits a `MsgUpdateOracle` containing the 0th Tx of l1 block to l2 when a block in l1 is created. Since oracle data always needs to be the latest, old oracles are discarded or ignored. To relay oracle, `oracle_enabled` must be set to true in bridge config.
 
 ## Batch
-`Batch` queries the batch info stored in the chain and submit the batch according to the account and chain ID. The user must provide the appropriate `RPC address`, `bech32-prefix` and `gas-price` via config. Also, the account in the batch info must be registered in the keyring. Each block's raw bytes is compressed with `gzip`. The collected block data is divided into max chunk size of config. When the `2/3` of the submission interval registered in the chain has passed since the previous submission time, it submits the batch header and block data to DA by adding last raw commit bytes. The batch header contains the last l2 block height and the checksums of each chunk that this data contains.
+`Batch` queries the batch info stored in the chain and submit the batch according to the account and chain ID. The user must provide the appropriate `RPC address`, `bech32-prefix` and `gas-price` via config. Also, the account in the batch info must be registered in the keyring. Each block's raw bytes is compressed with `gzip`. The collected block data is divided into max chunk size of config. When the `2/3` of the submission interval registered in the chain has passed since the previous submission time, it submits the batch data header first and batch data chunks to DA by adding last raw commit bytes with headers. The batch header contains the start, end l2 block height and the checksums of each chunk that this data contains.
 ```go
-// BatchHeader is the header of a batch
-type BatchHeader struct {
-	// last l2 block height which is included in the batch
-	End uint64 `json:"end"`
-	// checksums of all chunks
-	Chunks [][]byte `json:"chunks"`
+// BatchDataHeader is the header of a batch
+type BatchDataHeader struct {
+	Start     uint64
+	End       uint64
+	Checksums [][]byte
+}
+
+func MarshalBatchDataHeader(
+	start uint64,
+	end uint64,
+	checksums [][]byte,
+) []byte {
+	data := make([]byte, 1)
+	data[0] = byte(BatchDataTypeHeader)
+	data = binary.BigEndian.AppendUint64(data, start)
+	data = binary.BigEndian.AppendUint64(data, end)
+	data = binary.BigEndian.AppendUint64(data, uint64(len(checksums)))
+	for _, checksum := range checksums {
+		data = append(data, checksum...)
+	}
+	return data
+}
+
+// BatchDataChunk is the chunk of a batch
+type BatchDataChunk struct {
+	Start     uint64
+	End       uint64
+	Index     uint64
+	Length    uint64
+	ChunkData []byte
+}
+
+func MarshalBatchDataChunk(
+	start uint64,
+	end uint64,
+	index uint64,
+	length uint64,
+	chunkData []byte,
+) []byte {
+	data := make([]byte, 1)
+	data[0] = byte(BatchDataTypeChunk)
+	data = binary.BigEndian.AppendUint64(data, start)
+	data = binary.BigEndian.AppendUint64(data, end)
+	data = binary.BigEndian.AppendUint64(data, index)
+	data = binary.BigEndian.AppendUint64(data, length)
+	data = append(data, chunkData...)
+	return data
 }
 ```
-If a l2 block contains `MsgUpdateOracle`, only the data field is submitted empty to reduce block bytes since the oracle data is already stored in l1. 
+### Note
+* If a l2 block contains `MsgUpdateOracle`, only the data field is submitted empty to reduce block bytes since the oracle data is already stored in l1.
+* Batch data is stored in a `batch` file in the home directory until it is submitted, so be careful **not to change the file.**
 
 ### Update batch info
 If the batch info registered in the chain is changed to change the account or DA chain for the batch, `Host` catches the `update_batch_info` event and send it to `Batch`. The batch will empty the temporal batch file and turn off the bot to resubmit from the last finalized output block number. Users must update the config file with updated information before starting the bot.
@@ -234,3 +270,89 @@ If the batch info registered in the chain is changed to change the account or DA
 ```
 ## Sync from the beginning
 If for some reason you need to re-sync from the beginning, the bot will query the outputs and deposits submitted to the chain and not resubmit them. However, the tree must always be saved, as it must provide withdrawal proofs.
+
+
+## Query
+
+### Status
+```bash
+curl localhost:3000/status
+```
+
+```json
+{
+  "bridge_id": 1,
+  "host": {
+    "node": {
+      "last_block_height": 0,
+      "broadcaster": {
+        "pending_txs": 0,
+        "sequence": 0
+      }
+    },
+    "last_proposed_output_index": 0,
+    "last_proposed_output_l2_block_number": 0
+  },
+  "child": {
+    "node": {
+      "last_block_height": 0,
+      "broadcaster": {
+        "pending_txs": 0,
+        "sequence": 0
+      }
+    },
+    "last_updated_oracle_height": 0,
+    "last_finalized_deposit_l1_block_height": 0,
+    "last_finalized_deposit_l1_sequence": 0,
+    "last_withdrawal_l2_sequence": 0,
+    "working_tree_index": 0,
+    "finalizing_block_height": 0,
+    "last_output_submission_time": "",
+    "next_output_submission_time": ""
+  },
+  "batch": {
+    "node": {
+      "last_block_height": 0,
+    },
+    "batch_info": {
+      "submitter": "",
+      "chain_type": ""
+    },
+    "current_batch_file_size": 0,
+    "batch_start_block_number": 0,
+    "batch_end_block_number": 0,
+    "last_batch_submission_time": ""
+  },
+  "da": {
+    "broadcaster": {
+      "pending_txs": 0,
+      "sequence": 0
+    }
+  }
+}
+```
+### Withdrawals 
+```bash
+curl localhost:3000/withdrawal/{sequence} | jq . > ./withdrawal-info.json
+initiad tx ophost finalize-token-withdrawal ./withdrawal-info.json --gas= --gas-prices= --chain-id= --from=
+```
+
+```go
+type QueryWithdrawalResponse struct {
+	// fields required to withdraw funds
+	BridgeId         uint64   `json:"bridge_id"`
+	OutputIndex      uint64   `json:"output_index"`
+	WithdrawalProofs [][]byte `json:"withdrawal_proofs"`
+	Sender           string   `json:"sender"`
+	Sequence         uint64   `json:"sequence"`
+	Amount           string   `json:"amount"`
+	Version          []byte   `json:"version"`
+	StorageRoot      []byte   `json:"storage_root"`
+	LatestBlockHash  []byte   `json:"latest_block_hash"`
+
+	// extra info
+	BlockNumber    uint64 `json:"block_number"`
+	Receiver       string `json:"receiver"`
+	WithdrawalHash []byte `json:"withdrawal_hash"`
+}
+```

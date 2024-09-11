@@ -1,9 +1,9 @@
 package node
 
 import (
-	dbtypes "github.com/initia-labs/opinit-bots-go/db/types"
-	nodetypes "github.com/initia-labs/opinit-bots-go/node/types"
-	"github.com/initia-labs/opinit-bots-go/types"
+	dbtypes "github.com/initia-labs/opinit-bots/db/types"
+	nodetypes "github.com/initia-labs/opinit-bots/node/types"
+	"github.com/initia-labs/opinit-bots/types"
 	"go.uber.org/zap"
 )
 

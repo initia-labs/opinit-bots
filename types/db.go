@@ -20,6 +20,7 @@ type DB interface {
 	Delete([]byte) error
 	Close() error
 	PrefixedIterate([]byte, func([]byte, []byte) (bool, error)) error
+	PrefixedReverseIterate([]byte, func([]byte, []byte) (bool, error)) error
 	SeekPrevInclusiveKey([]byte, []byte) ([]byte, []byte, error)
 	WithPrefix([]byte) DB
 	PrefixedKey([]byte) []byte

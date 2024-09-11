@@ -1,6 +1,7 @@
 package broadcaster
 
 import (
+	"context"
 	"sync"
 	"time"
 
@@ -17,9 +18,9 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/tx/signing"
 
-	btypes "github.com/initia-labs/opinit-bots-go/node/broadcaster/types"
-	"github.com/initia-labs/opinit-bots-go/node/rpcclient"
-	"github.com/initia-labs/opinit-bots-go/types"
+	btypes "github.com/initia-labs/opinit-bots/node/broadcaster/types"
+	"github.com/initia-labs/opinit-bots/node/rpcclient"
+	"github.com/initia-labs/opinit-bots/types"
 )
 
 type Broadcaster struct {
@@ -56,7 +57,6 @@ func NewBroadcaster(
 	cdc codec.Codec,
 	txConfig client.TxConfig,
 	rpcClient *rpcclient.RPCClient,
-	status *rpccoretypes.ResultStatus,
 ) (*Broadcaster, error) {
 	b := &Broadcaster{
 		cdc:       cdc,
@@ -108,14 +108,12 @@ func NewBroadcaster(
 	}
 	b.keyAddress = addr
 	b.keyName = keyringRecord.Name
-
-	// prepare broadcaster
-	err = b.prepareBroadcaster(uint64(status.SyncInfo.LatestBlockHeight), status.SyncInfo.LatestBlockTime)
-	if err != nil {
-		return nil, err
-	}
-
 	return b, nil
+}
+
+func (b *Broadcaster) Initialize(ctx context.Context, status *rpccoretypes.ResultStatus) error {
+	// prepare broadcaster
+	return b.prepareBroadcaster(ctx, status.SyncInfo.LatestBlockTime)
 }
 
 func (b Broadcaster) getClientCtx() client.Context {
@@ -130,7 +128,7 @@ func (b Broadcaster) GetTxf() tx.Factory {
 	return b.txf
 }
 
-func (b *Broadcaster) prepareBroadcaster(_ /*lastBlockHeight*/ uint64, lastBlockTime time.Time) error {
+func (b *Broadcaster) prepareBroadcaster(ctx context.Context, lastBlockTime time.Time) error {
 	b.txf = tx.Factory{}.
 		WithAccountRetriever(b).
 		WithChainID(b.cfg.ChainID).
@@ -152,7 +150,6 @@ func (b *Broadcaster) prepareBroadcaster(_ /*lastBlockHeight*/ uint64, lastBlock
 		return err
 	}
 
-	// TODO: handle mismatched sequence & pending txs
 	if len(loadedPendingTxs) > 0 {
 		pendingTxTime := time.Unix(0, loadedPendingTxs[0].Timestamp)
 
@@ -161,7 +158,11 @@ func (b *Broadcaster) prepareBroadcaster(_ /*lastBlockHeight*/ uint64, lastBlock
 			waitingTime := timeoutTime.Sub(lastBlockTime)
 			timer := time.NewTimer(waitingTime)
 			b.logger.Info("waiting for pending txs to be processed", zap.Duration("waiting_time", waitingTime))
-			<-timer.C
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-timer.C:
+			}
 		}
 
 		// convert pending txs to raw kv pairs for deletion

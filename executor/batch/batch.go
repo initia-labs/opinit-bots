@@ -1,38 +1,28 @@
 package batch
 
 import (
+	"compress/gzip"
 	"context"
 	"errors"
-	"io"
 	"os"
 	"sync"
-	"time"
 
 	"go.uber.org/zap"
 
 	opchildtypes "github.com/initia-labs/OPinit/x/opchild/types"
 	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
 
-	dbtypes "github.com/initia-labs/opinit-bots-go/db/types"
-	"github.com/initia-labs/opinit-bots-go/executor/child"
-	executortypes "github.com/initia-labs/opinit-bots-go/executor/types"
-	"github.com/initia-labs/opinit-bots-go/node"
-	btypes "github.com/initia-labs/opinit-bots-go/node/broadcaster/types"
-	nodetypes "github.com/initia-labs/opinit-bots-go/node/types"
-	"github.com/initia-labs/opinit-bots-go/types"
+	executortypes "github.com/initia-labs/opinit-bots/executor/types"
+	"github.com/initia-labs/opinit-bots/node"
+	btypes "github.com/initia-labs/opinit-bots/node/broadcaster/types"
+	nodetypes "github.com/initia-labs/opinit-bots/node/types"
+	childprovider "github.com/initia-labs/opinit-bots/provider/child"
+	"github.com/initia-labs/opinit-bots/types"
 )
 
 type hostNode interface {
 	QueryBatchInfos(context.Context, uint64) (*ophosttypes.QueryBatchInfosResponse, error)
 }
-
-type compressionFunc interface {
-	Write([]byte) (int, error)
-	Reset(io.Writer)
-	Close() error
-}
-
-var SubmissionKey = []byte("submission_time")
 
 type BatchSubmitter struct {
 	version uint8
@@ -50,30 +40,28 @@ type BatchSubmitter struct {
 
 	opchildQueryClient opchildtypes.QueryClient
 
-	batchInfoMu *sync.Mutex
-	batchInfos  []ophosttypes.BatchInfoWithOutput
-	batchWriter compressionFunc
-	batchFile   *os.File
-	batchHeader *executortypes.BatchHeader
+	batchInfoMu    *sync.Mutex
+	batchInfos     []ophosttypes.BatchInfoWithOutput
+	batchWriter    *gzip.Writer
+	batchFile      *os.File
+	localBatchInfo *executortypes.LocalBatchInfo
 
 	processedMsgs []btypes.ProcessedMsgs
 
 	chainID  string
 	homePath string
 
-	lastSubmissionTime time.Time
-
 	// status info
 	LastBatchEndBlockNumber uint64
 }
 
-func NewBatchSubmitter(
-	version uint8, cfg nodetypes.NodeConfig,
+func NewBatchSubmitterV0(
+	cfg nodetypes.NodeConfig,
 	batchCfg executortypes.BatchConfig,
 	db types.DB, logger *zap.Logger,
 	chainID, homePath, bech32Prefix string,
 ) *BatchSubmitter {
-	appCodec, txConfig, err := child.GetCodec(bech32Prefix)
+	appCodec, txConfig, err := childprovider.GetCodec(bech32Prefix)
 	if err != nil {
 		panic(err)
 	}
@@ -86,7 +74,7 @@ func NewBatchSubmitter(
 	}
 
 	ch := &BatchSubmitter{
-		version: version,
+		version: 0,
 
 		node: node,
 
@@ -98,7 +86,8 @@ func NewBatchSubmitter(
 
 		opchildQueryClient: opchildtypes.NewQueryClient(node.GetRPCClient()),
 
-		batchInfoMu: &sync.Mutex{},
+		batchInfoMu:    &sync.Mutex{},
+		localBatchInfo: &executortypes.LocalBatchInfo{},
 
 		processedMsgs: make([]btypes.ProcessedMsgs, 0),
 		homePath:      homePath,
@@ -108,7 +97,7 @@ func NewBatchSubmitter(
 }
 
 func (bs *BatchSubmitter) Initialize(ctx context.Context, startHeight uint64, host hostNode, bridgeInfo opchildtypes.BridgeInfo) error {
-	err := bs.node.Initialize(startHeight)
+	err := bs.node.Initialize(ctx, startHeight)
 	if err != nil {
 		return err
 	}
@@ -131,8 +120,17 @@ func (bs *BatchSubmitter) Initialize(ctx context.Context, startHeight uint64, ho
 	}
 
 	fileFlag := os.O_CREATE | os.O_RDWR
-	// if the node has already processed blocks, append to the file
-	if !bs.node.HeightInitialized() {
+	if bs.node.HeightInitialized() {
+		bs.localBatchInfo.Start = bs.node.GetHeight()
+		bs.localBatchInfo.End = 0
+		bs.localBatchInfo.BatchFileSize = 0
+
+		err = bs.saveLocalBatchInfo()
+		if err != nil {
+			return err
+		}
+	} else {
+		// if the node has already processed blocks, append to the file
 		fileFlag |= os.O_APPEND
 	}
 
@@ -140,8 +138,8 @@ func (bs *BatchSubmitter) Initialize(ctx context.Context, startHeight uint64, ho
 	if err != nil {
 		return err
 	}
-
-	err = bs.LoadSubmissionInfo()
+	// linux command gzip use level 6 as default
+	bs.batchWriter, err = gzip.NewWriterLevel(bs.batchFile, 6)
 	if err != nil {
 		return err
 	}
@@ -166,25 +164,6 @@ func (bs *BatchSubmitter) Start(ctx context.Context) {
 
 func (bs *BatchSubmitter) SetBridgeInfo(bridgeInfo opchildtypes.BridgeInfo) {
 	bs.bridgeInfo = bridgeInfo
-}
-
-func (bs *BatchSubmitter) LoadSubmissionInfo() error {
-	val, err := bs.db.Get(SubmissionKey)
-	if err != nil {
-		if err == dbtypes.ErrNotFound {
-			return nil
-		}
-		return err
-	}
-	bs.lastSubmissionTime = time.Unix(0, dbtypes.ToInt64(val))
-	return nil
-}
-
-func (bs *BatchSubmitter) SubmissionInfoToRawKV(timestamp int64) types.RawKV {
-	return types.RawKV{
-		Key:   bs.db.PrefixedKey(SubmissionKey),
-		Value: dbtypes.FromInt64(timestamp),
-	}
 }
 
 func (bs *BatchSubmitter) ChainID() string {

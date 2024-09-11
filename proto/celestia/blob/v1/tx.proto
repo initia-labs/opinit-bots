@@ -3,7 +3,7 @@ package celestia.blob.v1;
 
 import "celestia/core/v1/blob/blob.proto";
 
-option go_package = "github.com/initia-labs/opinit-bots-go/types/celestia";
+option go_package = "github.com/initia-labs/opinit-bots/types/celestia";
 
 // MsgPayForBlobs pays for the inclusion of a blob in the block.
 message MsgPayForBlobs {

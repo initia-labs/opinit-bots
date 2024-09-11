@@ -5,6 +5,7 @@ This repository contains the Go implementation of OPinit bots.
 ## Components
 
 - [Executor](./executor)
+- [Challenger](./challenger)
 
 ## How to Use
 
@@ -16,9 +17,9 @@ Before running OPinit bots, make sure you have the following prerequisites insta
 
 To ensure compatibility with the node version, check the following versions:
 
-| L1 Node | MiniMove | MiniWasm | MiniEVM |
-| ------- | -------- | -------- | ------- |
-| v0.4.2  | v0.4.0   | v0.4.0   | v0.4.0  |
+| L1 Node | MiniMove | MiniWasm | MiniEVM | 
+| ------- | -------- | -------- | ------- | 
+| v0.4.7  | v0.4.1   | v0.4.1   |    -    | 
 
 ### Build and Configure
 
@@ -37,6 +38,7 @@ Default config path is `~/.opinit/[bot-name].json`
 Supported bot names
 
 - `executor`
+- `challenger`
 
 ### Register keys
 
@@ -58,25 +60,16 @@ To start the bot, use the following command:
 opinitd start [bot-name]
 ```
 
-log level can be set by using `--log-level` flag. Default log level is `info`.
-
+Options 
+- `--log-level`: log level can be set. Default log level is `info`.
+- `--polling-interval`: polling interval can be set. Default polling interval is `100ms`.
+- `--config`: config file name can be set. Default config file name is `[bot-name].json`.
+- `--home`: home dir can be set. Default home dir is `~/.opinit`.
+  
 ### Reset Bot DB
 
 To reset the bot database, use the following command:
 
 ```bash
 opinitd reset-db [bot-name]
-```
-
-### Query status
-
-```bash
-curl localhost:3000/status
-```
-
-### Query withdrawals
-
-```bash
-curl localhost:3000/withdrawal/{sequence} | jq . > ./withdrawal-info.json
-initiad tx ophost finalize-token-withdrawal ./withdrawal-info.json --gas= --gas-prices= --chain-id= --from=
 ```

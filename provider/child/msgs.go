@@ -6,7 +6,26 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 )
 
-func (ch Child) GetMsgFinalizeTokenDeposit(
+func (b BaseChild) GetMsgSetBridgeInfo(
+	bridgeInfo opchildtypes.BridgeInfo,
+) (sdk.Msg, error) {
+	sender, err := b.node.MustGetBroadcaster().GetAddressString()
+	if err != nil {
+		return nil, err
+	}
+
+	msg := opchildtypes.NewMsgSetBridgeInfo(
+		sender,
+		bridgeInfo,
+	)
+	err = msg.Validate(b.node.AccountCodec())
+	if err != nil {
+		return nil, err
+	}
+	return msg, nil
+}
+
+func (b BaseChild) GetMsgFinalizeTokenDeposit(
 	from string,
 	to string,
 	coin sdk.Coin,
@@ -15,7 +34,7 @@ func (ch Child) GetMsgFinalizeTokenDeposit(
 	l1Denom string,
 	data []byte,
 ) (sdk.Msg, error) {
-	sender, err := ch.node.MustGetBroadcaster().GetAddressString()
+	sender, err := b.node.MustGetBroadcaster().GetAddressString()
 	if err != nil {
 		return nil, err
 	}
@@ -30,18 +49,18 @@ func (ch Child) GetMsgFinalizeTokenDeposit(
 		l1Denom,
 		data,
 	)
-	err = msg.Validate(ch.node.AccountCodec())
+	err = msg.Validate(b.node.AccountCodec())
 	if err != nil {
 		return nil, err
 	}
 	return msg, nil
 }
 
-func (ch Child) GetMsgUpdateOracle(
+func (b BaseChild) GetMsgUpdateOracle(
 	height uint64,
 	data []byte,
 ) (sdk.Msg, error) {
-	sender, err := ch.node.MustGetBroadcaster().GetAddressString()
+	sender, err := b.node.MustGetBroadcaster().GetAddressString()
 	if err != nil {
 		return nil, err
 	}
@@ -51,7 +70,7 @@ func (ch Child) GetMsgUpdateOracle(
 		height,
 		data,
 	)
-	err = msg.Validate(ch.node.AccountCodec())
+	err = msg.Validate(b.node.AccountCodec())
 	if err != nil {
 		return nil, err
 	}

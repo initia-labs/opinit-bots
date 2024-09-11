@@ -3,8 +3,8 @@ package broadcaster
 import (
 	"go.uber.org/zap"
 
-	btypes "github.com/initia-labs/opinit-bots-go/node/broadcaster/types"
-	"github.com/initia-labs/opinit-bots-go/types"
+	btypes "github.com/initia-labs/opinit-bots/node/broadcaster/types"
+	"github.com/initia-labs/opinit-bots/types"
 )
 
 ///////////////

@@ -7,9 +7,9 @@ import (
 	"github.com/cosmos/cosmos-sdk/client/tx"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 
-	btypes "github.com/initia-labs/opinit-bots-go/node/broadcaster/types"
-	"github.com/initia-labs/opinit-bots-go/txutils"
-	celestiatypes "github.com/initia-labs/opinit-bots-go/types/celestia"
+	btypes "github.com/initia-labs/opinit-bots/node/broadcaster/types"
+	"github.com/initia-labs/opinit-bots/txutils"
+	celestiatypes "github.com/initia-labs/opinit-bots/types/celestia"
 )
 
 // buildTxWithMessages creates a transaction from the given messages.

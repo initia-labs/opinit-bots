@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/initia-labs/opinit-bots-go/keys"
+	"github.com/initia-labs/opinit-bots/keys"
 
 	"github.com/cosmos/cosmos-sdk/codec"
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"

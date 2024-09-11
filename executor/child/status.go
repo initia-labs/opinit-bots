@@ -3,7 +3,7 @@ package child
 import (
 	"time"
 
-	nodetypes "github.com/initia-labs/opinit-bots-go/node/types"
+	nodetypes "github.com/initia-labs/opinit-bots/node/types"
 )
 
 type Status struct {
@@ -21,12 +21,12 @@ type Status struct {
 
 func (ch Child) GetStatus() Status {
 	return Status{
-		Node:                              ch.node.GetStatus(),
+		Node:                              ch.Node().GetStatus(),
 		LastUpdatedOracleL1Height:         ch.lastUpdatedOracleL1Height,
 		LastFinalizedDepositL1BlockHeight: ch.lastFinalizedDepositL1BlockHeight,
 		LastFinalizedDepositL1Sequence:    ch.lastFinalizedDepositL1Sequence,
-		LastWithdrawalL2Sequence:          ch.mk.GetWorkingTreeLeafCount() + ch.mk.GetStartLeafIndex() - 1,
-		WorkingTreeIndex:                  ch.mk.GetWorkingTreeIndex(),
+		LastWithdrawalL2Sequence:          ch.Merkle().GetWorkingTreeLeafCount() + ch.Merkle().GetStartLeafIndex() - 1,
+		WorkingTreeIndex:                  ch.Merkle().GetWorkingTreeIndex(),
 		FinalizingBlockHeight:             ch.finalizingBlockHeight,
 		LastOutputSubmissionTime:          ch.lastOutputTime,
 		NextOutputSubmissionTime:          ch.nextOutputTime,

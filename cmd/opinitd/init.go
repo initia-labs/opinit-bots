@@ -2,14 +2,13 @@ package main
 
 import (
 	"encoding/json"
-	"errors"
 	"os"
-	"path"
 
 	"github.com/spf13/cobra"
 
-	bottypes "github.com/initia-labs/opinit-bots-go/bot/types"
-	executortypes "github.com/initia-labs/opinit-bots-go/executor/types"
+	bottypes "github.com/initia-labs/opinit-bots/bot/types"
+	challengertypes "github.com/initia-labs/opinit-bots/challenger/types"
+	executortypes "github.com/initia-labs/opinit-bots/executor/types"
 )
 
 func initCmd(ctx *cmdContext) *cobra.Command {
@@ -22,36 +21,40 @@ func initCmd(ctx *cmdContext) *cobra.Command {
 Currently supported bots are: executor
 `,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			configName, err := cmd.Flags().GetString(flagConfigName)
+			botType := bottypes.BotTypeFromString(args[0])
+			if err := botType.Validate(); err != nil {
+				return err
+			}
+
+			configPath, err := getConfigPath(cmd, ctx.homePath, args[0])
 			if err != nil {
 				return err
 			}
 
-			configPath := path.Join(ctx.homePath, configName)
-			if path.Ext(configPath) != ".json" {
-				return errors.New("config file must be a json file")
+			if err := os.MkdirAll(ctx.homePath, os.ModePerm); err != nil {
+				return err
 			}
 
-			botType := bottypes.BotTypeFromString(args[0])
+			f, err := os.Create(configPath)
+			if err != nil {
+				return err
+			}
+
+			var config interface{}
 			switch botType {
 			case bottypes.BotTypeExecutor:
-				if err := os.MkdirAll(ctx.homePath, os.ModePerm); err != nil {
-					return err
-				}
+				config = executortypes.DefaultConfig()
+			case bottypes.BotTypeChallenger:
+				config = challengertypes.DefaultConfig()
+			}
 
-				f, err := os.Create(configPath)
-				if err != nil {
-					return err
-				}
+			bz, err := json.MarshalIndent(config, "", "  ")
+			if err != nil {
+				return err
+			}
 
-				bz, err := json.MarshalIndent(executortypes.DefaultConfig(), "", "  ")
-				if err != nil {
-					return err
-				}
-
-				if _, err := f.Write(bz); err != nil {
-					return err
-				}
+			if _, err := f.Write(bz); err != nil {
+				return err
 			}
 
 			return nil

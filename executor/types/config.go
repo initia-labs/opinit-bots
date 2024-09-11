@@ -4,8 +4,8 @@ import (
 	"errors"
 	"time"
 
-	btypes "github.com/initia-labs/opinit-bots-go/node/broadcaster/types"
-	nodetypes "github.com/initia-labs/opinit-bots-go/node/types"
+	btypes "github.com/initia-labs/opinit-bots/node/broadcaster/types"
+	nodetypes "github.com/initia-labs/opinit-bots/node/types"
 )
 
 type NodeConfig struct {
@@ -55,9 +55,6 @@ type Config struct {
 	//
 	// If you don't want to use the bridge executor feature, you can leave it empty.
 	BridgeExecutor string `json:"bridge_executor"`
-
-	// RelayOracle is the flag to enable the oracle relay feature.
-	RelayOracle bool `json:"relay_oracle"`
 
 	// MaxChunks is the maximum number of chunks in a batch.
 	MaxChunks uint64 `json:"max_chunks"`
@@ -111,8 +108,6 @@ func DefaultConfig() *Config {
 		OutputSubmitter: "",
 		BridgeExecutor:  "",
 
-		RelayOracle: true,
-
 		MaxChunks:         5000,
 		MaxChunkSize:      300000,  // 300KB
 		MaxSubmissionTime: 60 * 60, // 1 hour
@@ -125,6 +120,10 @@ func DefaultConfig() *Config {
 func (cfg Config) Validate() error {
 	if cfg.Version == 0 {
 		return errors.New("version is required")
+	}
+
+	if cfg.Version != 1 {
+		return errors.New("only version 1 is supported")
 	}
 
 	if cfg.ListenAddress == "" {

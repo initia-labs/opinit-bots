@@ -13,19 +13,46 @@ import (
 
 	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
 
-	"github.com/initia-labs/opinit-bots-go/node/rpcclient"
-	"github.com/initia-labs/opinit-bots-go/types"
+	"github.com/initia-labs/opinit-bots/node/rpcclient"
+	"github.com/initia-labs/opinit-bots/types"
 )
 
-func (h Host) GetAddress() sdk.AccAddress {
-	return h.node.MustGetBroadcaster().GetAddress()
+func (b BaseHost) GetAddress() sdk.AccAddress {
+	return b.node.MustGetBroadcaster().GetAddress()
 }
 
-func (h Host) GetAddressStr() (string, error) {
-	return h.node.MustGetBroadcaster().GetAddressString()
+func (b BaseHost) GetAddressStr() (string, error) {
+	return b.node.MustGetBroadcaster().GetAddressString()
 }
 
-func (h Host) QueryLastOutput(ctx context.Context, bridgeId uint64) (*ophosttypes.QueryOutputProposalResponse, error) {
+func (b BaseHost) QueryBridgeConfig(ctx context.Context, bridgeId uint64) (*ophosttypes.QueryBridgeResponse, error) {
+	req := &ophosttypes.QueryBridgeRequest{
+		BridgeId: bridgeId,
+	}
+	ctx, cancel := rpcclient.GetQueryContext(ctx, 0)
+	defer cancel()
+
+	return b.ophostQueryClient.Bridge(ctx, req)
+}
+
+func (b BaseHost) QueryLastFinalizedOutput(ctx context.Context, bridgeId uint64) (*ophosttypes.QueryLastFinalizedOutputResponse, error) {
+	req := &ophosttypes.QueryLastFinalizedOutputRequest{
+		BridgeId: bridgeId,
+	}
+	ctx, cancel := rpcclient.GetQueryContext(ctx, 0)
+	defer cancel()
+
+	res, err := b.ophostQueryClient.LastFinalizedOutput(ctx, req)
+	if err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return res, nil
+}
+
+func (b BaseHost) QueryLastOutput(ctx context.Context, bridgeId uint64) (*ophosttypes.QueryOutputProposalResponse, error) {
 	req := &ophosttypes.QueryOutputProposalsRequest{
 		BridgeId: bridgeId,
 		Pagination: &query.PageRequest{
@@ -36,7 +63,7 @@ func (h Host) QueryLastOutput(ctx context.Context, bridgeId uint64) (*ophosttype
 	ctx, cancel := rpcclient.GetQueryContext(ctx, 0)
 	defer cancel()
 
-	res, err := h.ophostQueryClient.OutputProposals(ctx, req)
+	res, err := b.ophostQueryClient.OutputProposals(ctx, req)
 	if err != nil {
 		return nil, err
 	}
@@ -46,27 +73,27 @@ func (h Host) QueryLastOutput(ctx context.Context, bridgeId uint64) (*ophosttype
 	return &res.OutputProposals[0], nil
 }
 
-func (h Host) QueryOutput(ctx context.Context, bridgeId uint64, outputIndex uint64) (*ophosttypes.QueryOutputProposalResponse, error) {
+func (b BaseHost) QueryOutput(ctx context.Context, bridgeId uint64, outputIndex uint64, height uint64) (*ophosttypes.QueryOutputProposalResponse, error) {
 	req := &ophosttypes.QueryOutputProposalRequest{
 		BridgeId:    bridgeId,
 		OutputIndex: outputIndex,
 	}
-	ctx, cancel := rpcclient.GetQueryContext(ctx, 0)
+	ctx, cancel := rpcclient.GetQueryContext(ctx, height)
 	defer cancel()
 
-	return h.ophostQueryClient.OutputProposal(ctx, req)
+	return b.ophostQueryClient.OutputProposal(ctx, req)
 }
 
 // QueryOutputByL2BlockNumber queries the last output proposal before the given L2 block number
-func (h Host) QueryOutputByL2BlockNumber(ctx context.Context, bridgeId uint64, l2BlockNumber uint64) (*ophosttypes.QueryOutputProposalResponse, error) {
-	start, err := h.QueryOutput(ctx, bridgeId, 1)
+func (b BaseHost) QueryOutputByL2BlockNumber(ctx context.Context, bridgeId uint64, l2BlockNumber uint64) (*ophosttypes.QueryOutputProposalResponse, error) {
+	start, err := b.QueryOutput(ctx, bridgeId, 1, 0)
 	if err != nil {
 		if strings.Contains(err.Error(), "not found") {
 			return nil, nil
 		}
 		return nil, err
 	}
-	end, err := h.QueryLastOutput(ctx, bridgeId)
+	end, err := b.QueryLastOutput(ctx, bridgeId)
 	if err != nil {
 		return nil, err
 	} else if end == nil {
@@ -76,7 +103,7 @@ func (h Host) QueryOutputByL2BlockNumber(ctx context.Context, bridgeId uint64, l
 	for {
 		if start.OutputProposal.L2BlockNumber >= l2BlockNumber {
 			if start.OutputIndex != 1 {
-				return h.QueryOutput(ctx, bridgeId, start.OutputIndex-1)
+				return b.QueryOutput(ctx, bridgeId, start.OutputIndex-1, 0)
 			}
 			return nil, nil
 		} else if end.OutputProposal.L2BlockNumber < l2BlockNumber {
@@ -86,7 +113,7 @@ func (h Host) QueryOutputByL2BlockNumber(ctx context.Context, bridgeId uint64, l
 		}
 
 		midIndex := (start.OutputIndex + end.OutputIndex) / 2
-		output, err := h.QueryOutput(ctx, bridgeId, midIndex)
+		output, err := b.QueryOutput(ctx, bridgeId, midIndex, 0)
 		if err != nil {
 			return nil, err
 		}
@@ -99,7 +126,7 @@ func (h Host) QueryOutputByL2BlockNumber(ctx context.Context, bridgeId uint64, l
 	}
 }
 
-func (h Host) QueryCreateBridgeHeight(ctx context.Context, bridgeId uint64) (uint64, error) {
+func (b BaseHost) QueryCreateBridgeHeight(ctx context.Context, bridgeId uint64) (uint64, error) {
 	ctx, cancel := rpcclient.GetQueryContext(ctx, 0)
 	defer cancel()
 
@@ -109,7 +136,7 @@ func (h Host) QueryCreateBridgeHeight(ctx context.Context, bridgeId uint64) (uin
 		bridgeId,
 	)
 	perPage := 1
-	res, err := h.node.GetRPCClient().TxSearch(ctx, query, false, nil, &perPage, "desc")
+	res, err := b.node.GetRPCClient().TxSearch(ctx, query, false, nil, &perPage, "desc")
 	if err != nil {
 		return 0, err
 	}
@@ -120,16 +147,16 @@ func (h Host) QueryCreateBridgeHeight(ctx context.Context, bridgeId uint64) (uin
 	return uint64(res.Txs[0].Height), nil
 }
 
-func (h Host) QueryBatchInfos(ctx context.Context, bridgeId uint64) (*ophosttypes.QueryBatchInfosResponse, error) {
+func (b BaseHost) QueryBatchInfos(ctx context.Context, bridgeId uint64) (*ophosttypes.QueryBatchInfosResponse, error) {
 	req := &ophosttypes.QueryBatchInfosRequest{
 		BridgeId: bridgeId,
 	}
 	ctx, cancel := rpcclient.GetQueryContext(ctx, 0)
 	defer cancel()
-	return h.ophostQueryClient.BatchInfos(ctx, req)
+	return b.ophostQueryClient.BatchInfos(ctx, req)
 }
 
-func (h Host) QueryDepositTxHeight(ctx context.Context, bridgeId uint64, l1Sequence uint64) (uint64, error) {
+func (b BaseHost) QueryDepositTxHeight(ctx context.Context, bridgeId uint64, l1Sequence uint64) (uint64, error) {
 	if l1Sequence == 0 {
 		return 0, nil
 	}
@@ -153,7 +180,7 @@ func (h Host) QueryDepositTxHeight(ctx context.Context, bridgeId uint64, l1Seque
 		case <-ticker.C:
 		}
 
-		res, err := h.node.GetRPCClient().TxSearch(ctx, query, false, &page, &per_page, "asc")
+		res, err := b.node.GetRPCClient().TxSearch(ctx, query, false, &page, &per_page, "asc")
 		if err != nil {
 			return 0, err
 		}

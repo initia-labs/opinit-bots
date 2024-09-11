@@ -3,7 +3,7 @@ package types
 import (
 	"fmt"
 
-	btypes "github.com/initia-labs/opinit-bots-go/node/broadcaster/types"
+	btypes "github.com/initia-labs/opinit-bots/node/broadcaster/types"
 )
 
 type BlockProcessType uint8

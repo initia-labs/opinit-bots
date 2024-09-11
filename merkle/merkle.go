@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"math/bits"
 
-	merkletypes "github.com/initia-labs/opinit-bots-go/merkle/types"
-	types "github.com/initia-labs/opinit-bots-go/types"
+	merkletypes "github.com/initia-labs/opinit-bots/merkle/types"
+	types "github.com/initia-labs/opinit-bots/types"
 )
 
 // NodeGeneratorFn is a function type that generates parent node from two child nodes.
@@ -61,10 +61,6 @@ func NewMerkle(db types.DB, nodeGeneratorFn NodeGeneratorFn) (*Merkle, error) {
 
 // InitializeWorkingTree resets the working tree with the given tree index and start leaf index.
 func (m *Merkle) InitializeWorkingTree(treeIndex uint64, startLeafIndex uint64) error {
-	if m.workingTree != nil && !m.workingTree.Done {
-		return fmt.Errorf("failed to initialize working tree index: %d; working tree is not finalized", treeIndex)
-	}
-
 	if treeIndex < 1 || startLeafIndex < 1 {
 		return fmt.Errorf("failed to initialize working tree index: %d, leaf: %d; invalid index", treeIndex, startLeafIndex)
 	}
@@ -128,6 +124,7 @@ func (m *Merkle) LoadWorkingTree(version uint64) error {
 
 	var workingTree merkletypes.TreeInfo
 	err = json.Unmarshal(data, &workingTree)
+	m.workingTree = &workingTree
 	if err != nil {
 		return err
 	} else if workingTree.Done {
@@ -135,8 +132,6 @@ func (m *Merkle) LoadWorkingTree(version uint64) error {
 		nextStartLeafIndex := workingTree.StartLeafIndex + workingTree.LeafCount
 		return m.InitializeWorkingTree(nextTreeIndex, nextStartLeafIndex)
 	}
-
-	m.workingTree = &workingTree
 	return nil
 }
 

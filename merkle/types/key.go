@@ -3,7 +3,7 @@ package types
 import (
 	"encoding/binary"
 
-	dbtypes "github.com/initia-labs/opinit-bots-go/db/types"
+	dbtypes "github.com/initia-labs/opinit-bots/db/types"
 )
 
 var (

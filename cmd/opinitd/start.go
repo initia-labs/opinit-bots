@@ -11,9 +11,9 @@ import (
 	"github.com/spf13/cobra"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/initia-labs/opinit-bots-go/bot"
-	bottypes "github.com/initia-labs/opinit-bots-go/bot/types"
-	"github.com/initia-labs/opinit-bots-go/types"
+	"github.com/initia-labs/opinit-bots/bot"
+	bottypes "github.com/initia-labs/opinit-bots/bot/types"
+	"github.com/initia-labs/opinit-bots/types"
 )
 
 const (
@@ -31,12 +31,17 @@ Currently supported bots:
 - executor
 `,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			configName, err := cmd.Flags().GetString(flagConfigName)
+			botType := bottypes.BotTypeFromString(args[0])
+			if err := botType.Validate(); err != nil {
+				return err
+			}
+
+			configPath, err := getConfigPath(cmd, ctx.homePath, args[0])
 			if err != nil {
 				return err
 			}
-			botType := bottypes.BotTypeFromString(args[0])
-			bot, err := bot.NewBot(botType, ctx.logger, ctx.homePath, configName)
+
+			bot, err := bot.NewBot(botType, ctx.logger, ctx.homePath, configPath)
 			if err != nil {
 				return err
 			}

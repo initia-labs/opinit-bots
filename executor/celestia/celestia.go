@@ -16,13 +16,13 @@ import (
 	inclusion "github.com/celestiaorg/go-square/v2/inclusion"
 	sh "github.com/celestiaorg/go-square/v2/share"
 
-	executortypes "github.com/initia-labs/opinit-bots-go/executor/types"
-	"github.com/initia-labs/opinit-bots-go/keys"
-	"github.com/initia-labs/opinit-bots-go/node"
-	btypes "github.com/initia-labs/opinit-bots-go/node/broadcaster/types"
-	nodetypes "github.com/initia-labs/opinit-bots-go/node/types"
-	"github.com/initia-labs/opinit-bots-go/types"
-	celestiatypes "github.com/initia-labs/opinit-bots-go/types/celestia"
+	executortypes "github.com/initia-labs/opinit-bots/executor/types"
+	"github.com/initia-labs/opinit-bots/keys"
+	"github.com/initia-labs/opinit-bots/node"
+	btypes "github.com/initia-labs/opinit-bots/node/broadcaster/types"
+	nodetypes "github.com/initia-labs/opinit-bots/node/types"
+	"github.com/initia-labs/opinit-bots/types"
+	celestiatypes "github.com/initia-labs/opinit-bots/types/celestia"
 )
 
 type batchNode interface {
@@ -38,7 +38,7 @@ type Celestia struct {
 	node  *node.Node
 	batch batchNode
 
-	bridgeId  int64
+	bridgeId  uint64
 	namespace sh.Namespace
 
 	cfg    nodetypes.NodeConfig
@@ -92,8 +92,8 @@ func createCodec(bech32Prefix string) (codec.Codec, client.TxConfig, error) {
 	})
 }
 
-func (c *Celestia) Initialize(batch batchNode, bridgeId int64) error {
-	err := c.node.Initialize(0)
+func (c *Celestia) Initialize(ctx context.Context, batch batchNode, bridgeId uint64) error {
+	err := c.node.Initialize(ctx, 0)
 	if err != nil {
 		return err
 	}
@@ -128,7 +128,7 @@ func (c Celestia) ProcessedMsgsToRawKV(msgs []btypes.ProcessedMsgs, delete bool)
 	return c.node.MustGetBroadcaster().ProcessedMsgsToRawKV(msgs, delete)
 }
 
-func (c *Celestia) SetBridgeId(brigeId int64) {
+func (c *Celestia) SetBridgeId(brigeId uint64) {
 	c.bridgeId = brigeId
 }
 

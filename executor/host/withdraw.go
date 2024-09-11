@@ -3,49 +3,20 @@ package host
 import (
 	"context"
 	"encoding/base64"
-	"encoding/hex"
-	"strconv"
 
-	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
-	nodetypes "github.com/initia-labs/opinit-bots-go/node/types"
+	nodetypes "github.com/initia-labs/opinit-bots/node/types"
+	hostprovider "github.com/initia-labs/opinit-bots/provider/host"
 	"go.uber.org/zap"
 )
 
 func (h *Host) proposeOutputHandler(_ context.Context, args nodetypes.EventHandlerArgs) error {
-	var bridgeId, l2BlockNumber, outputIndex uint64
-	var proposer string
-	var outputRoot []byte
-	var err error
-
-	for _, attr := range args.EventAttributes {
-		switch attr.Key {
-		case ophosttypes.AttributeKeyProposer:
-			proposer = attr.Value
-		case ophosttypes.AttributeKeyBridgeId:
-			bridgeId, err = strconv.ParseUint(attr.Value, 10, 64)
-			if err != nil {
-				return err
-			}
-			if bridgeId != uint64(h.bridgeId) {
-				// pass other bridge output proposal event
-				return nil
-			}
-		case ophosttypes.AttributeKeyOutputIndex:
-			outputIndex, err = strconv.ParseUint(attr.Value, 10, 64)
-			if err != nil {
-				return err
-			}
-		case ophosttypes.AttributeKeyL2BlockNumber:
-			l2BlockNumber, err = strconv.ParseUint(attr.Value, 10, 64)
-			if err != nil {
-				return err
-			}
-		case ophosttypes.AttributeKeyOutputRoot:
-			outputRoot, err = hex.DecodeString(attr.Value)
-			if err != nil {
-				return err
-			}
-		}
+	bridgeId, l2BlockNumber, outputIndex, proposer, outputRoot, err := hostprovider.ParseMsgProposeOutput(args.EventAttributes)
+	if err != nil {
+		return err
+	}
+	if bridgeId != h.BridgeId() {
+		// pass other bridge output proposal event
+		return nil
 	}
 
 	h.handleProposeOutput(bridgeId, proposer, outputIndex, l2BlockNumber, outputRoot)
@@ -55,7 +26,7 @@ func (h *Host) proposeOutputHandler(_ context.Context, args nodetypes.EventHandl
 }
 
 func (h *Host) handleProposeOutput(bridgeId uint64, proposer string, outputIndex uint64, l2BlockNumber uint64, outputRoot []byte) {
-	h.logger.Info("propose output",
+	h.Logger().Info("propose output",
 		zap.Uint64("bridge_id", bridgeId),
 		zap.String("proposer", proposer),
 		zap.Uint64("output_index", outputIndex),
@@ -65,50 +36,21 @@ func (h *Host) handleProposeOutput(bridgeId uint64, proposer string, outputIndex
 }
 
 func (h *Host) finalizeWithdrawalHandler(_ context.Context, args nodetypes.EventHandlerArgs) error {
-	var bridgeId uint64
-	var outputIndex, l2Sequence uint64
-	var from, to, l1Denom, l2Denom, amount string
-	var err error
-
-	for _, attr := range args.EventAttributes {
-		switch attr.Key {
-		case ophosttypes.AttributeKeyBridgeId:
-			bridgeId, err = strconv.ParseUint(attr.Value, 10, 64)
-			if err != nil {
-				return err
-			}
-			if bridgeId != uint64(h.bridgeId) {
-				// pass other bridge withdrawal event
-				return nil
-			}
-		case ophosttypes.AttributeKeyOutputIndex:
-			outputIndex, err = strconv.ParseUint(attr.Value, 10, 64)
-			if err != nil {
-				return err
-			}
-		case ophosttypes.AttributeKeyL2Sequence:
-			l2Sequence, err = strconv.ParseUint(attr.Value, 10, 64)
-			if err != nil {
-				return err
-			}
-		case ophosttypes.AttributeKeyFrom:
-			from = attr.Value
-		case ophosttypes.AttributeKeyTo:
-			to = attr.Value
-		case ophosttypes.AttributeKeyL1Denom:
-			l1Denom = attr.Value
-		case ophosttypes.AttributeKeyL2Denom:
-			l2Denom = attr.Value
-		case ophosttypes.AttributeKeyAmount:
-			amount = attr.Value
-		}
+	bridgeId, outputIndex, l2Sequence, from, to, l1Denom, l2Denom, amount, err := hostprovider.ParseMsgFinalizeWithdrawal(args.EventAttributes)
+	if err != nil {
+		return err
 	}
+	if bridgeId != h.BridgeId() {
+		// pass other bridge withdrawal event
+		return nil
+	}
+
 	h.handleFinalizeWithdrawal(bridgeId, outputIndex, l2Sequence, from, to, l1Denom, l2Denom, amount)
 	return nil
 }
 
 func (h *Host) handleFinalizeWithdrawal(bridgeId uint64, outputIndex uint64, l2Sequence uint64, from string, to string, l1Denom string, l2Denom string, amount string) {
-	h.logger.Info("finalize withdrawal",
+	h.Logger().Info("finalize withdrawal",
 		zap.Uint64("bridge_id", bridgeId),
 		zap.Uint64("output_index", outputIndex),
 		zap.Uint64("l2_sequence", l2Sequence),

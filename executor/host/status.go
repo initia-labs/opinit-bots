@@ -1,7 +1,7 @@
 package host
 
 import (
-	nodetypes "github.com/initia-labs/opinit-bots-go/node/types"
+	nodetypes "github.com/initia-labs/opinit-bots/node/types"
 )
 
 type Status struct {
@@ -12,12 +12,12 @@ type Status struct {
 
 func (h Host) GetStatus() Status {
 	return Status{
-		Node:                            h.node.GetStatus(),
+		Node:                            h.GetNodeStatus(),
 		LastProposedOutputIndex:         h.lastProposedOutputIndex,
 		LastProposedOutputL2BlockNumber: h.lastProposedOutputL2BlockNumber,
 	}
 }
 
 func (h Host) GetNodeStatus() nodetypes.Status {
-	return h.node.GetStatus()
+	return h.Node().GetStatus()
 }
