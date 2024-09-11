@@ -89,7 +89,11 @@ func (b *BaseHost) Initialize(ctx context.Context, startHeight uint64, bridgeInf
 }
 
 func (b *BaseHost) Start(ctx context.Context) {
-	b.logger.Info("host start", zap.Uint64("height", b.node.GetHeight()))
+	if b.cfg.ProcessType == nodetypes.PROCESS_TYPE_ONLY_BROADCAST {
+		b.logger.Info("host start")
+	} else {
+		b.logger.Info("host start", zap.Uint64("height", b.node.GetHeight()))
+	}
 	b.node.Start(ctx)
 }
 

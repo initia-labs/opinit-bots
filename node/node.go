@@ -203,7 +203,7 @@ func (n Node) GetStatus() nodetypes.Status {
 	}
 
 	if n.broadcaster != nil {
-		s.Broadcaster = nodetypes.BroadcasterStatus{
+		s.Broadcaster = &nodetypes.BroadcasterStatus{
 			PendingTxs: n.broadcaster.LenLocalPendingTx(),
 			Sequence:   n.broadcaster.GetTxf().Sequence(),
 		}
