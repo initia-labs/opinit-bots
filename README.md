@@ -31,14 +31,17 @@ opinitd init [bot-name]
 ```
 
 Default config path is `~/.opinit/[bot-name].json`
+
 - Customize home dir with `--home ~/.opinit-custom-path`
 - Customize config name with `--config [bot-custom-name].json`
 
 Supported bot names
+
 - `executor`
 - `challenger`
 
 ### Register keys
+
 ```bash
 opinitd keys add [chain-id] [key-name]
 ### with mnemonic file
