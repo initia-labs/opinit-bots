@@ -119,7 +119,12 @@ func (bs *BatchSubmitter) Initialize(ctx context.Context, startHeight uint64, ho
 		bs.DequeueBatchInfo()
 	}
 
-	fileFlag := os.O_CREATE | os.O_RDWR
+	fileFlag := os.O_CREATE | os.O_RDWR | os.O_APPEND
+	bs.batchFile, err = os.OpenFile(bs.homePath+"/batch", fileFlag, 0666)
+	if err != nil {
+		return err
+	}
+
 	if bs.node.HeightInitialized() {
 		bs.localBatchInfo.Start = bs.node.GetHeight()
 		bs.localBatchInfo.End = 0
@@ -129,14 +134,15 @@ func (bs *BatchSubmitter) Initialize(ctx context.Context, startHeight uint64, ho
 		if err != nil {
 			return err
 		}
-	} else {
-		// if the node has already processed blocks, append to the file
-		fileFlag |= os.O_APPEND
-	}
-
-	bs.batchFile, err = os.OpenFile(bs.homePath+"/batch", fileFlag, 0666)
-	if err != nil {
-		return err
+		// reset batch file
+		err := bs.batchFile.Truncate(0)
+		if err != nil {
+			return err
+		}
+		_, err = bs.batchFile.Seek(0, 0)
+		if err != nil {
+			return err
+		}
 	}
 	// linux command gzip use level 6 as default
 	bs.batchWriter, err = gzip.NewWriterLevel(bs.batchFile, 6)
@@ -160,6 +166,15 @@ func (bs *BatchSubmitter) SetDANode(da executortypes.DANode) error {
 func (bs *BatchSubmitter) Start(ctx context.Context) {
 	bs.logger.Info("batch start", zap.Uint64("height", bs.node.GetHeight()))
 	bs.node.Start(ctx)
+}
+
+func (bs *BatchSubmitter) Close() {
+	if bs.batchWriter != nil {
+		bs.batchWriter.Close()
+	}
+	if bs.batchFile != nil {
+		bs.batchFile.Close()
+	}
 }
 
 func (bs *BatchSubmitter) SetBridgeInfo(bridgeInfo opchildtypes.BridgeInfo) {

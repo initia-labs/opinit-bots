@@ -143,6 +143,7 @@ func (ex *Executor) Start(ctx context.Context) error {
 }
 
 func (ex *Executor) Close() {
+	ex.batch.Close()
 	ex.db.Close()
 }
 
