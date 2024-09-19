@@ -509,7 +509,7 @@ func (c *baseRPCClient) RawCommit(ctx context.Context, height *int64) ([]byte, e
 	if height != nil {
 		params["height"] = height
 	}
-	_, err := c.caller.Call(ctx, "commit", params, result)
+	_, err := c.caller.Call(ctx, "raw_commit", params, result)
 	if err != nil {
 		return nil, err
 	}
