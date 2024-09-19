@@ -89,6 +89,7 @@ func (db *LevelDB) Close() error {
 // @dev: `LevelDB.prefix + prefix` is used as the prefix for the iteration.
 func (db *LevelDB) PrefixedIterate(prefix []byte, cb func(key, value []byte) (stop bool, err error)) error {
 	iter := db.db.NewIterator(util.BytesPrefix(db.PrefixedKey(prefix)), nil)
+	defer iter.Release()
 	for iter.Next() {
 		key := db.UnprefixedKey(iter.Key())
 		if stop, err := cb(key, iter.Value()); err != nil {
@@ -97,12 +98,12 @@ func (db *LevelDB) PrefixedIterate(prefix []byte, cb func(key, value []byte) (st
 			break
 		}
 	}
-	iter.Release()
 	return iter.Error()
 }
 
 func (db *LevelDB) PrefixedReverseIterate(prefix []byte, cb func(key, value []byte) (stop bool, err error)) error {
 	iter := db.db.NewIterator(util.BytesPrefix(db.PrefixedKey(prefix)), nil)
+	defer iter.Release()
 	if iter.Last() {
 		for {
 			key := db.UnprefixedKey(iter.Key())
@@ -117,7 +118,6 @@ func (db *LevelDB) PrefixedReverseIterate(prefix []byte, cb func(key, value []by
 			}
 		}
 	}
-	iter.Release()
 	return iter.Error()
 }
 
@@ -126,13 +126,13 @@ func (db *LevelDB) PrefixedReverseIterate(prefix []byte, cb func(key, value []by
 // @dev: `LevelDB.prefix + prefix` is used as the prefix for the iteration.
 func (db *LevelDB) SeekPrevInclusiveKey(prefix []byte, key []byte) (k []byte, v []byte, err error) {
 	iter := db.db.NewIterator(util.BytesPrefix(db.PrefixedKey(prefix)), nil)
+	defer iter.Release()
 	if iter.Seek(db.PrefixedKey(key)) || iter.Valid() && iter.Prev() || iter.Last() && iter.Valid() {
 		k = db.UnprefixedKey(iter.Key())
 		v = iter.Value()
 	} else {
 		err = dbtypes.ErrNotFound
 	}
-	iter.Release()
 	if iter.Error() != nil {
 		err = iter.Error()
 	}

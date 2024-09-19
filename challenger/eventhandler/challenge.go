@@ -36,6 +36,7 @@ func (ch *ChallengeEventHandler) CheckValue(events []challengertypes.ChallengeEv
 		}
 		processedEvents = append(processedEvents, pendingEvent)
 
+		// clearing pending oracle events up to l1 height of the last oracle event
 		if event.Type() == challengertypes.EventTypeOracle {
 			oracleEvents := ch.getOraclePendingEvents(event.Id().Id)
 			processedEvents = append(processedEvents, oracleEvents...)
@@ -48,8 +49,8 @@ func (ch *ChallengeEventHandler) CheckValue(events []challengertypes.ChallengeEv
 func (ch *ChallengeEventHandler) GetPrevPendingEvent(event challengertypes.ChallengeEvent) (challengertypes.ChallengeEvent, bool) {
 	prevId := event.Id()
 	prevId.Id--
-	prevOutputEvent, ok := ch.GetPendingEvent(prevId)
-	return prevOutputEvent, ok
+	prevEvent, ok := ch.GetPendingEvent(prevId)
+	return prevEvent, ok
 }
 
 func (ch *ChallengeEventHandler) CheckTimeout(blockTime time.Time, events []challengertypes.ChallengeEvent) ([]challengertypes.Challenge, []challengertypes.ChallengeEvent) {

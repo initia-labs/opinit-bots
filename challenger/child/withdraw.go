@@ -119,7 +119,7 @@ func (ch *Child) handleTree(blockHeight uint64, blockHeader cmtproto.Header) (kv
 	// panic if we passed the finalizing block height
 	// this must not happened
 	if ch.finalizingBlockHeight != 0 && ch.finalizingBlockHeight < blockHeight {
-		panic(fmt.Errorf("INVARIANT failed; handleTree expect to finalize tree at block `%d` but we got block `%d`", blockHeight-1, blockHeight))
+		panic(fmt.Errorf("INVARIANT failed; handleTree expect to finalize tree at block `%d` but we got block `%d`", ch.finalizingBlockHeight, blockHeight))
 	}
 
 	if ch.finalizingBlockHeight == blockHeight {
