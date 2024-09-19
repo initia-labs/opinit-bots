@@ -14,12 +14,11 @@ func (c *Celestia) payForBlobsHandler(_ context.Context, args nodetypes.EventHan
 
 	for _, attr := range args.EventAttributes {
 		switch attr.Key {
-		// signer
-		case "signer":
+		case "c2lnbmVy": // signer
 			signer = attr.Value
-		case "blob_sizes":
+		case "YmxvYl9zaXplcw==": // blob_sizes
 			blobSizes = attr.Value
-		case "namespaces":
+		case "bmFtZXNwYWNlcw==": // namespaces
 			namespaces = attr.Value
 		}
 	}
