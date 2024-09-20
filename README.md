@@ -73,3 +73,28 @@ To reset the bot database, use the following command:
 ```bash
 opinitd reset-db [bot-name]
 ```
+
+### Reset Node Heights
+
+To reset bot's all height info to 0, use the following command:
+
+```bash
+opinitd reset-heights [bot-name]
+```
+
+### Reset Node Height
+
+To reset bot's specific node height info to 0 , use the following command:
+
+```bash
+opinitd reset-height [bot-name] [node-type]
+
+Executor node types: 
+- host
+- child
+- batch
+
+Challenger node types: 
+- host
+- child
+```

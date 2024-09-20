@@ -49,8 +49,8 @@ func resetHeightsCmd(ctx *cmdContext) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "reset-heights [bot-name]",
 		Args:  cobra.ExactArgs(1),
-		Short: "Reset all bot's height info.",
-		Long: `Reset all bot's height info.
+		Short: "Reset bot's all height info.",
+		Long: `Reset bot's all height info.
 `,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			botType := bottypes.BotTypeFromString(args[0])
