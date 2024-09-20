@@ -67,7 +67,7 @@ func (b BaseHost) QueryLastOutput(ctx context.Context, bridgeId uint64) (*ophost
 	if err != nil {
 		return nil, err
 	}
-	if res.OutputProposals == nil || len(res.OutputProposals) == 0 {
+	if res == nil || res.OutputProposals == nil || len(res.OutputProposals) == 0 {
 		return nil, nil
 	}
 	return &res.OutputProposals[0], nil

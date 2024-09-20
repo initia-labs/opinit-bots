@@ -19,7 +19,7 @@ To ensure compatibility with the node version, check the following versions:
 
 | L1 Node | MiniMove | MiniWasm | MiniEVM | 
 | ------- | -------- | -------- | ------- | 
-| v0.4.7  | v0.4.1   | v0.4.1   |    -    | 
+| v0.4.9  | v0.4.2   | v0.4.2   |    -    | 
 
 ### Build and Configure
 
@@ -72,4 +72,29 @@ To reset the bot database, use the following command:
 
 ```bash
 opinitd reset-db [bot-name]
+```
+
+### Reset Node Heights
+
+To reset bot's all height info to 0, use the following command:
+
+```bash
+opinitd reset-heights [bot-name]
+```
+
+### Reset Node Height
+
+To reset bot's specific node height info to 0 , use the following command:
+
+```bash
+opinitd reset-height [bot-name] [node-type]
+
+Executor node types: 
+- host
+- child
+- batch
+
+Challenger node types: 
+- host
+- child
 ```

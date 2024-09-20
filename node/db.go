@@ -19,6 +19,7 @@ func (n *Node) loadSyncInfo(startHeight uint64) error {
 	if err == dbtypes.ErrNotFound {
 		n.SetSyncInfo(startHeight)
 		n.startHeightInitialized = true
+		n.logger.Info("initialize sync info", zap.Uint64("start_height", startHeight+1))
 		return nil
 	} else if err != nil {
 		return err
@@ -44,4 +45,12 @@ func (n Node) SyncInfoToRawKV(height uint64) types.RawKV {
 		Key:   n.db.PrefixedKey(nodetypes.LastProcessedBlockHeightKey),
 		Value: dbtypes.FromUint64(height),
 	}
+}
+
+func (n Node) DeleteSyncInfo() error {
+	return n.db.Delete(nodetypes.LastProcessedBlockHeightKey)
+}
+
+func DeleteSyncInfo(db types.DB) error {
+	return db.Delete(nodetypes.LastProcessedBlockHeightKey)
 }

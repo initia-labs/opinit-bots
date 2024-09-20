@@ -55,7 +55,7 @@ type BatchSubmitter struct {
 	LastBatchEndBlockNumber uint64
 }
 
-func NewBatchSubmitterV0(
+func NewBatchSubmitterV1(
 	cfg nodetypes.NodeConfig,
 	batchCfg executortypes.BatchConfig,
 	db types.DB, logger *zap.Logger,
@@ -74,7 +74,7 @@ func NewBatchSubmitterV0(
 	}
 
 	ch := &BatchSubmitter{
-		version: 0,
+		version: 1,
 
 		node: node,
 
@@ -187,4 +187,8 @@ func (bs *BatchSubmitter) ChainID() string {
 
 func (bs *BatchSubmitter) DA() executortypes.DANode {
 	return bs.da
+}
+
+func (bs BatchSubmitter) Node() *node.Node {
+	return bs.node
 }

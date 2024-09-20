@@ -89,13 +89,29 @@ func GetCodec(bech32Prefix string) (codec.Codec, client.TxConfig, error) {
 	})
 }
 
-func (b *BaseChild) Initialize(ctx context.Context, startHeight uint64, startOutputIndex uint64, bridgeInfo opchildtypes.BridgeInfo) error {
+func (b *BaseChild) Initialize(ctx context.Context, startHeight uint64, startOutputIndex uint64, bridgeInfo opchildtypes.BridgeInfo) (uint64, error) {
 	err := b.node.Initialize(ctx, startHeight)
 	if err != nil {
-		return err
+		return 0, err
 	}
 
+	var l2Sequence uint64
 	if b.node.HeightInitialized() && startOutputIndex != 0 {
+		l2Sequence, err = b.QueryNextL2Sequence(ctx, startHeight)
+		if err != nil {
+			return 0, err
+		}
+
+		err = b.mk.DeleteFutureFinalizedTrees(l2Sequence)
+		if err != nil {
+			return 0, err
+		}
+
+		err = b.mk.DeleteFutureWorkingTrees(startHeight + 1)
+		if err != nil {
+			return 0, err
+		}
+
 		b.initializeTreeFn = func(blockHeight uint64) (bool, error) {
 			if startHeight+1 == blockHeight {
 				b.logger.Info("initialize tree", zap.Uint64("index", startOutputIndex))
@@ -109,7 +125,7 @@ func (b *BaseChild) Initialize(ctx context.Context, startHeight uint64, startOut
 		}
 	}
 	b.SetBridgeInfo(bridgeInfo)
-	return nil
+	return l2Sequence, nil
 }
 
 func (b *BaseChild) Start(ctx context.Context) {

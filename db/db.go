@@ -161,3 +161,11 @@ func (db LevelDB) UnprefixedKey(key []byte) []byte {
 func (db LevelDB) GetPath() string {
 	return db.path
 }
+
+func (db LevelDB) GetPrefix() []byte {
+	splits := bytes.Split(db.prefix, []byte{dbtypes.Splitter})
+	if len(splits) == 0 {
+		return nil
+	}
+	return splits[len(splits)-1]
+}

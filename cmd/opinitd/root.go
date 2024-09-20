@@ -46,6 +46,8 @@ func NewRootCmd() *cobra.Command {
 		startCmd(ctx),
 		keysCmd(ctx),
 		resetDBCmd(ctx),
+		resetHeightsCmd(ctx),
+		resetHeightCmd(ctx),
 		version.NewVersionCommand(),
 	)
 	return rootCmd

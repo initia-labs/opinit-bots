@@ -59,10 +59,17 @@ func NewChildV1(
 }
 
 func (ch *Child) Initialize(ctx context.Context, startHeight uint64, startOutputIndex uint64, host hostNode, bridgeInfo opchildtypes.BridgeInfo) error {
-	err := ch.BaseChild.Initialize(ctx, startHeight, startOutputIndex, bridgeInfo)
+	l2Sequence, err := ch.BaseChild.Initialize(ctx, startHeight, startOutputIndex, bridgeInfo)
 	if err != nil {
 		return err
 	}
+	if l2Sequence != 0 {
+		err = ch.DeleteFutureWithdrawals(l2Sequence)
+		if err != nil {
+			return err
+		}
+	}
+
 	ch.host = host
 	ch.registerHandlers()
 	return nil
