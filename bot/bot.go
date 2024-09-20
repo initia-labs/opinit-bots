@@ -42,7 +42,7 @@ func NewBot(botType bottypes.BotType, logger *zap.Logger, homePath string, confi
 		return nil, err
 	}
 
-	db, err := db.NewDB(getDBPath(homePath, botType))
+	db, err := db.NewDB(GetDBPath(homePath, botType))
 	if err != nil {
 		return nil, err
 	}
@@ -67,6 +67,6 @@ func NewBot(botType bottypes.BotType, logger *zap.Logger, homePath string, confi
 	return nil, errors.New("not providing bot name")
 }
 
-func getDBPath(homePath string, botName bottypes.BotType) string {
+func GetDBPath(homePath string, botName bottypes.BotType) string {
 	return fmt.Sprintf(homePath+"/%s.db", botName)
 }

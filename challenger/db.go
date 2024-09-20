@@ -1,10 +1,13 @@
 package challenger
 
 import (
+	"fmt"
 	"slices"
 
 	challengertypes "github.com/initia-labs/opinit-bots/challenger/types"
+	"github.com/initia-labs/opinit-bots/node"
 	"github.com/initia-labs/opinit-bots/types"
+	"github.com/pkg/errors"
 )
 
 func (c *Challenger) PendingChallengeToRawKVs(challenges []challengertypes.Challenge, delete bool) ([]types.RawKV, error) {
@@ -79,4 +82,33 @@ func (c *Challenger) loadChallenges() (challenges []challengertypes.Challenge, e
 	}
 	slices.Reverse(challenges)
 	return
+}
+
+func ResetHeights(db types.DB) error {
+	dbs := []types.DB{
+		db.WithPrefix([]byte(types.HostName)),
+		db.WithPrefix([]byte(types.ChildName)),
+	}
+
+	for _, db := range dbs {
+		if err := node.DeleteSyncInfo(db); err != nil {
+			return err
+		}
+		fmt.Printf("reset height to 0 for node %s\n", string(db.GetPrefix()))
+	}
+	return nil
+}
+
+func ResetHeight(db types.DB, nodeName string) error {
+	if nodeName != types.HostName &&
+		nodeName != types.ChildName {
+		return errors.New("unknown node name")
+	}
+	nodeDB := db.WithPrefix([]byte(nodeName))
+	err := node.DeleteSyncInfo(nodeDB)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("reset height to 0 for node %s\n", string(nodeDB.GetPrefix()))
+	return nil
 }

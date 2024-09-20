@@ -26,4 +26,5 @@ type DB interface {
 	PrefixedKey([]byte) []byte
 	UnprefixedKey([]byte) []byte
 	GetPath() string
+	GetPrefix() []byte
 }

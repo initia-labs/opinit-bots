@@ -58,7 +58,7 @@ func NewExecutor(cfg *executortypes.Config, db types.DB, sv *server.Server, logg
 			db.WithPrefix([]byte(types.ChildName)),
 			logger.Named(types.ChildName), cfg.L2Node.Bech32Prefix,
 		),
-		batch: batch.NewBatchSubmitterV0(
+		batch: batch.NewBatchSubmitterV1(
 			cfg.L2NodeConfig(homePath),
 			cfg.BatchConfig(), db.WithPrefix([]byte(types.BatchName)),
 			logger.Named(types.BatchName), cfg.L2Node.ChainID, homePath,
