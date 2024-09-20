@@ -190,3 +190,16 @@ func (ch *Child) SetWithdrawal(sequence uint64, data executortypes.WithdrawalDat
 
 	return ch.DB().Set(executortypes.PrefixedWithdrawalKey(sequence), dataBytes)
 }
+
+func (ch *Child) DeleteFutureWithdrawals(fromSequence uint64) error {
+	return ch.DB().PrefixedIterate(executortypes.WithdrawalKey, func(key, _ []byte) (bool, error) {
+		sequence := dbtypes.ToUint64Key(key[len(key)-8:])
+		if sequence >= fromSequence {
+			err := ch.DB().Delete(key)
+			if err != nil {
+				return true, err
+			}
+		}
+		return false, nil
+	})
+}

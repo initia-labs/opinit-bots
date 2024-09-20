@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"math/bits"
 
+	dbtypes "github.com/initia-labs/opinit-bots/db/types"
 	merkletypes "github.com/initia-labs/opinit-bots/merkle/types"
 	types "github.com/initia-labs/opinit-bots/types"
 )
@@ -111,6 +112,32 @@ func (m *Merkle) FinalizeWorkingTree(extraData []byte) ([]types.RawKV, []byte /*
 	}}
 
 	return kvs, treeRootHash, err
+}
+
+func (m *Merkle) DeleteFutureFinalizedTrees(fromSequence uint64) error {
+	return m.db.PrefixedIterate(merkletypes.FinalizedTreeKey, func(key, _ []byte) (bool, error) {
+		sequence := dbtypes.ToUint64Key(key[len(key)-8:])
+		if sequence >= fromSequence {
+			err := m.db.Delete(key)
+			if err != nil {
+				return true, err
+			}
+		}
+		return false, nil
+	})
+}
+
+func (m *Merkle) DeleteFutureWorkingTrees(fromVersion uint64) error {
+	return m.db.PrefixedIterate(merkletypes.WorkingTreeKey, func(key, _ []byte) (bool, error) {
+		version := dbtypes.ToUint64Key(key[len(key)-8:])
+		if version >= fromVersion {
+			err := m.db.Delete(key)
+			if err != nil {
+				return true, err
+			}
+		}
+		return false, nil
+	})
 }
 
 // LoadWorkingTree loads the working tree from the database.
