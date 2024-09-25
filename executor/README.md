@@ -208,7 +208,7 @@ type QueryWithdrawalResponse struct {
  LatestBlockHash  []byte   `json:"latest_block_hash"`
 
  // extra info
- BlockNumber    uint64 `json:"block_number"`
+ BlockNumber    int64 `json:"block_number"`
  Receiver       string `json:"receiver"`
  WithdrawalHash []byte `json:"withdrawal_hash"`
 }
@@ -380,7 +380,7 @@ type QueryWithdrawalResponse struct {
  LatestBlockHash  []byte   `json:"latest_block_hash"`
 
  // extra info
- BlockNumber    uint64 `json:"block_number"`
+ BlockNumber    int64 `json:"block_number"`
  Receiver       string `json:"receiver"`
  WithdrawalHash []byte `json:"withdrawal_hash"`
 }
