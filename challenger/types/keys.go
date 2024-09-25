@@ -4,6 +4,7 @@ import (
 	"time"
 
 	dbtypes "github.com/initia-labs/opinit-bots/db/types"
+	"github.com/initia-labs/opinit-bots/types"
 	"github.com/pkg/errors"
 )
 
@@ -34,7 +35,7 @@ func PrefixedPendingChallenge(id ChallengeId) []byte {
 }
 
 func PrefixedTimeEventTypeId(eventTime time.Time, id ChallengeId) []byte {
-	return append(append(dbtypes.FromUint64Key(uint64(eventTime.UnixNano())), dbtypes.Splitter),
+	return append(append(dbtypes.FromUint64Key(types.MustInt64ToUint64(eventTime.UnixNano())), dbtypes.Splitter),
 		PrefixedEventTypeId(id.Type, id.Id)...)
 }
 

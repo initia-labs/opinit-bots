@@ -80,14 +80,14 @@ func (bs *BatchSubmitter) rawBlockHandler(ctx context.Context, args nodetypes.Ra
 	return nil
 }
 
-func (bs *BatchSubmitter) prepareBatch(blockHeight uint64) error {
+func (bs *BatchSubmitter) prepareBatch(blockHeight int64) error {
 	err := bs.loadLocalBatchInfo()
 	if err != nil {
 		return err
 	}
 
 	// check whether the requested block height is reached to the l2 block number of the next batch info.
-	if nextBatchInfo := bs.NextBatchInfo(); nextBatchInfo != nil && nextBatchInfo.Output.L2BlockNumber < blockHeight {
+	if nextBatchInfo := bs.NextBatchInfo(); nextBatchInfo != nil && types.MustUint64ToInt64(nextBatchInfo.Output.L2BlockNumber) < blockHeight {
 		// if the next batch info is reached, finalize the current batch and update the batch info.
 		if bs.batchWriter != nil {
 			err := bs.batchWriter.Close()
@@ -105,11 +105,11 @@ func (bs *BatchSubmitter) prepareBatch(blockHeight uint64) error {
 		}
 
 		// save sync info
-		err = bs.node.SaveSyncInfo(nextBatchInfo.Output.L2BlockNumber)
+		err = bs.node.SaveSyncInfo(types.MustUint64ToInt64(nextBatchInfo.Output.L2BlockNumber))
 		if err != nil {
 			return errors.Wrap(err, "failed to save sync info")
 		}
-		bs.localBatchInfo.Start = nextBatchInfo.Output.L2BlockNumber + 1
+		bs.localBatchInfo.Start = types.MustUint64ToInt64(nextBatchInfo.Output.L2BlockNumber) + 1
 		bs.localBatchInfo.End = 0
 		bs.localBatchInfo.BatchFileSize = 0
 		err = bs.saveLocalBatchInfo()
@@ -117,7 +117,7 @@ func (bs *BatchSubmitter) prepareBatch(blockHeight uint64) error {
 			return err
 		}
 		// set last processed block height to l2 block number
-		bs.node.SetSyncInfo(nextBatchInfo.Output.L2BlockNumber)
+		bs.node.SetSyncInfo(types.MustUint64ToInt64(nextBatchInfo.Output.L2BlockNumber))
 		bs.DequeueBatchInfo()
 
 		// error will restart block process from nextBatchInfo.Output.L2BlockNumber + 1
@@ -150,9 +150,9 @@ func (bs *BatchSubmitter) handleBatch(blockBytes []byte) (int, error) {
 }
 
 // finalize batch and create batch messages
-func (bs *BatchSubmitter) finalizeBatch(ctx context.Context, blockHeight uint64) error {
+func (bs *BatchSubmitter) finalizeBatch(ctx context.Context, blockHeight int64) error {
 	// write last block's commit to batch file
-	rawCommit, err := bs.node.GetRPCClient().QueryRawCommit(ctx, int64(blockHeight))
+	rawCommit, err := bs.node.GetRPCClient().QueryRawCommit(ctx, blockHeight)
 	if err != nil {
 		return errors.Wrap(err, "failed to query raw commit")
 	}
@@ -189,15 +189,15 @@ func (bs *BatchSubmitter) finalizeBatch(ctx context.Context, blockHeight uint64)
 
 		checksum := executortypes.GetChecksumFromChunk(chunk)
 		checksums = append(checksums, checksum[:])
-		if uint64(readLength) < bs.batchCfg.MaxChunkSize {
+		if int64(readLength) < bs.batchCfg.MaxChunkSize {
 			break
 		}
 		offset += int64(readLength)
 	}
 
 	headerData := executortypes.MarshalBatchDataHeader(
-		bs.localBatchInfo.Start,
-		bs.localBatchInfo.End,
+		types.MustInt64ToUint64(bs.localBatchInfo.Start),
+		types.MustInt64ToUint64(bs.localBatchInfo.End),
 		checksums,
 	)
 
@@ -213,10 +213,10 @@ func (bs *BatchSubmitter) finalizeBatch(ctx context.Context, blockHeight uint64)
 
 	for i, chunk := range chunks {
 		chunkData := executortypes.MarshalBatchDataChunk(
-			bs.localBatchInfo.Start,
-			bs.localBatchInfo.End,
-			uint64(i),
-			uint64(len(checksums)),
+			types.MustInt64ToUint64(bs.localBatchInfo.Start),
+			types.MustInt64ToUint64(bs.localBatchInfo.End),
+			types.MustInt64ToUint64(int64(i)),
+			types.MustInt64ToUint64(int64(len(checksums))),
 			chunk,
 		)
 		msg, err := bs.da.CreateBatchMsg(chunkData)
@@ -231,30 +231,30 @@ func (bs *BatchSubmitter) finalizeBatch(ctx context.Context, blockHeight uint64)
 	}
 
 	bs.logger.Info("finalize batch",
-		zap.Uint64("height", blockHeight),
-		zap.Uint64("batch start", bs.localBatchInfo.Start),
-		zap.Uint64("batch end", bs.localBatchInfo.End),
-		zap.Uint64("batch file size ", uint64(bs.localBatchInfo.BatchFileSize)),
+		zap.Int64("height", blockHeight),
+		zap.Int64("batch start", bs.localBatchInfo.Start),
+		zap.Int64("batch end", bs.localBatchInfo.End),
+		zap.Int64("batch file size ", bs.localBatchInfo.BatchFileSize),
 		zap.Int("chunks", len(checksums)),
 		zap.Int("txs", len(bs.processedMsgs)),
 	)
 	return nil
 }
 
-func (bs *BatchSubmitter) checkBatch(ctx context.Context, blockHeight uint64, latestHeight uint64, blockTime time.Time) error {
+func (bs *BatchSubmitter) checkBatch(ctx context.Context, blockHeight int64, latestHeight int64, blockTime time.Time) error {
 	fileSize, err := bs.batchFileSize(true)
 	if err != nil {
 		return err
 	}
-	bs.localBatchInfo.BatchFileSize = fileSize
 
+	bs.localBatchInfo.BatchFileSize = fileSize
 	// if the block time is after the last submission time + submission interval * 2/3
 	// or the block time is after the last submission time + max submission time
 	// or the batch file size is greater than (max chunks - 1) * max chunk size
 	// then finalize the batch
 	if (blockHeight == latestHeight && blockTime.After(bs.localBatchInfo.LastSubmissionTime.Add(bs.bridgeInfo.BridgeConfig.SubmissionInterval*2/3))) ||
 		(blockHeight == latestHeight && blockTime.After(bs.localBatchInfo.LastSubmissionTime.Add(time.Duration(bs.batchCfg.MaxSubmissionTime)*time.Second))) ||
-		uint64(fileSize) > (bs.batchCfg.MaxChunks-1)*bs.batchCfg.MaxChunkSize {
+		fileSize > (bs.batchCfg.MaxChunks-1)*bs.batchCfg.MaxChunkSize {
 
 		// finalize the batch
 		bs.LastBatchEndBlockNumber = blockHeight
@@ -288,12 +288,12 @@ func (bs *BatchSubmitter) batchFileSize(flush bool) (int64, error) {
 }
 
 // UpdateBatchInfo appends the batch info with the given chain, submitter, output index, and l2 block number
-func (bs *BatchSubmitter) UpdateBatchInfo(chain string, submitter string, outputIndex uint64, l2BlockNumber uint64) {
+func (bs *BatchSubmitter) UpdateBatchInfo(chain string, submitter string, outputIndex uint64, l2BlockNumber int64) {
 	bs.batchInfoMu.Lock()
 	defer bs.batchInfoMu.Unlock()
 
 	// check if the batch info is already updated
-	if bs.batchInfos[len(bs.batchInfos)-1].Output.L2BlockNumber >= l2BlockNumber {
+	if types.MustUint64ToInt64(bs.batchInfos[len(bs.batchInfos)-1].Output.L2BlockNumber) >= l2BlockNumber {
 		return
 	}
 
@@ -303,7 +303,7 @@ func (bs *BatchSubmitter) UpdateBatchInfo(chain string, submitter string, output
 			Submitter: submitter,
 		},
 		Output: ophosttypes.Output{
-			L2BlockNumber: l2BlockNumber,
+			L2BlockNumber: types.MustInt64ToUint64(l2BlockNumber),
 		},
 	})
 }

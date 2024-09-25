@@ -168,25 +168,25 @@ func GetHeightFromMetadata(md metadata.MD) (int64, error) {
 
 // Canceling this context releases resources associated with it, so code should
 // call cancel as soon as the operations running in this [Context] complete:
-func GetQueryContext(ctx context.Context, height uint64) (context.Context, context.CancelFunc) {
+func GetQueryContext(ctx context.Context, height int64) (context.Context, context.CancelFunc) {
 	// TODO: configurable timeout
 	timeout := 10 * time.Second
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 
-	strHeight := strconv.FormatUint(height, 10)
+	strHeight := strconv.FormatInt(height, 10)
 	ctx = metadata.AppendToOutgoingContext(ctx, grpctypes.GRPCBlockHeightHeader, strHeight)
 	return ctx, cancel
 }
 
 // QueryRawCommit queries the raw commit at a given height.
 func (q RPCClient) QueryRawCommit(ctx context.Context, height int64) ([]byte, error) {
-	ctx, cancel := GetQueryContext(ctx, uint64(height))
+	ctx, cancel := GetQueryContext(ctx, height)
 	defer cancel()
 	return q.RawCommit(ctx, &height)
 }
 
 // QueryBlockBulk queries blocks in bulk.
-func (q RPCClient) QueryBlockBulk(ctx context.Context, start uint64, end uint64) ([][]byte, error) {
+func (q RPCClient) QueryBlockBulk(ctx context.Context, start int64, end int64) ([][]byte, error) {
 	ctx, cancel := GetQueryContext(ctx, 0)
 	defer cancel()
 	return q.BlockBulk(ctx, &start, &end)

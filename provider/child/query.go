@@ -30,7 +30,7 @@ func (b BaseChild) QueryBridgeInfo(ctx context.Context) (opchildtypes.BridgeInfo
 	return res.BridgeInfo, nil
 }
 
-func (b BaseChild) QueryNextL1Sequence(ctx context.Context, height uint64) (uint64, error) {
+func (b BaseChild) QueryNextL1Sequence(ctx context.Context, height int64) (uint64, error) {
 	req := &opchildtypes.QueryNextL1SequenceRequest{}
 	ctx, cancel := rpcclient.GetQueryContext(ctx, height)
 	defer cancel()
@@ -42,7 +42,7 @@ func (b BaseChild) QueryNextL1Sequence(ctx context.Context, height uint64) (uint
 	return res.NextL1Sequence, nil
 }
 
-func (b BaseChild) QueryNextL2Sequence(ctx context.Context, height uint64) (uint64, error) {
+func (b BaseChild) QueryNextL2Sequence(ctx context.Context, height int64) (uint64, error) {
 	req := &opchildtypes.QueryNextL2SequenceRequest{}
 	ctx, cancel := rpcclient.GetQueryContext(ctx, height)
 	defer cancel()

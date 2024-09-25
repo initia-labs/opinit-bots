@@ -9,13 +9,13 @@ import (
 
 type Status struct {
 	Node                              nodetypes.Status `json:"node"`
-	LastUpdatedOracleL1Height         uint64           `json:"last_updated_oracle_height"`
-	LastFinalizedDepositL1BlockHeight uint64           `json:"last_finalized_deposit_l1_block_height"`
+	LastUpdatedOracleL1Height         int64            `json:"last_updated_oracle_height"`
+	LastFinalizedDepositL1BlockHeight int64            `json:"last_finalized_deposit_l1_block_height"`
 	LastFinalizedDepositL1Sequence    uint64           `json:"last_finalized_deposit_l1_sequence"`
 	LastWithdrawalL2Sequence          uint64           `json:"last_withdrawal_l2_sequence"`
 	WorkingTreeIndex                  uint64           `json:"working_tree_index"`
 
-	FinalizingBlockHeight    uint64    `json:"finalizing_block_height"`
+	FinalizingBlockHeight    int64     `json:"finalizing_block_height"`
 	LastOutputSubmissionTime time.Time `json:"last_output_submission_time"`
 	NextOutputSubmissionTime time.Time `json:"next_output_submission_time"`
 

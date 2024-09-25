@@ -12,7 +12,7 @@ import (
 )
 
 func (ch *Child) beginBlockHandler(ctx context.Context, args nodetypes.BeginBlockArgs) (err error) {
-	blockHeight := uint64(args.Block.Header.Height)
+	blockHeight := args.Block.Header.Height
 	ch.eventQueue = ch.eventQueue[:0]
 
 	err = ch.prepareTree(blockHeight)
@@ -28,7 +28,7 @@ func (ch *Child) beginBlockHandler(ctx context.Context, args nodetypes.BeginBloc
 }
 
 func (ch *Child) endBlockHandler(_ context.Context, args nodetypes.EndBlockArgs) error {
-	blockHeight := uint64(args.Block.Header.Height)
+	blockHeight := args.Block.Header.Height
 	batchKVs := make([]types.RawKV, 0)
 	pendingChallenges := make([]challengertypes.Challenge, 0)
 
@@ -109,6 +109,6 @@ func (ch *Child) txHandler(_ context.Context, args nodetypes.TxHandlerArgs) erro
 	if !ok {
 		return nil
 	}
-	ch.oracleTxHandler(args.BlockTime, msg.Sender, msg.Height, msg.Data)
+	ch.oracleTxHandler(args.BlockTime, msg.Sender, types.MustUint64ToInt64(msg.Height), msg.Data)
 	return nil
 }

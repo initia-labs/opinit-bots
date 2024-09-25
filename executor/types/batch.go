@@ -25,9 +25,9 @@ type DANode interface {
 
 type LocalBatchInfo struct {
 	// start l2 block height which is included in the batch
-	Start uint64 `json:"start"`
+	Start int64 `json:"start"`
 	// last l2 block height which is included in the batch
-	End uint64 `json:"end"`
+	End int64 `json:"end"`
 
 	LastSubmissionTime time.Time `json:"last_submission_time"`
 	BatchFileSize      int64     `json:"batch_size"`
@@ -86,7 +86,12 @@ func UnmarshalBatchDataHeader(data []byte) (BatchDataHeader, error) {
 	}
 
 	length := binary.BigEndian.Uint64(data[17:25])
-	if (len(data)-25)%32 != 0 || (uint64(len(data)-25)/32) != length {
+	expectedLength, err := types.SafeInt64ToUint64(int64(len(data)-25) / 32)
+	if err != nil {
+		return BatchDataHeader{}, err
+	}
+
+	if expectedLength != 0 || expectedLength != length {
 		err := fmt.Errorf("invalid checksum length: %d, data length: %d", length, len(data)-25)
 		return BatchDataHeader{}, err
 	}

@@ -21,9 +21,9 @@ func (ch *Child) finalizeDepositHandler(_ context.Context, args nodetypes.EventH
 	return nil
 }
 
-func (ch *Child) handleFinalizeDeposit(l1BlockHeight uint64, l1Sequence uint64, from string, to string, amount sdk.Coin, baseDenom string) {
+func (ch *Child) handleFinalizeDeposit(l1BlockHeight int64, l1Sequence uint64, from string, to string, amount sdk.Coin, baseDenom string) {
 	ch.Logger().Info("finalize token deposit",
-		zap.Uint64("l1_blockHeight", l1BlockHeight),
+		zap.Int64("l1_blockHeight", l1BlockHeight),
 		zap.Uint64("l1_sequence", l1Sequence),
 		zap.String("from", from),
 		zap.String("to", to),
