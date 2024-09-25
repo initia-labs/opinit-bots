@@ -13,11 +13,8 @@ RUN make install
 
 FROM alpine:latest
 
-WORKDIR /root
-
 COPY --from=builder /go/bin/opinitd /usr/local/bin/
 
-COPY ./entrypoint.sh .
-RUN chmod +x ./entrypoint.sh
+COPY --chmod=755 ./entrypoint.sh /usr/local/bin
 
-ENTRYPOINT ["/bin/sh", "/root/entrypoint.sh"]
+ENTRYPOINT ["entrypoint.sh"]
