@@ -23,9 +23,7 @@ concurrency:
 jobs:
   golangci:
     env:
-      GOPRIVATE: github.com/initia-labs
-      GITHUB_ACCESS_TOKEN: ${{ secrets.GH_READ_TOKEN }}
-      GOLANGCI_LINT_VERSION: v1.59.1
+      GOLANGCI_LINT_VERSION: v1.61.0
     name: golangci-lint
     runs-on: ubuntu-latest
     steps:
@@ -41,7 +39,6 @@ jobs:
             **/**.go
             go.mod
             go.sum
-      - run: git config --global url.https://${GITHUB_ACCESS_TOKEN}:x-oauth-basic@github.com/.insteadOf https://github.com/
       # install golangci-lint
       - run: go install github.com/golangci/golangci-lint/cmd/golangci-lint@${GOLANGCI_LINT_VERSION}
       - name: run go linters (long)
@@ -68,10 +65,6 @@ jobs:
   # Use --check or --exit-code when available (Go 1.19?)
   # https://github.com/golang/go/issues/27005
   tidy:
-    env:
-      # for private repo access
-      GOPRIVATE: github.com/initia-labs,github.com/skip-mev/slinky
-      GITHUB_ACCESS_TOKEN: ${{ secrets.GH_READ_TOKEN }}
     runs-on: ubuntu-latest
     name: tidy
     steps:
@@ -81,7 +74,6 @@ jobs:
         with:
           go-version: 1.22
           check-latest: true
-      - run: git config --global url.https://${GITHUB_ACCESS_TOKEN}:x-oauth-basic@github.com/.insteadOf https://github.com/
       - run: |
           go mod tidy
           CHANGES_IN_REPO=$(git status --porcelain)
