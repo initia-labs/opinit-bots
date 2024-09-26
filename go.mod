@@ -7,7 +7,7 @@ require (
 	github.com/cometbft/cometbft v0.38.12
 	github.com/cosmos/cosmos-sdk v0.50.9
 	github.com/gofiber/fiber/v2 v2.52.5
-	github.com/initia-labs/OPinit v0.5.1
+	github.com/initia-labs/OPinit v0.5.2
 	github.com/pkg/errors v0.9.1
 	github.com/spf13/cobra v1.8.1
 	github.com/spf13/viper v1.19.0
