@@ -134,21 +134,19 @@ func (n *Node) Start(ctx context.Context) {
 	}
 
 	if n.cfg.ProcessType == nodetypes.PROCESS_TYPE_ONLY_BROADCAST {
-		if n.broadcaster == nil {
-			panic("broadcaster cannot be nil with nodetypes.PROCESS_TYPE_ONLY_BROADCAST")
+		if n.broadcaster != nil {
+			errGrp.Go(func() (err error) {
+				defer func() {
+					n.logger.Info("tx checker looper stopped")
+					if r := recover(); r != nil {
+						n.logger.Error("tx checker panic", zap.Any("recover", r))
+						err = fmt.Errorf("tx checker panic: %v", r)
+					}
+				}()
+
+				return n.txChecker(ctx)
+			})
 		}
-
-		errGrp.Go(func() (err error) {
-			defer func() {
-				n.logger.Info("tx checker looper stopped")
-				if r := recover(); r != nil {
-					n.logger.Error("tx checker panic", zap.Any("recover", r))
-					err = fmt.Errorf("tx checker panic: %v", r)
-				}
-			}()
-
-			return n.txChecker(ctx)
-		})
 	} else {
 		errGrp.Go(func() (err error) {
 			defer func() {
@@ -182,7 +180,7 @@ func (n Node) HasBroadcaster() bool {
 
 func (n Node) GetBroadcaster() (*broadcaster.Broadcaster, error) {
 	if n.broadcaster == nil {
-		return nil, errors.New("cannot get broadcaster without broadcaster")
+		return nil, types.ErrKeyNotSet
 	}
 
 	return n.broadcaster, nil

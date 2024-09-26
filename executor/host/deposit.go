@@ -37,9 +37,9 @@ func (h *Host) initiateDepositHandler(_ context.Context, args nodetypes.EventHan
 	)
 	if err != nil {
 		return err
+	} else if msg != nil {
+		h.AppendMsgQueue(msg)
 	}
-
-	h.AppendMsgQueue(msg)
 	return nil
 }
 

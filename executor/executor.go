@@ -179,10 +179,19 @@ func (ex *Executor) makeDANode(ctx context.Context, bridgeInfo opchildtypes.Brid
 			ex.logger.Named(types.DAHostName),
 			ex.cfg.DANode.Bech32Prefix, batchInfo.BatchInfo.Submitter,
 		)
-		if ex.host.GetAddress().Equals(da.GetAddress()) {
-			return ex.host, nil
+		daAddr, err := da.GetAddress()
+		if err != nil && !errors.Is(err, types.ErrKeyNotSet) {
+			return nil, err
 		}
-		err := da.InitializeDA(ctx, bridgeInfo)
+
+		hostAddr, err := ex.host.GetAddress()
+		if err == nil && hostAddr.Equals(daAddr) {
+			return ex.host, nil
+		} else if err != nil && !errors.Is(err, types.ErrKeyNotSet) {
+			return nil, err
+		}
+
+		err = da.InitializeDA(ctx, bridgeInfo)
 		return da, err
 	case ophosttypes.BatchInfo_CHAIN_TYPE_CELESTIA:
 		da := celestia.NewDACelestia(ex.cfg.Version, ex.cfg.DANodeConfig(ex.homePath),

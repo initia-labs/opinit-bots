@@ -56,6 +56,10 @@ type Config struct {
 	// If you don't want to use the bridge executor feature, you can leave it empty.
 	BridgeExecutor string `json:"bridge_executor"`
 
+	// EnableBatchSubmitter is the flag to enable the batch submitter.
+	// If it is false, the batch submitter will not be started.
+	EnableBatchSubmitter bool `json:"enable_batch_submitter"`
+
 	// MaxChunks is the maximum number of chunks in a batch.
 	MaxChunks int64 `json:"max_chunks"`
 	// MaxChunkSize is the maximum size of a chunk in a batch.
@@ -105,8 +109,9 @@ func DefaultConfig() *Config {
 			TxTimeout:     60,
 		},
 
-		OutputSubmitter: "",
-		BridgeExecutor:  "",
+		OutputSubmitter:      "",
+		BridgeExecutor:       "",
+		EnableBatchSubmitter: true,
 
 		MaxChunks:         5000,
 		MaxChunkSize:      300000,  // 300KB
@@ -214,7 +219,10 @@ func (cfg Config) DANodeConfig(homePath string) nodetypes.NodeConfig {
 	nc := nodetypes.NodeConfig{
 		RPC:         cfg.DANode.RPCAddress,
 		ProcessType: nodetypes.PROCESS_TYPE_ONLY_BROADCAST,
-		BroadcasterConfig: &btypes.BroadcasterConfig{
+	}
+
+	if cfg.EnableBatchSubmitter {
+		nc.BroadcasterConfig = &btypes.BroadcasterConfig{
 			ChainID:       cfg.DANode.ChainID,
 			GasPrice:      cfg.DANode.GasPrice,
 			GasAdjustment: cfg.DANode.GasAdjustment,
@@ -223,9 +231,8 @@ func (cfg Config) DANodeConfig(homePath string) nodetypes.NodeConfig {
 			KeyringConfig: btypes.KeyringConfig{
 				HomePath: homePath,
 			},
-		},
+		}
 	}
-
 	return nc
 }
 

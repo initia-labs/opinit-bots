@@ -17,12 +17,20 @@ import (
 	"github.com/initia-labs/opinit-bots/types"
 )
 
-func (b BaseHost) GetAddress() sdk.AccAddress {
-	return b.node.MustGetBroadcaster().GetAddress()
+func (b BaseHost) GetAddress() (sdk.AccAddress, error) {
+	broadcaster, err := b.node.GetBroadcaster()
+	if err != nil {
+		return nil, err
+	}
+	return broadcaster.GetAddress(), nil
 }
 
 func (b BaseHost) GetAddressStr() (string, error) {
-	return b.node.MustGetBroadcaster().GetAddressString()
+	broadcaster, err := b.node.GetBroadcaster()
+	if err != nil {
+		return "", err
+	}
+	return broadcaster.GetAddressString()
 }
 
 func (b BaseHost) QueryBridgeConfig(ctx context.Context, bridgeId uint64) (*ophosttypes.QueryBridgeResponse, error) {

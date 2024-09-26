@@ -166,8 +166,9 @@ func (ch *Child) handleOutput(blockHeight int64, version uint8, blockId []byte, 
 	)
 	if err != nil {
 		return err
+	} else if msg != nil {
+		ch.AppendMsgQueue(msg)
 	}
-	ch.AppendMsgQueue(msg)
 	return nil
 }
 

@@ -52,7 +52,7 @@ func NewHostV1(
 	cfg nodetypes.NodeConfig,
 	db types.DB, logger *zap.Logger, bech32Prefix, batchSubmitter string,
 ) *Host {
-	if batchSubmitter != "" {
+	if cfg.BroadcasterConfig != nil && batchSubmitter != "" {
 		cfg.BroadcasterConfig.Bech32Prefix = bech32Prefix
 		cfg.BroadcasterConfig.KeyringConfig.Address = batchSubmitter
 	}

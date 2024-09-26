@@ -3,6 +3,7 @@ package celestia
 import (
 	"context"
 	"crypto/sha256"
+	"errors"
 
 	"go.uber.org/zap"
 
@@ -69,9 +70,11 @@ func NewDACelestia(
 		panic(err)
 	}
 
-	cfg.BroadcasterConfig.KeyringConfig.Address = batchSubmitter
-	cfg.BroadcasterConfig.BuildTxWithMessages = c.BuildTxWithMessages
-	cfg.BroadcasterConfig.PendingTxToProcessedMsgs = c.PendingTxToProcessedMsgs
+	if cfg.BroadcasterConfig != nil {
+		cfg.BroadcasterConfig.KeyringConfig.Address = batchSubmitter
+		cfg.BroadcasterConfig.BuildTxWithMessages = c.BuildTxWithMessages
+		cfg.BroadcasterConfig.PendingTxToProcessedMsgs = c.PendingTxToProcessedMsgs
+	}
 
 	node, err := node.NewNode(cfg, db, logger, appCodec, txConfig)
 	if err != nil {
@@ -141,8 +144,11 @@ func (c Celestia) GetHeight() int64 {
 }
 
 func (c Celestia) CreateBatchMsg(rawBlob []byte) (sdk.Msg, error) {
-	submitter, err := c.node.MustGetBroadcaster().GetAddressString()
+	submitter, err := c.GetAddressStr()
 	if err != nil {
+		if errors.Is(err, types.ErrKeyNotSet) {
+			return nil, nil
+		}
 		return nil, err
 	}
 	blob, err := sh.NewV0Blob(c.namespace, rawBlob)
@@ -183,4 +189,20 @@ func (c Celestia) CreateBatchMsg(rawBlob []byte) (sdk.Msg, error) {
 func (c Celestia) NamespaceID() []byte {
 	chainIDhash := sha256.Sum256([]byte(c.batch.ChainID()))
 	return chainIDhash[:10]
+}
+
+func (c Celestia) GetAddress() (sdk.AccAddress, error) {
+	broadcaster, err := c.node.GetBroadcaster()
+	if err != nil {
+		return nil, err
+	}
+	return broadcaster.GetAddress(), nil
+}
+
+func (c Celestia) GetAddressStr() (string, error) {
+	broadcaster, err := c.node.GetBroadcaster()
+	if err != nil {
+		return "", err
+	}
+	return broadcaster.GetAddressString()
 }
