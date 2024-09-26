@@ -73,12 +73,12 @@ func (ch *Child) handleInitiateWithdrawal(l2Sequence uint64, from string, to str
 	return nil
 }
 
-func (ch *Child) prepareTree(blockHeight uint64) error {
+func (ch *Child) prepareTree(blockHeight int64) error {
 	if ch.InitializeTree(blockHeight) {
 		return nil
 	}
 
-	err := ch.Merkle().LoadWorkingTree(blockHeight - 1)
+	err := ch.Merkle().LoadWorkingTree(types.MustInt64ToUint64(blockHeight - 1))
 	if err == dbtypes.ErrNotFound {
 		// must not happened
 		panic(fmt.Errorf("working tree not found at height: %d, current: %d", blockHeight-1, blockHeight))
@@ -110,12 +110,12 @@ func (ch *Child) prepareOutput(ctx context.Context) error {
 		return err
 	} else {
 		ch.nextOutputTime = output.OutputProposal.L1BlockTime
-		ch.finalizingBlockHeight = output.OutputProposal.L2BlockNumber
+		ch.finalizingBlockHeight = types.MustUint64ToInt64(output.OutputProposal.L2BlockNumber)
 	}
 	return nil
 }
 
-func (ch *Child) handleTree(blockHeight uint64, blockHeader cmtproto.Header) (kvs []types.RawKV, storageRoot []byte, err error) {
+func (ch *Child) handleTree(blockHeight int64, blockHeader cmtproto.Header) (kvs []types.RawKV, storageRoot []byte, err error) {
 	// panic if we passed the finalizing block height
 	// this must not happened
 	if ch.finalizingBlockHeight != 0 && ch.finalizingBlockHeight < blockHeight {
@@ -130,7 +130,7 @@ func (ch *Child) handleTree(blockHeight uint64, blockHeader cmtproto.Header) (kv
 
 		ch.Logger().Info("finalize working tree",
 			zap.Uint64("tree_index", ch.Merkle().GetWorkingTreeIndex()),
-			zap.Uint64("height", blockHeight),
+			zap.Int64("height", blockHeight),
 			zap.Uint64("num_leaves", ch.Merkle().GetWorkingTreeLeafCount()),
 			zap.String("storage_root", base64.StdEncoding.EncodeToString(storageRoot)),
 		)
@@ -139,7 +139,7 @@ func (ch *Child) handleTree(blockHeight uint64, blockHeader cmtproto.Header) (kv
 		ch.lastOutputTime = blockHeader.Time
 	}
 
-	err = ch.Merkle().SaveWorkingTree(blockHeight)
+	err = ch.Merkle().SaveWorkingTree(types.MustInt64ToUint64(blockHeight))
 	if err != nil {
 		return nil, nil, err
 	}
@@ -147,7 +147,7 @@ func (ch *Child) handleTree(blockHeight uint64, blockHeader cmtproto.Header) (kv
 	return kvs, storageRoot, nil
 }
 
-func (ch *Child) handleOutput(blockTime time.Time, blockHeight uint64, version uint8, blockId []byte, outputIndex uint64, storageRoot []byte) error {
+func (ch *Child) handleOutput(blockTime time.Time, blockHeight int64, version uint8, blockId []byte, outputIndex uint64, storageRoot []byte) error {
 	outputRoot := ophosttypes.GenerateOutputRoot(version, storageRoot, blockId)
 	output := challengertypes.NewOutput(blockHeight, outputIndex, outputRoot[:], blockTime)
 

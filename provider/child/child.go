@@ -30,7 +30,7 @@ type BaseChild struct {
 
 	bridgeInfo opchildtypes.BridgeInfo
 
-	initializeTreeFn func(uint64) (bool, error)
+	initializeTreeFn func(int64) (bool, error)
 
 	cfg    nodetypes.NodeConfig
 	db     types.DB
@@ -89,7 +89,7 @@ func GetCodec(bech32Prefix string) (codec.Codec, client.TxConfig, error) {
 	})
 }
 
-func (b *BaseChild) Initialize(ctx context.Context, startHeight uint64, startOutputIndex uint64, bridgeInfo opchildtypes.BridgeInfo) (uint64, error) {
+func (b *BaseChild) Initialize(ctx context.Context, startHeight int64, startOutputIndex uint64, bridgeInfo opchildtypes.BridgeInfo) (uint64, error) {
 	err := b.node.Initialize(ctx, startHeight)
 	if err != nil {
 		return 0, err
@@ -107,12 +107,13 @@ func (b *BaseChild) Initialize(ctx context.Context, startHeight uint64, startOut
 			return 0, err
 		}
 
-		err = b.mk.DeleteFutureWorkingTrees(startHeight + 1)
+		version := types.MustInt64ToUint64(startHeight)
+		err = b.mk.DeleteFutureWorkingTrees(version + 1)
 		if err != nil {
 			return 0, err
 		}
 
-		b.initializeTreeFn = func(blockHeight uint64) (bool, error) {
+		b.initializeTreeFn = func(blockHeight int64) (bool, error) {
 			if startHeight+1 == blockHeight {
 				b.logger.Info("initialize tree", zap.Uint64("index", startOutputIndex))
 				err := b.mk.InitializeWorkingTree(startOutputIndex, 1)
@@ -129,7 +130,7 @@ func (b *BaseChild) Initialize(ctx context.Context, startHeight uint64, startOut
 }
 
 func (b *BaseChild) Start(ctx context.Context) {
-	b.logger.Info("child start", zap.Uint64("height", b.Height()))
+	b.logger.Info("child start", zap.Int64("height", b.Height()))
 	b.node.Start(ctx)
 }
 
@@ -169,7 +170,7 @@ func (b BaseChild) BridgeInfo() opchildtypes.BridgeInfo {
 	return b.bridgeInfo
 }
 
-func (b BaseChild) Height() uint64 {
+func (b BaseChild) Height() int64 {
 	return b.node.GetHeight()
 }
 

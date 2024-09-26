@@ -10,7 +10,7 @@ import (
 )
 
 func (ch *Child) beginBlockHandler(ctx context.Context, args nodetypes.BeginBlockArgs) (err error) {
-	blockHeight := uint64(args.Block.Header.Height)
+	blockHeight := args.Block.Header.Height
 	ch.EmptyMsgQueue()
 	ch.EmptyProcessedMsgs()
 
@@ -27,7 +27,7 @@ func (ch *Child) beginBlockHandler(ctx context.Context, args nodetypes.BeginBloc
 }
 
 func (ch *Child) endBlockHandler(_ context.Context, args nodetypes.EndBlockArgs) error {
-	blockHeight := uint64(args.Block.Header.Height)
+	blockHeight := args.Block.Header.Height
 	batchKVs := make([]types.RawKV, 0)
 	treeKVs, storageRoot, err := ch.handleTree(blockHeight, args.LatestHeight, args.BlockID, args.Block.Header)
 	if err != nil {

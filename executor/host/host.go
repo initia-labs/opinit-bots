@@ -23,17 +23,14 @@ type childNode interface {
 	HasKey() bool
 	BroadcastMsgs(btypes.ProcessedMsgs)
 	ProcessedMsgsToRawKV([]btypes.ProcessedMsgs, bool) ([]types.RawKV, error)
-	QueryNextL1Sequence(context.Context, uint64) (uint64, error)
+	QueryNextL1Sequence(context.Context, int64) (uint64, error)
 
-	GetMsgFinalizeTokenDeposit(string, string, sdk.Coin, uint64, uint64, string, []byte) (sdk.Msg, error)
-	GetMsgUpdateOracle(
-		height uint64,
-		data []byte,
-	) (sdk.Msg, error)
+	GetMsgFinalizeTokenDeposit(string, string, sdk.Coin, uint64, int64, string, []byte) (sdk.Msg, error)
+	GetMsgUpdateOracle(int64, []byte) (sdk.Msg, error)
 }
 
 type batchNode interface {
-	UpdateBatchInfo(chain string, submitter string, outputIndex uint64, l2BlockNumber uint64)
+	UpdateBatchInfo(string, string, uint64, int64)
 }
 
 var _ executortypes.DANode = &Host{}
@@ -48,7 +45,7 @@ type Host struct {
 
 	// status info
 	lastProposedOutputIndex         uint64
-	lastProposedOutputL2BlockNumber uint64
+	lastProposedOutputL2BlockNumber int64
 }
 
 func NewHostV1(
@@ -64,7 +61,7 @@ func NewHostV1(
 	}
 }
 
-func (h *Host) Initialize(ctx context.Context, startHeight uint64, child childNode, batch batchNode, bridgeInfo opchildtypes.BridgeInfo) error {
+func (h *Host) Initialize(ctx context.Context, startHeight int64, child childNode, batch batchNode, bridgeInfo opchildtypes.BridgeInfo) error {
 	err := h.BaseHost.Initialize(ctx, startHeight, bridgeInfo)
 	if err != nil {
 		return err

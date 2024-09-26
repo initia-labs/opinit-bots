@@ -2,6 +2,7 @@ package child
 
 import (
 	opchildtypes "github.com/initia-labs/OPinit/x/opchild/types"
+	"github.com/initia-labs/opinit-bots/types"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 )
@@ -30,7 +31,7 @@ func (b BaseChild) GetMsgFinalizeTokenDeposit(
 	to string,
 	coin sdk.Coin,
 	l1Sequence uint64,
-	blockHeight uint64,
+	blockHeight int64,
 	l1Denom string,
 	data []byte,
 ) (sdk.Msg, error) {
@@ -45,7 +46,7 @@ func (b BaseChild) GetMsgFinalizeTokenDeposit(
 		to,
 		coin,
 		l1Sequence,
-		blockHeight,
+		types.MustInt64ToUint64(blockHeight),
 		l1Denom,
 		data,
 	)
@@ -57,7 +58,7 @@ func (b BaseChild) GetMsgFinalizeTokenDeposit(
 }
 
 func (b BaseChild) GetMsgUpdateOracle(
-	height uint64,
+	height int64,
 	data []byte,
 ) (sdk.Msg, error) {
 	sender, err := b.node.MustGetBroadcaster().GetAddressString()
@@ -67,7 +68,7 @@ func (b BaseChild) GetMsgUpdateOracle(
 
 	msg := opchildtypes.NewMsgUpdateOracle(
 		sender,
-		height,
+		types.MustInt64ToUint64(height),
 		data,
 	)
 	err = msg.Validate(b.node.AccountCodec())

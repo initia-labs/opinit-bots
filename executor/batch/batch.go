@@ -52,7 +52,7 @@ type BatchSubmitter struct {
 	homePath string
 
 	// status info
-	LastBatchEndBlockNumber uint64
+	LastBatchEndBlockNumber int64
 }
 
 func NewBatchSubmitterV1(
@@ -96,7 +96,7 @@ func NewBatchSubmitterV1(
 	return ch
 }
 
-func (bs *BatchSubmitter) Initialize(ctx context.Context, startHeight uint64, host hostNode, bridgeInfo opchildtypes.BridgeInfo) error {
+func (bs *BatchSubmitter) Initialize(ctx context.Context, startHeight int64, host hostNode, bridgeInfo opchildtypes.BridgeInfo) error {
 	err := bs.node.Initialize(ctx, startHeight)
 	if err != nil {
 		return err
@@ -113,7 +113,7 @@ func (bs *BatchSubmitter) Initialize(ctx context.Context, startHeight uint64, ho
 		return errors.New("no batch info")
 	}
 	for _, batchInfo := range bs.batchInfos {
-		if len(bs.batchInfos) == 1 || (batchInfo.Output.L2BlockNumber+1) >= bs.node.GetHeight() {
+		if len(bs.batchInfos) == 1 || types.MustUint64ToInt64(batchInfo.Output.L2BlockNumber+1) >= bs.node.GetHeight() {
 			break
 		}
 		bs.DequeueBatchInfo()
@@ -164,7 +164,7 @@ func (bs *BatchSubmitter) SetDANode(da executortypes.DANode) error {
 }
 
 func (bs *BatchSubmitter) Start(ctx context.Context) {
-	bs.logger.Info("batch start", zap.Uint64("height", bs.node.GetHeight()))
+	bs.logger.Info("batch start", zap.Int64("height", bs.node.GetHeight()))
 	bs.node.Start(ctx)
 }
 

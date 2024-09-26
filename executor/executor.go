@@ -201,7 +201,7 @@ func (ex *Executor) makeDANode(ctx context.Context, bridgeInfo opchildtypes.Brid
 	return nil, fmt.Errorf("unsupported chain id for DA: %s", ophosttypes.BatchInfo_ChainType_name[int32(batchInfo.BatchInfo.ChainType)])
 }
 
-func (ex *Executor) getStartHeights(ctx context.Context, bridgeId uint64) (l1StartHeight uint64, l2StartHeight uint64, startOutputIndex uint64, batchStartHeight uint64, err error) {
+func (ex *Executor) getStartHeights(ctx context.Context, bridgeId uint64) (l1StartHeight int64, l2StartHeight int64, startOutputIndex uint64, batchStartHeight int64, err error) {
 	// get the bridge start height from the host
 	l1StartHeight, err = ex.host.QueryCreateBridgeHeight(ctx, bridgeId)
 	if err != nil {
@@ -214,8 +214,8 @@ func (ex *Executor) getStartHeights(ctx context.Context, bridgeId uint64) (l1Sta
 		if err != nil {
 			return 0, 0, 0, 0, err
 		} else if output != nil {
-			l1StartHeight = output.OutputProposal.L1BlockNumber
-			l2StartHeight = output.OutputProposal.L2BlockNumber
+			l1StartHeight = types.MustUint64ToInt64(output.OutputProposal.L1BlockNumber)
+			l2StartHeight = types.MustUint64ToInt64(output.OutputProposal.L2BlockNumber)
 			startOutputIndex = output.OutputIndex + 1
 		}
 	}

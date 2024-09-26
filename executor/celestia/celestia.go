@@ -27,7 +27,7 @@ import (
 
 type batchNode interface {
 	ChainID() string
-	UpdateBatchInfo(chain string, submitter string, outputIndex uint64, l2BlockNumber uint64)
+	UpdateBatchInfo(string, string, uint64, int64)
 }
 
 var _ executortypes.DANode = &Celestia{}
@@ -136,7 +136,7 @@ func (c Celestia) HasKey() bool {
 	return c.node.HasBroadcaster()
 }
 
-func (c Celestia) GetHeight() uint64 {
+func (c Celestia) GetHeight() int64 {
 	return c.node.GetHeight()
 }
 
@@ -157,12 +157,18 @@ func (c Celestia) CreateBatchMsg(rawBlob []byte) (sdk.Msg, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	dataLength, err := types.SafeIntToUint32(len(blob.Data()))
+	if err != nil {
+		return nil, err
+	}
+
 	return &celestiatypes.MsgPayForBlobsWithBlob{
 		MsgPayForBlobs: &celestiatypes.MsgPayForBlobs{
 			Signer:           submitter,
 			Namespaces:       [][]byte{c.namespace.Bytes()},
 			ShareCommitments: [][]byte{commitment},
-			BlobSizes:        []uint32{uint32(len(blob.Data()))},
+			BlobSizes:        []uint32{dataLength},
 			ShareVersions:    []uint32{uint32(blob.ShareVersion())},
 		},
 		Blob: &celestiatypes.Blob{

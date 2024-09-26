@@ -192,7 +192,7 @@ func (c *Challenger) RegisterQuerier() {
 	})
 }
 
-func (c *Challenger) getStartHeights(ctx context.Context, bridgeId uint64) (l1StartHeight uint64, l2StartHeight uint64, startOutputIndex uint64, err error) {
+func (c *Challenger) getStartHeights(ctx context.Context, bridgeId uint64) (l1StartHeight int64, l2StartHeight int64, startOutputIndex uint64, err error) {
 	// get the bridge start height from the host
 	l1StartHeight, err = c.host.QueryCreateBridgeHeight(ctx, bridgeId)
 	if err != nil {
@@ -205,8 +205,8 @@ func (c *Challenger) getStartHeights(ctx context.Context, bridgeId uint64) (l1St
 		if err != nil {
 			return 0, 0, 0, err
 		} else if output != nil {
-			l1StartHeight = output.OutputProposal.L1BlockNumber
-			l2StartHeight = output.OutputProposal.L2BlockNumber
+			l1StartHeight = types.MustUint64ToInt64(output.OutputProposal.L1BlockNumber)
+			l2StartHeight = types.MustUint64ToInt64(output.OutputProposal.L2BlockNumber)
 			startOutputIndex = output.OutputIndex + 1
 		}
 	}

@@ -120,16 +120,6 @@ func New(remote, wsEndpoint string) (*HTTP, error) {
 	return NewWithClient(remote, wsEndpoint, httpClient)
 }
 
-// Create timeout enabled http client
-func NewWithTimeout(remote, wsEndpoint string, timeout uint) (*HTTP, error) {
-	httpClient, err := jsonrpcclient.DefaultHTTPClient(remote)
-	if err != nil {
-		return nil, err
-	}
-	httpClient.Timeout = time.Duration(timeout) * time.Second
-	return NewWithClient(remote, wsEndpoint, httpClient)
-}
-
 // NewWithClient allows for setting a custom http client (See New).
 // An error is returned on invalid remote. The function panics when remote is nil.
 func NewWithClient(remote, wsEndpoint string, client *http.Client) (*HTTP, error) {
@@ -421,7 +411,7 @@ func (c *baseRPCClient) Block(ctx context.Context, height *int64) (*ctypes.Resul
 	return result, nil
 }
 
-func (c *baseRPCClient) BlockBulk(ctx context.Context, start *uint64, end *uint64) ([][]byte, error) {
+func (c *baseRPCClient) BlockBulk(ctx context.Context, start *int64, end *int64) ([][]byte, error) {
 	result := new(ResultBlockBulk)
 	params := make(map[string]interface{})
 	if start != nil {

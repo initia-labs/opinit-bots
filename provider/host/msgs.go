@@ -2,6 +2,7 @@ package host
 
 import (
 	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
+	"github.com/initia-labs/opinit-bots/types"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 )
@@ -9,7 +10,7 @@ import (
 func (b BaseHost) GetMsgProposeOutput(
 	bridgeId uint64,
 	outputIndex uint64,
-	l2BlockNumber uint64,
+	l2BlockNumber int64,
 	outputRoot []byte,
 ) (sdk.Msg, error) {
 	sender, err := b.node.MustGetBroadcaster().GetAddressString()
@@ -21,7 +22,7 @@ func (b BaseHost) GetMsgProposeOutput(
 		sender,
 		bridgeId,
 		outputIndex,
-		l2BlockNumber,
+		types.MustInt64ToUint64(l2BlockNumber),
 		outputRoot,
 	)
 	err = msg.Validate(b.node.AccountCodec())

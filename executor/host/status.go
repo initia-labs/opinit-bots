@@ -7,7 +7,7 @@ import (
 type Status struct {
 	Node                            nodetypes.Status `json:"node"`
 	LastProposedOutputIndex         uint64           `json:"last_proposed_output_index"`
-	LastProposedOutputL2BlockNumber uint64           `json:"last_proposed_output_l2_block_number"`
+	LastProposedOutputL2BlockNumber int64            `json:"last_proposed_output_l2_block_number"`
 }
 
 func (h Host) GetStatus() Status {

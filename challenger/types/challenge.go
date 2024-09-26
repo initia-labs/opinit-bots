@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"time"
+
+	"github.com/initia-labs/opinit-bots/types"
 )
 
 type Challenge struct {
@@ -94,7 +96,7 @@ func (e EventType) String() string {
 type Deposit struct {
 	EventType     string    `json:"event_type"`
 	Sequence      uint64    `json:"sequence"`
-	L1BlockHeight uint64    `json:"l1_block_height"`
+	L1BlockHeight int64     `json:"l1_block_height"`
 	From          string    `json:"from"`
 	To            string    `json:"to"`
 	L1Denom       string    `json:"l1_denom"`
@@ -105,7 +107,7 @@ type Deposit struct {
 
 var _ ChallengeEvent = &Deposit{}
 
-func NewDeposit(sequence, l1BlockHeight uint64, from, to, l1Denom, amount string, time time.Time) *Deposit {
+func NewDeposit(sequence uint64, l1BlockHeight int64, from, to, l1Denom, amount string, time time.Time) *Deposit {
 	d := &Deposit{
 		Sequence:      sequence,
 		L1BlockHeight: l1BlockHeight,
@@ -169,7 +171,7 @@ func (d Deposit) IsTimeout() bool {
 
 type Output struct {
 	EventType     string    `json:"event_type"`
-	L2BlockNumber uint64    `json:"l2_block_number"`
+	L2BlockNumber int64     `json:"l2_block_number"`
 	OutputIndex   uint64    `json:"output_index"`
 	OutputRoot    []byte    `json:"output_root"`
 	Time          time.Time `json:"time"`
@@ -178,7 +180,7 @@ type Output struct {
 
 var _ ChallengeEvent = &Output{}
 
-func NewOutput(l2BlockNumber, outputIndex uint64, outputRoot []byte, time time.Time) *Output {
+func NewOutput(l2BlockNumber int64, outputIndex uint64, outputRoot []byte, time time.Time) *Output {
 	o := &Output{
 		L2BlockNumber: l2BlockNumber,
 		OutputIndex:   outputIndex,
@@ -235,13 +237,13 @@ func (o Output) IsTimeout() bool {
 
 type Oracle struct {
 	EventType string    `json:"event_type"`
-	L1Height  uint64    `json:"l1_height"`
+	L1Height  int64     `json:"l1_height"`
 	Data      []byte    `json:"data"`
 	Time      time.Time `json:"time"`
 	Timeout   bool      `json:"timeout"`
 }
 
-func NewOracle(l1Height uint64, data []byte, time time.Time) *Oracle {
+func NewOracle(l1Height int64, data []byte, time time.Time) *Oracle {
 	o := &Oracle{
 		L1Height: l1Height,
 		Data:     data,
@@ -283,7 +285,7 @@ func (o Oracle) EventTime() time.Time {
 func (o Oracle) Id() ChallengeId {
 	return ChallengeId{
 		Type: EventTypeOracle,
-		Id:   o.L1Height,
+		Id:   types.MustInt64ToUint64(o.L1Height),
 	}
 }
 

@@ -15,7 +15,7 @@ func (h *Host) beginBlockHandler(_ context.Context, args nodetypes.BeginBlockArg
 }
 
 func (h *Host) endBlockHandler(_ context.Context, args nodetypes.EndBlockArgs) error {
-	blockHeight := uint64(args.Block.Header.Height)
+	blockHeight := args.Block.Header.Height
 	batchKVs := []types.RawKV{
 		h.Node().SyncInfoToRawKV(blockHeight),
 	}

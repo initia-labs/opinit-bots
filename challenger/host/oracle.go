@@ -8,7 +8,7 @@ import (
 	challengertypes "github.com/initia-labs/opinit-bots/challenger/types"
 )
 
-func (h *Host) oracleTxHandler(blockHeight uint64, blockTime time.Time, oracleDataBytes comettypes.Tx) {
+func (h *Host) oracleTxHandler(blockHeight int64, blockTime time.Time, oracleDataBytes comettypes.Tx) {
 	if !h.OracleEnabled() {
 		return
 	}

@@ -7,43 +7,43 @@ import (
 	"go.uber.org/zap"
 )
 
-func (n *Node) SetSyncInfo(height uint64) {
+func (n *Node) SetSyncInfo(height int64) {
 	n.lastProcessedBlockHeight = height
 	if n.broadcaster != nil {
 		n.broadcaster.SetSyncInfo(n.lastProcessedBlockHeight)
 	}
 }
 
-func (n *Node) loadSyncInfo(startHeight uint64) error {
+func (n *Node) loadSyncInfo(startHeight int64) error {
 	data, err := n.db.Get(nodetypes.LastProcessedBlockHeightKey)
 	if err == dbtypes.ErrNotFound {
 		n.SetSyncInfo(startHeight)
 		n.startHeightInitialized = true
-		n.logger.Info("initialize sync info", zap.Uint64("start_height", startHeight+1))
+		n.logger.Info("initialize sync info", zap.Int64("start_height", startHeight+1))
 		return nil
 	} else if err != nil {
 		return err
 	}
 
-	lastSyncedHeight, err := dbtypes.ToUint64(data)
+	lastSyncedHeight, err := dbtypes.ToInt64(data)
 	if err != nil {
 		return err
 	}
 
 	n.SetSyncInfo(lastSyncedHeight)
-	n.logger.Debug("load sync info", zap.Uint64("last_processed_height", n.lastProcessedBlockHeight))
+	n.logger.Debug("load sync info", zap.Int64("last_processed_height", n.lastProcessedBlockHeight))
 
 	return nil
 }
 
-func (n Node) SaveSyncInfo(height uint64) error {
-	return n.db.Set(nodetypes.LastProcessedBlockHeightKey, dbtypes.FromUint64(height))
+func (n Node) SaveSyncInfo(height int64) error {
+	return n.db.Set(nodetypes.LastProcessedBlockHeightKey, dbtypes.FromUint64(types.MustInt64ToUint64(height)))
 }
 
-func (n Node) SyncInfoToRawKV(height uint64) types.RawKV {
+func (n Node) SyncInfoToRawKV(height int64) types.RawKV {
 	return types.RawKV{
 		Key:   n.db.PrefixedKey(nodetypes.LastProcessedBlockHeightKey),
-		Value: dbtypes.FromUint64(height),
+		Value: dbtypes.FromUint64(types.MustInt64ToUint64(height)),
 	}
 }
 
