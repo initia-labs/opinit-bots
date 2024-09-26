@@ -24,14 +24,9 @@ type hostNode interface {
 	BroadcastMsgs(btypes.ProcessedMsgs)
 	ProcessedMsgsToRawKV([]btypes.ProcessedMsgs, bool) ([]types.RawKV, error)
 	QueryLastOutput(context.Context, uint64) (*ophosttypes.QueryOutputProposalResponse, error)
-	QueryOutput(context.Context, uint64, uint64, uint64) (*ophosttypes.QueryOutputProposalResponse, error)
+	QueryOutput(context.Context, uint64, uint64, int64) (*ophosttypes.QueryOutputProposalResponse, error)
 
-	GetMsgProposeOutput(
-		bridgeId uint64,
-		outputIndex uint64,
-		l2BlockNumber uint64,
-		outputRoot []byte,
-	) (sdk.Msg, error)
+	GetMsgProposeOutput(uint64, uint64, int64, []byte) (sdk.Msg, error)
 }
 
 type Child struct {
@@ -40,11 +35,11 @@ type Child struct {
 	host hostNode
 
 	nextOutputTime        time.Time
-	finalizingBlockHeight uint64
+	finalizingBlockHeight int64
 
 	// status info
-	lastUpdatedOracleL1Height         uint64
-	lastFinalizedDepositL1BlockHeight uint64
+	lastUpdatedOracleL1Height         int64
+	lastFinalizedDepositL1BlockHeight int64
 	lastFinalizedDepositL1Sequence    uint64
 	lastOutputTime                    time.Time
 }
@@ -58,7 +53,7 @@ func NewChildV1(
 	}
 }
 
-func (ch *Child) Initialize(ctx context.Context, startHeight uint64, startOutputIndex uint64, host hostNode, bridgeInfo opchildtypes.BridgeInfo) error {
+func (ch *Child) Initialize(ctx context.Context, startHeight int64, startOutputIndex uint64, host hostNode, bridgeInfo opchildtypes.BridgeInfo) error {
 	l2Sequence, err := ch.BaseChild.Initialize(ctx, startHeight, startOutputIndex, bridgeInfo)
 	if err != nil {
 		return err

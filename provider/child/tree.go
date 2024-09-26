@@ -1,6 +1,6 @@
 package child
 
-func (b *BaseChild) InitializeTree(blockHeight uint64) bool {
+func (b *BaseChild) InitializeTree(blockHeight int64) bool {
 	if b.initializeTreeFn != nil {
 		ok, err := b.initializeTreeFn(blockHeight)
 		if err != nil {

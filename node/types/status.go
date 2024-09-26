@@ -6,6 +6,6 @@ type BroadcasterStatus struct {
 }
 
 type Status struct {
-	LastBlockHeight uint64             `json:"last_block_height,omitempty"`
+	LastBlockHeight int64              `json:"last_block_height,omitempty"`
 	Broadcaster     *BroadcasterStatus `json:"broadcaster,omitempty"`
 }

@@ -175,11 +175,11 @@ func (m *Merkle) SaveWorkingTree(version uint64) error {
 
 // Height returns the height of the working tree.
 func (m *Merkle) Height() uint8 {
-	if m.workingTree.LeafCount <= 1 {
-		return uint8(m.workingTree.LeafCount)
+	leafCount := m.workingTree.LeafCount
+	if leafCount <= 1 {
+		return uint8(leafCount)
 	}
-
-	return uint8(bits.Len64(m.workingTree.LeafCount - 1))
+	return types.MustIntToUint8(bits.Len64(leafCount - 1))
 }
 
 // GetWorkingTreeIndex returns the index of the working tree.

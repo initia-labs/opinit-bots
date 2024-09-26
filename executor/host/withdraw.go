@@ -25,12 +25,12 @@ func (h *Host) proposeOutputHandler(_ context.Context, args nodetypes.EventHandl
 	return nil
 }
 
-func (h *Host) handleProposeOutput(bridgeId uint64, proposer string, outputIndex uint64, l2BlockNumber uint64, outputRoot []byte) {
+func (h *Host) handleProposeOutput(bridgeId uint64, proposer string, outputIndex uint64, l2BlockNumber int64, outputRoot []byte) {
 	h.Logger().Info("propose output",
 		zap.Uint64("bridge_id", bridgeId),
 		zap.String("proposer", proposer),
 		zap.Uint64("output_index", outputIndex),
-		zap.Uint64("l2_block_number", l2BlockNumber),
+		zap.Int64("l2_block_number", l2BlockNumber),
 		zap.String("output_root", base64.StdEncoding.EncodeToString(outputRoot)),
 	)
 }

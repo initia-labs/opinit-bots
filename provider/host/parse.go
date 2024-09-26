@@ -22,7 +22,8 @@ func ParseMsgRecordBatch(eventAttrs []abcitypes.EventAttribute) (
 
 func ParseMsgUpdateBatchInfo(eventAttrs []abcitypes.EventAttribute) (
 	bridgeId uint64, submitter, chain string,
-	outputIndex, l2BlockNumber uint64,
+	outputIndex uint64,
+	l2BlockNumber int64,
 	err error) {
 	for _, attr := range eventAttrs {
 		switch attr.Key {
@@ -41,7 +42,7 @@ func ParseMsgUpdateBatchInfo(eventAttrs []abcitypes.EventAttribute) (
 				return
 			}
 		case ophosttypes.AttributeKeyFinalizedL2BlockNumber:
-			l2BlockNumber, err = strconv.ParseUint(attr.Value, 10, 64)
+			l2BlockNumber, err = strconv.ParseInt(attr.Value, 10, 64)
 			if err != nil {
 				return
 			}
@@ -88,7 +89,9 @@ func ParseMsgInitiateDeposit(eventAttrs []abcitypes.EventAttribute) (
 }
 
 func ParseMsgProposeOutput(eventAttrs []abcitypes.EventAttribute) (
-	bridgeId, l2BlockNumber, outputIndex uint64,
+	bridgeId uint64,
+	l2BlockNumber int64,
+	outputIndex uint64,
 	proposer string,
 	outputRoot []byte,
 	err error) {
@@ -107,7 +110,7 @@ func ParseMsgProposeOutput(eventAttrs []abcitypes.EventAttribute) (
 				return
 			}
 		case ophosttypes.AttributeKeyL2BlockNumber:
-			l2BlockNumber, err = strconv.ParseUint(attr.Value, 10, 64)
+			l2BlockNumber, err = strconv.ParseInt(attr.Value, 10, 64)
 			if err != nil {
 				return
 			}

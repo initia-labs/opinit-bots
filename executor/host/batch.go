@@ -40,7 +40,7 @@ func (h *Host) updateBatchInfoHandler(_ context.Context, args nodetypes.EventHan
 		zap.String("chain", chain),
 		zap.String("submitter", submitter),
 		zap.Uint64("output_index", outputIndex),
-		zap.Uint64("l2_block_number", l2BlockNumber),
+		zap.Int64("l2_block_number", l2BlockNumber),
 	)
 
 	h.batch.UpdateBatchInfo(chain, submitter, outputIndex, l2BlockNumber)

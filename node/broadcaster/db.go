@@ -82,7 +82,7 @@ func (b Broadcaster) ProcessedMsgsToRawKV(ProcessedMsgs []btypes.ProcessedMsgs, 
 			}
 		}
 		kvs = append(kvs, types.RawKV{
-			Key:   b.db.PrefixedKey(btypes.PrefixedProcessedMsgs(uint64(processedMsgs.Timestamp))),
+			Key:   b.db.PrefixedKey(btypes.PrefixedProcessedMsgs(types.MustInt64ToUint64(processedMsgs.Timestamp))),
 			Value: data,
 		})
 	}
@@ -117,5 +117,5 @@ func (b Broadcaster) loadProcessedMsgs() (ProcessedMsgs []btypes.ProcessedMsgs, 
 }
 
 func (b Broadcaster) deleteProcessedMsgs(timestamp int64) error {
-	return b.db.Delete(btypes.PrefixedProcessedMsgs(uint64(timestamp)))
+	return b.db.Delete(btypes.PrefixedProcessedMsgs(types.MustInt64ToUint64(timestamp)))
 }
