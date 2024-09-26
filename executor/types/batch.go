@@ -91,7 +91,7 @@ func UnmarshalBatchDataHeader(data []byte) (BatchDataHeader, error) {
 		return BatchDataHeader{}, err
 	}
 
-	if expectedLength != 0 || expectedLength != length {
+	if int64(len(data)-25)%32 != 0 || expectedLength != length {
 		err := fmt.Errorf("invalid checksum length: %d, data length: %d", length, len(data)-25)
 		return BatchDataHeader{}, err
 	}
