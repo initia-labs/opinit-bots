@@ -204,12 +204,13 @@ func (bs *BatchSubmitter) finalizeBatch(ctx context.Context, blockHeight int64) 
 	msg, err := bs.da.CreateBatchMsg(headerData)
 	if err != nil {
 		return err
+	} else if msg != nil {
+		bs.processedMsgs = append(bs.processedMsgs, btypes.ProcessedMsgs{
+			Msgs:      []sdk.Msg{msg},
+			Timestamp: time.Now().UnixNano(),
+			Save:      true,
+		})
 	}
-	bs.processedMsgs = append(bs.processedMsgs, btypes.ProcessedMsgs{
-		Msgs:      []sdk.Msg{msg},
-		Timestamp: time.Now().UnixNano(),
-		Save:      true,
-	})
 
 	for i, chunk := range chunks {
 		chunkData := executortypes.MarshalBatchDataChunk(
@@ -222,12 +223,13 @@ func (bs *BatchSubmitter) finalizeBatch(ctx context.Context, blockHeight int64) 
 		msg, err := bs.da.CreateBatchMsg(chunkData)
 		if err != nil {
 			return err
+		} else if msg != nil {
+			bs.processedMsgs = append(bs.processedMsgs, btypes.ProcessedMsgs{
+				Msgs:      []sdk.Msg{msg},
+				Timestamp: time.Now().UnixNano(),
+				Save:      true,
+			})
 		}
-		bs.processedMsgs = append(bs.processedMsgs, btypes.ProcessedMsgs{
-			Msgs:      []sdk.Msg{msg},
-			Timestamp: time.Now().UnixNano(),
-			Save:      true,
-		})
 	}
 
 	bs.logger.Info("finalize batch",

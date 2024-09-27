@@ -182,7 +182,7 @@ func (n Node) HasBroadcaster() bool {
 
 func (n Node) GetBroadcaster() (*broadcaster.Broadcaster, error) {
 	if n.broadcaster == nil {
-		return nil, errors.New("cannot get broadcaster without broadcaster")
+		return nil, types.ErrKeyNotSet
 	}
 
 	return n.broadcaster, nil

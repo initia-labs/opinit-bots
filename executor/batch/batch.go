@@ -154,13 +154,8 @@ func (bs *BatchSubmitter) Initialize(ctx context.Context, startHeight int64, hos
 	return nil
 }
 
-func (bs *BatchSubmitter) SetDANode(da executortypes.DANode) error {
-	if !da.HasKey() {
-		return errors.New("da has no key")
-	}
-
+func (bs *BatchSubmitter) SetDANode(da executortypes.DANode) {
 	bs.da = da
-	return nil
 }
 
 func (bs *BatchSubmitter) Start(ctx context.Context) {

@@ -111,11 +111,7 @@ func (ex *Executor) Initialize(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	err = ex.batch.SetDANode(da)
-	if err != nil {
-		return err
-	}
-
+	ex.batch.SetDANode(da)
 	ex.RegisterQuerier()
 	return nil
 }
@@ -170,32 +166,48 @@ func (ex *Executor) RegisterQuerier() {
 }
 
 func (ex *Executor) makeDANode(ctx context.Context, bridgeInfo opchildtypes.BridgeInfo) (executortypes.DANode, error) {
+	if !ex.cfg.EnableBatchSubmitter {
+		return batch.NewNoopDA(), nil
+	}
+
 	batchInfo := ex.batch.BatchInfo()
 	switch batchInfo.BatchInfo.ChainType {
 	case ophosttypes.BatchInfo_CHAIN_TYPE_INITIA:
-		da := host.NewHostV1(
+		hostda := host.NewHostV1(
 			ex.cfg.DANodeConfig(ex.homePath),
 			ex.db.WithPrefix([]byte(types.DAHostName)),
 			ex.logger.Named(types.DAHostName),
 			ex.cfg.DANode.Bech32Prefix, batchInfo.BatchInfo.Submitter,
 		)
-		if ex.host.GetAddress().Equals(da.GetAddress()) {
+
+		// should exist
+		daAddr, err := hostda.GetAddress()
+		if err != nil {
+			return nil, err
+		}
+
+		// might not exist
+		hostAddr, err := ex.host.GetAddress()
+		if err != nil && !errors.Is(err, types.ErrKeyNotSet) {
+			return nil, err
+		} else if err == nil && hostAddr.Equals(daAddr) {
 			return ex.host, nil
 		}
-		err := da.InitializeDA(ctx, bridgeInfo)
-		return da, err
+
+		err = hostda.InitializeDA(ctx, bridgeInfo)
+		return hostda, err
 	case ophosttypes.BatchInfo_CHAIN_TYPE_CELESTIA:
-		da := celestia.NewDACelestia(ex.cfg.Version, ex.cfg.DANodeConfig(ex.homePath),
+		celestiada := celestia.NewDACelestia(ex.cfg.Version, ex.cfg.DANodeConfig(ex.homePath),
 			ex.db.WithPrefix([]byte(types.DACelestiaName)),
 			ex.logger.Named(types.DACelestiaName),
 			ex.cfg.DANode.Bech32Prefix, batchInfo.BatchInfo.Submitter,
 		)
-		err := da.Initialize(ctx, ex.batch, bridgeInfo.BridgeId)
+		err := celestiada.Initialize(ctx, ex.batch, bridgeInfo.BridgeId)
 		if err != nil {
 			return nil, err
 		}
-		da.RegisterDAHandlers()
-		return da, nil
+		celestiada.RegisterDAHandlers()
+		return celestiada, nil
 	}
 
 	return nil, fmt.Errorf("unsupported chain id for DA: %s", ophosttypes.BatchInfo_ChainType_name[int32(batchInfo.BatchInfo.ChainType)])

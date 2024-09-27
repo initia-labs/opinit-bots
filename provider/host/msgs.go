@@ -1,6 +1,8 @@
 package host
 
 import (
+	"errors"
+
 	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
 	"github.com/initia-labs/opinit-bots/types"
 
@@ -13,8 +15,11 @@ func (b BaseHost) GetMsgProposeOutput(
 	l2BlockNumber int64,
 	outputRoot []byte,
 ) (sdk.Msg, error) {
-	sender, err := b.node.MustGetBroadcaster().GetAddressString()
+	sender, err := b.GetAddressStr()
 	if err != nil {
+		if errors.Is(err, types.ErrKeyNotSet) {
+			return nil, nil
+		}
 		return nil, err
 	}
 
@@ -33,8 +38,11 @@ func (b BaseHost) GetMsgProposeOutput(
 }
 
 func (b BaseHost) CreateBatchMsg(batchBytes []byte) (sdk.Msg, error) {
-	submitter, err := b.node.MustGetBroadcaster().GetAddressString()
+	submitter, err := b.GetAddressStr()
 	if err != nil {
+		if errors.Is(err, types.ErrKeyNotSet) {
+			return nil, nil
+		}
 		return nil, err
 	}
 
