@@ -2,6 +2,7 @@ package node
 
 import (
 	dbtypes "github.com/initia-labs/opinit-bots/db/types"
+	btypes "github.com/initia-labs/opinit-bots/node/broadcaster/types"
 	nodetypes "github.com/initia-labs/opinit-bots/node/types"
 	"github.com/initia-labs/opinit-bots/types"
 	"go.uber.org/zap"
@@ -53,4 +54,24 @@ func (n Node) DeleteSyncInfo() error {
 
 func DeleteSyncInfo(db types.DB) error {
 	return db.Delete(nodetypes.LastProcessedBlockHeightKey)
+}
+
+func DeleteProcessedMsgs(db types.DB) error {
+	return db.PrefixedIterate(btypes.ProcessedMsgsKey, func(key, _ []byte) (stop bool, err error) {
+		err = db.Delete(key)
+		if err != nil {
+			return stop, err
+		}
+		return false, nil
+	})
+}
+
+func DeletePendingTxs(db types.DB) error {
+	return db.PrefixedIterate(btypes.PendingTxsKey, func(key, _ []byte) (stop bool, err error) {
+		err = db.Delete(key)
+		if err != nil {
+			return stop, err
+		}
+		return false, nil
+	})
 }
