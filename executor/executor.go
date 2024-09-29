@@ -236,14 +236,13 @@ func (ex *Executor) getStartHeights(ctx context.Context, bridgeId uint64) (l1Sta
 	if err != nil {
 		return 0, 0, 0, 0, err
 	}
-	if l1Sequence > 1 {
-		depositTxHeight, err := ex.host.QueryDepositTxHeight(ctx, bridgeId, l1Sequence-1)
-		if err != nil {
-			return 0, 0, 0, 0, err
-		}
-		if l1StartHeight > depositTxHeight {
-			l1StartHeight = depositTxHeight
-		}
+
+	depositTxHeight, err := ex.host.QueryDepositTxHeight(ctx, bridgeId, l1Sequence)
+	if err != nil {
+		return 0, 0, 0, 0, err
+	}
+	if l1StartHeight > depositTxHeight {
+		l1StartHeight = depositTxHeight
 	}
 
 	if l2StartHeight == 0 {
@@ -251,6 +250,9 @@ func (ex *Executor) getStartHeights(ctx context.Context, bridgeId uint64) (l1Sta
 	}
 	if ex.cfg.BatchStartHeight > 0 {
 		batchStartHeight = ex.cfg.BatchStartHeight - 1
+	}
+	if l1StartHeight > 0 {
+		l1StartHeight--
 	}
 	return l1StartHeight, l2StartHeight, startOutputIndex, batchStartHeight, err
 }

@@ -22,9 +22,6 @@ func (h *Host) endBlockHandler(_ context.Context, args nodetypes.EndBlockArgs) e
 	// collect more msgs if block height is not latest
 	blockHeight := args.Block.Header.Height
 	msgQueue := h.GetMsgQueue()
-	if blockHeight != args.LatestHeight && len(msgQueue) > 0 && len(msgQueue) <= 10 {
-		return nil
-	}
 
 	batchKVs := []types.RawKV{
 		h.Node().SyncInfoToRawKV(blockHeight),
