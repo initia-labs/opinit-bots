@@ -96,8 +96,8 @@ func NewBatchSubmitterV1(
 	return ch
 }
 
-func (bs *BatchSubmitter) Initialize(ctx context.Context, startHeight int64, host hostNode, bridgeInfo opchildtypes.BridgeInfo) error {
-	err := bs.node.Initialize(ctx, startHeight)
+func (bs *BatchSubmitter) Initialize(ctx context.Context, processedHeight int64, host hostNode, bridgeInfo opchildtypes.BridgeInfo) error {
+	err := bs.node.Initialize(ctx, processedHeight)
 	if err != nil {
 		return err
 	}

@@ -89,15 +89,15 @@ func GetCodec(bech32Prefix string) (codec.Codec, client.TxConfig, error) {
 	})
 }
 
-func (b *BaseChild) Initialize(ctx context.Context, startHeight int64, startOutputIndex uint64, bridgeInfo opchildtypes.BridgeInfo) (uint64, error) {
-	err := b.node.Initialize(ctx, startHeight)
+func (b *BaseChild) Initialize(ctx context.Context, processedHeight int64, startOutputIndex uint64, bridgeInfo opchildtypes.BridgeInfo) (uint64, error) {
+	err := b.node.Initialize(ctx, processedHeight)
 	if err != nil {
 		return 0, err
 	}
 
 	var l2Sequence uint64
-	if b.node.HeightInitialized() && startOutputIndex != 0 {
-		l2Sequence, err = b.QueryNextL2Sequence(ctx, startHeight)
+	if b.node.HeightInitialized() {
+		l2Sequence, err = b.QueryNextL2Sequence(ctx, processedHeight)
 		if err != nil {
 			return 0, err
 		}
@@ -107,14 +107,14 @@ func (b *BaseChild) Initialize(ctx context.Context, startHeight int64, startOutp
 			return 0, err
 		}
 
-		version := types.MustInt64ToUint64(startHeight)
+		version := types.MustInt64ToUint64(processedHeight)
 		err = b.mk.DeleteFutureWorkingTrees(version + 1)
 		if err != nil {
 			return 0, err
 		}
 
 		b.initializeTreeFn = func(blockHeight int64) (bool, error) {
-			if startHeight+1 == blockHeight {
+			if processedHeight+1 == blockHeight {
 				b.logger.Info("initialize tree", zap.Uint64("index", startOutputIndex))
 				err := b.mk.InitializeWorkingTree(startOutputIndex, 1)
 				if err != nil {
