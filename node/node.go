@@ -85,7 +85,7 @@ func NewNode(cfg nodetypes.NodeConfig, db types.DB, logger *zap.Logger, cdc code
 // StartHeight is the height to start processing.
 // If it is 0, the latest height is used.
 // If the latest height exists in the database, this is ignored.
-func (n *Node) Initialize(ctx context.Context, startHeight int64) (err error) {
+func (n *Node) Initialize(ctx context.Context, processedHeight int64) (err error) {
 	// check if node is catching up
 	status, err := n.rpcClient.Status(ctx)
 	if err != nil {
@@ -102,7 +102,7 @@ func (n *Node) Initialize(ctx context.Context, startHeight int64) (err error) {
 	}
 
 	// load sync info
-	return n.loadSyncInfo(startHeight)
+	return n.loadSyncInfo(processedHeight)
 }
 
 func (n *Node) HeightInitialized() bool {

@@ -89,20 +89,20 @@ func (ex *Executor) Initialize(ctx context.Context) error {
 		zap.Duration("submission_interval", bridgeInfo.BridgeConfig.SubmissionInterval),
 	)
 
-	hostStartHeight, childStartHeight, startOutputIndex, batchStartHeight, err := ex.getStartHeights(ctx, bridgeInfo.BridgeId)
+	hostProcessedHeight, childProcessedHeight, processedOutputIndex, batchProcessedHeight, err := ex.getProcessedHeights(ctx, bridgeInfo.BridgeId)
 	if err != nil {
 		return err
 	}
 
-	err = ex.host.Initialize(ctx, hostStartHeight, ex.child, ex.batch, bridgeInfo)
+	err = ex.host.Initialize(ctx, hostProcessedHeight, ex.child, ex.batch, bridgeInfo)
 	if err != nil {
 		return err
 	}
-	err = ex.child.Initialize(ctx, childStartHeight, startOutputIndex, ex.host, bridgeInfo)
+	err = ex.child.Initialize(ctx, childProcessedHeight, processedOutputIndex+1, ex.host, bridgeInfo)
 	if err != nil {
 		return err
 	}
-	err = ex.batch.Initialize(ctx, batchStartHeight, ex.host, bridgeInfo)
+	err = ex.batch.Initialize(ctx, batchProcessedHeight, ex.host, bridgeInfo)
 	if err != nil {
 		return err
 	}
@@ -213,11 +213,31 @@ func (ex *Executor) makeDANode(ctx context.Context, bridgeInfo opchildtypes.Brid
 	return nil, fmt.Errorf("unsupported chain id for DA: %s", ophosttypes.BatchInfo_ChainType_name[int32(batchInfo.BatchInfo.ChainType)])
 }
 
-func (ex *Executor) getStartHeights(ctx context.Context, bridgeId uint64) (l1StartHeight int64, l2StartHeight int64, startOutputIndex uint64, batchStartHeight int64, err error) {
+func (ex *Executor) getProcessedHeights(ctx context.Context, bridgeId uint64) (l1ProcessedHeight int64, l2ProcessedHeight int64, processedOutputIndex uint64, batchProcessedHeight int64, err error) {
 	// get the bridge start height from the host
-	l1StartHeight, err = ex.host.QueryCreateBridgeHeight(ctx, bridgeId)
+	l1ProcessedHeight, err = ex.host.QueryCreateBridgeHeight(ctx, bridgeId)
 	if err != nil {
 		return 0, 0, 0, 0, err
+	}
+
+	l1Sequence, err := ex.child.QueryNextL1Sequence(ctx, 0)
+	if err != nil {
+		return 0, 0, 0, 0, err
+	}
+
+	// query l1Sequence tx height
+	depositTxHeight, err := ex.host.QueryDepositTxHeight(ctx, bridgeId, l1Sequence)
+	if err != nil {
+		return 0, 0, 0, 0, err
+	} else if depositTxHeight == 0 && l1Sequence > 1 {
+		// query l1Sequence - 1 tx height
+		depositTxHeight, err = ex.host.QueryDepositTxHeight(ctx, bridgeId, l1Sequence-1)
+		if err != nil {
+			return 0, 0, 0, 0, err
+		}
+	}
+	if depositTxHeight >= 1 && depositTxHeight-1 > l1ProcessedHeight {
+		l1ProcessedHeight = depositTxHeight - 1
 	}
 
 	// get the last submitted output height before the start height from the host
@@ -226,33 +246,17 @@ func (ex *Executor) getStartHeights(ctx context.Context, bridgeId uint64) (l1Sta
 		if err != nil {
 			return 0, 0, 0, 0, err
 		} else if output != nil {
-			l1StartHeight = types.MustUint64ToInt64(output.OutputProposal.L1BlockNumber)
-			l2StartHeight = types.MustUint64ToInt64(output.OutputProposal.L2BlockNumber)
-			startOutputIndex = output.OutputIndex + 1
+			l1BlockNumber := types.MustUint64ToInt64(output.OutputProposal.L1BlockNumber)
+			if l1BlockNumber < l1ProcessedHeight {
+				l1ProcessedHeight = l1BlockNumber
+			}
+			l2ProcessedHeight = types.MustUint64ToInt64(output.OutputProposal.L2BlockNumber)
+			processedOutputIndex = output.OutputIndex
 		}
 	}
-	// get the last deposit tx height from the host
-	l1Sequence, err := ex.child.QueryNextL1Sequence(ctx, 0)
-	if err != nil {
-		return 0, 0, 0, 0, err
-	}
 
-	depositTxHeight, err := ex.host.QueryDepositTxHeight(ctx, bridgeId, l1Sequence-1)
-	if err != nil {
-		return 0, 0, 0, 0, err
-	}
-	if l1StartHeight > depositTxHeight {
-		l1StartHeight = depositTxHeight
-	}
-
-	if l2StartHeight == 0 {
-		startOutputIndex = 1
-	}
 	if ex.cfg.BatchStartHeight > 0 {
-		batchStartHeight = ex.cfg.BatchStartHeight - 1
+		batchProcessedHeight = ex.cfg.BatchStartHeight - 1
 	}
-	if l1StartHeight > 0 {
-		l1StartHeight--
-	}
-	return l1StartHeight, l2StartHeight, startOutputIndex, batchStartHeight, err
+	return l1ProcessedHeight, l2ProcessedHeight, processedOutputIndex, batchProcessedHeight, err
 }

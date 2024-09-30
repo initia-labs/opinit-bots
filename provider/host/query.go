@@ -210,5 +210,5 @@ func (b BaseHost) QueryDepositTxHeight(ctx context.Context, bridgeId uint64, l1S
 			break
 		}
 	}
-	return 0, fmt.Errorf("failed to fetch deposit tx with l1 Sequence: %d", l1Sequence)
+	return 0, nil
 }

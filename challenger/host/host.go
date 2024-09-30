@@ -55,8 +55,8 @@ func NewHostV1(
 	}
 }
 
-func (h *Host) Initialize(ctx context.Context, startHeight int64, child childNode, bridgeInfo opchildtypes.BridgeInfo, challenger challenger) error {
-	err := h.BaseHost.Initialize(ctx, startHeight, bridgeInfo)
+func (h *Host) Initialize(ctx context.Context, processedHeight int64, child childNode, bridgeInfo opchildtypes.BridgeInfo, challenger challenger) error {
+	err := h.BaseHost.Initialize(ctx, processedHeight, bridgeInfo)
 	if err != nil {
 		return err
 	}

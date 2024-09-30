@@ -15,12 +15,12 @@ func (n *Node) SetSyncInfo(height int64) {
 	}
 }
 
-func (n *Node) loadSyncInfo(startHeight int64) error {
+func (n *Node) loadSyncInfo(processedHeight int64) error {
 	data, err := n.db.Get(nodetypes.LastProcessedBlockHeightKey)
 	if err == dbtypes.ErrNotFound {
-		n.SetSyncInfo(startHeight)
+		n.SetSyncInfo(processedHeight)
 		n.startHeightInitialized = true
-		n.logger.Info("initialize sync info", zap.Int64("start_height", startHeight+1))
+		n.logger.Info("initialize sync info", zap.Int64("start_height", processedHeight+1))
 		return nil
 	} else if err != nil {
 		return err
