@@ -1,0 +1,11 @@
+name: Build executable binaries and release them
+
+on:
+  push:
+    tags:
+      - 'v*'
+      - 'test-'
+  
+jobs:
+  build-darwin:
+    uses: ./.github/workflows/build-darwin.yml
