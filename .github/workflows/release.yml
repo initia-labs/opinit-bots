@@ -4,8 +4,6 @@ on:
   push:
     tags:
       - 'v*'
-      - 'test-'
-  
 jobs:
   release-darwin:
     uses: ./.github/workflows/build-darwin.yml
