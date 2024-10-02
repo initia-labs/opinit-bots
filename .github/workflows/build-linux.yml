@@ -29,11 +29,13 @@ jobs:
       - name: Build and Package for Linux
         run: |
           make build
-          tar -czf "$GITHUB_WORKSPACE"/opinitd_"$VERSION"_Linux_x86_64.tar.gz ./build/opinitd
-          rm build/opinitd
+          pushd build
+          tar -czf "$GITHUB_WORKSPACE"/opinitd_"$VERSION"_Linux_x86_64.tar.gz ./opinitd
+          rm ./opinitd; popd
           GOARCH=arm64 make build
-          tar -czf "$GITHUB_WORKSPACE"/opinitd_"$VERSION"_Linux_aarch64.tar.gz ./build/opinitd
-          rm build/opinitd
+          pushd build
+          tar -czf "$GITHUB_WORKSPACE"/opinitd_"$VERSION"_Linux_aarch64.tar.gz ./opinitd
+          rm ./opinitd; popd
 
       - name: Release
         uses: softprops/action-gh-release@v2

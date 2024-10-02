@@ -33,8 +33,9 @@ jobs:
           GOARCH=amd64 make build
           mv ./build/opinitd ./build/opinitd.amd64
           lipo -create -output ./build/opinitd  ./build/opinitd.arm64 ./build/opinitd.amd64
-          tar -czf "$GITHUB_WORKSPACE"/opinitd_"$VERSION"_Darwin.tar.gz ./build/opinitd
-          rm ./build/opinitd.arm64 ./build/opinitd.amd64 ./build/opinitd
+          pushd build
+          tar -czf "$GITHUB_WORKSPACE"/opinitd_"$VERSION"_Darwin.tar.gz ./opinitd
+          rm ./opinitd.arm64 ./opinitd.amd64 ./opinitd; popd
 
       - name: Release
         uses: softprops/action-gh-release@v2
