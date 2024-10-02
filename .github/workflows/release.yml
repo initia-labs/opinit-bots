@@ -7,5 +7,7 @@ on:
       - 'test-'
   
 jobs:
-  build-darwin:
+  release-darwin:
     uses: ./.github/workflows/build-darwin.yml
+  release-linux:
+    uses: ./.github/workflows/build-linux.yml

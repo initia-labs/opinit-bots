@@ -1,11 +1,11 @@
-name: Build and release Darwin executable binary
+name: Build and realease Linux executable binaries
 
 on:
   workflow_call:
 
 jobs:
-  build-macos:
-    runs-on: macos-latest
+  build-linux:
+    runs-on: ubuntu-22.04
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -26,20 +26,20 @@ jobs:
           fi
           echo "VERSION=${VERSION}" >> $GITHUB_ENV
 
-      - name: Build and Package for Darwin
+      - name: Build and Package for Linux
         run: |
           make build
-          mv ./build/opinitd ./build/opinitd.arm64
-          GOARCH=amd64 make build
-          mv ./build/opinitd ./build/opinitd.amd64
-          lipo -create -output ./build/opinitd  ./build/opinitd.arm64 ./build/opinitd.amd64
-          tar -czf "$GITHUB_WORKSPACE"/opinitd_"$VERSION"_Darwin.tar.gz ./build/opinitd
-          rm ./build/opinitd.arm64 ./build/opinitd.amd64 ./build/opinitd
+          tar -czf "$GITHUB_WORKSPACE"/opinitd_"$VERSION"_Linux_x86_64.tar.gz ./build/opinitd
+          rm build/opinitd
+          GOARCH=arm64 make build
+          tar -czf "$GITHUB_WORKSPACE"/opinitd_"$VERSION"_Linux_aarch64.tar.gz ./build/opinitd
+          rm build/opinitd
 
       - name: Release
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            opinitd_${{ env.VERSION }}_Darwin.tar.gz
+            opinitd_${{ env.VERSION }}_Linux_x64_64.tar.gz
+            opinitd_${{ env.VERSION }}_Linux_aarch64.tar.gz
         env:
           VERSION: ${{ env.VERSION }}
