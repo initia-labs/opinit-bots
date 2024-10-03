@@ -29,18 +29,19 @@ jobs:
       - name: Build and Package for Darwin
         run: |
           make build
-          mv ./build/opinitd ./build/opinitd.arm64
-          GOARCH=amd64 make build
-          mv ./build/opinitd ./build/opinitd.amd64
-          lipo -create -output ./build/opinitd  ./build/opinitd.arm64 ./build/opinitd.amd64
           pushd build
-          tar -czf "$GITHUB_WORKSPACE"/opinitd_"$VERSION"_Darwin.tar.gz ./opinitd
-          rm ./opinitd.arm64 ./opinitd.amd64 ./opinitd; popd
+          tar -czf "$GITHUB_WORKSPACE"/opinitd_"$VERSION"_Darwin_aarch64.tar.gz ./opinitd
+          rm ./opinitd; popd
+          GOARCH=amd64 make build
+          pushd build
+          tar -czf "$GITHUB_WORKSPACE"/opinitd_"$VERSION"_Darwin_x86_64.tar.gz ./opinitd
+          rm ./opinitd; popd
 
       - name: Release
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            opinitd_${{ env.VERSION }}_Darwin.tar.gz
+            opinitd_${{ env.VERSION }}_Darwin_x86_64.tar.gz
+            opinitd_${{ env.VERSION }}_Darwin_aarch64.tar.gz
         env:
           VERSION: ${{ env.VERSION }}
