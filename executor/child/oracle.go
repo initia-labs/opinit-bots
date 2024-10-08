@@ -19,9 +19,9 @@ func (ch *Child) updateOracleHandler(_ context.Context, args nodetypes.EventHand
 	return nil
 }
 
-func (ch *Child) handleUpdateOracle(l1BlockHeight uint64, from string) {
+func (ch *Child) handleUpdateOracle(l1BlockHeight int64, from string) {
 	ch.Logger().Info("update oracle",
-		zap.Uint64("l1_blockHeight", l1BlockHeight),
+		zap.Int64("l1_blockHeight", l1BlockHeight),
 		zap.String("from", from),
 	)
 }

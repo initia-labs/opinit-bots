@@ -18,6 +18,7 @@ package main
 
 import (
 	"bufio"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -37,7 +38,15 @@ const (
 	flagRecover      = "recover"
 	flagMnemonicSrc  = "source"
 	flagBech32Prefix = "bech32"
+	flagOutput       = "output"
 )
+
+type keyJsonOutput map[string]keyJsonOutputElem
+
+type keyJsonOutputElem struct {
+	Address  string `json:"address"`
+	Mnemonic string `json:"mnemonic"`
+}
 
 // keysCmd represents the keys command
 func keysCmd(ctx *cmdContext) *cobra.Command {
@@ -69,7 +78,8 @@ func keysAddCmd(ctx *cmdContext) *cobra.Command {
 $ keys add localnet key1
 $ keys add l2 key2 --bech32 celestia
 $ keys add l2 key2 --recover 
-$ keys add l2 key2 --recover --source mnemonic.txt`),
+$ keys add l2 key2 --recover --source mnemonic.txt
+$ keys add l2 key2 --output json`),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			chainId := args[0]
 			keyName := args[1]
@@ -138,13 +148,32 @@ $ keys add l2 key2 --recover --source mnemonic.txt`),
 				return err
 			}
 
-			fmt.Fprintf(cmd.OutOrStdout(), "%s: %s\n%s\n", account.Name, addrString, mnemonic)
+			outputFormat, _ := cmd.Flags().GetString(flagOutput)
+			var output string
+			switch outputFormat {
+			case "json":
+				jsonOutput := make(keyJsonOutput)
+				jsonOutput[account.Name] = keyJsonOutputElem{
+					Address:  addrString,
+					Mnemonic: mnemonic,
+				}
+				outputBytes, err := json.Marshal(&jsonOutput)
+				if err != nil {
+					return err
+				}
+				output = string(outputBytes)
+			default:
+				output = fmt.Sprintf("%s: %s\n%s", account.Name, addrString, mnemonic)
+			}
+
+			fmt.Fprintln(cmd.OutOrStdout(), output)
 			return nil
 		},
 	}
 	cmd.Flags().Bool(flagRecover, false, "Provide seed phrase to recover existing key instead of creating")
 	cmd.Flags().String(flagMnemonicSrc, "", "Import mnemonic from a file")
 	cmd.Flags().String(flagBech32Prefix, "init", "Bech32 prefix")
+	cmd.Flags().String(flagOutput, "plain", "Output format (plain|json)")
 	return cmd
 }
 

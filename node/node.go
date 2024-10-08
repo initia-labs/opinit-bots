@@ -38,7 +38,7 @@ type Node struct {
 
 	// status info
 	startHeightInitialized   bool
-	lastProcessedBlockHeight uint64
+	lastProcessedBlockHeight int64
 	running                  bool
 }
 
@@ -85,7 +85,7 @@ func NewNode(cfg nodetypes.NodeConfig, db types.DB, logger *zap.Logger, cdc code
 // StartHeight is the height to start processing.
 // If it is 0, the latest height is used.
 // If the latest height exists in the database, this is ignored.
-func (n *Node) Initialize(ctx context.Context, startHeight uint64) (err error) {
+func (n *Node) Initialize(ctx context.Context, processedHeight int64) (err error) {
 	// check if node is catching up
 	status, err := n.rpcClient.Status(ctx)
 	if err != nil {
@@ -102,7 +102,7 @@ func (n *Node) Initialize(ctx context.Context, startHeight uint64) (err error) {
 	}
 
 	// load sync info
-	return n.loadSyncInfo(startHeight)
+	return n.loadSyncInfo(processedHeight)
 }
 
 func (n *Node) HeightInitialized() bool {
@@ -168,7 +168,7 @@ func (n Node) AccountCodec() address.Codec {
 	return n.cdc.InterfaceRegistry().SigningContext().AddressCodec()
 }
 
-func (n Node) GetHeight() uint64 {
+func (n Node) GetHeight() int64 {
 	return n.lastProcessedBlockHeight + 1
 }
 
@@ -182,7 +182,7 @@ func (n Node) HasBroadcaster() bool {
 
 func (n Node) GetBroadcaster() (*broadcaster.Broadcaster, error) {
 	if n.broadcaster == nil {
-		return nil, errors.New("cannot get broadcaster without broadcaster")
+		return nil, types.ErrKeyNotSet
 	}
 
 	return n.broadcaster, nil

@@ -10,6 +10,6 @@ type WithdrawalData struct {
 }
 
 type TreeExtraData struct {
-	BlockNumber uint64 `json:"block_number"`
+	BlockNumber int64  `json:"block_number"`
 	BlockHash   []byte `json:"block_hash"`
 }

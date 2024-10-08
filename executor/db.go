@@ -19,6 +19,12 @@ func ResetHeights(db types.DB) error {
 		if err := node.DeleteSyncInfo(db); err != nil {
 			return err
 		}
+		if err := node.DeletePendingTxs(db); err != nil {
+			return err
+		}
+		if err := node.DeleteProcessedMsgs(db); err != nil {
+			return err
+		}
 		fmt.Printf("reset height to 0 for node %s\n", string(db.GetPrefix()))
 	}
 	return nil
@@ -33,6 +39,12 @@ func ResetHeight(db types.DB, nodeName string) error {
 	nodeDB := db.WithPrefix([]byte(nodeName))
 	err := node.DeleteSyncInfo(nodeDB)
 	if err != nil {
+		return err
+	}
+	if err := node.DeletePendingTxs(db); err != nil {
+		return err
+	}
+	if err := node.DeleteProcessedMsgs(db); err != nil {
 		return err
 	}
 	fmt.Printf("reset height to 0 for node %s\n", string(nodeDB.GetPrefix()))

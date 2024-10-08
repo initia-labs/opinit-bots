@@ -1,41 +1,28 @@
 package child
 
 import (
+	"errors"
+
 	opchildtypes "github.com/initia-labs/OPinit/x/opchild/types"
+	"github.com/initia-labs/opinit-bots/types"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 )
-
-func (b BaseChild) GetMsgSetBridgeInfo(
-	bridgeInfo opchildtypes.BridgeInfo,
-) (sdk.Msg, error) {
-	sender, err := b.node.MustGetBroadcaster().GetAddressString()
-	if err != nil {
-		return nil, err
-	}
-
-	msg := opchildtypes.NewMsgSetBridgeInfo(
-		sender,
-		bridgeInfo,
-	)
-	err = msg.Validate(b.node.AccountCodec())
-	if err != nil {
-		return nil, err
-	}
-	return msg, nil
-}
 
 func (b BaseChild) GetMsgFinalizeTokenDeposit(
 	from string,
 	to string,
 	coin sdk.Coin,
 	l1Sequence uint64,
-	blockHeight uint64,
+	blockHeight int64,
 	l1Denom string,
 	data []byte,
 ) (sdk.Msg, error) {
-	sender, err := b.node.MustGetBroadcaster().GetAddressString()
+	sender, err := b.GetAddressStr()
 	if err != nil {
+		if errors.Is(err, types.ErrKeyNotSet) {
+			return nil, nil
+		}
 		return nil, err
 	}
 
@@ -45,7 +32,7 @@ func (b BaseChild) GetMsgFinalizeTokenDeposit(
 		to,
 		coin,
 		l1Sequence,
-		blockHeight,
+		types.MustInt64ToUint64(blockHeight),
 		l1Denom,
 		data,
 	)
@@ -57,17 +44,20 @@ func (b BaseChild) GetMsgFinalizeTokenDeposit(
 }
 
 func (b BaseChild) GetMsgUpdateOracle(
-	height uint64,
+	height int64,
 	data []byte,
 ) (sdk.Msg, error) {
-	sender, err := b.node.MustGetBroadcaster().GetAddressString()
+	sender, err := b.GetAddressStr()
 	if err != nil {
+		if errors.Is(err, types.ErrKeyNotSet) {
+			return nil, nil
+		}
 		return nil, err
 	}
 
 	msg := opchildtypes.NewMsgUpdateOracle(
 		sender,
-		height,
+		types.MustInt64ToUint64(height),
 		data,
 	)
 	err = msg.Validate(b.node.AccountCodec())

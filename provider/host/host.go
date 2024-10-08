@@ -79,8 +79,8 @@ func GetCodec(bech32Prefix string) (codec.Codec, client.TxConfig, error) {
 	})
 }
 
-func (b *BaseHost) Initialize(ctx context.Context, startHeight uint64, bridgeInfo opchildtypes.BridgeInfo) error {
-	err := b.node.Initialize(ctx, startHeight)
+func (b *BaseHost) Initialize(ctx context.Context, processedHeight int64, bridgeInfo opchildtypes.BridgeInfo) error {
+	err := b.node.Initialize(ctx, processedHeight)
 	if err != nil {
 		return err
 	}
@@ -92,7 +92,7 @@ func (b *BaseHost) Start(ctx context.Context) {
 	if b.cfg.ProcessType == nodetypes.PROCESS_TYPE_ONLY_BROADCAST {
 		b.logger.Info("host start")
 	} else {
-		b.logger.Info("host start", zap.Uint64("height", b.node.GetHeight()))
+		b.logger.Info("host start", zap.Int64("height", b.node.GetHeight()))
 	}
 	b.node.Start(ctx)
 }
@@ -133,7 +133,7 @@ func (b BaseHost) HasKey() bool {
 	return b.node.HasBroadcaster()
 }
 
-func (b BaseHost) Height() uint64 {
+func (b BaseHost) Height() int64 {
 	return b.node.GetHeight()
 }
 

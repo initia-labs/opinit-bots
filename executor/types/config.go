@@ -56,21 +56,25 @@ type Config struct {
 	// If you don't want to use the bridge executor feature, you can leave it empty.
 	BridgeExecutor string `json:"bridge_executor"`
 
+	// EnableBatchSubmitter is the flag to enable the batch submitter.
+	// If it is false, the batch submitter will not be started.
+	EnableBatchSubmitter bool `json:"enable_batch_submitter"`
+
 	// MaxChunks is the maximum number of chunks in a batch.
-	MaxChunks uint64 `json:"max_chunks"`
+	MaxChunks int64 `json:"max_chunks"`
 	// MaxChunkSize is the maximum size of a chunk in a batch.
-	MaxChunkSize uint64 `json:"max_chunk_size"`
+	MaxChunkSize int64 `json:"max_chunk_size"`
 	// MaxSubmissionTime is the maximum time to submit a batch.
-	MaxSubmissionTime uint64 `json:"max_submission_time"` // seconds
+	MaxSubmissionTime int64 `json:"max_submission_time"` // seconds
 
 	// L2StartHeight is the height to start the l2 node. If it is 0, it will start from the latest height.
 	// If the latest height stored in the db is not 0, this config is ignored.
 	// L2 starts from the last submitted output l2 block number + 1 before L2StartHeight.
 	// L1 starts from the block number of the output tx + 1
-	L2StartHeight uint64 `json:"l2_start_height"`
+	L2StartHeight int64 `json:"l2_start_height"`
 	// BatchStartHeight is the height to start the batch. If it is 0, it will start from the latest height.
 	// If the latest height stored in the db is not 0, this config is ignored.
-	BatchStartHeight uint64 `json:"batch_start_height"`
+	BatchStartHeight int64 `json:"batch_start_height"`
 }
 
 func DefaultConfig() *Config {
@@ -105,8 +109,9 @@ func DefaultConfig() *Config {
 			TxTimeout:     60,
 		},
 
-		OutputSubmitter: "",
-		BridgeExecutor:  "",
+		OutputSubmitter:      "",
+		BridgeExecutor:       "",
+		EnableBatchSubmitter: true,
 
 		MaxChunks:         5000,
 		MaxChunkSize:      300000,  // 300KB
@@ -140,6 +145,26 @@ func (cfg Config) Validate() error {
 
 	if err := cfg.DANode.Validate(); err != nil {
 		return err
+	}
+
+	if cfg.MaxChunks <= 0 {
+		return errors.New("max chunks must be greater than 0")
+	}
+
+	if cfg.MaxChunkSize <= 0 {
+		return errors.New("max chunk size must be greater than 0")
+	}
+
+	if cfg.MaxSubmissionTime <= 0 {
+		return errors.New("max submission time must be greater than 0")
+	}
+
+	if cfg.L2StartHeight < 0 {
+		return errors.New("l2 start height must be greater than or equal to 0")
+	}
+
+	if cfg.BatchStartHeight < 0 {
+		return errors.New("batch start height must be greater than or equal to 0")
 	}
 	return nil
 }
@@ -194,7 +219,10 @@ func (cfg Config) DANodeConfig(homePath string) nodetypes.NodeConfig {
 	nc := nodetypes.NodeConfig{
 		RPC:         cfg.DANode.RPCAddress,
 		ProcessType: nodetypes.PROCESS_TYPE_ONLY_BROADCAST,
-		BroadcasterConfig: &btypes.BroadcasterConfig{
+	}
+
+	if cfg.EnableBatchSubmitter {
+		nc.BroadcasterConfig = &btypes.BroadcasterConfig{
 			ChainID:       cfg.DANode.ChainID,
 			GasPrice:      cfg.DANode.GasPrice,
 			GasAdjustment: cfg.DANode.GasAdjustment,
@@ -203,9 +231,8 @@ func (cfg Config) DANodeConfig(homePath string) nodetypes.NodeConfig {
 			KeyringConfig: btypes.KeyringConfig{
 				HomePath: homePath,
 			},
-		},
+		}
 	}
-
 	return nc
 }
 
@@ -218,7 +245,7 @@ func (cfg Config) BatchConfig() BatchConfig {
 }
 
 type BatchConfig struct {
-	MaxChunks         uint64 `json:"max_chunks"`
-	MaxChunkSize      uint64 `json:"max_chunk_size"`
-	MaxSubmissionTime uint64 `json:"max_submission_time"` // seconds
+	MaxChunks         int64 `json:"max_chunks"`
+	MaxChunkSize      int64 `json:"max_chunk_size"`
+	MaxSubmissionTime int64 `json:"max_submission_time"` // seconds
 }

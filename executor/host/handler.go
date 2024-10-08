@@ -20,11 +20,8 @@ func (h *Host) beginBlockHandler(_ context.Context, args nodetypes.BeginBlockArg
 
 func (h *Host) endBlockHandler(_ context.Context, args nodetypes.EndBlockArgs) error {
 	// collect more msgs if block height is not latest
-	blockHeight := uint64(args.Block.Header.Height)
+	blockHeight := args.Block.Header.Height
 	msgQueue := h.GetMsgQueue()
-	if blockHeight != args.LatestHeight && len(msgQueue) > 0 && len(msgQueue) <= 10 {
-		return nil
-	}
 
 	batchKVs := []types.RawKV{
 		h.Node().SyncInfoToRawKV(blockHeight),

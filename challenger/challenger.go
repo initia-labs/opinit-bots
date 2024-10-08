@@ -96,16 +96,16 @@ func (c *Challenger) Initialize(ctx context.Context) error {
 		zap.Duration("submission_interval", bridgeInfo.BridgeConfig.SubmissionInterval),
 	)
 
-	hostStartHeight, childStartHeight, startOutputIndex, err := c.getStartHeights(ctx, bridgeInfo.BridgeId)
+	hostProcessedHeight, childProcessedHeight, processedOutputIndex, err := c.getProcessedHeights(ctx, bridgeInfo.BridgeId)
 	if err != nil {
 		return err
 	}
 
-	err = c.host.Initialize(ctx, hostStartHeight, c.child, bridgeInfo, c)
+	err = c.host.Initialize(ctx, hostProcessedHeight, c.child, bridgeInfo, c)
 	if err != nil {
 		return err
 	}
-	err = c.child.Initialize(ctx, childStartHeight, startOutputIndex, c.host, bridgeInfo, c)
+	err = c.child.Initialize(ctx, childProcessedHeight, processedOutputIndex+1, c.host, bridgeInfo, c)
 	if err != nil {
 		return err
 	}
@@ -192,9 +192,9 @@ func (c *Challenger) RegisterQuerier() {
 	})
 }
 
-func (c *Challenger) getStartHeights(ctx context.Context, bridgeId uint64) (l1StartHeight uint64, l2StartHeight uint64, startOutputIndex uint64, err error) {
+func (c *Challenger) getProcessedHeights(ctx context.Context, bridgeId uint64) (l1ProcessedHeight int64, l2ProcessedHeight int64, processedOutputIndex uint64, err error) {
 	// get the bridge start height from the host
-	l1StartHeight, err = c.host.QueryCreateBridgeHeight(ctx, bridgeId)
+	l1ProcessedHeight, err = c.host.QueryCreateBridgeHeight(ctx, bridgeId)
 	if err != nil {
 		return 0, 0, 0, err
 	}
@@ -205,27 +205,31 @@ func (c *Challenger) getStartHeights(ctx context.Context, bridgeId uint64) (l1St
 		if err != nil {
 			return 0, 0, 0, err
 		} else if output != nil {
-			l1StartHeight = output.OutputProposal.L1BlockNumber
-			l2StartHeight = output.OutputProposal.L2BlockNumber
-			startOutputIndex = output.OutputIndex + 1
+			l1ProcessedHeight = types.MustUint64ToInt64(output.OutputProposal.L1BlockNumber)
+			l2ProcessedHeight = types.MustUint64ToInt64(output.OutputProposal.L2BlockNumber)
+			processedOutputIndex = output.OutputIndex
 		}
 	}
-	if l2StartHeight > 0 {
+	if l2ProcessedHeight > 0 {
 		// get the last deposit tx height from the host
-		l1Sequence, err := c.child.QueryNextL1Sequence(ctx, l2StartHeight-1)
+		l1Sequence, err := c.child.QueryNextL1Sequence(ctx, l2ProcessedHeight-1)
 		if err != nil {
 			return 0, 0, 0, err
 		}
-		depositTxHeight, err := c.host.QueryDepositTxHeight(ctx, bridgeId, l1Sequence-1)
+		// query l1Sequence tx height
+		depositTxHeight, err := c.host.QueryDepositTxHeight(ctx, bridgeId, l1Sequence)
 		if err != nil {
 			return 0, 0, 0, err
+		} else if depositTxHeight == 0 && l1Sequence > 1 {
+			// query l1Sequence - 1 tx height
+			depositTxHeight, err = c.host.QueryDepositTxHeight(ctx, bridgeId, l1Sequence-1)
+			if err != nil {
+				return 0, 0, 0, err
+			}
 		}
-		if l1StartHeight > depositTxHeight {
-			l1StartHeight = depositTxHeight
+		if depositTxHeight >= 1 && depositTxHeight-1 < l1ProcessedHeight {
+			l1ProcessedHeight = depositTxHeight - 1
 		}
 	}
-	if l2StartHeight == 0 {
-		startOutputIndex = 1
-	}
-	return l1StartHeight, l2StartHeight, startOutputIndex, err
+	return l1ProcessedHeight, l2ProcessedHeight, processedOutputIndex, err
 }

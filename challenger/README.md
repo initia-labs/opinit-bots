@@ -85,7 +85,7 @@ When the `initiate_token_deposit` event is detected in l1, saves it as a `Deposi
 type Deposit struct {
 	EventType     string    `json:"event_type"`
 	Sequence      uint64    `json:"sequence"`
-	L1BlockHeight uint64    `json:"l1_block_height"`
+	L1BlockHeight int64    `json:"l1_block_height"`
 	From          string    `json:"from"`
 	To            string    `json:"to"`
 	L1Denom       string    `json:"l1_denom"`
@@ -101,7 +101,7 @@ When the `propose_output` event is detected in l1, saves it as a `Output` challe
 // Output is the challenge event for the output
 type Output struct {
 	EventType     string    `json:"event_type"`
-	L2BlockNumber uint64    `json:"l2_block_number"`
+	L2BlockNumber int64    `json:"l2_block_number"`
 	OutputIndex   uint64    `json:"output_index"`
 	OutputRoot    []byte    `json:"output_root"`
 	Time          time.Time `json:"time"`

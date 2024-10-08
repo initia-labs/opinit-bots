@@ -3,6 +3,7 @@ package celestia
 import (
 	"context"
 	"crypto/sha256"
+	"errors"
 
 	"go.uber.org/zap"
 
@@ -27,7 +28,7 @@ import (
 
 type batchNode interface {
 	ChainID() string
-	UpdateBatchInfo(chain string, submitter string, outputIndex uint64, l2BlockNumber uint64)
+	UpdateBatchInfo(string, string, uint64, int64)
 }
 
 var _ executortypes.DANode = &Celestia{}
@@ -69,9 +70,11 @@ func NewDACelestia(
 		panic(err)
 	}
 
-	cfg.BroadcasterConfig.KeyringConfig.Address = batchSubmitter
-	cfg.BroadcasterConfig.BuildTxWithMessages = c.BuildTxWithMessages
-	cfg.BroadcasterConfig.PendingTxToProcessedMsgs = c.PendingTxToProcessedMsgs
+	if cfg.BroadcasterConfig != nil {
+		cfg.BroadcasterConfig.KeyringConfig.Address = batchSubmitter
+		cfg.BroadcasterConfig.BuildTxWithMessages = c.BuildTxWithMessages
+		cfg.BroadcasterConfig.PendingTxToProcessedMsgs = c.PendingTxToProcessedMsgs
+	}
 
 	node, err := node.NewNode(cfg, db, logger, appCodec, txConfig)
 	if err != nil {
@@ -136,13 +139,16 @@ func (c Celestia) HasKey() bool {
 	return c.node.HasBroadcaster()
 }
 
-func (c Celestia) GetHeight() uint64 {
+func (c Celestia) GetHeight() int64 {
 	return c.node.GetHeight()
 }
 
 func (c Celestia) CreateBatchMsg(rawBlob []byte) (sdk.Msg, error) {
-	submitter, err := c.node.MustGetBroadcaster().GetAddressString()
+	submitter, err := c.GetAddressStr()
 	if err != nil {
+		if errors.Is(err, types.ErrKeyNotSet) {
+			return nil, nil
+		}
 		return nil, err
 	}
 	blob, err := sh.NewV0Blob(c.namespace, rawBlob)
@@ -157,12 +163,18 @@ func (c Celestia) CreateBatchMsg(rawBlob []byte) (sdk.Msg, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	dataLength, err := types.SafeIntToUint32(len(blob.Data()))
+	if err != nil {
+		return nil, err
+	}
+
 	return &celestiatypes.MsgPayForBlobsWithBlob{
 		MsgPayForBlobs: &celestiatypes.MsgPayForBlobs{
 			Signer:           submitter,
 			Namespaces:       [][]byte{c.namespace.Bytes()},
 			ShareCommitments: [][]byte{commitment},
-			BlobSizes:        []uint32{uint32(len(blob.Data()))},
+			BlobSizes:        []uint32{dataLength},
 			ShareVersions:    []uint32{uint32(blob.ShareVersion())},
 		},
 		Blob: &celestiatypes.Blob{
@@ -177,4 +189,20 @@ func (c Celestia) CreateBatchMsg(rawBlob []byte) (sdk.Msg, error) {
 func (c Celestia) NamespaceID() []byte {
 	chainIDhash := sha256.Sum256([]byte(c.batch.ChainID()))
 	return chainIDhash[:10]
+}
+
+func (c Celestia) GetAddress() (sdk.AccAddress, error) {
+	broadcaster, err := c.node.GetBroadcaster()
+	if err != nil {
+		return nil, err
+	}
+	return broadcaster.GetAddress(), nil
+}
+
+func (c Celestia) GetAddressStr() (string, error) {
+	broadcaster, err := c.node.GetBroadcaster()
+	if err != nil {
+		return "", err
+	}
+	return broadcaster.GetAddressString()
 }

@@ -31,7 +31,7 @@ func (n *Node) blockProcessLooper(ctx context.Context, processType nodetypes.Blo
 			continue
 		}
 
-		latestChainHeight := uint64(status.SyncInfo.LatestBlockHeight)
+		latestChainHeight := status.SyncInfo.LatestBlockHeight
 		if n.lastProcessedBlockHeight >= latestChainHeight {
 			continue
 		}
@@ -45,7 +45,7 @@ func (n *Node) blockProcessLooper(ctx context.Context, processType nodetypes.Blo
 				case <-timer.C:
 				}
 				// TODO: may fetch blocks in batch
-				block, blockResult, err := n.fetchNewBlock(ctx, int64(queryHeight))
+				block, blockResult, err := n.fetchNewBlock(ctx, queryHeight)
 				if err != nil {
 					// TODO: handle error
 					n.logger.Error("failed to fetch new block", zap.String("error", err.Error()))
@@ -120,7 +120,7 @@ func (n *Node) fetchNewBlock(ctx context.Context, height int64) (block *rpccoret
 	return block, blockResult, nil
 }
 
-func (n *Node) handleNewBlock(ctx context.Context, block *rpccoretypes.ResultBlock, blockResult *rpccoretypes.ResultBlockResults, latestChainHeight uint64) error {
+func (n *Node) handleNewBlock(ctx context.Context, block *rpccoretypes.ResultBlock, blockResult *rpccoretypes.ResultBlockResults, latestChainHeight int64) error {
 	protoBlock, err := block.Block.ToProto()
 	if err != nil {
 		return err
@@ -148,10 +148,10 @@ func (n *Node) handleNewBlock(ctx context.Context, block *rpccoretypes.ResultBlo
 	for txIndex, tx := range block.Block.Txs {
 		if n.txHandler != nil {
 			err := n.txHandler(ctx, nodetypes.TxHandlerArgs{
-				BlockHeight:  uint64(block.Block.Height),
+				BlockHeight:  block.Block.Height,
 				BlockTime:    block.Block.Time,
 				LatestHeight: latestChainHeight,
-				TxIndex:      uint64(txIndex),
+				TxIndex:      int64(txIndex),
 				Tx:           tx,
 			})
 			if err != nil {
@@ -162,7 +162,7 @@ func (n *Node) handleNewBlock(ctx context.Context, block *rpccoretypes.ResultBlo
 		if len(n.eventHandlers) != 0 {
 			events := blockResult.TxsResults[txIndex].GetEvents()
 			for eventIndex, event := range events {
-				err := n.handleEvent(ctx, uint64(block.Block.Height), block.Block.Time, latestChainHeight, event)
+				err := n.handleEvent(ctx, block.Block.Height, block.Block.Time, latestChainHeight, event)
 				if err != nil {
 					return fmt.Errorf("failed to handle event: tx_index: %d, event_index: %d; %w", txIndex, eventIndex, err)
 				}
@@ -171,7 +171,7 @@ func (n *Node) handleNewBlock(ctx context.Context, block *rpccoretypes.ResultBlo
 	}
 
 	for eventIndex, event := range blockResult.FinalizeBlockEvents {
-		err := n.handleEvent(ctx, uint64(block.Block.Height), block.Block.Time, latestChainHeight, event)
+		err := n.handleEvent(ctx, block.Block.Height, block.Block.Time, latestChainHeight, event)
 		if err != nil {
 			return fmt.Errorf("failed to handle event: finalize block, event_index: %d; %w", eventIndex, err)
 		}
@@ -190,12 +190,12 @@ func (n *Node) handleNewBlock(ctx context.Context, block *rpccoretypes.ResultBlo
 	return nil
 }
 
-func (n *Node) handleEvent(ctx context.Context, blockHeight uint64, blockTime time.Time, latestHeight uint64, event abcitypes.Event) error {
+func (n *Node) handleEvent(ctx context.Context, blockHeight int64, blockTime time.Time, latestHeight int64, event abcitypes.Event) error {
 	if n.eventHandlers[event.GetType()] == nil {
 		return nil
 	}
 
-	n.logger.Debug("handle event", zap.Uint64("height", blockHeight), zap.String("type", event.GetType()))
+	n.logger.Debug("handle event", zap.Int64("height", blockHeight), zap.String("type", event.GetType()))
 	return n.eventHandlers[event.Type](ctx, nodetypes.EventHandlerArgs{
 		BlockHeight:     blockHeight,
 		BlockTime:       blockTime,
@@ -236,7 +236,7 @@ func (n *Node) txChecker(ctx context.Context) error {
 				default:
 				}
 
-				err := n.handleEvent(ctx, uint64(res.Height), blockTime, 0, event)
+				err := n.handleEvent(ctx, res.Height, blockTime, 0, event)
 				if err != nil {
 					n.logger.Error("failed to handle event", zap.String("tx_hash", pendingTx.TxHash), zap.Int("event_index", eventIndex), zap.String("error", err.Error()))
 					break

@@ -1,0 +1,47 @@
+name: Build and release Darwin executable binary
+
+on:
+  workflow_call:
+
+jobs:
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.22.7"
+
+      - name: Set env vars
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/* ]] || [[ "${{ github.ref }}" == "refs/tags/"* ]]; then
+            VERSION=${GITHUB_REF#refs/tags/}
+          else
+            VERSION="v0.0.0-${GITHUB_SHA:0:8}"
+          fi
+          echo "VERSION=${VERSION}" >> "$GITHUB_ENV"
+
+      - name: Build and Package for Darwin
+        run: |
+          make build
+          pushd build
+          tar -czf "$GITHUB_WORKSPACE"/opinitd_"$VERSION"_Darwin_aarch64.tar.gz ./opinitd
+          rm ./opinitd; popd
+          GOARCH=amd64 make build
+          pushd build
+          tar -czf "$GITHUB_WORKSPACE"/opinitd_"$VERSION"_Darwin_x86_64.tar.gz ./opinitd
+          rm ./opinitd; popd
+
+      - name: Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            opinitd_${{ env.VERSION }}_Darwin_x86_64.tar.gz
+            opinitd_${{ env.VERSION }}_Darwin_aarch64.tar.gz
+        env:
+          VERSION: ${{ env.VERSION }}

@@ -17,12 +17,20 @@ import (
 	"github.com/initia-labs/opinit-bots/types"
 )
 
-func (b BaseHost) GetAddress() sdk.AccAddress {
-	return b.node.MustGetBroadcaster().GetAddress()
+func (b BaseHost) GetAddress() (sdk.AccAddress, error) {
+	broadcaster, err := b.node.GetBroadcaster()
+	if err != nil {
+		return nil, err
+	}
+	return broadcaster.GetAddress(), nil
 }
 
 func (b BaseHost) GetAddressStr() (string, error) {
-	return b.node.MustGetBroadcaster().GetAddressString()
+	broadcaster, err := b.node.GetBroadcaster()
+	if err != nil {
+		return "", err
+	}
+	return broadcaster.GetAddressString()
 }
 
 func (b BaseHost) QueryBridgeConfig(ctx context.Context, bridgeId uint64) (*ophosttypes.QueryBridgeResponse, error) {
@@ -73,7 +81,7 @@ func (b BaseHost) QueryLastOutput(ctx context.Context, bridgeId uint64) (*ophost
 	return &res.OutputProposals[0], nil
 }
 
-func (b BaseHost) QueryOutput(ctx context.Context, bridgeId uint64, outputIndex uint64, height uint64) (*ophosttypes.QueryOutputProposalResponse, error) {
+func (b BaseHost) QueryOutput(ctx context.Context, bridgeId uint64, outputIndex uint64, height int64) (*ophosttypes.QueryOutputProposalResponse, error) {
 	req := &ophosttypes.QueryOutputProposalRequest{
 		BridgeId:    bridgeId,
 		OutputIndex: outputIndex,
@@ -85,7 +93,7 @@ func (b BaseHost) QueryOutput(ctx context.Context, bridgeId uint64, outputIndex 
 }
 
 // QueryOutputByL2BlockNumber queries the last output proposal before the given L2 block number
-func (b BaseHost) QueryOutputByL2BlockNumber(ctx context.Context, bridgeId uint64, l2BlockNumber uint64) (*ophosttypes.QueryOutputProposalResponse, error) {
+func (b BaseHost) QueryOutputByL2BlockNumber(ctx context.Context, bridgeId uint64, l2BlockHeight int64) (*ophosttypes.QueryOutputProposalResponse, error) {
 	start, err := b.QueryOutput(ctx, bridgeId, 1, 0)
 	if err != nil {
 		if strings.Contains(err.Error(), "not found") {
@@ -100,6 +108,7 @@ func (b BaseHost) QueryOutputByL2BlockNumber(ctx context.Context, bridgeId uint6
 		return nil, nil
 	}
 
+	l2BlockNumber := types.MustInt64ToUint64(l2BlockHeight)
 	for {
 		if start.OutputProposal.L2BlockNumber >= l2BlockNumber {
 			if start.OutputIndex != 1 {
@@ -126,7 +135,7 @@ func (b BaseHost) QueryOutputByL2BlockNumber(ctx context.Context, bridgeId uint6
 	}
 }
 
-func (b BaseHost) QueryCreateBridgeHeight(ctx context.Context, bridgeId uint64) (uint64, error) {
+func (b BaseHost) QueryCreateBridgeHeight(ctx context.Context, bridgeId uint64) (int64, error) {
 	ctx, cancel := rpcclient.GetQueryContext(ctx, 0)
 	defer cancel()
 
@@ -144,7 +153,7 @@ func (b BaseHost) QueryCreateBridgeHeight(ctx context.Context, bridgeId uint64) 
 		// bridge not found
 		return 0, errors.New("bridge not found")
 	}
-	return uint64(res.Txs[0].Height), nil
+	return res.Txs[0].Height, nil
 }
 
 func (b BaseHost) QueryBatchInfos(ctx context.Context, bridgeId uint64) (*ophosttypes.QueryBatchInfosResponse, error) {
@@ -156,7 +165,7 @@ func (b BaseHost) QueryBatchInfos(ctx context.Context, bridgeId uint64) (*ophost
 	return b.ophostQueryClient.BatchInfos(ctx, req)
 }
 
-func (b BaseHost) QueryDepositTxHeight(ctx context.Context, bridgeId uint64, l1Sequence uint64) (uint64, error) {
+func (b BaseHost) QueryDepositTxHeight(ctx context.Context, bridgeId uint64, l1Sequence uint64) (int64, error) {
 	if l1Sequence == 0 {
 		return 0, nil
 	}
@@ -190,7 +199,7 @@ func (b BaseHost) QueryDepositTxHeight(ctx context.Context, bridgeId uint64, l1S
 				if event.Type == ophosttypes.EventTypeInitiateTokenDeposit {
 					for _, attr := range event.Attributes {
 						if attr.Key == ophosttypes.AttributeKeyBridgeId && attr.Value == strconv.FormatUint(bridgeId, 10) {
-							return uint64(tx.Height), nil
+							return tx.Height, nil
 						}
 					}
 				}
@@ -201,5 +210,5 @@ func (b BaseHost) QueryDepositTxHeight(ctx context.Context, bridgeId uint64, l1S
 			break
 		}
 	}
-	return 0, fmt.Errorf("failed to fetch deposit tx with l1 Sequence: %d", l1Sequence)
+	return 0, nil
 }

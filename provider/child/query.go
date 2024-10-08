@@ -10,12 +10,20 @@ import (
 	"github.com/initia-labs/opinit-bots/node/rpcclient"
 )
 
-func (b BaseChild) GetAddress() sdk.AccAddress {
-	return b.node.MustGetBroadcaster().GetAddress()
+func (b BaseChild) GetAddress() (sdk.AccAddress, error) {
+	broadcaster, err := b.node.GetBroadcaster()
+	if err != nil {
+		return nil, err
+	}
+	return broadcaster.GetAddress(), nil
 }
 
 func (b BaseChild) GetAddressStr() (string, error) {
-	return b.node.MustGetBroadcaster().GetAddressString()
+	broadcaster, err := b.node.GetBroadcaster()
+	if err != nil {
+		return "", err
+	}
+	return broadcaster.GetAddressString()
 }
 
 func (b BaseChild) QueryBridgeInfo(ctx context.Context) (opchildtypes.BridgeInfo, error) {
@@ -30,7 +38,7 @@ func (b BaseChild) QueryBridgeInfo(ctx context.Context) (opchildtypes.BridgeInfo
 	return res.BridgeInfo, nil
 }
 
-func (b BaseChild) QueryNextL1Sequence(ctx context.Context, height uint64) (uint64, error) {
+func (b BaseChild) QueryNextL1Sequence(ctx context.Context, height int64) (uint64, error) {
 	req := &opchildtypes.QueryNextL1SequenceRequest{}
 	ctx, cancel := rpcclient.GetQueryContext(ctx, height)
 	defer cancel()
@@ -42,7 +50,7 @@ func (b BaseChild) QueryNextL1Sequence(ctx context.Context, height uint64) (uint
 	return res.NextL1Sequence, nil
 }
 
-func (b BaseChild) QueryNextL2Sequence(ctx context.Context, height uint64) (uint64, error) {
+func (b BaseChild) QueryNextL2Sequence(ctx context.Context, height int64) (uint64, error) {
 	req := &opchildtypes.QueryNextL2SequenceRequest{}
 	ctx, cancel := rpcclient.GetQueryContext(ctx, height)
 	defer cancel()

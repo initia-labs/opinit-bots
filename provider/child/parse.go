@@ -12,7 +12,8 @@ import (
 )
 
 func ParseFinalizeDeposit(eventAttrs []abcitypes.EventAttribute) (
-	l1BlockHeight, l1Sequence uint64,
+	l1BlockHeight int64,
+	l1Sequence uint64,
 	from, to, baseDenom string,
 	amount sdk.Coin,
 	err error) {
@@ -39,7 +40,7 @@ func ParseFinalizeDeposit(eventAttrs []abcitypes.EventAttribute) (
 			}
 			amount.Amount = coinAmount
 		case opchildtypes.AttributeKeyFinalizeHeight:
-			l1BlockHeight, err = strconv.ParseUint(attr.Value, 10, 64)
+			l1BlockHeight, err = strconv.ParseInt(attr.Value, 10, 64)
 			if err != nil {
 				return
 			}
@@ -49,13 +50,13 @@ func ParseFinalizeDeposit(eventAttrs []abcitypes.EventAttribute) (
 }
 
 func ParseUpdateOracle(eventAttrs []abcitypes.EventAttribute) (
-	l1BlockHeight uint64,
+	l1BlockHeight int64,
 	from string,
 	err error) {
 	for _, attr := range eventAttrs {
 		switch attr.Key {
 		case opchildtypes.AttributeKeyHeight:
-			l1BlockHeight, err = strconv.ParseUint(attr.Value, 10, 64)
+			l1BlockHeight, err = strconv.ParseInt(attr.Value, 10, 64)
 			if err != nil {
 				return
 			}

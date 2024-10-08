@@ -14,12 +14,12 @@ import (
 	btypes "github.com/initia-labs/opinit-bots/node/broadcaster/types"
 )
 
-func (b Broadcaster) GetHeight() uint64 {
+func (b Broadcaster) GetHeight() int64 {
 	return b.lastProcessedBlockHeight + 1
 }
 
 // HandleNewBlock is called when a new block is received.
-func (b *Broadcaster) HandleNewBlock(block *rpccoretypes.ResultBlock, blockResult *rpccoretypes.ResultBlockResults, latestChainHeight uint64) error {
+func (b *Broadcaster) HandleNewBlock(block *rpccoretypes.ResultBlock, blockResult *rpccoretypes.ResultBlockResults, latestChainHeight int64) error {
 	// check pending txs first
 	for _, tx := range block.Block.Txs {
 		if b.LenLocalPendingTx() == 0 {

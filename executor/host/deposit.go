@@ -37,15 +37,15 @@ func (h *Host) initiateDepositHandler(_ context.Context, args nodetypes.EventHan
 	)
 	if err != nil {
 		return err
+	} else if msg != nil {
+		h.AppendMsgQueue(msg)
 	}
-
-	h.AppendMsgQueue(msg)
 	return nil
 }
 
 func (h *Host) handleInitiateDeposit(
 	l1Sequence uint64,
-	blockHeight uint64,
+	blockHeight int64,
 	from string,
 	to string,
 	l1Denom string,
