@@ -17,9 +17,9 @@ Before running OPinit bots, make sure you have the following prerequisites insta
 
 To ensure compatibility with the node version, check the following versions:
 
-| L1 Node | MiniMove | MiniWasm | MiniEVM | 
-| ------- | -------- | -------- | ------- | 
-| v0.4.9  | v0.4.2   | v0.4.2   |    -    | 
+| L1 Node | MiniMove | MiniWasm | MiniEVM |
+| ------- | -------- | -------- | ------- |
+| v0.4.9  | v0.4.2   | v0.4.2   |    -    |
 
 ### Build and Configure
 
@@ -60,7 +60,8 @@ To start the bot, use the following command:
 opinitd start [bot-name]
 ```
 
-Options 
+Options
+
 - `--log-level`: log level can be set. Default log level is `info`.
 - `--polling-interval`: polling interval can be set. Default polling interval is `100ms`.
 - `--config`: config file name can be set. Default config file name is `[bot-name].json`.
