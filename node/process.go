@@ -153,6 +153,7 @@ func (n *Node) handleNewBlock(ctx context.Context, block *rpccoretypes.ResultBlo
 				LatestHeight: latestChainHeight,
 				TxIndex:      int64(txIndex),
 				Tx:           tx,
+				Success:      blockResult.TxsResults[txIndex].Code == abcitypes.CodeTypeOK,
 			})
 			if err != nil {
 				return fmt.Errorf("failed to handle tx: tx_index: %d; %w", txIndex, err)

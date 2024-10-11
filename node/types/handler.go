@@ -25,6 +25,7 @@ type TxHandlerArgs struct {
 	LatestHeight int64
 	TxIndex      int64
 	Tx           comettypes.Tx
+	Success      bool
 }
 
 type TxHandlerFn func(context.Context, TxHandlerArgs) error
