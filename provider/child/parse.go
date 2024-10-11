@@ -11,12 +11,32 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 )
 
+func missingAttrsError(missingAttrs map[string]struct{}) error {
+	if len(missingAttrs) != 0 {
+		missingAttrStr := ""
+		for attr := range missingAttrs {
+			missingAttrStr += attr + " "
+		}
+		return fmt.Errorf("missing attributes: %s", missingAttrs)
+	}
+	return nil
+}
+
 func ParseFinalizeDeposit(eventAttrs []abcitypes.EventAttribute) (
 	l1BlockHeight int64,
 	l1Sequence uint64,
 	from, to, baseDenom string,
 	amount sdk.Coin,
 	err error) {
+	missingAttrs := map[string]struct{}{
+		opchildtypes.AttributeKeyL1Sequence: {},
+		opchildtypes.AttributeKeySender:     {},
+		opchildtypes.AttributeKeyRecipient:  {},
+		opchildtypes.AttributeKeyDenom:      {},
+		opchildtypes.AttributeKeyBaseDenom:  {},
+		opchildtypes.AttributeKeyAmount:     {},
+	}
+
 	for _, attr := range eventAttrs {
 		switch attr.Key {
 		case opchildtypes.AttributeKeyL1Sequence:
@@ -44,8 +64,12 @@ func ParseFinalizeDeposit(eventAttrs []abcitypes.EventAttribute) (
 			if err != nil {
 				return
 			}
+		default:
+			continue
 		}
+		delete(missingAttrs, attr.Key)
 	}
+	err = missingAttrsError(missingAttrs)
 	return
 }
 
@@ -53,6 +77,11 @@ func ParseUpdateOracle(eventAttrs []abcitypes.EventAttribute) (
 	l1BlockHeight int64,
 	from string,
 	err error) {
+	missingAttrs := map[string]struct{}{
+		opchildtypes.AttributeKeyHeight: {},
+		opchildtypes.AttributeKeyFrom:   {},
+	}
+
 	for _, attr := range eventAttrs {
 		switch attr.Key {
 		case opchildtypes.AttributeKeyHeight:
@@ -62,8 +91,12 @@ func ParseUpdateOracle(eventAttrs []abcitypes.EventAttribute) (
 			}
 		case opchildtypes.AttributeKeyFrom:
 			from = attr.Value
+		default:
+			continue
 		}
+		delete(missingAttrs, attr.Key)
 	}
+	err = missingAttrsError(missingAttrs)
 	return
 }
 
@@ -71,6 +104,14 @@ func ParseInitiateWithdrawal(eventAttrs []abcitypes.EventAttribute) (
 	l2Sequence, amount uint64,
 	from, to, baseDenom string,
 	err error) {
+	missingAttrs := map[string]struct{}{
+		opchildtypes.AttributeKeyL2Sequence: {},
+		opchildtypes.AttributeKeyFrom:       {},
+		opchildtypes.AttributeKeyTo:         {},
+		opchildtypes.AttributeKeyBaseDenom:  {},
+		opchildtypes.AttributeKeyAmount:     {},
+	}
+
 	for _, attr := range eventAttrs {
 		switch attr.Key {
 		case opchildtypes.AttributeKeyL2Sequence:
@@ -91,7 +132,11 @@ func ParseInitiateWithdrawal(eventAttrs []abcitypes.EventAttribute) (
 				return
 			}
 			amount = coinAmount.Uint64()
+		default:
+			continue
 		}
+		delete(missingAttrs, attr.Key)
 	}
+	err = missingAttrsError(missingAttrs)
 	return
 }
