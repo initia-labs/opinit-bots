@@ -29,12 +29,13 @@ func ParseFinalizeDeposit(eventAttrs []abcitypes.EventAttribute) (
 	amount sdk.Coin,
 	err error) {
 	missingAttrs := map[string]struct{}{
-		opchildtypes.AttributeKeyL1Sequence: {},
-		opchildtypes.AttributeKeySender:     {},
-		opchildtypes.AttributeKeyRecipient:  {},
-		opchildtypes.AttributeKeyDenom:      {},
-		opchildtypes.AttributeKeyBaseDenom:  {},
-		opchildtypes.AttributeKeyAmount:     {},
+		opchildtypes.AttributeKeyL1Sequence:     {},
+		opchildtypes.AttributeKeySender:         {},
+		opchildtypes.AttributeKeyRecipient:      {},
+		opchildtypes.AttributeKeyDenom:          {},
+		opchildtypes.AttributeKeyBaseDenom:      {},
+		opchildtypes.AttributeKeyAmount:         {},
+		opchildtypes.AttributeKeyFinalizeHeight: {},
 	}
 
 	for _, attr := range eventAttrs {
