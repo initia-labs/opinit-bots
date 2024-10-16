@@ -10,7 +10,7 @@ The Challenger is responsible for
 
 ## Config
 
-To configure the Executor, fill in the values in the `~/.opinit/executor.json` file.
+To configure the Challenger, fill in the values in the `~/.opinit/challenger.json` file.
 
 ```json
 {
@@ -28,6 +28,11 @@ To configure the Executor, fill in the values in the `~/.opinit/executor.json` f
     "bech32_prefix": "init",
     "rpc_address": "tcp://localhost:27657",
   },
+  // L1StartHeight is the height to start the l1 node. If it is 0, it will finds the optimal height and sets it automatically.
+  // However, if you do not want to use this feature, set it to a non-zero value.
+  // There is no need for modification under normal circumstances, because it
+  // is automatically determined when you set the l2 start height,
+  "l1_start_height": 0,
   // L2StartHeight is the height to start the l2 node. If it is 0, it will start from the latest height.
   // If the latest height stored in the db is not 0, this config is ignored.
   // L2 starts from the last submitted output l2 block number + 1 before L2StartHeight.

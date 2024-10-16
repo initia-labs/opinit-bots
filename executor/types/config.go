@@ -67,6 +67,11 @@ type Config struct {
 	// MaxSubmissionTime is the maximum time to submit a batch.
 	MaxSubmissionTime int64 `json:"max_submission_time"` // seconds
 
+	// L1StartHeight is the height to start the l1 node. If it is 0, it will finds the optimal height and sets it automatically.
+	// However, if you do not want to use this feature, set it to a non-zero value.
+	// There is no need for modification under normal circumstances, because it
+	// is automatically determined when you set the l2 start height,
+	L1StartHeight int64 `json:"l1_start_height"`
 	// L2StartHeight is the height to start the l2 node. If it is 0, it will start from the latest height.
 	// If the latest height stored in the db is not 0, this config is ignored.
 	// L2 starts from the last submitted output l2 block number + 1 before L2StartHeight.
@@ -117,6 +122,7 @@ func DefaultConfig() *Config {
 		MaxChunkSize:      300000,  // 300KB
 		MaxSubmissionTime: 60 * 60, // 1 hour
 
+		L1StartHeight:    0,
 		L2StartHeight:    0,
 		BatchStartHeight: 0,
 	}
@@ -157,6 +163,10 @@ func (cfg Config) Validate() error {
 
 	if cfg.MaxSubmissionTime <= 0 {
 		return errors.New("max submission time must be greater than 0")
+	}
+
+	if cfg.L1StartHeight < 0 {
+		return errors.New("l1 start height must be greater than or equal to 0")
 	}
 
 	if cfg.L2StartHeight < 0 {

@@ -37,11 +37,16 @@ type Config struct {
 	// L2Node is the configuration for the l2 node.
 	L2Node NodeConfig `json:"l2_node"`
 
+	// L1StartHeight is the height to start the l1 node. If it is 0, it will finds the optimal height and sets it automatically.
+	// However, if you do not want to use this feature, set it to a non-zero value.
+	// There is no need for modification under normal circumstances, because it
+	// is automatically determined when you set the l2 start height,
+	L1StartHeight int64 `json:"l1_start_height"`
 	// L2StartHeight is the height to start the l2 node. If it is 0, it will start from the latest height.
 	// If the latest height stored in the db is not 0, this config is ignored.
 	// L2 starts from the last submitted output l2 block number + 1 before L2StartHeight.
 	// L1 starts from the block number of the output tx + 1
-	L2StartHeight uint64 `json:"l2_start_height"`
+	L2StartHeight int64 `json:"l2_start_height"`
 }
 
 func DefaultConfig() *Config {
@@ -60,6 +65,7 @@ func DefaultConfig() *Config {
 			Bech32Prefix: "init",
 			RPCAddress:   "tcp://localhost:27657",
 		},
+		L1StartHeight: 0,
 		L2StartHeight: 0,
 	}
 }
@@ -83,6 +89,14 @@ func (cfg Config) Validate() error {
 
 	if err := cfg.L2Node.Validate(); err != nil {
 		return err
+	}
+
+	if cfg.L1StartHeight < 0 {
+		return errors.New("l1 start height must be greater than or equal to 0")
+	}
+
+	if cfg.L2StartHeight < 0 {
+		return errors.New("l2 start height must be greater than or equal to 0")
 	}
 	return nil
 }

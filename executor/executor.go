@@ -214,46 +214,52 @@ func (ex *Executor) makeDANode(ctx context.Context, bridgeInfo opchildtypes.Brid
 }
 
 func (ex *Executor) getProcessedHeights(ctx context.Context, bridgeId uint64) (l1ProcessedHeight int64, l2ProcessedHeight int64, processedOutputIndex uint64, batchProcessedHeight int64, err error) {
-	// get the bridge start height from the host
-	l1ProcessedHeight, err = ex.host.QueryCreateBridgeHeight(ctx, bridgeId)
-	if err != nil {
-		return 0, 0, 0, 0, err
-	}
-
-	l1Sequence, err := ex.child.QueryNextL1Sequence(ctx, 0)
-	if err != nil {
-		return 0, 0, 0, 0, err
-	}
-
-	// query l1Sequence tx height
-	depositTxHeight, err := ex.host.QueryDepositTxHeight(ctx, bridgeId, l1Sequence)
-	if err != nil {
-		return 0, 0, 0, 0, err
-	} else if depositTxHeight == 0 && l1Sequence > 1 {
-		// query l1Sequence - 1 tx height
-		depositTxHeight, err = ex.host.QueryDepositTxHeight(ctx, bridgeId, l1Sequence-1)
-		if err != nil {
-			return 0, 0, 0, 0, err
-		}
-	}
-	if depositTxHeight >= 1 && depositTxHeight-1 > l1ProcessedHeight {
-		l1ProcessedHeight = depositTxHeight - 1
-	}
-
+	var outputL1BlockNumber int64
 	// get the last submitted output height before the start height from the host
 	if ex.cfg.L2StartHeight != 0 {
 		output, err := ex.host.QueryOutputByL2BlockNumber(ctx, bridgeId, ex.cfg.L2StartHeight)
 		if err != nil {
 			return 0, 0, 0, 0, err
 		} else if output != nil {
-			l1BlockNumber := types.MustUint64ToInt64(output.OutputProposal.L1BlockNumber)
-			if l1BlockNumber < l1ProcessedHeight {
-				l1ProcessedHeight = l1BlockNumber
-			}
+			outputL1BlockNumber = types.MustUint64ToInt64(output.OutputProposal.L1BlockNumber)
 			l2ProcessedHeight = types.MustUint64ToInt64(output.OutputProposal.L2BlockNumber)
 			processedOutputIndex = output.OutputIndex
 		}
 	}
+
+	if ex.cfg.L1StartHeight == 0 {
+		// get the bridge start height from the host
+		l1ProcessedHeight, err = ex.host.QueryCreateBridgeHeight(ctx, bridgeId)
+		if err != nil {
+			return 0, 0, 0, 0, err
+		}
+
+		l1Sequence, err := ex.child.QueryNextL1Sequence(ctx, 0)
+		if err != nil {
+			return 0, 0, 0, 0, err
+		}
+
+		// query l1Sequence tx height
+		depositTxHeight, err := ex.host.QueryDepositTxHeight(ctx, bridgeId, l1Sequence)
+		if err != nil {
+			return 0, 0, 0, 0, err
+		} else if depositTxHeight == 0 && l1Sequence > 1 {
+			// query l1Sequence - 1 tx height
+			depositTxHeight, err = ex.host.QueryDepositTxHeight(ctx, bridgeId, l1Sequence-1)
+			if err != nil {
+				return 0, 0, 0, 0, err
+			}
+		}
+		if depositTxHeight > l1ProcessedHeight {
+			l1ProcessedHeight = depositTxHeight
+		}
+		if outputL1BlockNumber < l1ProcessedHeight {
+			l1ProcessedHeight = outputL1BlockNumber
+		}
+	} else {
+		l1ProcessedHeight = ex.cfg.L1StartHeight
+	}
+	l1ProcessedHeight--
 
 	if ex.cfg.BatchStartHeight > 0 {
 		batchProcessedHeight = ex.cfg.BatchStartHeight - 1

@@ -3,11 +3,12 @@ package batch
 import (
 	"context"
 
-	sdk "github.com/cosmos/cosmos-sdk/types"
 	executortypes "github.com/initia-labs/opinit-bots/executor/types"
 	btypes "github.com/initia-labs/opinit-bots/node/broadcaster/types"
 	nodetypes "github.com/initia-labs/opinit-bots/node/types"
 	"github.com/initia-labs/opinit-bots/types"
+
+	sdk "github.com/cosmos/cosmos-sdk/types"
 )
 
 var _ executortypes.DANode = &NoopDA{}
