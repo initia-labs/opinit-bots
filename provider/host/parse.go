@@ -15,7 +15,7 @@ func missingAttrsError(missingAttrs map[string]struct{}) error {
 		for attr := range missingAttrs {
 			missingAttrStr += attr + " "
 		}
-		return fmt.Errorf("missing attributes: %s", missingAttrs)
+		return fmt.Errorf("missing attributes: %s", missingAttrStr)
 	}
 	return nil
 }
