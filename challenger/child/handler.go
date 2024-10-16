@@ -92,6 +92,10 @@ func (ch *Child) endBlockHandler(_ context.Context, args nodetypes.EndBlockArgs)
 }
 
 func (ch *Child) txHandler(_ context.Context, args nodetypes.TxHandlerArgs) error {
+	// ignore failed tx
+	if !args.Success {
+		return nil
+	}
 	txConfig := ch.Node().GetTxConfig()
 
 	tx, err := txutils.DecodeTx(txConfig, args.Tx)

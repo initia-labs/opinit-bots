@@ -12,6 +12,7 @@ import (
 	rpccoretypes "github.com/cometbft/cometbft/rpc/core/types"
 
 	btypes "github.com/initia-labs/opinit-bots/node/broadcaster/types"
+	"github.com/initia-labs/opinit-bots/types"
 )
 
 func (b Broadcaster) GetHeight() int64 {
@@ -110,7 +111,7 @@ func (b *Broadcaster) Start(ctx context.Context) error {
 			return nil
 		case data := <-b.txChannel:
 			var err error
-			for retry := 1; retry <= 10; retry++ {
+			for retry := 1; retry <= 7; retry++ {
 				err = b.handleProcessedMsgs(ctx, data)
 				if err == nil {
 					break
@@ -122,12 +123,7 @@ func (b *Broadcaster) Start(ctx context.Context) error {
 					break
 				}
 				b.logger.Warn("retry to handle processed msgs after 30 seconds", zap.Int("count", retry), zap.String("error", err.Error()))
-				timer := time.NewTimer(30 * time.Second)
-				select {
-				case <-ctx.Done():
-					return nil
-				case <-timer.C:
-				}
+				types.SleepWithRetry(ctx, retry)
 			}
 			if err != nil {
 				return errors.Wrap(err, "failed to handle processed msgs")

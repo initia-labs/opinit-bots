@@ -2,21 +2,41 @@ package host
 
 import (
 	"encoding/hex"
+	"fmt"
 	"strconv"
 
 	abcitypes "github.com/cometbft/cometbft/abci/types"
 	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
 )
 
+func missingAttrsError(missingAttrs map[string]struct{}) error {
+	if len(missingAttrs) != 0 {
+		missingAttrStr := ""
+		for attr := range missingAttrs {
+			missingAttrStr += attr + " "
+		}
+		return fmt.Errorf("missing attributes: %s", missingAttrStr)
+	}
+	return nil
+}
+
 func ParseMsgRecordBatch(eventAttrs []abcitypes.EventAttribute) (
 	submitter string, err error,
 ) {
+	missingAttrs := map[string]struct{}{
+		ophosttypes.AttributeKeySubmitter: {},
+	}
+
 	for _, attr := range eventAttrs {
 		switch attr.Key {
 		case ophosttypes.AttributeKeySubmitter:
 			submitter = attr.Value
+		default:
+			continue
 		}
+		delete(missingAttrs, attr.Key)
 	}
+	err = missingAttrsError(missingAttrs)
 	return
 }
 
@@ -25,6 +45,14 @@ func ParseMsgUpdateBatchInfo(eventAttrs []abcitypes.EventAttribute) (
 	outputIndex uint64,
 	l2BlockNumber int64,
 	err error) {
+	missingAttrs := map[string]struct{}{
+		ophosttypes.AttributeKeyBridgeId:               {},
+		ophosttypes.AttributeKeyBatchChainType:         {},
+		ophosttypes.AttributeKeyBatchSubmitter:         {},
+		ophosttypes.AttributeKeyFinalizedOutputIndex:   {},
+		ophosttypes.AttributeKeyFinalizedL2BlockNumber: {},
+	}
+
 	for _, attr := range eventAttrs {
 		switch attr.Key {
 		case ophosttypes.AttributeKeyBridgeId:
@@ -46,8 +74,12 @@ func ParseMsgUpdateBatchInfo(eventAttrs []abcitypes.EventAttribute) (
 			if err != nil {
 				return
 			}
+		default:
+			continue
 		}
+		delete(missingAttrs, attr.Key)
 	}
+	err = missingAttrsError(missingAttrs)
 	return
 }
 
@@ -55,6 +87,16 @@ func ParseMsgInitiateDeposit(eventAttrs []abcitypes.EventAttribute) (
 	bridgeId, l1Sequence uint64,
 	from, to, l1Denom, l2Denom, amount string,
 	data []byte, err error) {
+	missingAttrs := map[string]struct{}{
+		ophosttypes.AttributeKeyBridgeId:   {},
+		ophosttypes.AttributeKeyL1Sequence: {},
+		ophosttypes.AttributeKeyFrom:       {},
+		ophosttypes.AttributeKeyTo:         {},
+		ophosttypes.AttributeKeyL1Denom:    {},
+		ophosttypes.AttributeKeyL2Denom:    {},
+		ophosttypes.AttributeKeyAmount:     {},
+		ophosttypes.AttributeKeyData:       {},
+	}
 
 	for _, attr := range eventAttrs {
 		switch attr.Key {
@@ -83,8 +125,12 @@ func ParseMsgInitiateDeposit(eventAttrs []abcitypes.EventAttribute) (
 			if err != nil {
 				return
 			}
+		default:
+			continue
 		}
+		delete(missingAttrs, attr.Key)
 	}
+	err = missingAttrsError(missingAttrs)
 	return
 }
 
@@ -95,6 +141,14 @@ func ParseMsgProposeOutput(eventAttrs []abcitypes.EventAttribute) (
 	proposer string,
 	outputRoot []byte,
 	err error) {
+	missingAttrs := map[string]struct{}{
+		ophosttypes.AttributeKeyProposer:      {},
+		ophosttypes.AttributeKeyBridgeId:      {},
+		ophosttypes.AttributeKeyOutputIndex:   {},
+		ophosttypes.AttributeKeyL2BlockNumber: {},
+		ophosttypes.AttributeKeyOutputRoot:    {},
+	}
+
 	for _, attr := range eventAttrs {
 		switch attr.Key {
 		case ophosttypes.AttributeKeyProposer:
@@ -119,8 +173,12 @@ func ParseMsgProposeOutput(eventAttrs []abcitypes.EventAttribute) (
 			if err != nil {
 				return
 			}
+		default:
+			continue
 		}
+		delete(missingAttrs, attr.Key)
 	}
+	err = missingAttrsError(missingAttrs)
 	return
 }
 
@@ -128,6 +186,17 @@ func ParseMsgFinalizeWithdrawal(eventAttrs []abcitypes.EventAttribute) (
 	bridgeId, outputIndex, l2Sequence uint64,
 	from, to, l1Denom, l2Denom, amount string,
 	err error) {
+	missingAttrs := map[string]struct{}{
+		ophosttypes.AttributeKeyBridgeId:    {},
+		ophosttypes.AttributeKeyOutputIndex: {},
+		ophosttypes.AttributeKeyL2Sequence:  {},
+		ophosttypes.AttributeKeyFrom:        {},
+		ophosttypes.AttributeKeyTo:          {},
+		ophosttypes.AttributeKeyL1Denom:     {},
+		ophosttypes.AttributeKeyL2Denom:     {},
+		ophosttypes.AttributeKeyAmount:      {},
+	}
+
 	for _, attr := range eventAttrs {
 		switch attr.Key {
 		case ophosttypes.AttributeKeyBridgeId:
@@ -155,7 +224,11 @@ func ParseMsgFinalizeWithdrawal(eventAttrs []abcitypes.EventAttribute) (
 			l2Denom = attr.Value
 		case ophosttypes.AttributeKeyAmount:
 			amount = attr.Value
+		default:
+			continue
 		}
+		delete(missingAttrs, attr.Key)
 	}
+	err = missingAttrsError(missingAttrs)
 	return
 }
