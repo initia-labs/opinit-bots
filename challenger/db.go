@@ -3,6 +3,7 @@ package challenger
 import (
 	"fmt"
 	"slices"
+	"time"
 
 	challengertypes "github.com/initia-labs/opinit-bots/challenger/types"
 	"github.com/initia-labs/opinit-bots/node"
@@ -84,17 +85,35 @@ func (c *Challenger) loadChallenges() (challenges []challengertypes.Challenge, e
 	return
 }
 
-func ResetHeights(db types.DB) error {
-	dbs := []types.DB{
-		db.WithPrefix([]byte(types.HostName)),
-		db.WithPrefix([]byte(types.ChildName)),
+func (c *Challenger) DeleteFutureChallenges(initialBlockTime time.Time) error {
+	deletingKeys := make([][]byte, 0)
+	iterErr := c.db.PrefixedIterate(challengertypes.PrefixedChallengeEventTime(initialBlockTime), func(key []byte, _ []byte) (stop bool, err error) {
+		deletingKeys = append(deletingKeys, key)
+		return false, nil
+	})
+	if iterErr != nil {
+		return iterErr
 	}
 
-	for _, db := range dbs {
-		if err := node.DeleteSyncInfo(db); err != nil {
+	for _, key := range deletingKeys {
+		err := c.db.Delete(key)
+		if err != nil {
 			return err
 		}
-		fmt.Printf("reset height to 0 for node %s\n", string(db.GetPrefix()))
+	}
+	return nil
+}
+
+func ResetHeights(db types.DB) error {
+	dbNames := []string{
+		types.HostName,
+		types.ChildName,
+	}
+
+	for _, dbName := range dbNames {
+		if err := ResetHeight(db, dbName); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -105,10 +124,56 @@ func ResetHeight(db types.DB, nodeName string) error {
 		return errors.New("unknown node name")
 	}
 	nodeDB := db.WithPrefix([]byte(nodeName))
-	err := node.DeleteSyncInfo(nodeDB)
-	if err != nil {
+
+	if err := DeletePendingEvents(db); err != nil {
+		return err
+	}
+
+	if err := DeletePendingChallenges(db); err != nil {
+		return err
+	}
+
+	if err := node.DeleteSyncInfo(nodeDB); err != nil {
 		return err
 	}
 	fmt.Printf("reset height to 0 for node %s\n", string(nodeDB.GetPrefix()))
+	return nil
+}
+
+func DeletePendingEvents(db types.DB) error {
+	deletingKeys := make([][]byte, 0)
+	iterErr := db.PrefixedIterate(challengertypes.PendingEventKey, func(key []byte, _ []byte) (stop bool, err error) {
+		deletingKeys = append(deletingKeys, key)
+		return false, nil
+	})
+	if iterErr != nil {
+		return iterErr
+	}
+
+	for _, key := range deletingKeys {
+		err := db.Delete(key)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func DeletePendingChallenges(db types.DB) error {
+	deletingKeys := make([][]byte, 0)
+	iterErr := db.PrefixedIterate(challengertypes.PendingChallengeKey, func(key []byte, _ []byte) (stop bool, err error) {
+		deletingKeys = append(deletingKeys, key)
+		return false, nil
+	})
+	if iterErr != nil {
+		return iterErr
+	}
+
+	for _, key := range deletingKeys {
+		err := db.Delete(key)
+		if err != nil {
+			return err
+		}
+	}
 	return nil
 }

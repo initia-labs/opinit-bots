@@ -4,6 +4,7 @@ import (
 	"context"
 	"strconv"
 	"sync"
+	"time"
 
 	"github.com/pkg/errors"
 
@@ -101,14 +102,29 @@ func (c *Challenger) Initialize(ctx context.Context) error {
 		return err
 	}
 
-	err = c.host.Initialize(ctx, hostProcessedHeight, c.child, bridgeInfo, c)
+	var initialBlockTime time.Time
+	hostInitialBlockTime, err := c.host.Initialize(ctx, hostProcessedHeight, c.child, bridgeInfo, c)
 	if err != nil {
 		return err
 	}
-	err = c.child.Initialize(ctx, childProcessedHeight, processedOutputIndex+1, c.host, bridgeInfo, c)
+	if initialBlockTime.Before(hostInitialBlockTime) {
+		initialBlockTime = hostInitialBlockTime
+	}
+
+	childInitialBlockTime, err := c.child.Initialize(ctx, childProcessedHeight, processedOutputIndex+1, c.host, bridgeInfo, c)
 	if err != nil {
 		return err
 	}
+	if initialBlockTime.Before(childInitialBlockTime) {
+		initialBlockTime = childInitialBlockTime
+	}
+	if !initialBlockTime.IsZero() {
+		err := c.DeleteFutureChallenges(initialBlockTime)
+		if err != nil {
+			return err
+		}
+	}
+
 	c.RegisterQuerier()
 
 	c.pendingChallenges, err = c.loadPendingChallenges()

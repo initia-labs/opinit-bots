@@ -9,23 +9,15 @@ import (
 )
 
 func ResetHeights(db types.DB) error {
-	dbs := []types.DB{
-		db.WithPrefix([]byte(types.HostName)),
-		db.WithPrefix([]byte(types.ChildName)),
-		db.WithPrefix([]byte(types.BatchName)),
+	dbNames := []string{
+		types.HostName,
+		types.ChildName,
+		types.BatchName,
 	}
-
-	for _, db := range dbs {
-		if err := node.DeleteSyncInfo(db); err != nil {
+	for _, dbName := range dbNames {
+		if err := ResetHeight(db, dbName); err != nil {
 			return err
 		}
-		if err := node.DeletePendingTxs(db); err != nil {
-			return err
-		}
-		if err := node.DeleteProcessedMsgs(db); err != nil {
-			return err
-		}
-		fmt.Printf("reset height to 0 for node %s\n", string(db.GetPrefix()))
 	}
 	return nil
 }

@@ -34,14 +34,18 @@ func PrefixedPendingChallenge(id ChallengeId) []byte {
 		PrefixedEventTypeId(id.Type, id.Id)...)
 }
 
-func PrefixedTimeEventTypeId(eventTime time.Time, id ChallengeId) []byte {
-	return append(append(dbtypes.FromUint64Key(types.MustInt64ToUint64(eventTime.UnixNano())), dbtypes.Splitter),
-		PrefixedEventTypeId(id.Type, id.Id)...)
+func PrefixedTimeEvent(eventTime time.Time) []byte {
+	return append(dbtypes.FromUint64Key(types.MustInt64ToUint64(eventTime.UnixNano())), dbtypes.Splitter)
+}
+
+func PrefixedChallengeEventTime(eventTime time.Time) []byte {
+	return append(append(ChallengeKey, dbtypes.Splitter),
+		PrefixedTimeEvent(eventTime)...)
 }
 
 func PrefixedChallenge(eventTime time.Time, id ChallengeId) []byte {
-	return append(append(ChallengeKey, dbtypes.Splitter),
-		PrefixedTimeEventTypeId(eventTime, id)...)
+	return append(PrefixedChallengeEventTime(eventTime),
+		PrefixedEventTypeId(id.Type, id.Id)...)
 }
 
 func ParsePendingEvent(key []byte) (ChallengeId, error) {
