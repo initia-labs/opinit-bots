@@ -57,3 +57,14 @@ func ParsePendingEvent(key []byte) (ChallengeId, error) {
 	idBz := key[len(key)-8:]
 	return ChallengeId{Type: EventType(typeBz[0]), Id: dbtypes.ToUint64Key(idBz)}, nil
 }
+
+func ParseChallenge(key []byte) (time.Time, ChallengeId, error) {
+	if len(key) < 19 {
+		return time.Time{}, ChallengeId{}, errors.New("invalid key bytes")
+	}
+
+	timeBz := key[len(key)-19 : len(key)-11]
+	typeBz := key[len(key)-10 : len(key)-9]
+	idBz := key[len(key)-8:]
+	return time.Unix(0, types.MustUint64ToInt64(dbtypes.ToUint64Key(timeBz))), ChallengeId{Type: EventType(typeBz[0]), Id: dbtypes.ToUint64Key(idBz)}, nil
+}

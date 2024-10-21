@@ -87,7 +87,15 @@ func (c *Challenger) loadChallenges() (challenges []challengertypes.Challenge, e
 
 func (c *Challenger) DeleteFutureChallenges(initialBlockTime time.Time) error {
 	deletingKeys := make([][]byte, 0)
-	iterErr := c.db.PrefixedIterate(challengertypes.PrefixedChallengeEventTime(initialBlockTime), func(key []byte, _ []byte) (stop bool, err error) {
+	iterErr := c.db.PrefixedReverseIterate(challengertypes.ChallengeKey, func(key []byte, _ []byte) (stop bool, err error) {
+		ts, _, err := challengertypes.ParseChallenge(key)
+		if err != nil {
+			return true, err
+		}
+		if !ts.After(initialBlockTime) {
+			return true, nil
+		}
+
 		deletingKeys = append(deletingKeys, key)
 		return false, nil
 	})
