@@ -6,7 +6,6 @@ import (
 
 	"go.uber.org/zap"
 
-	opchildtypes "github.com/initia-labs/OPinit/x/opchild/types"
 	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
 
 	nodetypes "github.com/initia-labs/opinit-bots/node/types"
@@ -55,7 +54,7 @@ func NewHostV1(
 	}
 }
 
-func (h *Host) Initialize(ctx context.Context, processedHeight int64, child childNode, bridgeInfo opchildtypes.BridgeInfo, challenger challenger) error {
+func (h *Host) Initialize(ctx context.Context, processedHeight int64, child childNode, bridgeInfo ophosttypes.QueryBridgeResponse, challenger challenger) error {
 	err := h.BaseHost.Initialize(ctx, processedHeight, bridgeInfo)
 	if err != nil {
 		return err

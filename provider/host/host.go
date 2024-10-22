@@ -10,7 +10,6 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/x/auth"
 
-	opchildtypes "github.com/initia-labs/OPinit/x/opchild/types"
 	"github.com/initia-labs/OPinit/x/ophost"
 	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
 
@@ -26,7 +25,7 @@ type BaseHost struct {
 
 	node *node.Node
 
-	bridgeInfo opchildtypes.BridgeInfo
+	bridgeInfo ophosttypes.QueryBridgeResponse
 
 	cfg    nodetypes.NodeConfig
 	db     types.DB
@@ -79,7 +78,7 @@ func GetCodec(bech32Prefix string) (codec.Codec, client.TxConfig, error) {
 	})
 }
 
-func (b *BaseHost) Initialize(ctx context.Context, processedHeight int64, bridgeInfo opchildtypes.BridgeInfo) error {
+func (b *BaseHost) Initialize(ctx context.Context, processedHeight int64, bridgeInfo ophosttypes.QueryBridgeResponse) error {
 	err := b.node.Initialize(ctx, processedHeight)
 	if err != nil {
 		return err
@@ -121,11 +120,11 @@ func (b BaseHost) OracleEnabled() bool {
 	return b.bridgeInfo.BridgeConfig.OracleEnabled
 }
 
-func (b *BaseHost) SetBridgeInfo(bridgeInfo opchildtypes.BridgeInfo) {
+func (b *BaseHost) SetBridgeInfo(bridgeInfo ophosttypes.QueryBridgeResponse) {
 	b.bridgeInfo = bridgeInfo
 }
 
-func (b BaseHost) BridgeInfo() opchildtypes.BridgeInfo {
+func (b BaseHost) BridgeInfo() ophosttypes.QueryBridgeResponse {
 	return b.bridgeInfo
 }
 

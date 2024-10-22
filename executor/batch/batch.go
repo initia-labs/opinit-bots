@@ -31,7 +31,7 @@ type BatchSubmitter struct {
 	host hostNode
 	da   executortypes.DANode
 
-	bridgeInfo opchildtypes.BridgeInfo
+	bridgeInfo ophosttypes.QueryBridgeResponse
 
 	cfg      nodetypes.NodeConfig
 	batchCfg executortypes.BatchConfig
@@ -96,7 +96,7 @@ func NewBatchSubmitterV1(
 	return ch
 }
 
-func (bs *BatchSubmitter) Initialize(ctx context.Context, processedHeight int64, host hostNode, bridgeInfo opchildtypes.BridgeInfo) error {
+func (bs *BatchSubmitter) Initialize(ctx context.Context, processedHeight int64, host hostNode, bridgeInfo ophosttypes.QueryBridgeResponse) error {
 	err := bs.node.Initialize(ctx, processedHeight)
 	if err != nil {
 		return err
@@ -172,7 +172,7 @@ func (bs *BatchSubmitter) Close() {
 	}
 }
 
-func (bs *BatchSubmitter) SetBridgeInfo(bridgeInfo opchildtypes.BridgeInfo) {
+func (bs *BatchSubmitter) SetBridgeInfo(bridgeInfo ophosttypes.QueryBridgeResponse) {
 	bs.bridgeInfo = bridgeInfo
 }
 

@@ -17,7 +17,6 @@ import (
 	bottypes "github.com/initia-labs/opinit-bots/bot/types"
 	executortypes "github.com/initia-labs/opinit-bots/executor/types"
 
-	opchildtypes "github.com/initia-labs/OPinit/x/opchild/types"
 	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
 	"github.com/initia-labs/opinit-bots/types"
 	"go.uber.org/zap"
@@ -75,12 +74,17 @@ func NewExecutor(cfg *executortypes.Config, db types.DB, sv *server.Server, logg
 }
 
 func (ex *Executor) Initialize(ctx context.Context) error {
-	bridgeInfo, err := ex.child.QueryBridgeInfo(ctx)
+	childBridgeInfo, err := ex.child.QueryBridgeInfo(ctx)
 	if err != nil {
 		return err
 	}
-	if bridgeInfo.BridgeId == 0 {
+	if childBridgeInfo.BridgeId == 0 {
 		return errors.New("bridge info is not set")
+	}
+
+	bridgeInfo, err := ex.host.QueryBridgeConfig(ctx, childBridgeInfo.BridgeId)
+	if err != nil {
+		return err
 	}
 
 	ex.logger.Info(
@@ -94,20 +98,20 @@ func (ex *Executor) Initialize(ctx context.Context) error {
 		return err
 	}
 
-	err = ex.host.Initialize(ctx, hostProcessedHeight, ex.child, ex.batch, bridgeInfo)
+	err = ex.host.Initialize(ctx, hostProcessedHeight, ex.child, ex.batch, *bridgeInfo)
 	if err != nil {
 		return err
 	}
-	err = ex.child.Initialize(ctx, childProcessedHeight, processedOutputIndex+1, ex.host, bridgeInfo)
+	err = ex.child.Initialize(ctx, childProcessedHeight, processedOutputIndex+1, ex.host, *bridgeInfo)
 	if err != nil {
 		return err
 	}
-	err = ex.batch.Initialize(ctx, batchProcessedHeight, ex.host, bridgeInfo)
+	err = ex.batch.Initialize(ctx, batchProcessedHeight, ex.host, *bridgeInfo)
 	if err != nil {
 		return err
 	}
 
-	da, err := ex.makeDANode(ctx, bridgeInfo)
+	da, err := ex.makeDANode(ctx, *bridgeInfo)
 	if err != nil {
 		return err
 	}
@@ -165,7 +169,7 @@ func (ex *Executor) RegisterQuerier() {
 	})
 }
 
-func (ex *Executor) makeDANode(ctx context.Context, bridgeInfo opchildtypes.BridgeInfo) (executortypes.DANode, error) {
+func (ex *Executor) makeDANode(ctx context.Context, bridgeInfo ophosttypes.QueryBridgeResponse) (executortypes.DANode, error) {
 	if !ex.cfg.EnableBatchSubmitter {
 		return batch.NewNoopDA(), nil
 	}

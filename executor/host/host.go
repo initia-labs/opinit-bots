@@ -7,7 +7,6 @@ import (
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 
-	opchildtypes "github.com/initia-labs/OPinit/x/opchild/types"
 	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
 
 	executortypes "github.com/initia-labs/opinit-bots/executor/types"
@@ -61,7 +60,7 @@ func NewHostV1(
 	}
 }
 
-func (h *Host) Initialize(ctx context.Context, processedHeight int64, child childNode, batch batchNode, bridgeInfo opchildtypes.BridgeInfo) error {
+func (h *Host) Initialize(ctx context.Context, processedHeight int64, child childNode, batch batchNode, bridgeInfo ophosttypes.QueryBridgeResponse) error {
 	err := h.BaseHost.Initialize(ctx, processedHeight, bridgeInfo)
 	if err != nil {
 		return err
@@ -76,7 +75,7 @@ func (h *Host) Initialize(ctx context.Context, processedHeight int64, child chil
 	return nil
 }
 
-func (h *Host) InitializeDA(ctx context.Context, bridgeInfo opchildtypes.BridgeInfo) error {
+func (h *Host) InitializeDA(ctx context.Context, bridgeInfo ophosttypes.QueryBridgeResponse) error {
 	err := h.BaseHost.Initialize(ctx, 0, bridgeInfo)
 	if err != nil {
 		return err

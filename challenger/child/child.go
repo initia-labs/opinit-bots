@@ -56,7 +56,7 @@ func NewChildV1(
 	}
 }
 
-func (ch *Child) Initialize(ctx context.Context, processedHeight int64, startOutputIndex uint64, host hostNode, bridgeInfo opchildtypes.BridgeInfo, challenger challenger) error {
+func (ch *Child) Initialize(ctx context.Context, processedHeight int64, startOutputIndex uint64, host hostNode, bridgeInfo ophosttypes.QueryBridgeResponse, challenger challenger) error {
 	_, err := ch.BaseChild.Initialize(ctx, processedHeight, startOutputIndex, bridgeInfo)
 	if err != nil {
 		return err
