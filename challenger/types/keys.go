@@ -53,8 +53,10 @@ func ParsePendingEvent(key []byte) (ChallengeId, error) {
 		return ChallengeId{}, errors.New("invalid key bytes")
 	}
 
-	typeBz := key[len(key)-10 : len(key)-9]
-	idBz := key[len(key)-8:]
+	cursor := len(key) - 10
+	typeBz := key[cursor : cursor+1]
+	cursor += 1 + 1 // u8 + splitter
+	idBz := key[cursor:]
 	return ChallengeId{Type: EventType(typeBz[0]), Id: dbtypes.ToUint64Key(idBz)}, nil
 }
 
@@ -63,7 +65,7 @@ func ParseChallenge(key []byte) (time.Time, ChallengeId, error) {
 		return time.Time{}, ChallengeId{}, errors.New("invalid key bytes")
 	}
 
-	cursor := 0
+	cursor := len(key) - 19
 	timeBz := key[cursor : cursor+8]
 	cursor += 8 + 1 // u64 + splitter
 	typeBz := key[cursor : cursor+1]
