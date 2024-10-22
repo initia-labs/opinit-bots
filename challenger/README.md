@@ -1,6 +1,7 @@
 # Challenger
 
-The Challenger is responsible for 
+The Challenger is responsible for
+
 1. verifying that the `MsgInitiateTokenDeposit` event is properly relayed to `MsgFinalizeTokenDeposit`.
 2. checking whether `MsgInitiateTokenDeposit` was relayed on time.
 3. verifying that the `Oracle` data is properly relayed to `MsgUpdateOracle`.
@@ -44,9 +45,10 @@ To configure the Challenger, fill in the values in the `~/.opinit/challenger.jso
 ```
 
 ### Start height config examples
+
 If the latest height stored in the db is not 0, start height config is ignored.
 
-```
+```shell
 Output tx 1 
 - L1BlockNumber: 10
 - L2BlockNumber: 100
@@ -71,62 +73,75 @@ FinalizedTokenDeposit tx 2
 ```
 
 #### Config 1
+
 ```json
 {
   l2_start_height: 150, 
 }
 ```
+
 When Child's last l1 Sequence is `2`,
+
 - L1 starts from the height 10 + 1 = 11
 - L2 starts from the height 100 + 1 = 101
 
-
 ## Handler rules for the components of the Challenger
-For registered events or tx handlers, work processed in a block is atomically saved as `pending events`. Therefore, if `pending events` with the `ChallengeEvent` interface cannot be processed due to an interrupt or error, it is guaranteed to be read from the DB and processed. When an event matching the pending event comes in and is processed, or when the block time exceeds the event's timeout, a `Challenge` is created and stored in the DB. 
-#### The challenger can check the generated `Challenges` and decide what action to take.
+
+For registered events or tx handlers, work processed in a block is atomically saved as `pending events`. Therefore, if `pending events` with the `ChallengeEvent` interface cannot be processed due to an interrupt or error, it is guaranteed to be read from the DB and processed. When an event matching the pending event comes in and is processed, or when the block time exceeds the event's timeout, a `Challenge` is created and stored in the DB.
+
+### The challenger can check the generated `Challenges` and decide what action to take
 
 ## Deposit
+
 When the `initiate_token_deposit` event is detected in l1, saves it as a `Deposit` challenge event and check if it is the same as the `MsgFinalizeTokenDeposit` for the same sequence.
+
 ```go
 // Deposit is the challenge event for the deposit
 type Deposit struct {
-	EventType     string    `json:"event_type"`
-	Sequence      uint64    `json:"sequence"`
-	L1BlockHeight int64    `json:"l1_block_height"`
-	From          string    `json:"from"`
-	To            string    `json:"to"`
-	L1Denom       string    `json:"l1_denom"`
-	Amount        string    `json:"amount"`
-	Time          time.Time `json:"time"`
-	Timeout       bool      `json:"timeout"`
+ EventType     string    `json:"event_type"`
+ Sequence      uint64    `json:"sequence"`
+ L1BlockHeight int64    `json:"l1_block_height"`
+ From          string    `json:"from"`
+ To            string    `json:"to"`
+ L1Denom       string    `json:"l1_denom"`
+ Amount        string    `json:"amount"`
+ Time          time.Time `json:"time"`
+ Timeout       bool      `json:"timeout"`
 }
 ```
 
 ## Output
+
 When the `propose_output` event is detected in l1, saves it as a `Output` challenge event, replays up to l2 block number and check if `OutputRoot` is the same as submitted.
+
 ```go
 // Output is the challenge event for the output
 type Output struct {
-	EventType     string    `json:"event_type"`
-	L2BlockNumber int64    `json:"l2_block_number"`
-	OutputIndex   uint64    `json:"output_index"`
-	OutputRoot    []byte    `json:"output_root"`
-	Time          time.Time `json:"time"`
-	Timeout       bool      `json:"timeout"`
+ EventType     string    `json:"event_type"`
+ L2BlockNumber int64    `json:"l2_block_number"`
+ OutputIndex   uint64    `json:"output_index"`
+ OutputRoot    []byte    `json:"output_root"`
+ Time          time.Time `json:"time"`
+ Timeout       bool      `json:"timeout"`
 }
 ```
 
 ## Oracle
+
 If `oracle_enable` is turned on in bridge config, saves bytes of the 0th Tx as a `Oracle` challenge event and check if it is the same data in the `MsgUpdateOracle` for the l1 height.
 
 ## Batch
-Batch data is not verified by the challenger bot. 
-#### TODO
-* Challenger runs a L2 node it in rollup sync challenge mode in CometBFT to check whether the submitted batch is replayed properly.
+
+Batch data is not verified by the challenger bot.
+
+### TODO
+
+- Challenger runs a L2 node it in rollup sync challenge mode in CometBFT to check whether the submitted batch is replayed properly.
 
 ## Query
 
 ### Status
+
 ```bash
 curl localhost:3001/status
 ```
@@ -161,6 +176,7 @@ curl localhost:3001/status
 ```
 
 ### Challenges
+
 ```bash
 curl localhost:3001/challenges/{page}
 ```
@@ -180,6 +196,7 @@ curl localhost:3001/challenges/{page}
 ```
 
 ### Pending events
+
 ```bash
 curl localhost:3001/pending_events/host
 ```

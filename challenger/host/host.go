@@ -71,6 +71,8 @@ func (h *Host) Initialize(ctx context.Context, processedHeight int64, child chil
 	}
 
 	var blockTime time.Time
+
+	// only called when `ResetHeight` was executed.
 	if h.Node().HeightInitialized() {
 		blockTime, err = h.Node().QueryBlockTime(ctx, h.Node().GetHeight())
 		if err != nil {

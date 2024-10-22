@@ -71,6 +71,8 @@ func (ch *Child) Initialize(ctx context.Context, processedHeight int64, startOut
 	}
 
 	var blockTime time.Time
+
+	// only called when `ResetHeight` was executed.
 	if ch.Node().HeightInitialized() {
 		blockTime, err = ch.Node().QueryBlockTime(ctx, ch.Node().GetHeight())
 		if err != nil {

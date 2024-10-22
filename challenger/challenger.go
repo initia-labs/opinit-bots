@@ -118,7 +118,11 @@ func (c *Challenger) Initialize(ctx context.Context) error {
 	if initialBlockTime.Before(childInitialBlockTime) {
 		initialBlockTime = childInitialBlockTime
 	}
+
+	// only called when `ResetHeight` is executed.`
 	if !initialBlockTime.IsZero() {
+		// The db state is reset to a specific height, so we also
+		// need to delete future challenges which are not applicable anymore.
 		err := c.DeleteFutureChallenges(initialBlockTime)
 		if err != nil {
 			return err
