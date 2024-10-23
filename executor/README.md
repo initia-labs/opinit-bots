@@ -58,10 +58,12 @@ To configure the Executor, fill in the values in the `~/.opinit/executor.json` f
   "max_chunk_size": 300000,
   // MaxSubmissionTime is the maximum time to submit a batch.
   "max_submission_time": 3600,
-  // L1StartHeight is the height to start the l1 node. If it is 0, it will finds the optimal height and sets it automatically.
-  // However, if you do not want to use this feature, set it to a non-zero value.
-  // There is no need for modification under normal circumstances, because it
-  // is automatically determined when you set the l2 start height,
+  // DisableAutoSetL1Height is the flag to disable the automatic setting of the l1 height.
+  // If it is false, it will finds the optimal height and sets l1_start_height automatically
+  // from l2 start height and l1_start_height is ignored.
+  // It can be useful when you don't want to use TxSearch.
+  "disable_auto_set_l1_height": false,
+  // L1StartHeight is the height to start the l1 node.
   "l1_start_height": 0,
   // L2StartHeight is the height to start the l2 node. If it is 0, it will start from the latest height.
   // If the latest height stored in the db is not 0, this config is ignored.

@@ -224,7 +224,9 @@ func (ex *Executor) getProcessedHeights(ctx context.Context, bridgeId uint64) (l
 		}
 	}
 
-	if ex.cfg.L1StartHeight == 0 {
+	if ex.cfg.DisableAutoSetL1Height {
+		l1ProcessedHeight = ex.cfg.L1StartHeight
+	} else {
 		// get the bridge start height from the host
 		l1ProcessedHeight, err = ex.host.QueryCreateBridgeHeight(ctx, bridgeId)
 		if err != nil {
@@ -250,13 +252,14 @@ func (ex *Executor) getProcessedHeights(ctx context.Context, bridgeId uint64) (l
 		if depositTxHeight > l1ProcessedHeight {
 			l1ProcessedHeight = depositTxHeight
 		}
-		if outputL1BlockNumber < l1ProcessedHeight {
+		if outputL1BlockNumber != 0 && outputL1BlockNumber < l1ProcessedHeight {
 			l1ProcessedHeight = outputL1BlockNumber
 		}
-	} else {
-		l1ProcessedHeight = ex.cfg.L1StartHeight
 	}
-	l1ProcessedHeight--
+
+	if l1ProcessedHeight > 0 {
+		l1ProcessedHeight--
+	}
 
 	if ex.cfg.BatchStartHeight > 0 {
 		batchProcessedHeight = ex.cfg.BatchStartHeight - 1

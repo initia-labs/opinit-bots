@@ -56,10 +56,10 @@ func NewChildV1(
 	}
 }
 
-func (ch *Child) Initialize(ctx context.Context, processedHeight int64, startOutputIndex uint64, host hostNode, bridgeInfo ophosttypes.QueryBridgeResponse, challenger challenger) error {
+func (ch *Child) Initialize(ctx context.Context, processedHeight int64, startOutputIndex uint64, host hostNode, bridgeInfo ophosttypes.QueryBridgeResponse, challenger challenger) (time.Time, error) {
 	_, err := ch.BaseChild.Initialize(ctx, processedHeight, startOutputIndex, bridgeInfo, nil)
 	if err != nil {
-		return err
+		return time.Time{}, err
 	}
 	ch.host = host
 	ch.challenger = challenger
@@ -67,9 +67,19 @@ func (ch *Child) Initialize(ctx context.Context, processedHeight int64, startOut
 
 	err = ch.eventHandler.Initialize(bridgeInfo.BridgeConfig.SubmissionInterval)
 	if err != nil {
-		return err
+		return time.Time{}, err
 	}
-	return nil
+
+	var blockTime time.Time
+
+	// only called when `ResetHeight` was executed.
+	if ch.Node().HeightInitialized() {
+		blockTime, err = ch.Node().QueryBlockTime(ctx, ch.Node().GetHeight())
+		if err != nil {
+			return time.Time{}, err
+		}
+	}
+	return blockTime, nil
 }
 
 func (ch *Child) registerHandlers() {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"strconv"
 	"sync"
+	"time"
 
 	"github.com/pkg/errors"
 
@@ -106,14 +107,33 @@ func (c *Challenger) Initialize(ctx context.Context) error {
 		return err
 	}
 
-	err = c.host.Initialize(ctx, hostProcessedHeight, c.child, *bridgeInfo, c)
+	var initialBlockTime time.Time
+	hostInitialBlockTime, err := c.host.Initialize(ctx, hostProcessedHeight, c.child, *bridgeInfo, c)
 	if err != nil {
 		return err
 	}
-	err = c.child.Initialize(ctx, childProcessedHeight, processedOutputIndex+1, c.host, *bridgeInfo, c)
+	if initialBlockTime.Before(hostInitialBlockTime) {
+		initialBlockTime = hostInitialBlockTime
+	}
+
+	childInitialBlockTime, err := c.child.Initialize(ctx, childProcessedHeight, processedOutputIndex+1, c.host, *bridgeInfo, c)
 	if err != nil {
 		return err
 	}
+	if initialBlockTime.Before(childInitialBlockTime) {
+		initialBlockTime = childInitialBlockTime
+	}
+
+	// only called when `ResetHeight` was executed.
+	if !initialBlockTime.IsZero() {
+		// The db state is reset to a specific height, so we also
+		// need to delete future challenges which are not applicable anymore.
+		err := c.DeleteFutureChallenges(initialBlockTime)
+		if err != nil {
+			return err
+		}
+	}
+
 	c.RegisterQuerier()
 
 	c.pendingChallenges, err = c.loadPendingChallenges()
@@ -211,7 +231,9 @@ func (c *Challenger) getProcessedHeights(ctx context.Context, bridgeId uint64) (
 		}
 	}
 
-	if c.cfg.L1StartHeight == 0 {
+	if c.cfg.DisableAutoSetL1Height {
+		l1ProcessedHeight = c.cfg.L1StartHeight
+	} else {
 		// get the bridge start height from the host
 		l1ProcessedHeight, err = c.host.QueryCreateBridgeHeight(ctx, bridgeId)
 		if err != nil {
@@ -238,14 +260,14 @@ func (c *Challenger) getProcessedHeights(ctx context.Context, bridgeId uint64) (
 			if depositTxHeight > l1ProcessedHeight {
 				l1ProcessedHeight = depositTxHeight
 			}
-			if outputL1BlockNumber < l1ProcessedHeight {
+			if outputL1BlockNumber != 0 && outputL1BlockNumber < l1ProcessedHeight {
 				l1ProcessedHeight = outputL1BlockNumber
 			}
 		}
-	} else {
-		l1ProcessedHeight = c.cfg.L1StartHeight
 	}
-	l1ProcessedHeight--
+	if l1ProcessedHeight > 0 {
+		l1ProcessedHeight--
+	}
 
 	return l1ProcessedHeight, l2ProcessedHeight, processedOutputIndex, err
 }
