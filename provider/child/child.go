@@ -44,9 +44,9 @@ type BaseChild struct {
 
 func NewBaseChildV1(
 	cfg nodetypes.NodeConfig,
-	db types.DB, logger *zap.Logger, bech32Prefix string,
+	db types.DB, logger *zap.Logger,
 ) *BaseChild {
-	appCodec, txConfig, err := GetCodec(bech32Prefix)
+	appCodec, txConfig, err := GetCodec(cfg.Bech32Prefix)
 	if err != nil {
 		panic(err)
 	}
@@ -89,8 +89,8 @@ func GetCodec(bech32Prefix string) (codec.Codec, client.TxConfig, error) {
 	})
 }
 
-func (b *BaseChild) Initialize(ctx context.Context, processedHeight int64, startOutputIndex uint64, bridgeInfo ophosttypes.QueryBridgeResponse) (uint64, error) {
-	err := b.node.Initialize(ctx, processedHeight)
+func (b *BaseChild) Initialize(ctx context.Context, processedHeight int64, startOutputIndex uint64, bridgeInfo ophosttypes.QueryBridgeResponse, keyringConfig *btypes.KeyringConfig) (uint64, error) {
+	err := b.node.Initialize(ctx, processedHeight, keyringConfig)
 	if err != nil {
 		return 0, err
 	}

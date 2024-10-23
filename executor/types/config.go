@@ -44,17 +44,15 @@ type Config struct {
 	// DANode is the configuration for the data availability node.
 	DANode NodeConfig `json:"da_node"`
 
-	// OutputSubmitter is the key name in the keyring for the output submitter,
-	// which is used to relay the output transaction from l2 to l1.
-	//
-	// If you don't want to use the output submitter feature, you can leave it empty.
-	OutputSubmitter string `json:"output_submitter"`
-
 	// BridgeExecutor is the key name in the keyring for the bridge executor,
 	// which is used to relay initiate token bridge transaction from l1 to l2.
 	//
 	// If you don't want to use the bridge executor feature, you can leave it empty.
 	BridgeExecutor string `json:"bridge_executor"`
+
+	// EnableOutputSubmitter is the flag to enable the output submitter.
+	// If it is false, the output submitter will not be started.
+	EnableOutputSubmitter bool `json:"enable_output_submitter"`
 
 	// EnableBatchSubmitter is the flag to enable the batch submitter.
 	// If it is false, the batch submitter will not be started.
@@ -114,9 +112,9 @@ func DefaultConfig() *Config {
 			TxTimeout:     60,
 		},
 
-		OutputSubmitter:      "",
-		BridgeExecutor:       "",
-		EnableBatchSubmitter: true,
+		BridgeExecutor:        "",
+		EnableOutputSubmitter: true,
+		EnableBatchSubmitter:  true,
 
 		MaxChunks:         5000,
 		MaxChunkSize:      300000,  // 300KB
@@ -181,21 +179,19 @@ func (cfg Config) Validate() error {
 
 func (cfg Config) L1NodeConfig(homePath string) nodetypes.NodeConfig {
 	nc := nodetypes.NodeConfig{
-		RPC:         cfg.L1Node.RPCAddress,
-		ProcessType: nodetypes.PROCESS_TYPE_DEFAULT,
+		RPC:          cfg.L1Node.RPCAddress,
+		ProcessType:  nodetypes.PROCESS_TYPE_DEFAULT,
+		Bech32Prefix: cfg.L1Node.Bech32Prefix,
 	}
 
-	if cfg.OutputSubmitter != "" {
+	if cfg.EnableOutputSubmitter {
 		nc.BroadcasterConfig = &btypes.BroadcasterConfig{
 			ChainID:       cfg.L1Node.ChainID,
 			GasPrice:      cfg.L1Node.GasPrice,
 			GasAdjustment: cfg.L1Node.GasAdjustment,
-			Bech32Prefix:  cfg.L1Node.Bech32Prefix,
 			TxTimeout:     time.Duration(cfg.L1Node.TxTimeout) * time.Second,
-			KeyringConfig: btypes.KeyringConfig{
-				Name:     cfg.OutputSubmitter,
-				HomePath: homePath,
-			},
+			Bech32Prefix:  cfg.L1Node.Bech32Prefix,
+			HomePath:      homePath,
 		}
 	}
 
@@ -204,8 +200,9 @@ func (cfg Config) L1NodeConfig(homePath string) nodetypes.NodeConfig {
 
 func (cfg Config) L2NodeConfig(homePath string) nodetypes.NodeConfig {
 	nc := nodetypes.NodeConfig{
-		RPC:         cfg.L2Node.RPCAddress,
-		ProcessType: nodetypes.PROCESS_TYPE_DEFAULT,
+		RPC:          cfg.L2Node.RPCAddress,
+		ProcessType:  nodetypes.PROCESS_TYPE_DEFAULT,
+		Bech32Prefix: cfg.L2Node.Bech32Prefix,
 	}
 
 	if cfg.BridgeExecutor != "" {
@@ -213,12 +210,9 @@ func (cfg Config) L2NodeConfig(homePath string) nodetypes.NodeConfig {
 			ChainID:       cfg.L2Node.ChainID,
 			GasPrice:      cfg.L2Node.GasPrice,
 			GasAdjustment: cfg.L2Node.GasAdjustment,
-			Bech32Prefix:  cfg.L2Node.Bech32Prefix,
 			TxTimeout:     time.Duration(cfg.L2Node.TxTimeout) * time.Second,
-			KeyringConfig: btypes.KeyringConfig{
-				Name:     cfg.BridgeExecutor,
-				HomePath: homePath,
-			},
+			Bech32Prefix:  cfg.L2Node.Bech32Prefix,
+			HomePath:      homePath,
 		}
 	}
 
@@ -227,8 +221,9 @@ func (cfg Config) L2NodeConfig(homePath string) nodetypes.NodeConfig {
 
 func (cfg Config) DANodeConfig(homePath string) nodetypes.NodeConfig {
 	nc := nodetypes.NodeConfig{
-		RPC:         cfg.DANode.RPCAddress,
-		ProcessType: nodetypes.PROCESS_TYPE_ONLY_BROADCAST,
+		RPC:          cfg.DANode.RPCAddress,
+		ProcessType:  nodetypes.PROCESS_TYPE_ONLY_BROADCAST,
+		Bech32Prefix: cfg.DANode.Bech32Prefix,
 	}
 
 	if cfg.EnableBatchSubmitter {
@@ -236,11 +231,9 @@ func (cfg Config) DANodeConfig(homePath string) nodetypes.NodeConfig {
 			ChainID:       cfg.DANode.ChainID,
 			GasPrice:      cfg.DANode.GasPrice,
 			GasAdjustment: cfg.DANode.GasAdjustment,
-			Bech32Prefix:  cfg.DANode.Bech32Prefix,
 			TxTimeout:     time.Duration(cfg.DANode.TxTimeout) * time.Second,
-			KeyringConfig: btypes.KeyringConfig{
-				HomePath: homePath,
-			},
+			Bech32Prefix:  cfg.DANode.Bech32Prefix,
+			HomePath:      homePath,
 		}
 	}
 	return nc

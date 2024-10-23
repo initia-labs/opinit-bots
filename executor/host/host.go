@@ -49,19 +49,15 @@ type Host struct {
 
 func NewHostV1(
 	cfg nodetypes.NodeConfig,
-	db types.DB, logger *zap.Logger, bech32Prefix, batchSubmitter string,
+	db types.DB, logger *zap.Logger,
 ) *Host {
-	if cfg.BroadcasterConfig != nil && batchSubmitter != "" {
-		cfg.BroadcasterConfig.Bech32Prefix = bech32Prefix
-		cfg.BroadcasterConfig.KeyringConfig.Address = batchSubmitter
-	}
 	return &Host{
-		BaseHost: hostprovider.NewBaseHostV1(cfg, db, logger, bech32Prefix),
+		BaseHost: hostprovider.NewBaseHostV1(cfg, db, logger),
 	}
 }
 
-func (h *Host) Initialize(ctx context.Context, processedHeight int64, child childNode, batch batchNode, bridgeInfo ophosttypes.QueryBridgeResponse) error {
-	err := h.BaseHost.Initialize(ctx, processedHeight, bridgeInfo)
+func (h *Host) Initialize(ctx context.Context, processedHeight int64, child childNode, batch batchNode, bridgeInfo ophosttypes.QueryBridgeResponse, keyringConfig *btypes.KeyringConfig) error {
+	err := h.BaseHost.Initialize(ctx, processedHeight, bridgeInfo, keyringConfig)
 	if err != nil {
 		return err
 	}
@@ -75,8 +71,8 @@ func (h *Host) Initialize(ctx context.Context, processedHeight int64, child chil
 	return nil
 }
 
-func (h *Host) InitializeDA(ctx context.Context, bridgeInfo ophosttypes.QueryBridgeResponse) error {
-	err := h.BaseHost.Initialize(ctx, 0, bridgeInfo)
+func (h *Host) InitializeDA(ctx context.Context, bridgeInfo ophosttypes.QueryBridgeResponse, keyringConfig *btypes.KeyringConfig) error {
+	err := h.BaseHost.Initialize(ctx, 0, bridgeInfo, keyringConfig)
 	if err != nil {
 		return err
 	}

@@ -44,10 +44,10 @@ type Host struct {
 
 func NewHostV1(
 	cfg nodetypes.NodeConfig,
-	db types.DB, logger *zap.Logger, bech32Prefix string,
+	db types.DB, logger *zap.Logger,
 ) *Host {
 	return &Host{
-		BaseHost:                hostprovider.NewBaseHostV1(cfg, db, logger, bech32Prefix),
+		BaseHost:                hostprovider.NewBaseHostV1(cfg, db, logger),
 		eventHandler:            eventhandler.NewChallengeEventHandler(db, logger),
 		eventQueue:              make([]challengertypes.ChallengeEvent, 0),
 		outputPendingEventQueue: make([]challengertypes.ChallengeEvent, 0),
@@ -55,7 +55,7 @@ func NewHostV1(
 }
 
 func (h *Host) Initialize(ctx context.Context, processedHeight int64, child childNode, bridgeInfo ophosttypes.QueryBridgeResponse, challenger challenger) error {
-	err := h.BaseHost.Initialize(ctx, processedHeight, bridgeInfo)
+	err := h.BaseHost.Initialize(ctx, processedHeight, bridgeInfo, nil)
 	if err != nil {
 		return err
 	}

@@ -38,9 +38,9 @@ type BaseHost struct {
 }
 
 func NewBaseHostV1(cfg nodetypes.NodeConfig,
-	db types.DB, logger *zap.Logger, bech32Prefix string,
+	db types.DB, logger *zap.Logger,
 ) *BaseHost {
-	appCodec, txConfig, err := GetCodec(bech32Prefix)
+	appCodec, txConfig, err := GetCodec(cfg.Bech32Prefix)
 	if err != nil {
 		panic(err)
 	}
@@ -78,8 +78,8 @@ func GetCodec(bech32Prefix string) (codec.Codec, client.TxConfig, error) {
 	})
 }
 
-func (b *BaseHost) Initialize(ctx context.Context, processedHeight int64, bridgeInfo ophosttypes.QueryBridgeResponse) error {
-	err := b.node.Initialize(ctx, processedHeight)
+func (b *BaseHost) Initialize(ctx context.Context, processedHeight int64, bridgeInfo ophosttypes.QueryBridgeResponse, keyringConfig *btypes.KeyringConfig) error {
+	err := b.node.Initialize(ctx, processedHeight, keyringConfig)
 	if err != nil {
 		return err
 	}

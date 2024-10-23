@@ -46,15 +46,15 @@ type Child struct {
 
 func NewChildV1(
 	cfg nodetypes.NodeConfig,
-	db types.DB, logger *zap.Logger, bech32Prefix string,
+	db types.DB, logger *zap.Logger,
 ) *Child {
 	return &Child{
-		BaseChild: childprovider.NewBaseChildV1(cfg, db, logger, bech32Prefix),
+		BaseChild: childprovider.NewBaseChildV1(cfg, db, logger),
 	}
 }
 
-func (ch *Child) Initialize(ctx context.Context, processedHeight int64, startOutputIndex uint64, host hostNode, bridgeInfo ophosttypes.QueryBridgeResponse) error {
-	l2Sequence, err := ch.BaseChild.Initialize(ctx, processedHeight, startOutputIndex, bridgeInfo)
+func (ch *Child) Initialize(ctx context.Context, processedHeight int64, startOutputIndex uint64, host hostNode, bridgeInfo ophosttypes.QueryBridgeResponse, keyringConfig *btypes.KeyringConfig) error {
+	l2Sequence, err := ch.BaseChild.Initialize(ctx, processedHeight, startOutputIndex, bridgeInfo, keyringConfig)
 	if err != nil {
 		return err
 	}

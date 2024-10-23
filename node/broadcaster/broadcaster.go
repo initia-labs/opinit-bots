@@ -95,23 +95,28 @@ func NewBroadcaster(
 	if rpcClient == nil {
 		return nil, errors.New("rpc client is nil")
 	}
+	return b, nil
+}
+
+func (b *Broadcaster) Initialize(ctx context.Context, status *rpccoretypes.ResultStatus, keyringConfig *btypes.KeyringConfig) error {
+	err := keyringConfig.Validate()
+	if err != nil {
+		return err
+	}
 
 	// setup keyring
-	keyBase, keyringRecord, err := cfg.GetKeyringRecord(cdc, cfg.ChainID)
+	keyBase, keyringRecord, err := b.cfg.GetKeyringRecord(b.cdc, keyringConfig)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	b.keyBase = keyBase
 	addr, err := keyringRecord.GetAddress()
 	if err != nil {
-		return nil, err
+		return err
 	}
 	b.keyAddress = addr
 	b.keyName = keyringRecord.Name
-	return b, nil
-}
 
-func (b *Broadcaster) Initialize(ctx context.Context, status *rpccoretypes.ResultStatus) error {
 	// prepare broadcaster
 	return b.prepareBroadcaster(ctx, status.SyncInfo.LatestBlockTime)
 }
