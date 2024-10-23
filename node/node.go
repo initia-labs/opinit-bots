@@ -8,6 +8,7 @@ import (
 
 	"cosmossdk.io/core/address"
 	"github.com/initia-labs/opinit-bots/node/broadcaster"
+	btypes "github.com/initia-labs/opinit-bots/node/broadcaster/types"
 	"github.com/initia-labs/opinit-bots/node/rpcclient"
 	nodetypes "github.com/initia-labs/opinit-bots/node/types"
 	"github.com/initia-labs/opinit-bots/types"
@@ -85,7 +86,7 @@ func NewNode(cfg nodetypes.NodeConfig, db types.DB, logger *zap.Logger, cdc code
 // StartHeight is the height to start processing.
 // If it is 0, the latest height is used.
 // If the latest height exists in the database, this is ignored.
-func (n *Node) Initialize(ctx context.Context, processedHeight int64) (err error) {
+func (n *Node) Initialize(ctx context.Context, processedHeight int64, keyringConfig *btypes.KeyringConfig) (err error) {
 	// check if node is catching up
 	status, err := n.rpcClient.Status(ctx)
 	if err != nil {
@@ -95,7 +96,7 @@ func (n *Node) Initialize(ctx context.Context, processedHeight int64) (err error
 		return errors.New("node is catching up")
 	}
 	if n.broadcaster != nil {
-		err = n.broadcaster.Initialize(ctx, status)
+		err = n.broadcaster.Initialize(ctx, status, keyringConfig)
 		if err != nil {
 			return err
 		}

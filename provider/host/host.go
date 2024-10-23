@@ -10,7 +10,6 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/x/auth"
 
-	opchildtypes "github.com/initia-labs/OPinit/x/opchild/types"
 	"github.com/initia-labs/OPinit/x/ophost"
 	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
 
@@ -26,7 +25,7 @@ type BaseHost struct {
 
 	node *node.Node
 
-	bridgeInfo opchildtypes.BridgeInfo
+	bridgeInfo ophosttypes.QueryBridgeResponse
 
 	cfg    nodetypes.NodeConfig
 	db     types.DB
@@ -39,9 +38,9 @@ type BaseHost struct {
 }
 
 func NewBaseHostV1(cfg nodetypes.NodeConfig,
-	db types.DB, logger *zap.Logger, bech32Prefix string,
+	db types.DB, logger *zap.Logger,
 ) *BaseHost {
-	appCodec, txConfig, err := GetCodec(bech32Prefix)
+	appCodec, txConfig, err := GetCodec(cfg.Bech32Prefix)
 	if err != nil {
 		panic(err)
 	}
@@ -79,8 +78,8 @@ func GetCodec(bech32Prefix string) (codec.Codec, client.TxConfig, error) {
 	})
 }
 
-func (b *BaseHost) Initialize(ctx context.Context, processedHeight int64, bridgeInfo opchildtypes.BridgeInfo) error {
-	err := b.node.Initialize(ctx, processedHeight)
+func (b *BaseHost) Initialize(ctx context.Context, processedHeight int64, bridgeInfo ophosttypes.QueryBridgeResponse, keyringConfig *btypes.KeyringConfig) error {
+	err := b.node.Initialize(ctx, processedHeight, keyringConfig)
 	if err != nil {
 		return err
 	}
@@ -121,11 +120,11 @@ func (b BaseHost) OracleEnabled() bool {
 	return b.bridgeInfo.BridgeConfig.OracleEnabled
 }
 
-func (b *BaseHost) SetBridgeInfo(bridgeInfo opchildtypes.BridgeInfo) {
+func (b *BaseHost) SetBridgeInfo(bridgeInfo ophosttypes.QueryBridgeResponse) {
 	b.bridgeInfo = bridgeInfo
 }
 
-func (b BaseHost) BridgeInfo() opchildtypes.BridgeInfo {
+func (b BaseHost) BridgeInfo() ophosttypes.QueryBridgeResponse {
 	return b.bridgeInfo
 }
 

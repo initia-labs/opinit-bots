@@ -37,6 +37,9 @@ type BroadcasterConfig struct {
 	// PendingTxToProcessedMsgs is the function to convert pending tx to processed messages.
 	PendingTxToProcessedMsgs PendingTxToProcessedMsgsFn
 
+	// HomePath is the path to the keyring.
+	HomePath string
+
 	// KeyringConfig is the keyring configuration.
 	KeyringConfig KeyringConfig
 }
@@ -79,18 +82,18 @@ func (bc BroadcasterConfig) Validate() error {
 		return fmt.Errorf("tx timeout is zero")
 	}
 
-	return bc.KeyringConfig.Validate()
+	return nil
 }
 
-func (bc BroadcasterConfig) GetKeyringRecord(cdc codec.Codec, chainID string) (keyring.Keyring, *keyring.Record, error) {
-	keyBase, err := keys.GetKeyBase(chainID, bc.KeyringConfig.HomePath, cdc, nil)
+func (bc BroadcasterConfig) GetKeyringRecord(cdc codec.Codec, keyringConfig *KeyringConfig) (keyring.Keyring, *keyring.Record, error) {
+	keyBase, err := keys.GetKeyBase(bc.ChainID, bc.HomePath, cdc, nil)
 	if err != nil {
 		return nil, nil, err
 	} else if keyBase == nil {
 		return nil, nil, fmt.Errorf("failed to get key base")
 	}
 
-	keyringRecord, err := bc.KeyringConfig.GetKeyRecord(keyBase, bc.Bech32Prefix)
+	keyringRecord, err := keyringConfig.GetKeyRecord(keyBase, bc.Bech32Prefix)
 	if err != nil {
 		return nil, nil, err
 	} else if keyringRecord == nil {
@@ -101,17 +104,11 @@ func (bc BroadcasterConfig) GetKeyringRecord(cdc codec.Codec, chainID string) (k
 }
 
 type KeyringConfig struct {
-	// HomePath is the path to the keyring.
-	HomePath string `json:"home_path"`
-
 	// Name of key in keyring
 	Name string `json:"name"`
 
 	// Address of key in keyring
 	Address string `json:"address"`
-
-	// Mnemonic of key in keyring
-	// Mnemonic string `json:"mnemonic"`
 }
 
 func (kc KeyringConfig) GetKeyRecord(keyBase keyring.Keyring, bech32Prefix string) (*keyring.Record, error) {

@@ -106,16 +106,18 @@ func (cfg Config) Validate() error {
 
 func (cfg Config) L1NodeConfig(homePath string) nodetypes.NodeConfig {
 	nc := nodetypes.NodeConfig{
-		RPC:         cfg.L1Node.RPCAddress,
-		ProcessType: nodetypes.PROCESS_TYPE_DEFAULT,
+		RPC:          cfg.L1Node.RPCAddress,
+		ProcessType:  nodetypes.PROCESS_TYPE_DEFAULT,
+		Bech32Prefix: cfg.L1Node.Bech32Prefix,
 	}
 	return nc
 }
 
 func (cfg Config) L2NodeConfig(homePath string) nodetypes.NodeConfig {
 	nc := nodetypes.NodeConfig{
-		RPC:         cfg.L2Node.RPCAddress,
-		ProcessType: nodetypes.PROCESS_TYPE_DEFAULT,
+		RPC:          cfg.L2Node.RPCAddress,
+		ProcessType:  nodetypes.PROCESS_TYPE_DEFAULT,
+		Bech32Prefix: cfg.L2Node.Bech32Prefix,
 	}
 	return nc
 }

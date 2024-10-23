@@ -57,12 +57,12 @@ func NewChallenger(cfg *challengertypes.Config, db types.DB, sv *server.Server, 
 		host: host.NewHostV1(
 			cfg.L1NodeConfig(homePath),
 			db.WithPrefix([]byte(types.HostName)),
-			logger.Named(types.HostName), cfg.L1Node.Bech32Prefix,
+			logger.Named(types.HostName),
 		),
 		child: child.NewChildV1(
 			cfg.L2NodeConfig(homePath),
 			db.WithPrefix([]byte(types.ChildName)),
-			logger.Named(types.ChildName), cfg.L2Node.Bech32Prefix,
+			logger.Named(types.ChildName),
 		),
 
 		cfg:    cfg,
@@ -83,12 +83,17 @@ func NewChallenger(cfg *challengertypes.Config, db types.DB, sv *server.Server, 
 }
 
 func (c *Challenger) Initialize(ctx context.Context) error {
-	bridgeInfo, err := c.child.QueryBridgeInfo(ctx)
+	childBridgeInfo, err := c.child.QueryBridgeInfo(ctx)
 	if err != nil {
 		return err
 	}
-	if bridgeInfo.BridgeId == 0 {
+	if childBridgeInfo.BridgeId == 0 {
 		return errors.New("bridge info is not set")
+	}
+
+	bridgeInfo, err := c.host.QueryBridgeConfig(ctx, childBridgeInfo.BridgeId)
+	if err != nil {
+		return err
 	}
 
 	c.logger.Info(
@@ -103,7 +108,7 @@ func (c *Challenger) Initialize(ctx context.Context) error {
 	}
 
 	var initialBlockTime time.Time
-	hostInitialBlockTime, err := c.host.Initialize(ctx, hostProcessedHeight, c.child, bridgeInfo, c)
+	hostInitialBlockTime, err := c.host.Initialize(ctx, hostProcessedHeight, c.child, *bridgeInfo, c)
 	if err != nil {
 		return err
 	}
@@ -111,7 +116,7 @@ func (c *Challenger) Initialize(ctx context.Context) error {
 		initialBlockTime = hostInitialBlockTime
 	}
 
-	childInitialBlockTime, err := c.child.Initialize(ctx, childProcessedHeight, processedOutputIndex+1, c.host, bridgeInfo, c)
+	childInitialBlockTime, err := c.child.Initialize(ctx, childProcessedHeight, processedOutputIndex+1, c.host, *bridgeInfo, c)
 	if err != nil {
 		return err
 	}

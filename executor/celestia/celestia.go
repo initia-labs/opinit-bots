@@ -52,7 +52,7 @@ type Celestia struct {
 
 func NewDACelestia(
 	version uint8, cfg nodetypes.NodeConfig,
-	db types.DB, logger *zap.Logger, bech32Prefix, batchSubmitter string,
+	db types.DB, logger *zap.Logger,
 ) *Celestia {
 	c := &Celestia{
 		version: version,
@@ -65,13 +65,12 @@ func NewDACelestia(
 		msgQueue:      make([]sdk.Msg, 0),
 	}
 
-	appCodec, txConfig, err := createCodec(bech32Prefix)
+	appCodec, txConfig, err := createCodec(cfg.Bech32Prefix)
 	if err != nil {
 		panic(err)
 	}
 
 	if cfg.BroadcasterConfig != nil {
-		cfg.BroadcasterConfig.KeyringConfig.Address = batchSubmitter
 		cfg.BroadcasterConfig.BuildTxWithMessages = c.BuildTxWithMessages
 		cfg.BroadcasterConfig.PendingTxToProcessedMsgs = c.PendingTxToProcessedMsgs
 	}
@@ -95,8 +94,8 @@ func createCodec(bech32Prefix string) (codec.Codec, client.TxConfig, error) {
 	})
 }
 
-func (c *Celestia) Initialize(ctx context.Context, batch batchNode, bridgeId uint64) error {
-	err := c.node.Initialize(ctx, 0)
+func (c *Celestia) Initialize(ctx context.Context, batch batchNode, bridgeId uint64, keyringConfig *btypes.KeyringConfig) error {
+	err := c.node.Initialize(ctx, 0, keyringConfig)
 	if err != nil {
 		return err
 	}
