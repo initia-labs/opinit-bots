@@ -86,6 +86,10 @@ func (bc BroadcasterConfig) Validate() error {
 }
 
 func (bc BroadcasterConfig) GetKeyringRecord(cdc codec.Codec, keyringConfig *KeyringConfig) (keyring.Keyring, *keyring.Record, error) {
+	if keyringConfig == nil {
+		return nil, nil, fmt.Errorf("keyring config cannot be nil")
+	}
+
 	keyBase, err := keys.GetKeyBase(bc.ChainID, bc.HomePath, cdc, nil)
 	if err != nil {
 		return nil, nil, err

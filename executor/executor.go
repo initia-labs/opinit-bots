@@ -177,6 +177,9 @@ func (ex *Executor) makeDANode(ctx context.Context, bridgeInfo ophosttypes.Query
 	}
 
 	batchInfo := ex.batch.BatchInfo()
+	if batchInfo == nil {
+		return nil, errors.New("batch info is not set")
+	}
 	switch batchInfo.BatchInfo.ChainType {
 	case ophosttypes.BatchInfo_CHAIN_TYPE_INITIA:
 		// might not exist
