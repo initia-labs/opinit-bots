@@ -39,9 +39,6 @@ type BroadcasterConfig struct {
 
 	// HomePath is the path to the keyring.
 	HomePath string
-
-	// KeyringConfig is the keyring configuration.
-	KeyringConfig KeyringConfig
 }
 
 func (bc *BroadcasterConfig) WithPendingTxToProcessedMsgsFn(fn PendingTxToProcessedMsgsFn) {
