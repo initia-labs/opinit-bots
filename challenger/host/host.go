@@ -6,7 +6,6 @@ import (
 
 	"go.uber.org/zap"
 
-	opchildtypes "github.com/initia-labs/OPinit/x/opchild/types"
 	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
 
 	nodetypes "github.com/initia-labs/opinit-bots/node/types"
@@ -45,18 +44,18 @@ type Host struct {
 
 func NewHostV1(
 	cfg nodetypes.NodeConfig,
-	db types.DB, logger *zap.Logger, bech32Prefix string,
+	db types.DB, logger *zap.Logger,
 ) *Host {
 	return &Host{
-		BaseHost:                hostprovider.NewBaseHostV1(cfg, db, logger, bech32Prefix),
+		BaseHost:                hostprovider.NewBaseHostV1(cfg, db, logger),
 		eventHandler:            eventhandler.NewChallengeEventHandler(db, logger),
 		eventQueue:              make([]challengertypes.ChallengeEvent, 0),
 		outputPendingEventQueue: make([]challengertypes.ChallengeEvent, 0),
 	}
 }
 
-func (h *Host) Initialize(ctx context.Context, processedHeight int64, child childNode, bridgeInfo opchildtypes.BridgeInfo, challenger challenger) (time.Time, error) {
-	err := h.BaseHost.Initialize(ctx, processedHeight, bridgeInfo)
+func (h *Host) Initialize(ctx context.Context, processedHeight int64, child childNode, bridgeInfo ophosttypes.QueryBridgeResponse, challenger challenger) (time.Time, error) {
+	err := h.BaseHost.Initialize(ctx, processedHeight, bridgeInfo, nil)
 	if err != nil {
 		return time.Time{}, err
 	}

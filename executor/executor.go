@@ -16,8 +16,8 @@ import (
 
 	bottypes "github.com/initia-labs/opinit-bots/bot/types"
 	executortypes "github.com/initia-labs/opinit-bots/executor/types"
+	btypes "github.com/initia-labs/opinit-bots/node/broadcaster/types"
 
-	opchildtypes "github.com/initia-labs/OPinit/x/opchild/types"
 	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
 	"github.com/initia-labs/opinit-bots/types"
 	"go.uber.org/zap"
@@ -51,18 +51,17 @@ func NewExecutor(cfg *executortypes.Config, db types.DB, sv *server.Server, logg
 		host: host.NewHostV1(
 			cfg.L1NodeConfig(homePath),
 			db.WithPrefix([]byte(types.HostName)),
-			logger.Named(types.HostName), cfg.L1Node.Bech32Prefix, "",
+			logger.Named(types.HostName),
 		),
 		child: child.NewChildV1(
 			cfg.L2NodeConfig(homePath),
 			db.WithPrefix([]byte(types.ChildName)),
-			logger.Named(types.ChildName), cfg.L2Node.Bech32Prefix,
+			logger.Named(types.ChildName),
 		),
 		batch: batch.NewBatchSubmitterV1(
 			cfg.L2NodeConfig(homePath),
 			cfg.BatchConfig(), db.WithPrefix([]byte(types.BatchName)),
 			logger.Named(types.BatchName), cfg.L2Node.ChainID, homePath,
-			cfg.L2Node.Bech32Prefix,
 		),
 
 		cfg:    cfg,
@@ -75,12 +74,17 @@ func NewExecutor(cfg *executortypes.Config, db types.DB, sv *server.Server, logg
 }
 
 func (ex *Executor) Initialize(ctx context.Context) error {
-	bridgeInfo, err := ex.child.QueryBridgeInfo(ctx)
+	childBridgeInfo, err := ex.child.QueryBridgeInfo(ctx)
 	if err != nil {
 		return err
 	}
-	if bridgeInfo.BridgeId == 0 {
+	if childBridgeInfo.BridgeId == 0 {
 		return errors.New("bridge info is not set")
+	}
+
+	bridgeInfo, err := ex.host.QueryBridgeConfig(ctx, childBridgeInfo.BridgeId)
+	if err != nil {
+		return err
 	}
 
 	ex.logger.Info(
@@ -94,20 +98,22 @@ func (ex *Executor) Initialize(ctx context.Context) error {
 		return err
 	}
 
-	err = ex.host.Initialize(ctx, hostProcessedHeight, ex.child, ex.batch, bridgeInfo)
+	hostKeyringConfig, childKeyringConfig, daKeyringConfig := ex.getKeyringConfigs(*bridgeInfo)
+
+	err = ex.host.Initialize(ctx, hostProcessedHeight, ex.child, ex.batch, *bridgeInfo, hostKeyringConfig)
 	if err != nil {
 		return err
 	}
-	err = ex.child.Initialize(ctx, childProcessedHeight, processedOutputIndex+1, ex.host, bridgeInfo)
+	err = ex.child.Initialize(ctx, childProcessedHeight, processedOutputIndex+1, ex.host, *bridgeInfo, childKeyringConfig)
 	if err != nil {
 		return err
 	}
-	err = ex.batch.Initialize(ctx, batchProcessedHeight, ex.host, bridgeInfo)
+	err = ex.batch.Initialize(ctx, batchProcessedHeight, ex.host, *bridgeInfo)
 	if err != nil {
 		return err
 	}
 
-	da, err := ex.makeDANode(ctx, bridgeInfo)
+	da, err := ex.makeDANode(ctx, *bridgeInfo, daKeyringConfig)
 	if err != nil {
 		return err
 	}
@@ -165,44 +171,38 @@ func (ex *Executor) RegisterQuerier() {
 	})
 }
 
-func (ex *Executor) makeDANode(ctx context.Context, bridgeInfo opchildtypes.BridgeInfo) (executortypes.DANode, error) {
+func (ex *Executor) makeDANode(ctx context.Context, bridgeInfo ophosttypes.QueryBridgeResponse, daKeyringConfig *btypes.KeyringConfig) (executortypes.DANode, error) {
 	if !ex.cfg.EnableBatchSubmitter {
 		return batch.NewNoopDA(), nil
 	}
 
 	batchInfo := ex.batch.BatchInfo()
+	if batchInfo == nil {
+		return nil, errors.New("batch info is not set")
+	}
 	switch batchInfo.BatchInfo.ChainType {
 	case ophosttypes.BatchInfo_CHAIN_TYPE_INITIA:
+		// might not exist
+		hostAddrStr, err := ex.host.GetAddressStr()
+		if err != nil && !errors.Is(err, types.ErrKeyNotSet) {
+			return nil, err
+		} else if err == nil && hostAddrStr == batchInfo.BatchInfo.Submitter {
+			return ex.host, nil
+		}
+
 		hostda := host.NewHostV1(
 			ex.cfg.DANodeConfig(ex.homePath),
 			ex.db.WithPrefix([]byte(types.DAHostName)),
 			ex.logger.Named(types.DAHostName),
-			ex.cfg.DANode.Bech32Prefix, batchInfo.BatchInfo.Submitter,
 		)
-
-		// should exist
-		daAddr, err := hostda.GetAddress()
-		if err != nil {
-			return nil, err
-		}
-
-		// might not exist
-		hostAddr, err := ex.host.GetAddress()
-		if err != nil && !errors.Is(err, types.ErrKeyNotSet) {
-			return nil, err
-		} else if err == nil && hostAddr.Equals(daAddr) {
-			return ex.host, nil
-		}
-
-		err = hostda.InitializeDA(ctx, bridgeInfo)
+		err = hostda.InitializeDA(ctx, bridgeInfo, daKeyringConfig)
 		return hostda, err
 	case ophosttypes.BatchInfo_CHAIN_TYPE_CELESTIA:
 		celestiada := celestia.NewDACelestia(ex.cfg.Version, ex.cfg.DANodeConfig(ex.homePath),
 			ex.db.WithPrefix([]byte(types.DACelestiaName)),
 			ex.logger.Named(types.DACelestiaName),
-			ex.cfg.DANode.Bech32Prefix, batchInfo.BatchInfo.Submitter,
 		)
-		err := celestiada.Initialize(ctx, ex.batch, bridgeInfo.BridgeId)
+		err := celestiada.Initialize(ctx, ex.batch, bridgeInfo.BridgeId, daKeyringConfig)
 		if err != nil {
 			return nil, err
 		}
@@ -268,4 +268,25 @@ func (ex *Executor) getProcessedHeights(ctx context.Context, bridgeId uint64) (l
 		batchProcessedHeight = ex.cfg.BatchStartHeight - 1
 	}
 	return l1ProcessedHeight, l2ProcessedHeight, processedOutputIndex, batchProcessedHeight, err
+}
+
+func (ex *Executor) getKeyringConfigs(bridgeInfo ophosttypes.QueryBridgeResponse) (hostKeyringConfig *btypes.KeyringConfig, childKeyringConfig *btypes.KeyringConfig, daKeyringConfig *btypes.KeyringConfig) {
+	if ex.cfg.EnableOutputSubmitter {
+		hostKeyringConfig = &btypes.KeyringConfig{
+			Address: bridgeInfo.BridgeConfig.Proposer,
+		}
+	}
+
+	if ex.cfg.BridgeExecutor != "" {
+		childKeyringConfig = &btypes.KeyringConfig{
+			Name: ex.cfg.BridgeExecutor,
+		}
+	}
+
+	if ex.cfg.EnableBatchSubmitter {
+		daKeyringConfig = &btypes.KeyringConfig{
+			Address: bridgeInfo.BridgeConfig.BatchInfo.Submitter,
+		}
+	}
+	return
 }

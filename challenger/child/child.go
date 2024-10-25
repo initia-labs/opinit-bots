@@ -47,17 +47,17 @@ type Child struct {
 
 func NewChildV1(
 	cfg nodetypes.NodeConfig,
-	db types.DB, logger *zap.Logger, bech32Prefix string,
+	db types.DB, logger *zap.Logger,
 ) *Child {
 	return &Child{
-		BaseChild:    childprovider.NewBaseChildV1(cfg, db, logger, bech32Prefix),
+		BaseChild:    childprovider.NewBaseChildV1(cfg, db, logger),
 		eventHandler: eventhandler.NewChallengeEventHandler(db, logger),
 		eventQueue:   make([]challengertypes.ChallengeEvent, 0),
 	}
 }
 
-func (ch *Child) Initialize(ctx context.Context, processedHeight int64, startOutputIndex uint64, host hostNode, bridgeInfo opchildtypes.BridgeInfo, challenger challenger) (time.Time, error) {
-	_, err := ch.BaseChild.Initialize(ctx, processedHeight, startOutputIndex, bridgeInfo)
+func (ch *Child) Initialize(ctx context.Context, processedHeight int64, startOutputIndex uint64, host hostNode, bridgeInfo ophosttypes.QueryBridgeResponse, challenger challenger) (time.Time, error) {
+	_, err := ch.BaseChild.Initialize(ctx, processedHeight, startOutputIndex, bridgeInfo, nil)
 	if err != nil {
 		return time.Time{}, err
 	}

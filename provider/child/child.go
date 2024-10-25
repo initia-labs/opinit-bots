@@ -28,7 +28,7 @@ type BaseChild struct {
 	node *node.Node
 	mk   *merkle.Merkle
 
-	bridgeInfo opchildtypes.BridgeInfo
+	bridgeInfo ophosttypes.QueryBridgeResponse
 
 	initializeTreeFn func(int64) (bool, error)
 
@@ -44,9 +44,9 @@ type BaseChild struct {
 
 func NewBaseChildV1(
 	cfg nodetypes.NodeConfig,
-	db types.DB, logger *zap.Logger, bech32Prefix string,
+	db types.DB, logger *zap.Logger,
 ) *BaseChild {
-	appCodec, txConfig, err := GetCodec(bech32Prefix)
+	appCodec, txConfig, err := GetCodec(cfg.Bech32Prefix)
 	if err != nil {
 		panic(err)
 	}
@@ -89,8 +89,8 @@ func GetCodec(bech32Prefix string) (codec.Codec, client.TxConfig, error) {
 	})
 }
 
-func (b *BaseChild) Initialize(ctx context.Context, processedHeight int64, startOutputIndex uint64, bridgeInfo opchildtypes.BridgeInfo) (uint64, error) {
-	err := b.node.Initialize(ctx, processedHeight)
+func (b *BaseChild) Initialize(ctx context.Context, processedHeight int64, startOutputIndex uint64, bridgeInfo ophosttypes.QueryBridgeResponse, keyringConfig *btypes.KeyringConfig) (uint64, error) {
+	err := b.node.Initialize(ctx, processedHeight, keyringConfig)
 	if err != nil {
 		return 0, err
 	}
@@ -162,11 +162,11 @@ func (b BaseChild) HasKey() bool {
 	return b.node.HasBroadcaster()
 }
 
-func (b *BaseChild) SetBridgeInfo(bridgeInfo opchildtypes.BridgeInfo) {
+func (b *BaseChild) SetBridgeInfo(bridgeInfo ophosttypes.QueryBridgeResponse) {
 	b.bridgeInfo = bridgeInfo
 }
 
-func (b BaseChild) BridgeInfo() opchildtypes.BridgeInfo {
+func (b BaseChild) BridgeInfo() ophosttypes.QueryBridgeResponse {
 	return b.bridgeInfo
 }
 
