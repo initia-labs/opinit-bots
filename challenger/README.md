@@ -16,6 +16,7 @@ To configure the Challenger, fill in the values in the `~/.opinit/challenger.jso
 ```json
 {
   // Version is the version used to build output root.
+  // Please refer to `spec_version.json` for the correct version for each network.
   "version": 1,
   // ListenAddress is the address to listen for incoming requests.
   "listen_address": "localhost:3001",
