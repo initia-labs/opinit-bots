@@ -27,9 +27,14 @@ func (h *Host) endBlockHandler(_ context.Context, args nodetypes.EndBlockArgs) e
 		h.Node().SyncInfoToRawKV(blockHeight),
 	}
 	if h.Node().HasBroadcaster() {
-		if len(msgQueue) != 0 {
+		for i := 0; i < len(msgQueue); i += 5 {
+			end := i + 5
+			if end > len(msgQueue) {
+				end = len(msgQueue)
+			}
+
 			h.AppendProcessedMsgs(btypes.ProcessedMsgs{
-				Msgs:      msgQueue,
+				Msgs:      msgQueue[i:end],
 				Timestamp: time.Now().UnixNano(),
 				Save:      true,
 			})

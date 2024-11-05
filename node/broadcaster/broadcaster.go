@@ -187,11 +187,18 @@ func (b *Broadcaster) prepareBroadcaster(ctx context.Context, lastBlockTime time
 			}
 
 			if txInfo.Save {
-				b.pendingProcessedMsgs = append(b.pendingProcessedMsgs, btypes.ProcessedMsgs{
-					Msgs:      msgs,
-					Timestamp: time.Now().UnixNano(),
-					Save:      txInfo.Save,
-				})
+				for i := 0; i < len(msgs); i += 5 {
+					end := i + 5
+					if end > len(msgs) {
+						end = len(msgs)
+					}
+
+					b.pendingProcessedMsgs = append(b.pendingProcessedMsgs, btypes.ProcessedMsgs{
+						Msgs:      msgs[i:end],
+						Timestamp: time.Now().UnixNano(),
+						Save:      true,
+					})
+				}
 			}
 
 			b.logger.Debug("pending tx", zap.Int("index", i), zap.String("tx", txInfo.String()))

@@ -48,13 +48,21 @@ func (ch *Child) endBlockHandler(_ context.Context, args nodetypes.EndBlockArgs)
 
 	// if has key, then process the messages
 	if ch.host.HasKey() {
-		if len(ch.GetMsgQueue()) != 0 {
+		msgQueue := ch.GetMsgQueue()
+
+		for i := 0; i < len(msgQueue); i += 5 {
+			end := i + 5
+			if end > len(msgQueue) {
+				end = len(msgQueue)
+			}
+
 			ch.AppendProcessedMsgs(btypes.ProcessedMsgs{
-				Msgs:      ch.GetMsgQueue(),
+				Msgs:      msgQueue[i:end],
 				Timestamp: time.Now().UnixNano(),
 				Save:      true,
 			})
 		}
+
 		msgKVs, err := ch.host.ProcessedMsgsToRawKV(ch.GetProcessedMsgs(), false)
 		if err != nil {
 			return err
