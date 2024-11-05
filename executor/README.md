@@ -42,17 +42,20 @@ To configure the Executor, fill in the values in the `~/.opinit/executor.json` f
     "gas_adjustment": 1.5,
     "tx_timeout": 60
   },
-  // OutputSubmitter is the key name in the keyring for the output submitter,
-  // which is used to relay the output transaction from l2 to l1.
-  //
-  // If you don't want to use the output submitter feature, you can leave it empty.
-  "output_submitter": "",
-
   // BridgeExecutor is the key name in the keyring for the bridge executor,
   // which is used to relay initiate token bridge transaction from l1 to l2.
   //
   // If you don't want to use the bridge executor feature, you can leave it empty.
   "bridge_executor": "",
+
+	// EnableOutputSubmitter is the flag to enable the output submitter.
+	// If it is false, the output submitter will not be started.
+	"enable_output_submitter": true,
+
+	// EnableBatchSubmitter is the flag to enable the batch submitter.
+	// If it is false, the batch submitter will not be started.
+	"enable_batch_submitter": true,
+
   // MaxChunks is the maximum number of chunks in a batch.
   "max_chunks": 5000,
   // MaxChunkSize is the maximum size of a chunk in a batch.
