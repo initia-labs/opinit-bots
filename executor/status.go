@@ -18,10 +18,9 @@ type Status struct {
 func (ex Executor) GetStatus() (Status, error) {
 	var err error
 
-	s := Status{
-		BridgeId: ex.host.BridgeId(),
-	}
+	s := Status{}
 	if ex.host != nil {
+		s.BridgeId = ex.host.BridgeId()
 		s.Host, err = ex.host.GetStatus()
 		if err != nil {
 			return Status{}, err
