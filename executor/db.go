@@ -33,10 +33,10 @@ func ResetHeight(db types.DB, nodeName string) error {
 	if err != nil {
 		return err
 	}
-	if err := node.DeletePendingTxs(db); err != nil {
+	if err := node.DeletePendingTxs(nodeDB); err != nil {
 		return err
 	}
-	if err := node.DeleteProcessedMsgs(db); err != nil {
+	if err := node.DeleteProcessedMsgs(nodeDB); err != nil {
 		return err
 	}
 	fmt.Printf("reset height to 0 for node %s\n", string(nodeDB.GetPrefix()))
