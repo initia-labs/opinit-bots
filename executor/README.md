@@ -48,13 +48,13 @@ To configure the Executor, fill in the values in the `~/.opinit/executor.json` f
   // If you don't want to use the bridge executor feature, you can leave it empty.
   "bridge_executor": "",
 
-	// DisableOutputSubmitter is the flag to disable the output submitter.
-	// If it is true, the output submitter will not be started.
-	"disable_output_submitter": false,
+  // DisableOutputSubmitter is the flag to disable the output submitter.
+  // If it is true, the output submitter will not be started.
+  "disable_output_submitter": false,
 
-	// DisableBatchSubmitter is the flag to disable the batch submitter.
-	// If it is true, the batch submitter will not be started.
-	"disable_batch_submitter": false,
+  // DisableBatchSubmitter is the flag to disable the batch submitter.
+  // If it is true, the batch submitter will not be started.
+  "disable_batch_submitter": false,
 
   // MaxChunks is the maximum number of chunks in a batch.
   "max_chunks": 5000,
