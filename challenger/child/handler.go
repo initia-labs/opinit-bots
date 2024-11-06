@@ -39,7 +39,12 @@ func (ch *Child) endBlockHandler(_ context.Context, args nodetypes.EndBlockArgs)
 
 	batchKVs = append(batchKVs, treeKVs...)
 	if storageRoot != nil {
-		err = ch.handleOutput(args.Block.Header.Time, blockHeight, ch.Version(), args.BlockID, ch.Merkle().GetWorkingTreeIndex(), storageRoot)
+		workingTreeIndex, err := ch.Merkle().GetWorkingTreeIndex()
+		if err != nil {
+			return err
+		}
+
+		err = ch.handleOutput(args.Block.Header.Time, blockHeight, ch.Version(), args.BlockID, workingTreeIndex, storageRoot)
 		if err != nil {
 			return err
 		}

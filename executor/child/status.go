@@ -1,6 +1,7 @@
 package child
 
 import (
+	"errors"
 	"time"
 
 	nodetypes "github.com/initia-labs/opinit-bots/node/types"
@@ -19,16 +20,39 @@ type Status struct {
 	NextOutputSubmissionTime time.Time `json:"next_output_submission_time"`
 }
 
-func (ch Child) GetStatus() Status {
+func (ch Child) GetStatus() (Status, error) {
+	node := ch.Node()
+	if node == nil {
+		return Status{}, errors.New("node is not initialized")
+	}
+
+	merkle := ch.Merkle()
+	if merkle == nil {
+		return Status{}, errors.New("merkle is not initialized")
+	}
+
+	workingTreeLeafCount, err := merkle.GetWorkingTreeLeafCount()
+	if err != nil {
+		return Status{}, err
+	}
+	startLeafIndex, err := merkle.GetStartLeafIndex()
+	if err != nil {
+		return Status{}, err
+	}
+	workingTreeIndex, err := merkle.GetWorkingTreeIndex()
+	if err != nil {
+		return Status{}, err
+	}
+
 	return Status{
-		Node:                              ch.Node().GetStatus(),
+		Node:                              node.GetStatus(),
 		LastUpdatedOracleL1Height:         ch.lastUpdatedOracleL1Height,
 		LastFinalizedDepositL1BlockHeight: ch.lastFinalizedDepositL1BlockHeight,
 		LastFinalizedDepositL1Sequence:    ch.lastFinalizedDepositL1Sequence,
-		LastWithdrawalL2Sequence:          ch.Merkle().GetWorkingTreeLeafCount() + ch.Merkle().GetStartLeafIndex() - 1,
-		WorkingTreeIndex:                  ch.Merkle().GetWorkingTreeIndex(),
+		LastWithdrawalL2Sequence:          workingTreeLeafCount + startLeafIndex - 1,
+		WorkingTreeIndex:                  workingTreeIndex,
 		FinalizingBlockHeight:             ch.finalizingBlockHeight,
 		LastOutputSubmissionTime:          ch.lastOutputTime,
 		NextOutputSubmissionTime:          ch.nextOutputTime,
-	}
+	}, nil
 }

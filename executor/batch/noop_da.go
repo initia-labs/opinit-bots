@@ -27,4 +27,4 @@ func (n NoopDA) BroadcastMsgs(nil btypes.ProcessedMsgs)   {}
 func (n NoopDA) ProcessedMsgsToRawKV(_ []btypes.ProcessedMsgs, _ bool) ([]types.RawKV, error) {
 	return nil, nil
 }
-func (n NoopDA) GetNodeStatus() nodetypes.Status { return nodetypes.Status{} }
+func (n NoopDA) GetNodeStatus() (nodetypes.Status, error) { return nodetypes.Status{}, nil }

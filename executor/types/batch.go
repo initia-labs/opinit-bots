@@ -20,7 +20,7 @@ type DANode interface {
 	CreateBatchMsg([]byte) (sdk.Msg, error)
 	BroadcastMsgs(btypes.ProcessedMsgs)
 	ProcessedMsgsToRawKV(processedMsgs []btypes.ProcessedMsgs, delete bool) ([]types.RawKV, error)
-	GetNodeStatus() nodetypes.Status
+	GetNodeStatus() (nodetypes.Status, error)
 }
 
 type LocalBatchInfo struct {

@@ -190,7 +190,12 @@ func (c *Challenger) Close() {
 
 func (c *Challenger) RegisterQuerier() {
 	c.server.RegisterQuerier("/status", func(ctx *fiber.Ctx) error {
-		return ctx.JSON(c.GetStatus())
+		status, err := c.GetStatus()
+		if err != nil {
+			return err
+		}
+
+		return ctx.JSON(status)
 	})
 	c.server.RegisterQuerier("/challenges/:page", func(ctx *fiber.Ctx) error {
 		pageStr := ctx.Params("page")
@@ -209,11 +214,19 @@ func (c *Challenger) RegisterQuerier() {
 	})
 
 	c.server.RegisterQuerier("/pending_events/host", func(ctx *fiber.Ctx) error {
-		return ctx.JSON(c.host.GetAllPendingEvents())
+		pendingEvents, err := c.host.GetAllPendingEvents()
+		if err != nil {
+			return err
+		}
+		return ctx.JSON(pendingEvents)
 	})
 
 	c.server.RegisterQuerier("/pending_events/child", func(ctx *fiber.Ctx) error {
-		return ctx.JSON(c.child.GetAllPendingEvents())
+		pendingEvents, err := c.child.GetAllPendingEvents()
+		if err != nil {
+			return err
+		}
+		return ctx.JSON(pendingEvents)
 	})
 }
 

@@ -167,7 +167,11 @@ func (ex *Executor) RegisterQuerier() {
 	})
 
 	ex.server.RegisterQuerier("/status", func(c *fiber.Ctx) error {
-		return c.JSON(ex.GetStatus())
+		status, err := ex.GetStatus()
+		if err != nil {
+			return err
+		}
+		return c.JSON(status)
 	})
 }
 

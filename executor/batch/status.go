@@ -1,6 +1,7 @@
 package batch
 
 import (
+	"errors"
 	"time"
 
 	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
@@ -16,7 +17,15 @@ type Status struct {
 	LastBatchSubmissionTime time.Time             `json:"last_batch_submission_time"`
 }
 
-func (bs BatchSubmitter) GetStatus() Status {
+func (bs BatchSubmitter) GetStatus() (Status, error) {
+	if bs.node == nil {
+		return Status{}, errors.New("node is not initialized")
+	}
+
+	if bs.BatchInfo() == nil {
+		return Status{}, errors.New("batch info is not initialized")
+	}
+
 	return Status{
 		Node:                    bs.node.GetStatus(),
 		BatchInfo:               bs.BatchInfo().BatchInfo,
@@ -24,5 +33,5 @@ func (bs BatchSubmitter) GetStatus() Status {
 		BatchStartBlockNumber:   bs.localBatchInfo.Start,
 		BatchEndBlockNumber:     bs.localBatchInfo.End,
 		LastBatchSubmissionTime: bs.localBatchInfo.LastSubmissionTime,
-	}
+	}, nil
 }

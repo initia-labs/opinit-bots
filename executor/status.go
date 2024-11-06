@@ -15,21 +15,35 @@ type Status struct {
 	DA       nodetypes.Status `json:"da,omitempty"`
 }
 
-func (ex Executor) GetStatus() Status {
+func (ex Executor) GetStatus() (Status, error) {
+	var err error
+
 	s := Status{
 		BridgeId: ex.host.BridgeId(),
 	}
 	if ex.host != nil {
-		s.Host = ex.host.GetStatus()
-	}
-	if ex.child != nil {
-		s.Child = ex.child.GetStatus()
-	}
-	if ex.batch != nil {
-		s.Batch = ex.batch.GetStatus()
-		if ex.batch.DA() != nil {
-			s.DA = ex.batch.DA().GetNodeStatus()
+		s.Host, err = ex.host.GetStatus()
+		if err != nil {
+			return Status{}, err
 		}
 	}
-	return s
+	if ex.child != nil {
+		s.Child, err = ex.child.GetStatus()
+		if err != nil {
+			return Status{}, err
+		}
+	}
+	if ex.batch != nil {
+		s.Batch, err = ex.batch.GetStatus()
+		if err != nil {
+			return Status{}, err
+		}
+		if ex.batch.DA() != nil {
+			s.DA, err = ex.batch.DA().GetNodeStatus()
+			if err != nil {
+				return Status{}, err
+			}
+		}
+	}
+	return s, nil
 }
