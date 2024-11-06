@@ -79,6 +79,9 @@ func (m *Merkle) InitializeWorkingTree(treeIndex uint64, startLeafIndex uint64) 
 
 // FinalizeWorkingTree finalizes the working tree and returns the finalized tree info.
 func (m *Merkle) FinalizeWorkingTree(extraData []byte) ([]types.RawKV, []byte /* root */, error) {
+	if m.workingTree == nil {
+		return nil, nil, errors.New("working tree is not initialized")
+	}
 	m.workingTree.Done = true
 	if m.workingTree.LeafCount == 0 {
 		return nil, merkletypes.EmptyRootHash[:], nil
@@ -213,6 +216,9 @@ func (m *Merkle) GetWorkingTreeLeafCount() (uint64, error) {
 
 // GetStartLeafIndex returns the start leaf index of the working tree.
 func (m *Merkle) GetStartLeafIndex() (uint64, error) {
+	if m.workingTree == nil {
+		return 0, errors.New("working tree is not initialized")
+	}
 	return m.workingTree.StartLeafIndex, nil
 }
 
@@ -230,6 +236,9 @@ func (m *Merkle) getNode(treeIndex uint64, height uint8, localNodeIndex uint64) 
 
 // fillLeaves fills the rest of the leaves with the last leaf.
 func (m *Merkle) fillLeaves() error {
+	if m.workingTree == nil {
+		return errors.New("working tree is not initialized")
+	}
 	height, err := m.Height()
 	if err != nil {
 		return err
@@ -257,6 +266,9 @@ func (m *Merkle) fillLeaves() error {
 //
 // It updates the last sibling of each level until the root.
 func (m *Merkle) InsertLeaf(data []byte) error {
+	if m.workingTree == nil {
+		return errors.New("working tree is not initialized")
+	}
 	height := uint8(0)
 	localNodeIndex := m.workingTree.LeafCount
 
