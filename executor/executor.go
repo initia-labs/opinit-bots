@@ -172,7 +172,7 @@ func (ex *Executor) RegisterQuerier() {
 }
 
 func (ex *Executor) makeDANode(ctx context.Context, bridgeInfo ophosttypes.QueryBridgeResponse, daKeyringConfig *btypes.KeyringConfig) (executortypes.DANode, error) {
-	if !ex.cfg.EnableBatchSubmitter {
+	if ex.cfg.DisableBatchSubmitter {
 		return batch.NewNoopDA(), nil
 	}
 
@@ -271,7 +271,7 @@ func (ex *Executor) getProcessedHeights(ctx context.Context, bridgeId uint64) (l
 }
 
 func (ex *Executor) getKeyringConfigs(bridgeInfo ophosttypes.QueryBridgeResponse) (hostKeyringConfig *btypes.KeyringConfig, childKeyringConfig *btypes.KeyringConfig, daKeyringConfig *btypes.KeyringConfig) {
-	if ex.cfg.EnableOutputSubmitter {
+	if !ex.cfg.DisableOutputSubmitter {
 		hostKeyringConfig = &btypes.KeyringConfig{
 			Address: bridgeInfo.BridgeConfig.Proposer,
 		}
@@ -283,7 +283,7 @@ func (ex *Executor) getKeyringConfigs(bridgeInfo ophosttypes.QueryBridgeResponse
 		}
 	}
 
-	if ex.cfg.EnableBatchSubmitter {
+	if !ex.cfg.DisableBatchSubmitter {
 		daKeyringConfig = &btypes.KeyringConfig{
 			Address: bridgeInfo.BridgeConfig.BatchInfo.Submitter,
 		}
