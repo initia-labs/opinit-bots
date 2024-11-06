@@ -13,6 +13,8 @@ func ResetHeights(db types.DB) error {
 		types.HostName,
 		types.ChildName,
 		types.BatchName,
+		types.DAHostName,
+		types.DACelestiaName,
 	}
 	for _, dbName := range dbNames {
 		if err := ResetHeight(db, dbName); err != nil {
@@ -25,7 +27,9 @@ func ResetHeights(db types.DB) error {
 func ResetHeight(db types.DB, nodeName string) error {
 	if nodeName != types.HostName &&
 		nodeName != types.ChildName &&
-		nodeName != types.BatchName {
+		nodeName != types.BatchName &&
+		nodeName != types.DAHostName &&
+		nodeName != types.DACelestiaName {
 		return errors.New("unknown node name")
 	}
 	nodeDB := db.WithPrefix([]byte(nodeName))
@@ -33,10 +37,10 @@ func ResetHeight(db types.DB, nodeName string) error {
 	if err != nil {
 		return err
 	}
-	if err := node.DeletePendingTxs(db); err != nil {
+	if err := node.DeletePendingTxs(nodeDB); err != nil {
 		return err
 	}
-	if err := node.DeleteProcessedMsgs(db); err != nil {
+	if err := node.DeleteProcessedMsgs(nodeDB); err != nil {
 		return err
 	}
 	fmt.Printf("reset height to 0 for node %s\n", string(nodeDB.GetPrefix()))

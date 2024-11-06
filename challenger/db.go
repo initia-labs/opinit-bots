@@ -133,11 +133,11 @@ func ResetHeight(db types.DB, nodeName string) error {
 	}
 	nodeDB := db.WithPrefix([]byte(nodeName))
 
-	if err := DeletePendingEvents(db); err != nil {
+	if err := DeletePendingEvents(nodeDB); err != nil {
 		return err
 	}
 
-	if err := DeletePendingChallenges(db); err != nil {
+	if err := DeletePendingChallenges(nodeDB); err != nil {
 		return err
 	}
 
