@@ -50,13 +50,13 @@ type Config struct {
 	// If you don't want to use the bridge executor feature, you can leave it empty.
 	BridgeExecutor string `json:"bridge_executor"`
 
-	// EnableOutputSubmitter is the flag to enable the output submitter.
-	// If it is false, the output submitter will not be started.
-	EnableOutputSubmitter bool `json:"enable_output_submitter"`
+	// DisableOutputSubmitter is the flag to disable the output submitter.
+	// If it is true, the output submitter will not be started.
+	DisableOutputSubmitter bool `json:"disable_output_submitter"`
 
-	// EnableBatchSubmitter is the flag to enable the batch submitter.
-	// If it is false, the batch submitter will not be started.
-	EnableBatchSubmitter bool `json:"enable_batch_submitter"`
+	// DisableBatchSubmitter is the flag to disable the batch submitter.
+	// If it is true, the batch submitter will not be started.
+	DisableBatchSubmitter bool `json:"disable_batch_submitter"`
 
 	// MaxChunks is the maximum number of chunks in a batch.
 	MaxChunks int64 `json:"max_chunks"`
@@ -114,9 +114,9 @@ func DefaultConfig() *Config {
 			TxTimeout:     60,
 		},
 
-		BridgeExecutor:        "",
-		EnableOutputSubmitter: true,
-		EnableBatchSubmitter:  true,
+		BridgeExecutor:         "",
+		DisableOutputSubmitter: false,
+		DisableBatchSubmitter:  false,
 
 		MaxChunks:         5000,
 		MaxChunkSize:      300000,  // 300KB
@@ -187,7 +187,7 @@ func (cfg Config) L1NodeConfig(homePath string) nodetypes.NodeConfig {
 		Bech32Prefix: cfg.L1Node.Bech32Prefix,
 	}
 
-	if cfg.EnableOutputSubmitter {
+	if !cfg.DisableOutputSubmitter {
 		nc.BroadcasterConfig = &btypes.BroadcasterConfig{
 			ChainID:       cfg.L1Node.ChainID,
 			GasPrice:      cfg.L1Node.GasPrice,
@@ -229,7 +229,7 @@ func (cfg Config) DANodeConfig(homePath string) nodetypes.NodeConfig {
 		Bech32Prefix: cfg.DANode.Bech32Prefix,
 	}
 
-	if cfg.EnableBatchSubmitter {
+	if !cfg.DisableBatchSubmitter {
 		nc.BroadcasterConfig = &btypes.BroadcasterConfig{
 			ChainID:       cfg.DANode.ChainID,
 			GasPrice:      cfg.DANode.GasPrice,
