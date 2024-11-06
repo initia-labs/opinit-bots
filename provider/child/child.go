@@ -2,6 +2,7 @@ package child
 
 import (
 	"context"
+	"errors"
 
 	"go.uber.org/zap"
 
@@ -222,4 +223,25 @@ func (b *BaseChild) EmptyProcessedMsgs() {
 
 func (b BaseChild) Merkle() *merkle.Merkle {
 	return b.mk
+}
+
+func (b BaseChild) GetWorkingTreeIndex() (uint64, error) {
+	if b.mk == nil {
+		return 0, errors.New("merkle is not initialized")
+	}
+	return b.mk.GetWorkingTreeIndex()
+}
+
+func (b BaseChild) GetStartLeafIndex() (uint64, error) {
+	if b.mk == nil {
+		return 0, errors.New("merkle is not initialized")
+	}
+	return b.mk.GetStartLeafIndex()
+}
+
+func (b BaseChild) GetWorkingTreeLeafCount() (uint64, error) {
+	if b.mk == nil {
+		return 0, errors.New("merkle is not initialized")
+	}
+	return b.mk.GetWorkingTreeLeafCount()
 }

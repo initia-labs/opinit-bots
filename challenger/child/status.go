@@ -29,20 +29,15 @@ func (ch Child) GetStatus() (Status, error) {
 		return Status{}, errors.New("node is not initialized")
 	}
 
-	merkle := ch.Merkle()
-	if merkle == nil {
-		return Status{}, errors.New("merkle is not initialized")
-	}
-
-	workingTreeLeafCount, err := merkle.GetWorkingTreeLeafCount()
+	workingTreeLeafCount, err := ch.GetWorkingTreeLeafCount()
 	if err != nil {
 		return Status{}, err
 	}
-	startLeafIndex, err := merkle.GetStartLeafIndex()
+	startLeafIndex, err := ch.GetStartLeafIndex()
 	if err != nil {
 		return Status{}, err
 	}
-	workingTreeIndex, err := merkle.GetWorkingTreeIndex()
+	workingTreeIndex, err := ch.GetWorkingTreeIndex()
 	if err != nil {
 		return Status{}, err
 	}

@@ -15,10 +15,10 @@ type Status struct {
 
 func (c Challenger) GetStatus() (Status, error) {
 	var err error
-	s := Status{
-		BridgeId: c.host.BridgeId(),
-	}
+	s := Status{}
+
 	if c.host != nil {
+		s.BridgeId = c.host.BridgeId()
 		s.Host, err = c.host.GetStatus()
 		if err != nil {
 			return Status{}, err

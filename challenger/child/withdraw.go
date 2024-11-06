@@ -62,7 +62,7 @@ func (ch *Child) prepareTree(blockHeight int64) error {
 }
 
 func (ch *Child) prepareOutput(ctx context.Context) error {
-	workingTreeIndex, err := ch.Merkle().GetWorkingTreeIndex()
+	workingTreeIndex, err := ch.GetWorkingTreeIndex()
 	if err != nil {
 		return err
 	}
@@ -104,12 +104,12 @@ func (ch *Child) handleTree(blockHeight int64, blockHeader cmtproto.Header) (kvs
 			return nil, nil, err
 		}
 
-		workingTreeIndex, err := ch.Merkle().GetWorkingTreeIndex()
+		workingTreeIndex, err := ch.GetWorkingTreeIndex()
 		if err != nil {
 			return nil, nil, err
 		}
 
-		workingTreeLeafCount, err := ch.Merkle().GetWorkingTreeLeafCount()
+		workingTreeLeafCount, err := ch.GetWorkingTreeLeafCount()
 		if err != nil {
 			return nil, nil, err
 		}
