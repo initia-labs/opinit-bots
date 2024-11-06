@@ -2,6 +2,8 @@ package child
 
 import (
 	"context"
+	"errors"
+	"slices"
 	"time"
 
 	btypes "github.com/initia-labs/opinit-bots/node/broadcaster/types"
@@ -13,6 +15,10 @@ func (ch *Child) beginBlockHandler(ctx context.Context, args nodetypes.BeginBloc
 	blockHeight := args.Block.Header.Height
 	ch.EmptyMsgQueue()
 	ch.EmptyProcessedMsgs()
+
+	if ch.Merkle() == nil {
+		return errors.New("merkle is not initialized")
+	}
 
 	err = ch.prepareTree(blockHeight)
 	if err != nil {
@@ -35,9 +41,12 @@ func (ch *Child) endBlockHandler(_ context.Context, args nodetypes.EndBlockArgs)
 	}
 
 	batchKVs = append(batchKVs, treeKVs...)
-
 	if storageRoot != nil {
-		err = ch.handleOutput(blockHeight, ch.Version(), args.BlockID, ch.Merkle().GetWorkingTreeIndex(), storageRoot)
+		workingTreeIndex, err := ch.GetWorkingTreeIndex()
+		if err != nil {
+			return err
+		}
+		err = ch.handleOutput(blockHeight, ch.Version(), args.BlockID, workingTreeIndex, storageRoot)
 		if err != nil {
 			return err
 		}
@@ -57,7 +66,7 @@ func (ch *Child) endBlockHandler(_ context.Context, args nodetypes.EndBlockArgs)
 			}
 
 			ch.AppendProcessedMsgs(btypes.ProcessedMsgs{
-				Msgs:      msgQueue[i:end],
+				Msgs:      slices.Clone(msgQueue[i:end]),
 				Timestamp: time.Now().UnixNano(),
 				Save:      true,
 			})

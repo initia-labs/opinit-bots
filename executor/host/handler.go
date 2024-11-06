@@ -2,6 +2,7 @@ package host
 
 import (
 	"context"
+	"slices"
 	"time"
 
 	"github.com/initia-labs/opinit-bots/types"
@@ -34,7 +35,7 @@ func (h *Host) endBlockHandler(_ context.Context, args nodetypes.EndBlockArgs) e
 			}
 
 			h.AppendProcessedMsgs(btypes.ProcessedMsgs{
-				Msgs:      msgQueue[i:end],
+				Msgs:      slices.Clone(msgQueue[i:end]),
 				Timestamp: time.Now().UnixNano(),
 				Save:      true,
 			})

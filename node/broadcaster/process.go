@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
+	"math"
 	"time"
 
 	"github.com/pkg/errors"
@@ -111,7 +112,7 @@ func (b *Broadcaster) Start(ctx context.Context) error {
 			return nil
 		case data := <-b.txChannel:
 			var err error
-			for retry := 1; retry <= 7; retry++ {
+			for retry := 1; retry <= types.MaxRetryCount; retry++ {
 				err = b.handleProcessedMsgs(ctx, data)
 				if err == nil {
 					break
@@ -122,7 +123,7 @@ func (b *Broadcaster) Start(ctx context.Context) error {
 					err = nil
 					break
 				}
-				b.logger.Warn("retry to handle processed msgs after 30 seconds", zap.Int("count", retry), zap.String("error", err.Error()))
+				b.logger.Warn(fmt.Sprintf("retry to handle processed msgs after %d seconds", int(2*math.Exp2(float64(retry)))), zap.Int("count", retry), zap.String("error", err.Error()))
 				types.SleepWithRetry(ctx, retry)
 			}
 			if err != nil {

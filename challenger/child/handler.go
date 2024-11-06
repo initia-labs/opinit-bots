@@ -2,6 +2,7 @@ package child
 
 import (
 	"context"
+	"errors"
 
 	challengertypes "github.com/initia-labs/opinit-bots/challenger/types"
 	nodetypes "github.com/initia-labs/opinit-bots/node/types"
@@ -14,6 +15,10 @@ import (
 func (ch *Child) beginBlockHandler(ctx context.Context, args nodetypes.BeginBlockArgs) (err error) {
 	blockHeight := args.Block.Header.Height
 	ch.eventQueue = ch.eventQueue[:0]
+
+	if ch.Merkle() == nil {
+		return errors.New("merkle is not initialized")
+	}
 
 	err = ch.prepareTree(blockHeight)
 	if err != nil {
@@ -39,7 +44,12 @@ func (ch *Child) endBlockHandler(_ context.Context, args nodetypes.EndBlockArgs)
 
 	batchKVs = append(batchKVs, treeKVs...)
 	if storageRoot != nil {
-		err = ch.handleOutput(args.Block.Header.Time, blockHeight, ch.Version(), args.BlockID, ch.Merkle().GetWorkingTreeIndex(), storageRoot)
+		workingTreeIndex, err := ch.GetWorkingTreeIndex()
+		if err != nil {
+			return err
+		}
+
+		err = ch.handleOutput(args.Block.Header.Time, blockHeight, ch.Version(), args.BlockID, workingTreeIndex, storageRoot)
 		if err != nil {
 			return err
 		}

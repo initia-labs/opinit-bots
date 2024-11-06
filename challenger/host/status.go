@@ -1,6 +1,7 @@
 package host
 
 import (
+	"errors"
 	"time"
 
 	challengertypes "github.com/initia-labs/opinit-bots/challenger/types"
@@ -14,17 +15,31 @@ type Status struct {
 	NumPendingEvents map[string]int64 `json:"num_pending_events"`
 }
 
-func (h Host) GetStatus() Status {
-	return Status{
-		Node:             h.GetNodeStatus(),
-		NumPendingEvents: h.eventHandler.NumPendingEvents(),
+func (h Host) GetStatus() (Status, error) {
+	nodeStatus, err := h.GetNodeStatus()
+	if err != nil {
+		return Status{}, err
 	}
+	if h.eventHandler == nil {
+		return Status{}, errors.New("event handler is not initialized")
+	}
+
+	return Status{
+		Node:             nodeStatus,
+		NumPendingEvents: h.eventHandler.NumPendingEvents(),
+	}, nil
 }
 
-func (h Host) GetNodeStatus() nodetypes.Status {
-	return h.Node().GetStatus()
+func (h Host) GetNodeStatus() (nodetypes.Status, error) {
+	if h.Node() == nil {
+		return nodetypes.Status{}, errors.New("node is not initialized")
+	}
+	return h.Node().GetStatus(), nil
 }
 
-func (h Host) GetAllPendingEvents() []challengertypes.ChallengeEvent {
-	return h.eventHandler.GetAllSortedPendingEvents()
+func (h Host) GetAllPendingEvents() ([]challengertypes.ChallengeEvent, error) {
+	if h.eventHandler == nil {
+		return nil, errors.New("event handler is not initialized")
+	}
+	return h.eventHandler.GetAllSortedPendingEvents(), nil
 }

@@ -13,16 +13,23 @@ type Status struct {
 	LatestChallenges []challengertypes.Challenge `json:"latest_challenges"`
 }
 
-func (c Challenger) GetStatus() Status {
-	s := Status{
-		BridgeId: c.host.BridgeId(),
-	}
+func (c Challenger) GetStatus() (Status, error) {
+	var err error
+	s := Status{}
+
 	if c.host != nil {
-		s.Host = c.host.GetStatus()
+		s.BridgeId = c.host.BridgeId()
+		s.Host, err = c.host.GetStatus()
+		if err != nil {
+			return Status{}, err
+		}
 	}
 	if c.child != nil {
-		s.Child = c.child.GetStatus()
+		s.Child, err = c.child.GetStatus()
+		if err != nil {
+			return Status{}, err
+		}
 	}
 	s.LatestChallenges = c.getLatestChallenges()
-	return s
+	return s, nil
 }

@@ -78,20 +78,23 @@ func (ch *Child) prepareTree(blockHeight int64) error {
 }
 
 func (ch *Child) prepareOutput(ctx context.Context) error {
-	workingOutputIndex := ch.Merkle().GetWorkingTreeIndex()
+	workingTreeIndex, err := ch.GetWorkingTreeIndex()
+	if err != nil {
+		return err
+	}
 
 	// initialize next output time
-	if ch.nextOutputTime.IsZero() && workingOutputIndex > 1 {
-		output, err := ch.host.QueryOutput(ctx, ch.BridgeId(), workingOutputIndex-1, 0)
+	if ch.nextOutputTime.IsZero() && workingTreeIndex > 1 {
+		output, err := ch.host.QueryOutput(ctx, ch.BridgeId(), workingTreeIndex-1, 0)
 		if err != nil {
 			// TODO: maybe not return error here and roll back
-			return fmt.Errorf("output does not exist at index: %d", workingOutputIndex-1)
+			return fmt.Errorf("output does not exist at index: %d", workingTreeIndex-1)
 		}
 		ch.lastOutputTime = output.OutputProposal.L1BlockTime
 		ch.nextOutputTime = output.OutputProposal.L1BlockTime.Add(ch.BridgeInfo().BridgeConfig.SubmissionInterval * 2 / 3)
 	}
 
-	output, err := ch.host.QueryOutput(ctx, ch.BridgeId(), ch.Merkle().GetWorkingTreeIndex(), 0)
+	output, err := ch.host.QueryOutput(ctx, ch.BridgeId(), workingTreeIndex, 0)
 	if err != nil {
 		if strings.Contains(err.Error(), "collections: not found") {
 			return nil
@@ -130,10 +133,20 @@ func (ch *Child) handleTree(blockHeight int64, latestHeight int64, blockId []byt
 			return nil, nil, err
 		}
 
+		workingTreeIndex, err := ch.GetWorkingTreeIndex()
+		if err != nil {
+			return nil, nil, err
+		}
+
+		workingTreeLeafCount, err := ch.GetWorkingTreeLeafCount()
+		if err != nil {
+			return nil, nil, err
+		}
+
 		ch.Logger().Info("finalize working tree",
-			zap.Uint64("tree_index", ch.Merkle().GetWorkingTreeIndex()),
+			zap.Uint64("tree_index", workingTreeIndex),
 			zap.Int64("height", blockHeight),
-			zap.Uint64("num_leaves", ch.Merkle().GetWorkingTreeLeafCount()),
+			zap.Uint64("num_leaves", workingTreeLeafCount),
 			zap.String("storage_root", base64.StdEncoding.EncodeToString(storageRoot)),
 		)
 

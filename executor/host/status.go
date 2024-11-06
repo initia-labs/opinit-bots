@@ -1,6 +1,8 @@
 package host
 
 import (
+	"errors"
+
 	nodetypes "github.com/initia-labs/opinit-bots/node/types"
 )
 
@@ -10,14 +12,22 @@ type Status struct {
 	LastProposedOutputL2BlockNumber int64            `json:"last_proposed_output_l2_block_number"`
 }
 
-func (h Host) GetStatus() Status {
+func (h Host) GetStatus() (Status, error) {
+	nodeStatus, err := h.GetNodeStatus()
+	if err != nil {
+		return Status{}, err
+	}
+
 	return Status{
-		Node:                            h.GetNodeStatus(),
+		Node:                            nodeStatus,
 		LastProposedOutputIndex:         h.lastProposedOutputIndex,
 		LastProposedOutputL2BlockNumber: h.lastProposedOutputL2BlockNumber,
-	}
+	}, nil
 }
 
-func (h Host) GetNodeStatus() nodetypes.Status {
-	return h.Node().GetStatus()
+func (h Host) GetNodeStatus() (nodetypes.Status, error) {
+	if h.Node() == nil {
+		return nodetypes.Status{}, errors.New("node is not initialized")
+	}
+	return h.Node().GetStatus(), nil
 }
