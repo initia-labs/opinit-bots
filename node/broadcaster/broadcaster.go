@@ -2,6 +2,7 @@ package broadcaster
 
 import (
 	"context"
+	"slices"
 	"sync"
 	"time"
 
@@ -194,7 +195,7 @@ func (b *Broadcaster) prepareBroadcaster(ctx context.Context, lastBlockTime time
 					}
 
 					b.pendingProcessedMsgs = append(b.pendingProcessedMsgs, btypes.ProcessedMsgs{
-						Msgs:      msgs[i:end],
+						Msgs:      slices.Clone(msgs[i:end]),
 						Timestamp: time.Now().UnixNano(),
 						Save:      true,
 					})

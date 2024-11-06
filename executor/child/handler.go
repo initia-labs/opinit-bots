@@ -2,6 +2,7 @@ package child
 
 import (
 	"context"
+	"slices"
 	"time"
 
 	btypes "github.com/initia-labs/opinit-bots/node/broadcaster/types"
@@ -57,7 +58,7 @@ func (ch *Child) endBlockHandler(_ context.Context, args nodetypes.EndBlockArgs)
 			}
 
 			ch.AppendProcessedMsgs(btypes.ProcessedMsgs{
-				Msgs:      msgQueue[i:end],
+				Msgs:      slices.Clone(msgQueue[i:end]),
 				Timestamp: time.Now().UnixNano(),
 				Save:      true,
 			})
