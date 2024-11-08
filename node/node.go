@@ -38,9 +38,9 @@ type Node struct {
 	rawBlockHandler   nodetypes.RawBlockHandlerFn
 
 	// status info
-	startHeightInitialized   bool
-	lastProcessedBlockHeight int64
-	running                  bool
+	startHeightInitialized bool
+	syncedHeight           int64
+	running                bool
 }
 
 func NewNode(cfg nodetypes.NodeConfig, db types.DB, logger *zap.Logger, cdc codec.Codec, txConfig client.TxConfig) (*Node, error) {
@@ -95,7 +95,7 @@ func (n *Node) Initialize(ctx context.Context, processedHeight int64, keyringCon
 	if status.SyncInfo.CatchingUp {
 		return errors.New("node is catching up")
 	}
-	if n.broadcaster != nil {
+	if n.HasBroadcaster() {
 		err = n.broadcaster.Initialize(ctx, status, keyringConfig)
 		if err != nil {
 			return err
@@ -117,7 +117,7 @@ func (n *Node) Start(ctx context.Context) {
 	n.running = true
 
 	errGrp := ctx.Value(types.ContextKeyErrGrp).(*errgroup.Group)
-	if n.broadcaster != nil {
+	if n.HasBroadcaster() {
 		errGrp.Go(func() (err error) {
 			defer func() {
 				n.logger.Info("tx broadcast looper stopped")
@@ -170,7 +170,18 @@ func (n Node) AccountCodec() address.Codec {
 }
 
 func (n Node) GetHeight() int64 {
-	return n.lastProcessedBlockHeight + 1
+	return n.syncedHeight + 1
+}
+
+func (n *Node) SetSyncedHeight(height int64) {
+	n.syncedHeight = height
+	if n.HasBroadcaster() {
+		n.broadcaster.SetSyncHeight(height)
+	}
+}
+
+func (n Node) GetSyncedHeight() int64 {
+	return n.syncedHeight
 }
 
 func (n Node) GetTxConfig() client.TxConfig {
@@ -182,7 +193,7 @@ func (n Node) HasBroadcaster() bool {
 }
 
 func (n Node) GetBroadcaster() (*broadcaster.Broadcaster, error) {
-	if n.broadcaster == nil {
+	if !n.HasBroadcaster() {
 		return nil, types.ErrKeyNotSet
 	}
 
@@ -190,10 +201,9 @@ func (n Node) GetBroadcaster() (*broadcaster.Broadcaster, error) {
 }
 
 func (n Node) MustGetBroadcaster() *broadcaster.Broadcaster {
-	if n.broadcaster == nil {
+	if !n.HasBroadcaster() {
 		panic("cannot get broadcaster without broadcaster")
 	}
-
 	return n.broadcaster
 }
 
@@ -203,7 +213,7 @@ func (n Node) GetStatus() nodetypes.Status {
 		s.LastBlockHeight = n.GetHeight()
 	}
 
-	if n.broadcaster != nil {
+	if n.HasBroadcaster() {
 		s.Broadcaster = &nodetypes.BroadcasterStatus{
 			PendingTxs: n.broadcaster.LenLocalPendingTx(),
 			Sequence:   n.broadcaster.GetTxf().Sequence(),

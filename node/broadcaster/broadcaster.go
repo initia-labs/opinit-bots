@@ -48,7 +48,7 @@ type Broadcaster struct {
 
 	pendingProcessedMsgs []btypes.ProcessedMsgs
 
-	lastProcessedBlockHeight int64
+	syncedHeight int64
 }
 
 func NewBroadcaster(
@@ -242,8 +242,12 @@ func (b *Broadcaster) prepareBroadcaster(ctx context.Context, lastBlockTime time
 	return nil
 }
 
-func (b *Broadcaster) SetSyncInfo(height int64) {
-	b.lastProcessedBlockHeight = height
+func (b Broadcaster) GetHeight() int64 {
+	return b.syncedHeight + 1
+}
+
+func (b *Broadcaster) SetSyncHeight(height int64) {
+	b.syncedHeight = height
 }
 
 func (b Broadcaster) KeyName() string {

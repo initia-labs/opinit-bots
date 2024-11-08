@@ -16,12 +16,8 @@ import (
 	"github.com/initia-labs/opinit-bots/types"
 )
 
-func (b Broadcaster) GetHeight() int64 {
-	return b.lastProcessedBlockHeight + 1
-}
-
 // HandleNewBlock is called when a new block is received.
-func (b *Broadcaster) HandleNewBlock(block *rpccoretypes.ResultBlock, blockResult *rpccoretypes.ResultBlockResults, latestChainHeight int64) error {
+func (b *Broadcaster) HandleNewBlock(block *rpccoretypes.ResultBlock, latestChainHeight int64) error {
 	// check pending txs first
 	for _, tx := range block.Block.Txs {
 		if b.LenLocalPendingTx() == 0 {
@@ -32,7 +28,7 @@ func (b *Broadcaster) HandleNewBlock(block *rpccoretypes.ResultBlock, blockResul
 		if pendingTx := b.peekLocalPendingTx(); btypes.TxHash(tx) == pendingTx.TxHash {
 			err := b.RemovePendingTx(block.Block.Height, pendingTx.TxHash, pendingTx.Sequence, pendingTx.MsgTypes)
 			if err != nil {
-				return err
+				return errors.Wrap(err, "failed to remove pending tx")
 			}
 		}
 	}
@@ -46,46 +42,42 @@ func (b *Broadcaster) HandleNewBlock(block *rpccoretypes.ResultBlock, blockResul
 			panic(fmt.Errorf("something wrong, pending txs are not processed for a long time; current block time: %s, pending tx processing time: %s", block.Block.Time.UTC().String(), pendingTxTime.UTC().String()))
 		}
 	}
-
-	// update last processed block height
-	b.lastProcessedBlockHeight = latestChainHeight
-
 	return nil
 }
 
 // CheckPendingTx query tx info to check if pending tx is processed.
-func (b *Broadcaster) CheckPendingTx(ctx context.Context) (*btypes.PendingTxInfo, *rpccoretypes.ResultTx, time.Time, error) {
+func (b *Broadcaster) CheckPendingTx(ctx context.Context) (*btypes.PendingTxInfo, *rpccoretypes.ResultTx, time.Time, int64, error) {
 	if b.LenLocalPendingTx() == 0 {
-		return nil, nil, time.Time{}, nil
+		return nil, nil, time.Time{}, 0, nil
 	}
 
 	pendingTx := b.peekLocalPendingTx()
 	pendingTxTime := time.Unix(0, b.peekLocalPendingTx().Timestamp)
 
-	lastBlockResult, err := b.rpcClient.Block(ctx, nil)
+	latestBlockResult, err := b.rpcClient.Block(ctx, nil)
 	if err != nil {
-		return nil, nil, time.Time{}, err
+		return nil, nil, time.Time{}, 0, errors.Wrap(err, "failed to fetch latest block")
 	}
-	if lastBlockResult.Block.Time.After(pendingTxTime.Add(b.cfg.TxTimeout)) {
+	if latestBlockResult.Block.Time.After(pendingTxTime.Add(b.cfg.TxTimeout)) {
 		// @sh-cha: should we rebroadcast pending txs? or rasing monitoring alert?
 		panic(fmt.Errorf("something wrong, pending txs are not processed for a long time; current block time: %s, pending tx processing time: %s", time.Now().UTC().String(), pendingTxTime.UTC().String()))
 	}
 
 	txHash, err := hex.DecodeString(pendingTx.TxHash)
 	if err != nil {
-		return nil, nil, time.Time{}, err
+		return nil, nil, time.Time{}, 0, errors.Wrap(err, "failed to decode tx hash")
 	}
 	res, err := b.rpcClient.QueryTx(ctx, txHash)
 	if err != nil {
 		b.logger.Debug("failed to query tx", zap.String("tx_hash", pendingTx.TxHash), zap.String("error", err.Error()))
-		return nil, nil, time.Time{}, nil
+		return nil, nil, time.Time{}, 0, errors.Wrap(err, fmt.Sprintf("failed to query tx; hash: %s", pendingTx.TxHash))
 	}
 
 	blockResult, err := b.rpcClient.Block(ctx, &res.Height)
 	if err != nil {
-		return nil, nil, time.Time{}, err
+		return nil, nil, time.Time{}, 0, errors.Wrap(err, fmt.Sprintf("failed to fetch block; height: %d", res.Height))
 	}
-	return &pendingTx, res, blockResult.Block.Time, nil
+	return &pendingTx, res, blockResult.Block.Time, latestBlockResult.Block.Height, nil
 }
 
 // RemovePendingTx remove pending tx from local pending txs.
@@ -110,15 +102,15 @@ func (b *Broadcaster) Start(ctx context.Context) error {
 		select {
 		case <-ctx.Done():
 			return nil
-		case data := <-b.txChannel:
+		case msgs := <-b.txChannel:
 			var err error
 			for retry := 1; retry <= types.MaxRetryCount; retry++ {
-				err = b.handleProcessedMsgs(ctx, data)
+				err = b.handleProcessedMsgs(ctx, msgs)
 				if err == nil {
 					break
 				} else if err = b.handleMsgError(err); err == nil {
 					break
-				} else if !data.Save {
+				} else if !msgs.Save {
 					// if the message does not need to be saved, we can skip retry
 					err = nil
 					break

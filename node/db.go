@@ -8,17 +8,10 @@ import (
 	"go.uber.org/zap"
 )
 
-func (n *Node) SetSyncInfo(height int64) {
-	n.lastProcessedBlockHeight = height
-	if n.broadcaster != nil {
-		n.broadcaster.SetSyncInfo(n.lastProcessedBlockHeight)
-	}
-}
-
 func (n *Node) loadSyncInfo(processedHeight int64) error {
 	data, err := n.db.Get(nodetypes.LastProcessedBlockHeightKey)
 	if err == dbtypes.ErrNotFound {
-		n.SetSyncInfo(processedHeight)
+		n.SetSyncedHeight(processedHeight)
 		n.startHeightInitialized = true
 		n.logger.Info("initialize sync info", zap.Int64("start_height", processedHeight+1))
 		return nil
@@ -31,8 +24,8 @@ func (n *Node) loadSyncInfo(processedHeight int64) error {
 		return err
 	}
 
-	n.SetSyncInfo(lastSyncedHeight)
-	n.logger.Debug("load sync info", zap.Int64("last_processed_height", n.lastProcessedBlockHeight))
+	n.SetSyncedHeight(lastSyncedHeight)
+	n.logger.Debug("load sync info", zap.Int64("last_processed_height", n.syncedHeight))
 
 	return nil
 }
