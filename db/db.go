@@ -87,9 +87,13 @@ func (db *LevelDB) Close() error {
 // PrefixedIterate iterates over the key-value pairs in the database with prefixing the keys.
 //
 // @dev: `LevelDB.prefix + prefix` is used as the prefix for the iteration.
-func (db *LevelDB) PrefixedIterate(prefix []byte, cb func(key, value []byte) (stop bool, err error)) error {
+func (db *LevelDB) PrefixedIterate(prefix []byte, start []byte, cb func(key, value []byte) (stop bool, err error)) error {
 	iter := db.db.NewIterator(util.BytesPrefix(db.PrefixedKey(prefix)), nil)
 	defer iter.Release()
+	if start != nil {
+		iter.Seek(db.PrefixedKey(start))
+	}
+
 	for iter.Next() {
 		key := db.UnprefixedKey(bytes.Clone(iter.Key()))
 		if stop, err := cb(key, bytes.Clone(iter.Value())); err != nil {
@@ -101,9 +105,13 @@ func (db *LevelDB) PrefixedIterate(prefix []byte, cb func(key, value []byte) (st
 	return iter.Error()
 }
 
-func (db *LevelDB) PrefixedReverseIterate(prefix []byte, cb func(key, value []byte) (stop bool, err error)) error {
+func (db *LevelDB) PrefixedReverseIterate(prefix []byte, start []byte, cb func(key, value []byte) (stop bool, err error)) error {
 	iter := db.db.NewIterator(util.BytesPrefix(db.PrefixedKey(prefix)), nil)
 	defer iter.Release()
+	if start != nil {
+		iter.Seek(db.PrefixedKey(start))
+	}
+
 	if iter.Last() {
 		for {
 			key := db.UnprefixedKey(bytes.Clone(iter.Key()))

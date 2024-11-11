@@ -39,7 +39,7 @@ func (c *Challenger) deletePendingChallenge(challenge challengertypes.Challenge)
 }
 
 func (c *Challenger) loadPendingChallenges() (challenges []challengertypes.Challenge, err error) {
-	iterErr := c.db.PrefixedIterate(challengertypes.PendingChallengeKey, func(_, value []byte) (stop bool, err error) {
+	iterErr := c.db.PrefixedIterate(challengertypes.PendingChallengeKey, nil, func(_, value []byte) (stop bool, err error) {
 		challenge := challengertypes.Challenge{}
 		err = challenge.Unmarshal(value)
 		if err != nil {
@@ -66,7 +66,7 @@ func (c *Challenger) saveChallenge(challenge challengertypes.Challenge) (types.R
 }
 
 func (c *Challenger) loadChallenges() (challenges []challengertypes.Challenge, err error) {
-	iterErr := c.db.PrefixedReverseIterate(challengertypes.ChallengeKey, func(_, value []byte) (stop bool, err error) {
+	iterErr := c.db.PrefixedReverseIterate(challengertypes.ChallengeKey, nil, func(_, value []byte) (stop bool, err error) {
 		challenge := challengertypes.Challenge{}
 		err = challenge.Unmarshal(value)
 		if err != nil {
@@ -87,7 +87,7 @@ func (c *Challenger) loadChallenges() (challenges []challengertypes.Challenge, e
 
 func (c *Challenger) DeleteFutureChallenges(initialBlockTime time.Time) error {
 	deletingKeys := make([][]byte, 0)
-	iterErr := c.db.PrefixedReverseIterate(challengertypes.ChallengeKey, func(key []byte, _ []byte) (stop bool, err error) {
+	iterErr := c.db.PrefixedReverseIterate(challengertypes.ChallengeKey, nil, func(key []byte, _ []byte) (stop bool, err error) {
 		ts, _, err := challengertypes.ParseChallenge(key)
 		if err != nil {
 			return true, err
@@ -150,7 +150,7 @@ func ResetHeight(db types.DB, nodeName string) error {
 
 func DeletePendingEvents(db types.DB) error {
 	deletingKeys := make([][]byte, 0)
-	iterErr := db.PrefixedIterate(challengertypes.PendingEventKey, func(key []byte, _ []byte) (stop bool, err error) {
+	iterErr := db.PrefixedIterate(challengertypes.PendingEventKey, nil, func(key []byte, _ []byte) (stop bool, err error) {
 		deletingKeys = append(deletingKeys, key)
 		return false, nil
 	})
@@ -169,7 +169,7 @@ func DeletePendingEvents(db types.DB) error {
 
 func DeletePendingChallenges(db types.DB) error {
 	deletingKeys := make([][]byte, 0)
-	iterErr := db.PrefixedIterate(challengertypes.PendingChallengeKey, func(key []byte, _ []byte) (stop bool, err error) {
+	iterErr := db.PrefixedIterate(challengertypes.PendingChallengeKey, nil, func(key []byte, _ []byte) (stop bool, err error) {
 		deletingKeys = append(deletingKeys, key)
 		return false, nil
 	})
