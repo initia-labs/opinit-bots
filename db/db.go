@@ -92,15 +92,18 @@ func (db *LevelDB) PrefixedIterate(prefix []byte, start []byte, cb func(key, val
 	defer iter.Release()
 	if start != nil {
 		iter.Seek(db.PrefixedKey(start))
+	} else {
+		iter.First()
 	}
 
-	for iter.Next() {
+	for iter.Valid() {
 		key := db.UnprefixedKey(bytes.Clone(iter.Key()))
 		if stop, err := cb(key, bytes.Clone(iter.Value())); err != nil {
 			return err
 		} else if stop {
 			break
 		}
+		iter.Next()
 	}
 	return iter.Error()
 }
@@ -110,21 +113,19 @@ func (db *LevelDB) PrefixedReverseIterate(prefix []byte, start []byte, cb func(k
 	defer iter.Release()
 	if start != nil {
 		iter.Seek(db.PrefixedKey(start))
+	} else {
+		iter.Last()
 	}
 
-	if iter.Last() {
-		for {
-			key := db.UnprefixedKey(bytes.Clone(iter.Key()))
-			if stop, err := cb(key, bytes.Clone(iter.Value())); err != nil {
-				return err
-			} else if stop {
-				break
-			}
-
-			if !iter.Prev() {
-				break
-			}
+	for iter.Valid() {
+		key := db.UnprefixedKey(bytes.Clone(iter.Key()))
+		if stop, err := cb(key, bytes.Clone(iter.Value())); err != nil {
+			return err
+		} else if stop {
+			break
 		}
+
+		iter.Prev()
 	}
 	return iter.Error()
 }
