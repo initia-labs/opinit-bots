@@ -229,7 +229,6 @@ func (ch *Child) GetSequencesByAddress(address string, offset uint64, limit uint
 		if offset > lastIndex {
 			return nil, nil
 		}
-
 		startKey := executortypes.PrefixedWithdrawalKeyAddressIndex(address, lastIndex-offset)
 		err = ch.DB().PrefixedReverseIterate(executortypes.PrefixedWithdrawalKeyAddress(address), startKey, fetchFn)
 		if err != nil {
@@ -262,11 +261,11 @@ func (ch *Child) WithdrawalToRawKVs(sequence uint64, data executortypes.Withdraw
 	if err != nil {
 		return nil, err
 	}
+	ch.addressIndexMap[data.To] = addressIndex + 1
 	kvs = append(kvs, types.RawKV{
-		Key:   ch.DB().PrefixedKey(executortypes.PrefixedWithdrawalKeyAddressIndex(data.To, addressIndex+1)),
+		Key:   ch.DB().PrefixedKey(executortypes.PrefixedWithdrawalKeyAddressIndex(data.To, ch.addressIndexMap[data.To])),
 		Value: dbtypes.FromUint64(sequence),
 	})
-	ch.addressIndexMap[data.To] = addressIndex + 1
 	return kvs, nil
 }
 
