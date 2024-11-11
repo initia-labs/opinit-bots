@@ -22,5 +22,6 @@ type QueryWithdrawalResponse struct {
 
 type QueryWithdrawalsResponse struct {
 	Withdrawals []QueryWithdrawalResponse `json:"withdrawals"`
+	Next        uint64                    `json:"next"`
 	Total       uint64                    `json:"total"`
 }

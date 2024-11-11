@@ -203,14 +203,12 @@ func (ch *Child) GetWithdrawal(sequence uint64) (executortypes.WithdrawalData, e
 	return data, err
 }
 
-func (ch *Child) GetSequencesByAddress(address string, offset uint64, limit uint64, descOrder bool) ([]uint64, uint64, error) {
+func (ch *Child) GetSequencesByAddress(address string, offset uint64, limit uint64, descOrder bool) (sequences []uint64, next, total uint64, err error) {
 	if limit == 0 {
-		return nil, 0, nil
+		return nil, 0, 0, nil
 	}
 
 	count := uint64(0)
-	sequences := make([]uint64, 0)
-
 	fetchFn := func(key, value []byte) (bool, error) {
 		sequence, err := dbtypes.ToUint64(value)
 		if err != nil {
@@ -223,20 +221,22 @@ func (ch *Child) GetSequencesByAddress(address string, offset uint64, limit uint
 		}
 		return false, nil
 	}
-	lastIndex, err := ch.GetLastAddressIndex(address)
+	total, err = ch.GetLastAddressIndex(address)
 	if err != nil {
-		return nil, 0, err
+		return nil, 0, 0, err
 	}
 
 	if descOrder {
-		if offset > lastIndex || offset == 0 {
-			offset = lastIndex
+		if offset > total || offset == 0 {
+			offset = total
 		}
 		startKey := executortypes.PrefixedWithdrawalKeyAddressIndex(address, offset)
 		err = ch.DB().PrefixedReverseIterate(executortypes.PrefixedWithdrawalKeyAddress(address), startKey, fetchFn)
 		if err != nil {
-			return nil, 0, err
+			return nil, 0, 0, err
 		}
+
+		next = offset - count
 	} else {
 		if offset == 0 {
 			offset = 1
@@ -244,10 +244,13 @@ func (ch *Child) GetSequencesByAddress(address string, offset uint64, limit uint
 		startKey := executortypes.PrefixedWithdrawalKeyAddressIndex(address, offset)
 		err := ch.DB().PrefixedIterate(executortypes.PrefixedWithdrawalKeyAddress(address), startKey, fetchFn)
 		if err != nil {
-			return nil, 0, err
+			return nil, 0, 0, err
 		}
+
+		next = offset + count
 	}
-	return sequences, lastIndex, nil
+
+	return sequences, next, total, nil
 }
 
 // SetWithdrawal store the withdrawal data for the given sequence to the database
