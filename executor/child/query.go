@@ -45,18 +45,23 @@ func (ch Child) QueryWithdrawal(sequence uint64) (executortypes.QueryWithdrawalR
 	}, nil
 }
 
-func (ch Child) QueryWithdrawals(address string, offset uint64, limit uint64, descOrder bool) ([]executortypes.QueryWithdrawalResponse, error) {
-	sequences, err := ch.GetSequencesByAddress(address, offset, limit, descOrder)
+func (ch Child) QueryWithdrawals(address string, offset uint64, limit uint64, descOrder bool) (executortypes.QueryWithdrawalsResponse, error) {
+	sequences, lastIndex, err := ch.GetSequencesByAddress(address, offset, limit, descOrder)
 	if err != nil {
-		return nil, err
+		return executortypes.QueryWithdrawalsResponse{}, err
 	}
-	res := make([]executortypes.QueryWithdrawalResponse, 0)
+	withdrawals := make([]executortypes.QueryWithdrawalResponse, 0)
 	for _, sequence := range sequences {
 		withdrawal, err := ch.QueryWithdrawal(sequence)
 		if err != nil {
-			return nil, err
+			return executortypes.QueryWithdrawalsResponse{}, err
 		}
-		res = append(res, withdrawal)
+		withdrawals = append(withdrawals, withdrawal)
+	}
+
+	res := executortypes.QueryWithdrawalsResponse{
+		Withdrawals: withdrawals,
+		Total:       lastIndex,
 	}
 	return res, nil
 }

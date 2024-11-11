@@ -19,3 +19,8 @@ type QueryWithdrawalResponse struct {
 	// BlockNumber    int64  `json:"block_number"`
 	// WithdrawalHash []byte `json:"withdrawal_hash"`
 }
+
+type QueryWithdrawalsResponse struct {
+	Withdrawals []QueryWithdrawalResponse `json:"withdrawals"`
+	Total       uint64                    `json:"total"`
+}
