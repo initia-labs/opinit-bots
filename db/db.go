@@ -135,7 +135,10 @@ func (db *LevelDB) PrefixedReverseIterate(prefix []byte, start []byte, cb func(k
 func (db *LevelDB) SeekPrevInclusiveKey(prefix []byte, key []byte) (k []byte, v []byte, err error) {
 	iter := db.db.NewIterator(util.BytesPrefix(db.PrefixedKey(prefix)), nil)
 	defer iter.Release()
-	if iter.Seek(db.PrefixedKey(key)) || iter.Valid() && iter.Prev() || iter.Last() && iter.Valid() {
+	if iter.Seek(db.PrefixedKey(key)) {
+		if !bytes.Equal(db.PrefixedKey(key), iter.Key()) {
+			iter.Prev()
+		}
 		k = db.UnprefixedKey(bytes.Clone(iter.Key()))
 		v = bytes.Clone(iter.Value())
 	} else {

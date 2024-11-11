@@ -193,7 +193,6 @@ func (ex *Executor) RegisterQuerier() {
 		if orderStr == "asc" {
 			descOrder = false
 		}
-
 		res, err := ex.child.QueryWithdrawals(address, uoffset, ulimit, descOrder)
 		if err != nil {
 			return err

@@ -144,9 +144,15 @@ func (ch *Child) handleTree(blockHeight int64, latestHeight int64, blockId []byt
 			return nil, nil, err
 		}
 
+		startLeafIndex, err := ch.GetStartLeafIndex()
+		if err != nil {
+			return nil, nil, err
+		}
+
 		ch.Logger().Info("finalize working tree",
 			zap.Uint64("tree_index", workingTreeIndex),
 			zap.Int64("height", blockHeight),
+			zap.Uint64("start_leaf_index", startLeafIndex),
 			zap.Uint64("num_leaves", workingTreeLeafCount),
 			zap.String("storage_root", base64.StdEncoding.EncodeToString(storageRoot)),
 		)
@@ -197,7 +203,7 @@ func (ch *Child) GetWithdrawal(sequence uint64) (executortypes.WithdrawalData, e
 	return data, err
 }
 
-func (ch *Child) GetWithdrawalsByAddress(address string, offset uint64, limit uint64, descOrder bool) (withdrawals []executortypes.WithdrawalData, err error) {
+func (ch *Child) GetSequencesByAddress(address string, offset uint64, limit uint64, descOrder bool) ([]uint64, error) {
 	count := uint64(0)
 	sequences := make([]uint64, 0)
 
@@ -221,7 +227,7 @@ func (ch *Child) GetWithdrawalsByAddress(address string, offset uint64, limit ui
 			return nil, err
 		}
 		if offset > lastIndex {
-			return withdrawals, nil
+			return nil, nil
 		}
 
 		startKey := executortypes.PrefixedWithdrawalKeyAddressIndex(address, lastIndex-offset)
@@ -231,20 +237,12 @@ func (ch *Child) GetWithdrawalsByAddress(address string, offset uint64, limit ui
 		}
 	} else {
 		startKey := executortypes.PrefixedWithdrawalKeyAddressIndex(address, offset+1)
-		err = ch.DB().PrefixedIterate(executortypes.PrefixedWithdrawalKeyAddress(address), startKey, fetchFn)
+		err := ch.DB().PrefixedIterate(executortypes.PrefixedWithdrawalKeyAddress(address), startKey, fetchFn)
 		if err != nil {
 			return nil, err
 		}
 	}
-
-	for _, sequence := range sequences {
-		withdrawal, err := ch.GetWithdrawal(sequence)
-		if err != nil {
-			return nil, err
-		}
-		withdrawals = append(withdrawals, withdrawal)
-	}
-	return
+	return sequences, nil
 }
 
 // SetWithdrawal store the withdrawal data for the given sequence to the database
@@ -286,10 +284,7 @@ func (ch *Child) GetAddressIndex(address string) (uint64, error) {
 
 func (ch *Child) GetLastAddressIndex(address string) (lastIndex uint64, err error) {
 	err = ch.DB().PrefixedReverseIterate(executortypes.PrefixedWithdrawalKeyAddress(address), nil, func(key, _ []byte) (bool, error) {
-		lastIndex, err = dbtypes.ToUint64(key[len(key)-8:])
-		if err != nil {
-			return true, err
-		}
+		lastIndex = dbtypes.ToUint64Key(key[len(key)-8:])
 		return true, nil
 	})
 	return lastIndex, err

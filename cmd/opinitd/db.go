@@ -9,7 +9,7 @@ import (
 )
 
 // temporary db migration command for v0.1.5
-func Migration015Cmd(ctx *cmdContext) *cobra.Command {
+func migration015Cmd(ctx *cmdContext) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "migration",
 		Args:  cobra.ExactArgs(0),
