@@ -96,7 +96,7 @@ func (ch *ChallengeEventHandler) SetPendingEvents(events []challengertypes.Chall
 }
 
 func (ch *ChallengeEventHandler) loadPendingEvents() (events []challengertypes.ChallengeEvent, err error) {
-	iterErr := ch.db.PrefixedIterate(challengertypes.PendingEventKey, func(key, value []byte) (stop bool, err error) {
+	iterErr := ch.db.PrefixedIterate(challengertypes.PendingEventKey, nil, func(key, value []byte) (stop bool, err error) {
 		id, err := challengertypes.ParsePendingEvent(key)
 		if err != nil {
 			return true, err

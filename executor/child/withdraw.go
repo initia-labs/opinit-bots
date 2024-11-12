@@ -38,10 +38,11 @@ func (ch *Child) handleInitiateWithdrawal(l2Sequence uint64, from string, to str
 	}
 
 	// store to database
-	err := ch.SetWithdrawal(l2Sequence, data)
+	kvs, err := ch.WithdrawalToRawKVs(l2Sequence, data)
 	if err != nil {
 		return err
 	}
+	ch.batchKVs = append(ch.batchKVs, kvs...)
 
 	// generate merkle tree
 	err = ch.Merkle().InsertLeaf(withdrawalHash[:])
@@ -143,9 +144,15 @@ func (ch *Child) handleTree(blockHeight int64, latestHeight int64, blockId []byt
 			return nil, nil, err
 		}
 
+		startLeafIndex, err := ch.GetStartLeafIndex()
+		if err != nil {
+			return nil, nil, err
+		}
+
 		ch.Logger().Info("finalize working tree",
 			zap.Uint64("tree_index", workingTreeIndex),
 			zap.Int64("height", blockHeight),
+			zap.Uint64("start_leaf_index", startLeafIndex),
 			zap.Uint64("num_leaves", workingTreeLeafCount),
 			zap.String("storage_root", base64.StdEncoding.EncodeToString(storageRoot)),
 		)
@@ -196,18 +203,103 @@ func (ch *Child) GetWithdrawal(sequence uint64) (executortypes.WithdrawalData, e
 	return data, err
 }
 
-// SetWithdrawal store the withdrawal data for the given sequence to the database
-func (ch *Child) SetWithdrawal(sequence uint64, data executortypes.WithdrawalData) error {
-	dataBytes, err := json.Marshal(&data)
-	if err != nil {
-		return err
+func (ch *Child) GetSequencesByAddress(address string, offset uint64, limit uint64, descOrder bool) (sequences []uint64, next, total uint64, err error) {
+	if limit == 0 {
+		return nil, 0, 0, nil
 	}
 
-	return ch.DB().Set(executortypes.PrefixedWithdrawalKey(sequence), dataBytes)
+	count := uint64(0)
+	fetchFn := func(key, value []byte) (bool, error) {
+		sequence, err := dbtypes.ToUint64(value)
+		if err != nil {
+			return true, err
+		}
+		sequences = append(sequences, sequence)
+		count++
+		if count >= limit {
+			return true, nil
+		}
+		return false, nil
+	}
+	total, err = ch.GetLastAddressIndex(address)
+	if err != nil {
+		return nil, 0, 0, err
+	}
+
+	if descOrder {
+		if offset > total || offset == 0 {
+			offset = total
+		}
+		startKey := executortypes.PrefixedWithdrawalKeyAddressIndex(address, offset)
+		err = ch.DB().PrefixedReverseIterate(executortypes.PrefixedWithdrawalKeyAddress(address), startKey, fetchFn)
+		if err != nil {
+			return nil, 0, 0, err
+		}
+
+		next = offset - count
+	} else {
+		if offset == 0 {
+			offset = 1
+		}
+		startKey := executortypes.PrefixedWithdrawalKeyAddressIndex(address, offset)
+		err := ch.DB().PrefixedIterate(executortypes.PrefixedWithdrawalKeyAddress(address), startKey, fetchFn)
+		if err != nil {
+			return nil, 0, 0, err
+		}
+
+		next = offset + count
+	}
+
+	return sequences, next, total, nil
+}
+
+// SetWithdrawal store the withdrawal data for the given sequence to the database
+func (ch *Child) WithdrawalToRawKVs(sequence uint64, data executortypes.WithdrawalData) ([]types.RawKV, error) {
+	dataBytes, err := json.Marshal(&data)
+	if err != nil {
+		return nil, err
+	}
+
+	kvs := make([]types.RawKV, 0)
+	kvs = append(kvs, types.RawKV{
+		Key:   ch.DB().PrefixedKey(executortypes.PrefixedWithdrawalKey(sequence)),
+		Value: dataBytes,
+	})
+
+	addressIndex, err := ch.GetAddressIndex(data.To)
+	if err != nil {
+		return nil, err
+	}
+	ch.addressIndexMap[data.To] = addressIndex + 1
+	kvs = append(kvs, types.RawKV{
+		Key:   ch.DB().PrefixedKey(executortypes.PrefixedWithdrawalKeyAddressIndex(data.To, ch.addressIndexMap[data.To])),
+		Value: dbtypes.FromUint64(sequence),
+	})
+	return kvs, nil
+}
+
+func (ch *Child) GetAddressIndex(address string) (uint64, error) {
+	if index, ok := ch.addressIndexMap[address]; !ok {
+		lastIndex, err := ch.GetLastAddressIndex(address)
+		if err != nil {
+			return 0, err
+		}
+		return lastIndex, nil
+	} else {
+		return index, nil
+	}
+}
+
+func (ch *Child) GetLastAddressIndex(address string) (lastIndex uint64, err error) {
+	err = ch.DB().PrefixedReverseIterate(executortypes.PrefixedWithdrawalKeyAddress(address), nil, func(key, _ []byte) (bool, error) {
+		lastIndex = dbtypes.ToUint64Key(key[len(key)-8:])
+		return true, nil
+	})
+	return lastIndex, err
 }
 
 func (ch *Child) DeleteFutureWithdrawals(fromSequence uint64) error {
-	return ch.DB().PrefixedIterate(executortypes.WithdrawalKey, func(key, _ []byte) (bool, error) {
+	return ch.DB().PrefixedIterate(executortypes.WithdrawalKey, nil, func(key, _ []byte) (bool, error) {
 		sequence := dbtypes.ToUint64Key(key[len(key)-8:])
 		if sequence >= fromSequence {
 			err := ch.DB().Delete(key)

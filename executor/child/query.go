@@ -33,14 +33,36 @@ func (ch Child) QueryWithdrawal(sequence uint64) (executortypes.QueryWithdrawalR
 		BridgeId:         ch.BridgeId(),
 		OutputIndex:      outputIndex,
 		WithdrawalProofs: proofs,
-		Sender:           withdrawal.From,
+		From:             withdrawal.From,
+		To:               withdrawal.To,
 		Sequence:         sequence,
-		Amount:           amount.String(),
+		Amount:           amount,
 		Version:          []byte{ch.Version()},
 		StorageRoot:      outputRoot,
-		LatestBlockHash:  treeExtraData.BlockHash,
-		BlockNumber:      treeExtraData.BlockNumber,
-		Receiver:         withdrawal.To,
-		WithdrawalHash:   withdrawal.WithdrawalHash,
+		LastBlockHash:    treeExtraData.BlockHash,
+		// BlockNumber:      treeExtraData.BlockNumber,
+		// WithdrawalHash:   withdrawal.WithdrawalHash,
 	}, nil
+}
+
+func (ch Child) QueryWithdrawals(address string, offset uint64, limit uint64, descOrder bool) (executortypes.QueryWithdrawalsResponse, error) {
+	sequences, next, total, err := ch.GetSequencesByAddress(address, offset, limit, descOrder)
+	if err != nil {
+		return executortypes.QueryWithdrawalsResponse{}, err
+	}
+	withdrawals := make([]executortypes.QueryWithdrawalResponse, 0)
+	for _, sequence := range sequences {
+		withdrawal, err := ch.QueryWithdrawal(sequence)
+		if err != nil {
+			return executortypes.QueryWithdrawalsResponse{}, err
+		}
+		withdrawals = append(withdrawals, withdrawal)
+	}
+
+	res := executortypes.QueryWithdrawalsResponse{
+		Withdrawals: withdrawals,
+		Next:        next,
+		Total:       total,
+	}
+	return res, nil
 }

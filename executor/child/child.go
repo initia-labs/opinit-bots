@@ -42,6 +42,9 @@ type Child struct {
 	lastFinalizedDepositL1BlockHeight int64
 	lastFinalizedDepositL1Sequence    uint64
 	lastOutputTime                    time.Time
+
+	batchKVs        []types.RawKV
+	addressIndexMap map[string]uint64
 }
 
 func NewChildV1(
@@ -49,7 +52,9 @@ func NewChildV1(
 	db types.DB, logger *zap.Logger,
 ) *Child {
 	return &Child{
-		BaseChild: childprovider.NewBaseChildV1(cfg, db, logger),
+		BaseChild:       childprovider.NewBaseChildV1(cfg, db, logger),
+		batchKVs:        make([]types.RawKV, 0),
+		addressIndexMap: make(map[string]uint64),
 	}
 }
 

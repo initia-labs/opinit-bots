@@ -24,7 +24,7 @@ func (b Broadcaster) deletePendingTx(sequence uint64) error {
 }
 
 func (b Broadcaster) loadPendingTxs() (txs []btypes.PendingTxInfo, err error) {
-	iterErr := b.db.PrefixedIterate(btypes.PendingTxsKey, func(_, value []byte) (stop bool, err error) {
+	iterErr := b.db.PrefixedIterate(btypes.PendingTxsKey, nil, func(_, value []byte) (stop bool, err error) {
 		txInfo := btypes.PendingTxInfo{}
 		err = txInfo.Unmarshal(value)
 		if err != nil {
@@ -99,7 +99,7 @@ func (b Broadcaster) ProcessedMsgsToRawKV(ProcessedMsgs []btypes.ProcessedMsgs, 
 // }
 
 func (b Broadcaster) loadProcessedMsgs() (ProcessedMsgs []btypes.ProcessedMsgs, err error) {
-	iterErr := b.db.PrefixedIterate(btypes.ProcessedMsgsKey, func(_, value []byte) (stop bool, err error) {
+	iterErr := b.db.PrefixedIterate(btypes.ProcessedMsgsKey, nil, func(_, value []byte) (stop bool, err error) {
 		var processedMsgs btypes.ProcessedMsgs
 		err = processedMsgs.UnmarshalInterfaceJSON(b.cdc, value)
 		if err != nil {

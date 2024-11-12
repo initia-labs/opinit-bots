@@ -50,7 +50,7 @@ func DeleteSyncInfo(db types.DB) error {
 }
 
 func DeleteProcessedMsgs(db types.DB) error {
-	return db.PrefixedIterate(btypes.ProcessedMsgsKey, func(key, _ []byte) (stop bool, err error) {
+	return db.PrefixedIterate(btypes.ProcessedMsgsKey, nil, func(key, _ []byte) (stop bool, err error) {
 		err = db.Delete(key)
 		if err != nil {
 			return stop, err
@@ -60,7 +60,7 @@ func DeleteProcessedMsgs(db types.DB) error {
 }
 
 func DeletePendingTxs(db types.DB) error {
-	return db.PrefixedIterate(btypes.PendingTxsKey, func(key, _ []byte) (stop bool, err error) {
+	return db.PrefixedIterate(btypes.PendingTxsKey, nil, func(key, _ []byte) (stop bool, err error) {
 		err = db.Delete(key)
 		if err != nil {
 			return stop, err

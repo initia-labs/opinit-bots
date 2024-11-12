@@ -123,7 +123,7 @@ func (m *Merkle) FinalizeWorkingTree(extraData []byte) ([]types.RawKV, []byte /*
 }
 
 func (m *Merkle) DeleteFutureFinalizedTrees(fromSequence uint64) error {
-	return m.db.PrefixedIterate(merkletypes.FinalizedTreeKey, func(key, _ []byte) (bool, error) {
+	return m.db.PrefixedIterate(merkletypes.FinalizedTreeKey, nil, func(key, _ []byte) (bool, error) {
 		sequence := dbtypes.ToUint64Key(key[len(key)-8:])
 		if sequence >= fromSequence {
 			err := m.db.Delete(key)
@@ -136,7 +136,7 @@ func (m *Merkle) DeleteFutureFinalizedTrees(fromSequence uint64) error {
 }
 
 func (m *Merkle) DeleteFutureWorkingTrees(fromVersion uint64) error {
-	return m.db.PrefixedIterate(merkletypes.WorkingTreeKey, func(key, _ []byte) (bool, error) {
+	return m.db.PrefixedIterate(merkletypes.WorkingTreeKey, nil, func(key, _ []byte) (bool, error) {
 		version := dbtypes.ToUint64Key(key[len(key)-8:])
 		if version >= fromVersion {
 			err := m.db.Delete(key)

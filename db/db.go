@@ -87,36 +87,45 @@ func (db *LevelDB) Close() error {
 // PrefixedIterate iterates over the key-value pairs in the database with prefixing the keys.
 //
 // @dev: `LevelDB.prefix + prefix` is used as the prefix for the iteration.
-func (db *LevelDB) PrefixedIterate(prefix []byte, cb func(key, value []byte) (stop bool, err error)) error {
+func (db *LevelDB) PrefixedIterate(prefix []byte, start []byte, cb func(key, value []byte) (stop bool, err error)) error {
 	iter := db.db.NewIterator(util.BytesPrefix(db.PrefixedKey(prefix)), nil)
 	defer iter.Release()
-	for iter.Next() {
+	if start != nil {
+		iter.Seek(db.PrefixedKey(start))
+	} else {
+		iter.First()
+	}
+
+	for iter.Valid() {
 		key := db.UnprefixedKey(bytes.Clone(iter.Key()))
 		if stop, err := cb(key, bytes.Clone(iter.Value())); err != nil {
 			return err
 		} else if stop {
 			break
 		}
+		iter.Next()
 	}
 	return iter.Error()
 }
 
-func (db *LevelDB) PrefixedReverseIterate(prefix []byte, cb func(key, value []byte) (stop bool, err error)) error {
+func (db *LevelDB) PrefixedReverseIterate(prefix []byte, start []byte, cb func(key, value []byte) (stop bool, err error)) error {
 	iter := db.db.NewIterator(util.BytesPrefix(db.PrefixedKey(prefix)), nil)
 	defer iter.Release()
-	if iter.Last() {
-		for {
-			key := db.UnprefixedKey(bytes.Clone(iter.Key()))
-			if stop, err := cb(key, bytes.Clone(iter.Value())); err != nil {
-				return err
-			} else if stop {
-				break
-			}
+	if start != nil {
+		iter.Seek(db.PrefixedKey(start))
+	} else {
+		iter.Last()
+	}
 
-			if !iter.Prev() {
-				break
-			}
+	for iter.Valid() {
+		key := db.UnprefixedKey(bytes.Clone(iter.Key()))
+		if stop, err := cb(key, bytes.Clone(iter.Value())); err != nil {
+			return err
+		} else if stop {
+			break
 		}
+
+		iter.Prev()
 	}
 	return iter.Error()
 }
@@ -127,7 +136,13 @@ func (db *LevelDB) PrefixedReverseIterate(prefix []byte, cb func(key, value []by
 func (db *LevelDB) SeekPrevInclusiveKey(prefix []byte, key []byte) (k []byte, v []byte, err error) {
 	iter := db.db.NewIterator(util.BytesPrefix(db.PrefixedKey(prefix)), nil)
 	defer iter.Release()
-	if iter.Seek(db.PrefixedKey(key)) || iter.Valid() && iter.Prev() || iter.Last() && iter.Valid() {
+	if ok := iter.Seek(db.PrefixedKey(key)); ok || iter.Last() {
+		// if the valid key is not found, the iterator will be at the last key
+		// if the key is found, the iterator will be at the key
+		// or the previous key if the key is not found
+		if ok && !bytes.Equal(db.PrefixedKey(key), iter.Key()) {
+			iter.Prev()
+		}
 		k = db.UnprefixedKey(bytes.Clone(iter.Key()))
 		v = bytes.Clone(iter.Value())
 	} else {
