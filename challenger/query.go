@@ -4,7 +4,7 @@ import challengertypes "github.com/initia-labs/opinit-bots/challenger/types"
 
 func (c *Challenger) QueryChallenges(page uint64) (challenges []challengertypes.Challenge, err error) {
 	i := uint64(0)
-	iterErr := c.db.PrefixedIterate(challengertypes.ChallengeKey, func(_, value []byte) (stop bool, err error) {
+	iterErr := c.db.PrefixedIterate(challengertypes.ChallengeKey, nil, func(_, value []byte) (stop bool, err error) {
 		i++
 		if i >= (page+1)*100 {
 			return true, nil

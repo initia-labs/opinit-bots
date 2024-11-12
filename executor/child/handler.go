@@ -8,13 +8,15 @@ import (
 
 	btypes "github.com/initia-labs/opinit-bots/node/broadcaster/types"
 	nodetypes "github.com/initia-labs/opinit-bots/node/types"
-	"github.com/initia-labs/opinit-bots/types"
+	"golang.org/x/exp/maps"
 )
 
 func (ch *Child) beginBlockHandler(ctx context.Context, args nodetypes.BeginBlockArgs) (err error) {
 	blockHeight := args.Block.Header.Height
 	ch.EmptyMsgQueue()
 	ch.EmptyProcessedMsgs()
+	ch.batchKVs = ch.batchKVs[:0]
+	maps.Clear(ch.addressIndexMap)
 
 	if ch.Merkle() == nil {
 		return errors.New("merkle is not initialized")
@@ -34,13 +36,12 @@ func (ch *Child) beginBlockHandler(ctx context.Context, args nodetypes.BeginBloc
 
 func (ch *Child) endBlockHandler(_ context.Context, args nodetypes.EndBlockArgs) error {
 	blockHeight := args.Block.Header.Height
-	batchKVs := make([]types.RawKV, 0)
 	treeKVs, storageRoot, err := ch.handleTree(blockHeight, args.LatestHeight, args.BlockID, args.Block.Header)
 	if err != nil {
 		return err
 	}
 
-	batchKVs = append(batchKVs, treeKVs...)
+	ch.batchKVs = append(ch.batchKVs, treeKVs...)
 	if storageRoot != nil {
 		workingTreeIndex, err := ch.GetWorkingTreeIndex()
 		if err != nil {
@@ -53,7 +54,7 @@ func (ch *Child) endBlockHandler(_ context.Context, args nodetypes.EndBlockArgs)
 	}
 
 	// update the sync info
-	batchKVs = append(batchKVs, ch.Node().SyncInfoToRawKV(blockHeight))
+	ch.batchKVs = append(ch.batchKVs, ch.Node().SyncInfoToRawKV(blockHeight))
 
 	// if has key, then process the messages
 	if ch.host.HasKey() {
@@ -76,10 +77,10 @@ func (ch *Child) endBlockHandler(_ context.Context, args nodetypes.EndBlockArgs)
 		if err != nil {
 			return err
 		}
-		batchKVs = append(batchKVs, msgKVs...)
+		ch.batchKVs = append(ch.batchKVs, msgKVs...)
 	}
 
-	err = ch.DB().RawBatchSet(batchKVs...)
+	err = ch.DB().RawBatchSet(ch.batchKVs...)
 	if err != nil {
 		return err
 	}
