@@ -4,37 +4,30 @@ import (
 	"encoding/json"
 
 	dbtypes "github.com/initia-labs/opinit-bots/db/types"
+	executortypes "github.com/initia-labs/opinit-bots/executor/types"
 	"github.com/initia-labs/opinit-bots/types"
 )
 
 var LocalBatchInfoKey = []byte("local_batch_info")
 
-func (bs *BatchSubmitter) loadLocalBatchInfo() error {
-	val, err := bs.db.Get(LocalBatchInfoKey)
+func GetLocalBatchInfo(db types.BasicDB) (executortypes.LocalBatchInfo, error) {
+	val, err := db.Get(LocalBatchInfoKey)
 	if err != nil {
 		if err == dbtypes.ErrNotFound {
-			return nil
+			return executortypes.LocalBatchInfo{}, nil
 		}
-		return err
+		return executortypes.LocalBatchInfo{}, err
 	}
-	return json.Unmarshal(val, &bs.localBatchInfo)
+
+	var localBatchInfo executortypes.LocalBatchInfo
+	err = json.Unmarshal(val, &localBatchInfo)
+	return localBatchInfo, err
 }
 
-func (bs *BatchSubmitter) localBatchInfoToRawKV() (types.RawKV, error) {
-	value, err := json.Marshal(bs.localBatchInfo)
-	if err != nil {
-		return types.RawKV{}, err
-	}
-	return types.RawKV{
-		Key:   bs.db.PrefixedKey(LocalBatchInfoKey),
-		Value: value,
-	}, nil
-}
-
-func (bs *BatchSubmitter) saveLocalBatchInfo() error {
-	value, err := json.Marshal(bs.localBatchInfo)
+func SaveLocalBatchInfo(db types.BasicDB, localBatchInfo executortypes.LocalBatchInfo) error {
+	value, err := json.Marshal(&localBatchInfo)
 	if err != nil {
 		return err
 	}
-	return bs.db.Set(LocalBatchInfoKey, value)
+	return db.Set(LocalBatchInfoKey, value)
 }

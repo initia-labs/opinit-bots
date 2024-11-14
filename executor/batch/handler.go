@@ -2,7 +2,6 @@ package batch
 
 import (
 	"bytes"
-	"context"
 	"fmt"
 	"io"
 	"time"
@@ -19,14 +18,17 @@ import (
 	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
 
 	executortypes "github.com/initia-labs/opinit-bots/executor/types"
+	"github.com/initia-labs/opinit-bots/node"
+	"github.com/initia-labs/opinit-bots/node/broadcaster"
 	btypes "github.com/initia-labs/opinit-bots/node/broadcaster/types"
 	nodetypes "github.com/initia-labs/opinit-bots/node/types"
 	"github.com/initia-labs/opinit-bots/types"
 )
 
-func (bs *BatchSubmitter) rawBlockHandler(ctx context.Context, args nodetypes.RawBlockArgs) error {
+func (bs *BatchSubmitter) rawBlockHandler(ctx types.Context, args nodetypes.RawBlockArgs) error {
 	// clear processed messages
 	bs.processedMsgs = bs.processedMsgs[:0]
+	bs.stage.Reset()
 
 	pbb := new(cmtproto.Block)
 	err := proto.Unmarshal(args.BlockBytes, pbb)
@@ -55,36 +57,39 @@ func (bs *BatchSubmitter) rawBlockHandler(ctx context.Context, args nodetypes.Ra
 	}
 
 	// store the processed state into db with batch operation
-	batchKVs := make([]types.RawKV, 0)
-	batchKVs = append(batchKVs, bs.node.SyncInfoToRawKV(args.BlockHeight))
-	batchMsgKVs, err := bs.da.ProcessedMsgsToRawKV(bs.processedMsgs, false)
-	if err != nil {
-		return errors.Wrap(err, "failed to convert processed messages to raw key value")
-	}
-	batchKVs = append(batchKVs, batchMsgKVs...)
-
-	kv, err := bs.localBatchInfoToRawKV()
+	err = node.SetSyncedHeight(bs.stage, args.BlockHeight)
 	if err != nil {
 		return err
 	}
-	batchKVs = append(batchKVs, kv)
-
-	err = bs.db.RawBatchSet(batchKVs...)
+	if bs.da.HasBroadcaster() {
+		// save processed msgs to stage using host db
+		err := bs.stage.ExecuteFnWithDB(bs.da.DB(), func() error {
+			return broadcaster.SaveProcessedMsgsBatch(bs.stage, bs.da.Codec(), bs.processedMsgs)
+		})
+		if err != nil {
+			return err
+		}
+	}
+	err = SaveLocalBatchInfo(bs.stage, *bs.localBatchInfo)
 	if err != nil {
-		return errors.Wrap(err, "failed to set raw batch")
+		return err
+	}
+
+	err = bs.stage.Commit()
+	if err != nil {
+		return err
 	}
 	// broadcast processed messages
-	for _, processedMsg := range bs.processedMsgs {
-		bs.da.BroadcastMsgs(processedMsg)
-	}
+	bs.da.BroadcastProcessedMsgs(bs.processedMsgs...)
 	return nil
 }
 
 func (bs *BatchSubmitter) prepareBatch(blockHeight int64) error {
-	err := bs.loadLocalBatchInfo()
+	localBatchInfo, err := GetLocalBatchInfo(bs.DB())
 	if err != nil {
 		return err
 	}
+	bs.localBatchInfo = &localBatchInfo
 
 	// check whether the requested block height is reached to the l2 block number of the next batch info.
 	if nextBatchInfo := bs.NextBatchInfo(); nextBatchInfo != nil && types.MustUint64ToInt64(nextBatchInfo.Output.L2BlockNumber) < blockHeight {
@@ -105,19 +110,18 @@ func (bs *BatchSubmitter) prepareBatch(blockHeight int64) error {
 		}
 
 		// save sync info
-		err = bs.node.SaveSyncInfo(types.MustUint64ToInt64(nextBatchInfo.Output.L2BlockNumber))
-		if err != nil {
-			return errors.Wrap(err, "failed to save sync info")
-		}
 		bs.localBatchInfo.Start = types.MustUint64ToInt64(nextBatchInfo.Output.L2BlockNumber) + 1
 		bs.localBatchInfo.End = 0
 		bs.localBatchInfo.BatchFileSize = 0
-		err = bs.saveLocalBatchInfo()
+		err = SaveLocalBatchInfo(bs.DB(), *bs.localBatchInfo)
 		if err != nil {
 			return err
 		}
 		// set last processed block height to l2 block number
-		bs.node.SetSyncInfo(types.MustUint64ToInt64(nextBatchInfo.Output.L2BlockNumber))
+		err = node.SetSyncedHeight(bs.DB(), types.MustUint64ToInt64(nextBatchInfo.Output.L2BlockNumber))
+		if err != nil {
+			return err
+		}
 		bs.DequeueBatchInfo()
 
 		// error will restart block process from nextBatchInfo.Output.L2BlockNumber + 1
@@ -150,7 +154,7 @@ func (bs *BatchSubmitter) handleBatch(blockBytes []byte) (int, error) {
 }
 
 // finalize batch and create batch messages
-func (bs *BatchSubmitter) finalizeBatch(ctx context.Context, blockHeight int64) error {
+func (bs *BatchSubmitter) finalizeBatch(ctx types.Context, blockHeight int64) error {
 	// write last block's commit to batch file
 	rawCommit, err := bs.node.GetRPCClient().QueryRawCommit(ctx, blockHeight)
 	if err != nil {
@@ -232,7 +236,7 @@ func (bs *BatchSubmitter) finalizeBatch(ctx context.Context, blockHeight int64) 
 		}
 	}
 
-	bs.logger.Info("finalize batch",
+	ctx.Logger().Info("finalize batch",
 		zap.Int64("height", blockHeight),
 		zap.Int64("batch start", bs.localBatchInfo.Start),
 		zap.Int64("batch end", bs.localBatchInfo.End),
@@ -243,7 +247,7 @@ func (bs *BatchSubmitter) finalizeBatch(ctx context.Context, blockHeight int64) 
 	return nil
 }
 
-func (bs *BatchSubmitter) checkBatch(ctx context.Context, blockHeight int64, latestHeight int64, blockTime time.Time) error {
+func (bs *BatchSubmitter) checkBatch(ctx types.Context, blockHeight int64, latestHeight int64, blockTime time.Time) error {
 	fileSize, err := bs.batchFileSize(true)
 	if err != nil {
 		return err

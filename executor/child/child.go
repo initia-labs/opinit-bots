@@ -4,10 +4,9 @@ import (
 	"context"
 	"time"
 
-	"go.uber.org/zap"
-
 	sdk "github.com/cosmos/cosmos-sdk/types"
 
+	"github.com/cosmos/cosmos-sdk/codec"
 	opchildtypes "github.com/initia-labs/OPinit/x/opchild/types"
 	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
 
@@ -19,10 +18,12 @@ import (
 )
 
 type hostNode interface {
-	GetAddressStr() (string, error)
-	HasKey() bool
-	BroadcastMsgs(btypes.ProcessedMsgs)
-	ProcessedMsgsToRawKV([]btypes.ProcessedMsgs, bool) ([]types.RawKV, error)
+	DB() types.DB
+	Codec() codec.Codec
+
+	HasBroadcaster() bool
+	BroadcastProcessedMsgs(...btypes.ProcessedMsgs)
+
 	QueryLastOutput(context.Context, uint64) (*ophosttypes.QueryOutputProposalResponse, error)
 	QueryOutput(context.Context, uint64, uint64, int64) (*ophosttypes.QueryOutputProposalResponse, error)
 
@@ -43,22 +44,22 @@ type Child struct {
 	lastFinalizedDepositL1Sequence    uint64
 	lastOutputTime                    time.Time
 
-	batchKVs        []types.RawKV
+	stage           types.CommitDB
 	addressIndexMap map[string]uint64
 }
 
 func NewChildV1(
 	cfg nodetypes.NodeConfig,
-	db types.DB, logger *zap.Logger,
+	db types.DB,
 ) *Child {
 	return &Child{
-		BaseChild:       childprovider.NewBaseChildV1(cfg, db, logger),
-		batchKVs:        make([]types.RawKV, 0),
+		BaseChild:       childprovider.NewBaseChildV1(cfg, db),
+		stage:           db.NewStage(),
 		addressIndexMap: make(map[string]uint64),
 	}
 }
 
-func (ch *Child) Initialize(ctx context.Context, processedHeight int64, startOutputIndex uint64, host hostNode, bridgeInfo ophosttypes.QueryBridgeResponse, keyringConfig *btypes.KeyringConfig) error {
+func (ch *Child) Initialize(ctx types.Context, processedHeight int64, startOutputIndex uint64, host hostNode, bridgeInfo ophosttypes.QueryBridgeResponse, keyringConfig *btypes.KeyringConfig) error {
 	l2Sequence, err := ch.BaseChild.Initialize(ctx, processedHeight, startOutputIndex, bridgeInfo, keyringConfig)
 	if err != nil {
 		return err

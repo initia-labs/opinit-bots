@@ -1,12 +1,12 @@
 package types
 
 import (
-	"context"
 	"crypto/sha256"
 	"encoding/binary"
 	"fmt"
 	"time"
 
+	"github.com/cosmos/cosmos-sdk/codec"
 	btypes "github.com/initia-labs/opinit-bots/node/broadcaster/types"
 	nodetypes "github.com/initia-labs/opinit-bots/node/types"
 	"github.com/initia-labs/opinit-bots/types"
@@ -15,11 +15,15 @@ import (
 )
 
 type DANode interface {
-	Start(context.Context)
-	HasKey() bool
+	DB() types.DB
+	Codec() codec.Codec
+
+	Start(types.Context)
+	HasBroadcaster() bool
+	BroadcastProcessedMsgs(...btypes.ProcessedMsgs)
+
 	CreateBatchMsg([]byte) (sdk.Msg, error)
-	BroadcastMsgs(btypes.ProcessedMsgs)
-	ProcessedMsgsToRawKV(processedMsgs []btypes.ProcessedMsgs, delete bool) ([]types.RawKV, error)
+
 	GetNodeStatus() (nodetypes.Status, error)
 }
 

@@ -26,15 +26,7 @@ func (ch Child) GetStatus() (Status, error) {
 		return Status{}, errors.New("node is not initialized")
 	}
 
-	workingTreeLeafCount, err := ch.GetWorkingTreeLeafCount()
-	if err != nil {
-		return Status{}, err
-	}
-	startLeafIndex, err := ch.GetStartLeafIndex()
-	if err != nil {
-		return Status{}, err
-	}
-	workingTreeIndex, err := ch.GetWorkingTreeIndex()
+	workingTree, err := ch.GetWorkingTree()
 	if err != nil {
 		return Status{}, err
 	}
@@ -44,8 +36,8 @@ func (ch Child) GetStatus() (Status, error) {
 		LastUpdatedOracleL1Height:         ch.lastUpdatedOracleL1Height,
 		LastFinalizedDepositL1BlockHeight: ch.lastFinalizedDepositL1BlockHeight,
 		LastFinalizedDepositL1Sequence:    ch.lastFinalizedDepositL1Sequence,
-		LastWithdrawalL2Sequence:          workingTreeLeafCount + startLeafIndex - 1,
-		WorkingTreeIndex:                  workingTreeIndex,
+		LastWithdrawalL2Sequence:          workingTree.LeafCount + workingTree.StartLeafIndex - 1,
+		WorkingTreeIndex:                  workingTree.Index,
 		FinalizingBlockHeight:             ch.finalizingBlockHeight,
 		LastOutputSubmissionTime:          ch.lastOutputTime,
 		NextOutputSubmissionTime:          ch.nextOutputTime,

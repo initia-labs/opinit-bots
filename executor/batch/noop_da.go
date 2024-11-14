@@ -1,8 +1,7 @@
 package batch
 
 import (
-	"context"
-
+	"github.com/cosmos/cosmos-sdk/codec"
 	executortypes "github.com/initia-labs/opinit-bots/executor/types"
 	btypes "github.com/initia-labs/opinit-bots/node/broadcaster/types"
 	nodetypes "github.com/initia-labs/opinit-bots/node/types"
@@ -20,11 +19,11 @@ func NewNoopDA() *NoopDA {
 	return &NoopDA{}
 }
 
-func (n NoopDA) Start(_ context.Context)                  {}
-func (n NoopDA) HasKey() bool                             { return false }
-func (n NoopDA) CreateBatchMsg(_ []byte) (sdk.Msg, error) { return nil, nil }
-func (n NoopDA) BroadcastMsgs(nil btypes.ProcessedMsgs)   {}
-func (n NoopDA) ProcessedMsgsToRawKV(_ []btypes.ProcessedMsgs, _ bool) ([]types.RawKV, error) {
-	return nil, nil
-}
-func (n NoopDA) GetNodeStatus() (nodetypes.Status, error) { return nodetypes.Status{}, nil }
+func (n NoopDA) Start(_ types.Context) {}
+func (n NoopDA) DB() types.DB          { return nil }
+func (n NoopDA) Codec() codec.Codec    { return nil }
+
+func (n NoopDA) HasBroadcaster() bool                               { return false }
+func (n NoopDA) CreateBatchMsg(_ []byte) (sdk.Msg, error)           { return nil, nil }
+func (n NoopDA) BroadcastProcessedMsgs(nil ...btypes.ProcessedMsgs) {}
+func (n NoopDA) GetNodeStatus() (nodetypes.Status, error)           { return nodetypes.Status{}, nil }

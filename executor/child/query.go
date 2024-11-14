@@ -8,6 +8,7 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 
 	executortypes "github.com/initia-labs/opinit-bots/executor/types"
+	"github.com/initia-labs/opinit-bots/merkle"
 )
 
 func (ch Child) QueryWithdrawal(sequence uint64) (executortypes.QueryWithdrawalResponse, error) {
@@ -16,7 +17,7 @@ func (ch Child) QueryWithdrawal(sequence uint64) (executortypes.QueryWithdrawalR
 		return executortypes.QueryWithdrawalResponse{}, err
 	}
 
-	proofs, outputIndex, outputRoot, extraDataBytes, err := ch.Merkle().GetProofs(sequence)
+	proofs, outputIndex, outputRoot, extraDataBytes, err := merkle.GetProofs(ch.DB(), sequence)
 	if err != nil {
 		return executortypes.QueryWithdrawalResponse{}, err
 	}

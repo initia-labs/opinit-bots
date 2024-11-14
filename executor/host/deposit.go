@@ -1,17 +1,17 @@
 package host
 
 import (
-	"context"
 	"errors"
 
 	"cosmossdk.io/math"
 	nodetypes "github.com/initia-labs/opinit-bots/node/types"
 	hostprovider "github.com/initia-labs/opinit-bots/provider/host"
+	"github.com/initia-labs/opinit-bots/types"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 )
 
-func (h *Host) initiateDepositHandler(_ context.Context, args nodetypes.EventHandlerArgs) error {
+func (h *Host) initiateDepositHandler(_ types.Context, args nodetypes.EventHandlerArgs) error {
 	bridgeId, l1Sequence, from, to, l1Denom, l2Denom, amount, data, err := hostprovider.ParseMsgInitiateDeposit(args.EventAttributes)
 	if err != nil {
 		return err

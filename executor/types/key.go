@@ -5,17 +5,31 @@ import (
 )
 
 var (
-	WithdrawalKey = []byte("withdrawal")
+	WithdrawalPrefix         = []byte("withdrawal")
+	WithdrawalSequencePrefix = []byte("withdrawal_sequence")
+	WithdrawalAddressPrefix  = []byte("withdrawal_address")
+
+	WithdrawalSequenceKeyLength = len(WithdrawalSequencePrefix) + 1 + 8
 )
 
-func PrefixedWithdrawalKey(sequence uint64) []byte {
-	return append(append(WithdrawalKey, dbtypes.Splitter), dbtypes.FromUint64Key(sequence)...)
+func PrefixedWithdrawalSequence(sequence uint64) []byte {
+	return dbtypes.GenerateKey([][]byte{
+		WithdrawalSequencePrefix,
+		dbtypes.FromUint64Key(sequence),
+	})
 }
 
-func PrefixedWithdrawalKeyAddress(address string) []byte {
-	return append(append(append(WithdrawalKey, dbtypes.Splitter), []byte(address)...), dbtypes.Splitter)
+func PrefixedWithdrawalAddress(address string) []byte {
+	return dbtypes.GenerateKey([][]byte{
+		WithdrawalAddressPrefix,
+		[]byte(address),
+	})
 }
 
-func PrefixedWithdrawalKeyAddressIndex(address string, index uint64) []byte {
-	return append(PrefixedWithdrawalKeyAddress(address), dbtypes.FromUint64Key(index)...)
+func PrefixedWithdrawalAddressIndex(address string, index uint64) []byte {
+	return dbtypes.GenerateKey([][]byte{
+		WithdrawalAddressPrefix,
+		[]byte(address),
+		dbtypes.FromUint64Key(index),
+	})
 }

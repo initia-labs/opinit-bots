@@ -180,7 +180,7 @@ func (cfg Config) Validate() error {
 	return nil
 }
 
-func (cfg Config) L1NodeConfig(homePath string) nodetypes.NodeConfig {
+func (cfg Config) L1NodeConfig() nodetypes.NodeConfig {
 	nc := nodetypes.NodeConfig{
 		RPC:          cfg.L1Node.RPCAddress,
 		ProcessType:  nodetypes.PROCESS_TYPE_DEFAULT,
@@ -194,14 +194,13 @@ func (cfg Config) L1NodeConfig(homePath string) nodetypes.NodeConfig {
 			GasAdjustment: cfg.L1Node.GasAdjustment,
 			TxTimeout:     time.Duration(cfg.L1Node.TxTimeout) * time.Second,
 			Bech32Prefix:  cfg.L1Node.Bech32Prefix,
-			HomePath:      homePath,
 		}
 	}
 
 	return nc
 }
 
-func (cfg Config) L2NodeConfig(homePath string) nodetypes.NodeConfig {
+func (cfg Config) L2NodeConfig() nodetypes.NodeConfig {
 	nc := nodetypes.NodeConfig{
 		RPC:          cfg.L2Node.RPCAddress,
 		ProcessType:  nodetypes.PROCESS_TYPE_DEFAULT,
@@ -215,14 +214,13 @@ func (cfg Config) L2NodeConfig(homePath string) nodetypes.NodeConfig {
 			GasAdjustment: cfg.L2Node.GasAdjustment,
 			TxTimeout:     time.Duration(cfg.L2Node.TxTimeout) * time.Second,
 			Bech32Prefix:  cfg.L2Node.Bech32Prefix,
-			HomePath:      homePath,
 		}
 	}
 
 	return nc
 }
 
-func (cfg Config) DANodeConfig(homePath string) nodetypes.NodeConfig {
+func (cfg Config) DANodeConfig() nodetypes.NodeConfig {
 	nc := nodetypes.NodeConfig{
 		RPC:          cfg.DANode.RPCAddress,
 		ProcessType:  nodetypes.PROCESS_TYPE_ONLY_BROADCAST,
@@ -236,7 +234,6 @@ func (cfg Config) DANodeConfig(homePath string) nodetypes.NodeConfig {
 			GasAdjustment: cfg.DANode.GasAdjustment,
 			TxTimeout:     time.Duration(cfg.DANode.TxTimeout) * time.Second,
 			Bech32Prefix:  cfg.DANode.Bech32Prefix,
-			HomePath:      homePath,
 		}
 	}
 	return nc

@@ -1,27 +1,22 @@
 package child
 
 import (
-	"context"
-
 	nodetypes "github.com/initia-labs/opinit-bots/node/types"
 	childprovider "github.com/initia-labs/opinit-bots/provider/child"
+	"github.com/initia-labs/opinit-bots/types"
 	"go.uber.org/zap"
 )
 
-func (ch *Child) updateOracleHandler(_ context.Context, args nodetypes.EventHandlerArgs) error {
+func (ch *Child) updateOracleHandler(ctx types.Context, args nodetypes.EventHandlerArgs) error {
 	l1BlockHeight, from, err := childprovider.ParseUpdateOracle(args.EventAttributes)
 	if err != nil {
 		return err
 	}
 
-	ch.handleUpdateOracle(l1BlockHeight, from)
 	ch.lastUpdatedOracleL1Height = l1BlockHeight
-	return nil
-}
-
-func (ch *Child) handleUpdateOracle(l1BlockHeight int64, from string) {
-	ch.Logger().Info("update oracle",
+	ctx.Logger().Info("update oracle",
 		zap.Int64("l1_blockHeight", l1BlockHeight),
 		zap.String("from", from),
 	)
+	return nil
 }

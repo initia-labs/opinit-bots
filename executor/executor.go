@@ -1,13 +1,10 @@
 package executor
 
 import (
-	"context"
 	"fmt"
-	"strconv"
 
 	"github.com/pkg/errors"
 
-	"github.com/gofiber/fiber/v2"
 	"github.com/initia-labs/opinit-bots/executor/batch"
 	"github.com/initia-labs/opinit-bots/executor/celestia"
 	"github.com/initia-labs/opinit-bots/executor/child"
@@ -36,12 +33,9 @@ type Executor struct {
 	cfg    *executortypes.Config
 	db     types.DB
 	server *server.Server
-	logger *zap.Logger
-
-	homePath string
 }
 
-func NewExecutor(cfg *executortypes.Config, db types.DB, sv *server.Server, logger *zap.Logger, homePath string) *Executor {
+func NewExecutor(cfg *executortypes.Config, db types.DB, sv *server.Server) *Executor {
 	err := cfg.Validate()
 	if err != nil {
 		panic(err)
@@ -49,31 +43,27 @@ func NewExecutor(cfg *executortypes.Config, db types.DB, sv *server.Server, logg
 
 	return &Executor{
 		host: host.NewHostV1(
-			cfg.L1NodeConfig(homePath),
+			cfg.L1NodeConfig(),
 			db.WithPrefix([]byte(types.HostName)),
-			logger.Named(types.HostName),
 		),
 		child: child.NewChildV1(
-			cfg.L2NodeConfig(homePath),
+			cfg.L2NodeConfig(),
 			db.WithPrefix([]byte(types.ChildName)),
-			logger.Named(types.ChildName),
 		),
 		batch: batch.NewBatchSubmitterV1(
-			cfg.L2NodeConfig(homePath),
-			cfg.BatchConfig(), db.WithPrefix([]byte(types.BatchName)),
-			logger.Named(types.BatchName), cfg.L2Node.ChainID, homePath,
+			cfg.L2NodeConfig(),
+			cfg.BatchConfig(),
+			db.WithPrefix([]byte(types.BatchName)),
+			cfg.L2Node.ChainID,
 		),
 
 		cfg:    cfg,
 		db:     db,
 		server: sv,
-		logger: logger,
-
-		homePath: homePath,
 	}
 }
 
-func (ex *Executor) Initialize(ctx context.Context) error {
+func (ex *Executor) Initialize(ctx types.Context) error {
 	childBridgeInfo, err := ex.child.QueryBridgeInfo(ctx)
 	if err != nil {
 		return err
@@ -87,7 +77,7 @@ func (ex *Executor) Initialize(ctx context.Context) error {
 		return err
 	}
 
-	ex.logger.Info(
+	ctx.Logger().Info(
 		"bridge info",
 		zap.Uint64("id", bridgeInfo.BridgeId),
 		zap.Duration("submission_interval", bridgeInfo.BridgeConfig.SubmissionInterval),
@@ -122,18 +112,17 @@ func (ex *Executor) Initialize(ctx context.Context) error {
 	return nil
 }
 
-func (ex *Executor) Start(ctx context.Context) error {
+func (ex *Executor) Start(ctx types.Context) error {
 	defer ex.Close()
 
-	errGrp := types.ErrGrp(ctx)
-	errGrp.Go(func() (err error) {
+	ctx.ErrGrp().Go(func() (err error) {
 		<-ctx.Done()
 		return ex.server.Shutdown()
 	})
 
-	errGrp.Go(func() (err error) {
+	ctx.ErrGrp().Go(func() (err error) {
 		defer func() {
-			ex.logger.Info("api server stopped")
+			ctx.Logger().Info("api server stopped")
 		}()
 		return ex.server.Start(ex.cfg.ListenAddress)
 	})
@@ -141,75 +130,14 @@ func (ex *Executor) Start(ctx context.Context) error {
 	ex.child.Start(ctx)
 	ex.batch.Start(ctx)
 	ex.batch.DA().Start(ctx)
-	return errGrp.Wait()
+	return ctx.ErrGrp().Wait()
 }
 
 func (ex *Executor) Close() {
 	ex.batch.Close()
-	ex.db.Close()
 }
 
-func (ex *Executor) RegisterQuerier() {
-	ex.server.RegisterQuerier("/withdrawal/:sequence", func(c *fiber.Ctx) error {
-		sequenceStr := c.Params("sequence")
-		if sequenceStr == "" {
-			return errors.New("sequence is required")
-		}
-		sequence, err := strconv.ParseUint(sequenceStr, 10, 64)
-		if err != nil {
-			return err
-		}
-		res, err := ex.child.QueryWithdrawal(sequence)
-		if err != nil {
-			return err
-		}
-		return c.JSON(res)
-	})
-
-	ex.server.RegisterQuerier("/withdrawals/:address", func(c *fiber.Ctx) error {
-		address := c.Params("address")
-		if address == "" {
-			return errors.New("address is required")
-		}
-
-		offset := c.QueryInt("offset", 0)
-		uoffset, err := types.SafeInt64ToUint64(int64(offset))
-		if err != nil {
-			return err
-		}
-
-		limit := c.QueryInt("limit", 10)
-		if limit > 100 {
-			limit = 100
-		}
-
-		ulimit, err := types.SafeInt64ToUint64(int64(limit))
-		if err != nil {
-			return err
-		}
-
-		descOrder := true
-		orderStr := c.Query("order", "desc")
-		if orderStr == "asc" {
-			descOrder = false
-		}
-		res, err := ex.child.QueryWithdrawals(address, uoffset, ulimit, descOrder)
-		if err != nil {
-			return err
-		}
-		return c.JSON(res)
-	})
-
-	ex.server.RegisterQuerier("/status", func(c *fiber.Ctx) error {
-		status, err := ex.GetStatus()
-		if err != nil {
-			return err
-		}
-		return c.JSON(status)
-	})
-}
-
-func (ex *Executor) makeDANode(ctx context.Context, bridgeInfo ophosttypes.QueryBridgeResponse, daKeyringConfig *btypes.KeyringConfig) (executortypes.DANode, error) {
+func (ex *Executor) makeDANode(ctx types.Context, bridgeInfo ophosttypes.QueryBridgeResponse, daKeyringConfig *btypes.KeyringConfig) (executortypes.DANode, error) {
 	if ex.cfg.DisableBatchSubmitter {
 		return batch.NewNoopDA(), nil
 	}
@@ -229,16 +157,16 @@ func (ex *Executor) makeDANode(ctx context.Context, bridgeInfo ophosttypes.Query
 		}
 
 		hostda := host.NewHostV1(
-			ex.cfg.DANodeConfig(ex.homePath),
-			ex.db.WithPrefix([]byte(types.DAHostName)),
-			ex.logger.Named(types.DAHostName),
+			ex.cfg.DANodeConfig(),
+			ex.db.WithPrefix([]byte(types.DAName)),
 		)
 		err = hostda.InitializeDA(ctx, bridgeInfo, daKeyringConfig)
 		return hostda, err
 	case ophosttypes.BatchInfo_CHAIN_TYPE_CELESTIA:
-		celestiada := celestia.NewDACelestia(ex.cfg.Version, ex.cfg.DANodeConfig(ex.homePath),
-			ex.db.WithPrefix([]byte(types.DACelestiaName)),
-			ex.logger.Named(types.DACelestiaName),
+		celestiada := celestia.NewDACelestia(
+			ex.cfg.Version,
+			ex.cfg.DANodeConfig(),
+			ex.db.WithPrefix([]byte(types.DAName)),
 		)
 		err := celestiada.Initialize(ctx, ex.batch, bridgeInfo.BridgeId, daKeyringConfig)
 		if err != nil {
@@ -251,7 +179,7 @@ func (ex *Executor) makeDANode(ctx context.Context, bridgeInfo ophosttypes.Query
 	return nil, fmt.Errorf("unsupported chain id for DA: %s", ophosttypes.BatchInfo_ChainType_name[int32(batchInfo.BatchInfo.ChainType)])
 }
 
-func (ex *Executor) getProcessedHeights(ctx context.Context, bridgeId uint64) (l1ProcessedHeight int64, l2ProcessedHeight int64, processedOutputIndex uint64, batchProcessedHeight int64, err error) {
+func (ex *Executor) getProcessedHeights(ctx types.Context, bridgeId uint64) (l1ProcessedHeight int64, l2ProcessedHeight int64, processedOutputIndex uint64, batchProcessedHeight int64, err error) {
 	var outputL1BlockNumber int64
 	// get the last submitted output height before the start height from the host
 	if ex.cfg.L2StartHeight != 0 {
