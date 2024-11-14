@@ -85,13 +85,11 @@ func Migration016(db types.DB) error {
 		nodeDB := db.WithPrefix([]byte(nodeName))
 
 		value, err := nodeDB.Get(nodetypes.LastProcessedBlockHeightKey)
-		if err != nil {
-			return err
-		}
-
-		err = nodeDB.Set(nodetypes.SyncedHeightKey, value)
-		if err != nil {
-			return err
+		if err == nil {
+			err = nodeDB.Set(nodetypes.SyncedHeightKey, value)
+			if err != nil {
+				return err
+			}
 		}
 	}
 
