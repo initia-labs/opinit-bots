@@ -7,7 +7,6 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/initia-labs/opinit-bots/bot"
 	bottypes "github.com/initia-labs/opinit-bots/bot/types"
 	"github.com/initia-labs/opinit-bots/challenger"
 	"github.com/initia-labs/opinit-bots/db"
@@ -58,7 +57,7 @@ func resetHeightsCmd(ctx *cmdContext) *cobra.Command {
 				return err
 			}
 
-			db, err := db.NewDB(bot.GetDBPath(ctx.homePath, botType))
+			db, err := db.NewDB(GetDBPath(ctx.homePath, botType))
 			if err != nil {
 				return err
 			}
@@ -96,10 +95,11 @@ Challenger node types:
 				return err
 			}
 
-			db, err := db.NewDB(bot.GetDBPath(ctx.homePath, botType))
+			db, err := db.NewDB(GetDBPath(ctx.homePath, botType))
 			if err != nil {
 				return err
 			}
+			defer db.Close()
 
 			switch botType {
 			case bottypes.BotTypeExecutor:

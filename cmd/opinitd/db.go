@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 
-	"github.com/initia-labs/opinit-bots/bot"
 	bottypes "github.com/initia-labs/opinit-bots/bot/types"
 	"github.com/initia-labs/opinit-bots/db"
 	"github.com/initia-labs/opinit-bots/executor"
@@ -23,13 +22,14 @@ v0.1.5: Store the sequence number so that it can be accessed by address
 		RunE: func(cmd *cobra.Command, args []string) error {
 			version := args[0]
 			switch version {
-			case "v0.1.5":
+			case "v0.1.6":
 				// Run migration for v0.1.5
-				db, err := db.NewDB(bot.GetDBPath(ctx.homePath, bottypes.BotTypeExecutor))
+				db, err := db.NewDB(GetDBPath(ctx.homePath, bottypes.BotTypeExecutor))
 				if err != nil {
 					return err
 				}
-				return executor.Migration015(db)
+				defer db.Close()
+				return executor.Migration016(db)
 			default:
 				return fmt.Errorf("unknown migration version: %s", version)
 			}
