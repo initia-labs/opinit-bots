@@ -1,7 +1,6 @@
 package child
 
 import (
-	"context"
 	"errors"
 
 	"go.uber.org/zap"
@@ -17,6 +16,7 @@ import (
 
 	"github.com/initia-labs/opinit-bots/keys"
 	"github.com/initia-labs/opinit-bots/merkle"
+	merkletypes "github.com/initia-labs/opinit-bots/merkle/types"
 	"github.com/initia-labs/opinit-bots/node"
 	btypes "github.com/initia-labs/opinit-bots/node/broadcaster/types"
 	nodetypes "github.com/initia-labs/opinit-bots/node/types"
@@ -33,31 +33,30 @@ type BaseChild struct {
 
 	initializeTreeFn func(int64) (bool, error)
 
-	cfg    nodetypes.NodeConfig
-	db     types.DB
-	logger *zap.Logger
+	cfg nodetypes.NodeConfig
 
 	opchildQueryClient opchildtypes.QueryClient
 
 	processedMsgs []btypes.ProcessedMsgs
 	msgQueue      []sdk.Msg
+	stagingKVs    []types.RawKV
 }
 
 func NewBaseChildV1(
 	cfg nodetypes.NodeConfig,
-	db types.DB, logger *zap.Logger,
+	db types.DB,
 ) *BaseChild {
 	appCodec, txConfig, err := GetCodec(cfg.Bech32Prefix)
 	if err != nil {
 		panic(err)
 	}
 
-	node, err := node.NewNode(cfg, db, logger, appCodec, txConfig)
+	node, err := node.NewNode(cfg, db, appCodec, txConfig)
 	if err != nil {
 		panic(err)
 	}
 
-	mk, err := merkle.NewMerkle(db.WithPrefix([]byte(types.MerkleName)), ophosttypes.GenerateNodeHash)
+	mk, err := merkle.NewMerkle(ophosttypes.GenerateNodeHash)
 	if err != nil {
 		panic(err)
 	}
@@ -68,14 +67,13 @@ func NewBaseChildV1(
 		node: node,
 		mk:   mk,
 
-		cfg:    cfg,
-		db:     db,
-		logger: logger,
+		cfg: cfg,
 
 		opchildQueryClient: opchildtypes.NewQueryClient(node.GetRPCClient()),
 
 		processedMsgs: make([]btypes.ProcessedMsgs, 0),
 		msgQueue:      make([]sdk.Msg, 0),
+		stagingKVs:    make([]types.RawKV, 0),
 	}
 	return ch
 }
@@ -90,7 +88,7 @@ func GetCodec(bech32Prefix string) (codec.Codec, client.TxConfig, error) {
 	})
 }
 
-func (b *BaseChild) Initialize(ctx context.Context, processedHeight int64, startOutputIndex uint64, bridgeInfo ophosttypes.QueryBridgeResponse, keyringConfig *btypes.KeyringConfig) (uint64, error) {
+func (b *BaseChild) Initialize(ctx types.Context, processedHeight int64, startOutputIndex uint64, bridgeInfo ophosttypes.QueryBridgeResponse, keyringConfig *btypes.KeyringConfig) (uint64, error) {
 	err := b.node.Initialize(ctx, processedHeight, keyringConfig)
 	if err != nil {
 		return 0, err
@@ -103,20 +101,20 @@ func (b *BaseChild) Initialize(ctx context.Context, processedHeight int64, start
 			return 0, err
 		}
 
-		err = b.mk.DeleteFutureFinalizedTrees(l2Sequence)
+		err = merkle.DeleteFutureFinalizedTrees(b.DB(), l2Sequence)
 		if err != nil {
 			return 0, err
 		}
 
 		version := types.MustInt64ToUint64(processedHeight)
-		err = b.mk.DeleteFutureWorkingTrees(version + 1)
+		err = merkle.DeleteFutureWorkingTrees(b.DB(), version+1)
 		if err != nil {
 			return 0, err
 		}
 
 		b.initializeTreeFn = func(blockHeight int64) (bool, error) {
 			if processedHeight+1 == blockHeight {
-				b.logger.Info("initialize tree", zap.Uint64("index", startOutputIndex))
+				ctx.Logger().Info("initialize tree", zap.Uint64("index", startOutputIndex))
 				err := b.mk.InitializeWorkingTree(startOutputIndex, 1)
 				if err != nil {
 					return false, err
@@ -130,25 +128,30 @@ func (b *BaseChild) Initialize(ctx context.Context, processedHeight int64, start
 	return l2Sequence, nil
 }
 
-func (b *BaseChild) Start(ctx context.Context) {
-	b.logger.Info("child start", zap.Int64("height", b.Height()))
+func (b *BaseChild) Start(ctx types.Context) {
+	ctx.Logger().Info("child start", zap.Int64("height", b.Height()))
 	b.node.Start(ctx)
 }
-
-func (b BaseChild) BroadcastMsgs(msgs btypes.ProcessedMsgs) {
-	if len(msgs.Msgs) == 0 {
+func (b BaseChild) BroadcastProcessedMsgs(batch ...btypes.ProcessedMsgs) {
+	if len(batch) == 0 {
 		return
 	}
+	broadcaster := b.node.MustGetBroadcaster()
 
-	b.node.MustGetBroadcaster().BroadcastMsgs(msgs)
+	for _, processedMsgs := range batch {
+		if len(processedMsgs.Msgs) == 0 {
+			continue
+		}
+		broadcaster.BroadcastProcessedMsgs(processedMsgs)
+	}
 }
 
-func (b BaseChild) ProcessedMsgsToRawKV(msgs []btypes.ProcessedMsgs, delete bool) ([]types.RawKV, error) {
-	if len(msgs) == 0 {
-		return nil, nil
-	}
+func (b BaseChild) DB() types.DB {
+	return b.node.DB()
+}
 
-	return b.node.MustGetBroadcaster().ProcessedMsgsToRawKV(msgs, delete)
+func (b BaseChild) Codec() codec.Codec {
+	return b.node.Codec()
 }
 
 func (b BaseChild) BridgeId() uint64 {
@@ -159,7 +162,7 @@ func (b BaseChild) OracleEnabled() bool {
 	return b.bridgeInfo.BridgeConfig.OracleEnabled
 }
 
-func (b BaseChild) HasKey() bool {
+func (b BaseChild) HasBroadcaster() bool {
 	return b.node.HasBroadcaster()
 }
 
@@ -183,14 +186,6 @@ func (b BaseChild) Node() *node.Node {
 	return b.node
 }
 
-func (b BaseChild) Logger() *zap.Logger {
-	return b.logger
-}
-
-func (b BaseChild) DB() types.DB {
-	return b.db
-}
-
 /// MsgQueue
 
 func (b BaseChild) GetMsgQueue() []sdk.Msg {
@@ -211,37 +206,22 @@ func (b BaseChild) GetProcessedMsgs() []btypes.ProcessedMsgs {
 	return b.processedMsgs
 }
 
-func (b *BaseChild) AppendProcessedMsgs(msgs btypes.ProcessedMsgs) {
-	b.processedMsgs = append(b.processedMsgs, msgs)
+func (b *BaseChild) AppendProcessedMsgs(msgs ...btypes.ProcessedMsgs) {
+	b.processedMsgs = append(b.processedMsgs, msgs...)
 }
 
 func (b *BaseChild) EmptyProcessedMsgs() {
 	b.processedMsgs = b.processedMsgs[:0]
 }
 
-/// Merkle
-
+// / Merkle
 func (b BaseChild) Merkle() *merkle.Merkle {
 	return b.mk
 }
 
-func (b BaseChild) GetWorkingTreeIndex() (uint64, error) {
+func (b BaseChild) GetWorkingTree() (merkletypes.TreeInfo, error) {
 	if b.mk == nil {
-		return 0, errors.New("merkle is not initialized")
+		return merkletypes.TreeInfo{}, errors.New("merkle is not initialized")
 	}
-	return b.mk.GetWorkingTreeIndex()
-}
-
-func (b BaseChild) GetStartLeafIndex() (uint64, error) {
-	if b.mk == nil {
-		return 0, errors.New("merkle is not initialized")
-	}
-	return b.mk.GetStartLeafIndex()
-}
-
-func (b BaseChild) GetWorkingTreeLeafCount() (uint64, error) {
-	if b.mk == nil {
-		return 0, errors.New("merkle is not initialized")
-	}
-	return b.mk.GetWorkingTreeLeafCount()
+	return b.mk.GetWorkingTree()
 }

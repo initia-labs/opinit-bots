@@ -165,16 +165,16 @@ func (b BaseHost) QueryBatchInfos(ctx context.Context, bridgeId uint64) (*ophost
 	return b.ophostQueryClient.BatchInfos(ctx, req)
 }
 
-func (b BaseHost) QueryDepositTxHeight(ctx context.Context, bridgeId uint64, l1Sequence uint64) (int64, error) {
+func (b BaseHost) QueryDepositTxHeight(botCtx types.Context, bridgeId uint64, l1Sequence uint64) (int64, error) {
 	if l1Sequence == 0 {
 		return 0, nil
 	}
 
-	ctx, cancel := rpcclient.GetQueryContext(ctx, 0)
-	defer cancel()
-
-	ticker := time.NewTicker(types.PollingInterval(ctx))
+	ticker := time.NewTicker(botCtx.PollingInterval())
 	defer ticker.Stop()
+
+	ctx, cancel := rpcclient.GetQueryContext(botCtx, 0)
+	defer cancel()
 
 	query := fmt.Sprintf("%s.%s = %d",
 		ophosttypes.EventTypeInitiateTokenDeposit,

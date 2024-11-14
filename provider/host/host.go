@@ -1,8 +1,6 @@
 package host
 
 import (
-	"context"
-
 	"go.uber.org/zap"
 
 	"github.com/cosmos/cosmos-sdk/client"
@@ -27,9 +25,7 @@ type BaseHost struct {
 
 	bridgeInfo ophosttypes.QueryBridgeResponse
 
-	cfg    nodetypes.NodeConfig
-	db     types.DB
-	logger *zap.Logger
+	cfg nodetypes.NodeConfig
 
 	ophostQueryClient ophosttypes.QueryClient
 
@@ -37,15 +33,13 @@ type BaseHost struct {
 	msgQueue      []sdk.Msg
 }
 
-func NewBaseHostV1(cfg nodetypes.NodeConfig,
-	db types.DB, logger *zap.Logger,
-) *BaseHost {
+func NewBaseHostV1(cfg nodetypes.NodeConfig, db types.DB) *BaseHost {
 	appCodec, txConfig, err := GetCodec(cfg.Bech32Prefix)
 	if err != nil {
 		panic(err)
 	}
 
-	node, err := node.NewNode(cfg, db, logger, appCodec, txConfig)
+	node, err := node.NewNode(cfg, db, appCodec, txConfig)
 	if err != nil {
 		panic(err)
 	}
@@ -55,9 +49,7 @@ func NewBaseHostV1(cfg nodetypes.NodeConfig,
 
 		node: node,
 
-		cfg:    cfg,
-		db:     db,
-		logger: logger,
+		cfg: cfg,
 
 		ophostQueryClient: ophosttypes.NewQueryClient(node.GetRPCClient()),
 
@@ -78,7 +70,7 @@ func GetCodec(bech32Prefix string) (codec.Codec, client.TxConfig, error) {
 	})
 }
 
-func (b *BaseHost) Initialize(ctx context.Context, processedHeight int64, bridgeInfo ophosttypes.QueryBridgeResponse, keyringConfig *btypes.KeyringConfig) error {
+func (b *BaseHost) Initialize(ctx types.Context, processedHeight int64, bridgeInfo ophosttypes.QueryBridgeResponse, keyringConfig *btypes.KeyringConfig) error {
 	err := b.node.Initialize(ctx, processedHeight, keyringConfig)
 	if err != nil {
 		return err
@@ -87,29 +79,35 @@ func (b *BaseHost) Initialize(ctx context.Context, processedHeight int64, bridge
 	return nil
 }
 
-func (b *BaseHost) Start(ctx context.Context) {
+func (b *BaseHost) Start(ctx types.Context) {
 	if b.cfg.ProcessType == nodetypes.PROCESS_TYPE_ONLY_BROADCAST {
-		b.logger.Info("host start")
+		ctx.Logger().Info("host start")
 	} else {
-		b.logger.Info("host start", zap.Int64("height", b.node.GetHeight()))
+		ctx.Logger().Info("host start", zap.Int64("height", b.node.GetHeight()))
 	}
 	b.node.Start(ctx)
 }
 
-func (b BaseHost) BroadcastMsgs(msgs btypes.ProcessedMsgs) {
-	if len(msgs.Msgs) == 0 {
+func (b BaseHost) BroadcastProcessedMsgs(batch ...btypes.ProcessedMsgs) {
+	if len(batch) == 0 {
 		return
 	}
+	broadcaster := b.node.MustGetBroadcaster()
 
-	b.node.MustGetBroadcaster().BroadcastMsgs(msgs)
+	for _, processedMsgs := range batch {
+		if len(processedMsgs.Msgs) == 0 {
+			continue
+		}
+		broadcaster.BroadcastProcessedMsgs(processedMsgs)
+	}
 }
 
-func (b BaseHost) ProcessedMsgsToRawKV(msgs []btypes.ProcessedMsgs, delete bool) ([]types.RawKV, error) {
-	if len(msgs) == 0 {
-		return nil, nil
-	}
+func (b BaseHost) DB() types.DB {
+	return b.node.DB()
+}
 
-	return b.node.MustGetBroadcaster().ProcessedMsgsToRawKV(msgs, delete)
+func (b BaseHost) Codec() codec.Codec {
+	return b.node.Codec()
 }
 
 func (b BaseHost) BridgeId() uint64 {
@@ -128,7 +126,7 @@ func (b BaseHost) BridgeInfo() ophosttypes.QueryBridgeResponse {
 	return b.bridgeInfo
 }
 
-func (b BaseHost) HasKey() bool {
+func (b BaseHost) HasBroadcaster() bool {
 	return b.node.HasBroadcaster()
 }
 
@@ -142,14 +140,6 @@ func (b BaseHost) Version() uint8 {
 
 func (b BaseHost) Node() *node.Node {
 	return b.node
-}
-
-func (b BaseHost) Logger() *zap.Logger {
-	return b.logger
-}
-
-func (b BaseHost) DB() types.DB {
-	return b.db
 }
 
 /// MsgQueue
@@ -172,8 +162,8 @@ func (b BaseHost) GetProcessedMsgs() []btypes.ProcessedMsgs {
 	return b.processedMsgs
 }
 
-func (b *BaseHost) AppendProcessedMsgs(msgs btypes.ProcessedMsgs) {
-	b.processedMsgs = append(b.processedMsgs, msgs)
+func (b *BaseHost) AppendProcessedMsgs(msgs ...btypes.ProcessedMsgs) {
+	b.processedMsgs = append(b.processedMsgs, msgs...)
 }
 
 func (b *BaseHost) EmptyProcessedMsgs() {
