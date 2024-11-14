@@ -41,7 +41,7 @@ type Executor struct {
 	homePath string
 }
 
-func NewExecutor(cfg *executortypes.Config, db types.DB, sv *server.Server, logger *zap.Logger, homePath string) *Executor {
+func NewExecutor(cfg *executortypes.Config, db types.DB, logger *zap.Logger, homePath string) *Executor {
 	err := cfg.Validate()
 	if err != nil {
 		panic(err)
@@ -66,7 +66,7 @@ func NewExecutor(cfg *executortypes.Config, db types.DB, sv *server.Server, logg
 
 		cfg:    cfg,
 		db:     db,
-		server: sv,
+		server: server.NewServer(cfg.Server),
 		logger: logger,
 
 		homePath: homePath,
@@ -135,7 +135,7 @@ func (ex *Executor) Start(ctx context.Context) error {
 		defer func() {
 			ex.logger.Info("api server stopped")
 		}()
-		return ex.server.Start(ex.cfg.ListenAddress)
+		return ex.server.Start()
 	})
 	ex.host.Start(ctx)
 	ex.child.Start(ctx)
