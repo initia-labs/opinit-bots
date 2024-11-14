@@ -23,10 +23,9 @@ type DB interface {
 
 	NewStage() CommitDB
 
-	RawBatchSet(...RawKV) error
 	BatchSet(...KV) error
-	PrefixedIterate([]byte, []byte, func([]byte, []byte) (bool, error)) error
-	PrefixedReverseIterate([]byte, []byte, func([]byte, []byte) (bool, error)) error
+	Iterate([]byte, []byte, func([]byte, []byte) (bool, error)) error
+	ReverseIterate([]byte, []byte, func([]byte, []byte) (bool, error)) error
 	SeekPrevInclusiveKey([]byte, []byte) ([]byte, []byte, error)
 	WithPrefix([]byte) DB
 	PrefixedKey([]byte) []byte

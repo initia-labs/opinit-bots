@@ -2,6 +2,7 @@ package broadcaster
 
 import (
 	"github.com/cosmos/cosmos-sdk/codec"
+	dbtypes "github.com/initia-labs/opinit-bots/db/types"
 	btypes "github.com/initia-labs/opinit-bots/node/broadcaster/types"
 	"github.com/initia-labs/opinit-bots/types"
 )
@@ -23,7 +24,7 @@ func DeletePendingTx(db types.BasicDB, pendingTx btypes.PendingTxInfo) error {
 }
 
 func LoadPendingTxs(db types.DB) (txs []btypes.PendingTxInfo, err error) {
-	iterErr := db.PrefixedIterate(btypes.PendingTxsPrefix, nil, func(_, value []byte) (stop bool, err error) {
+	iterErr := db.Iterate(dbtypes.AppendSplitter(btypes.PendingTxsPrefix), nil, func(_, value []byte) (stop bool, err error) {
 		txInfo := btypes.PendingTxInfo{}
 		err = txInfo.Unmarshal(value)
 		if err != nil {
@@ -101,7 +102,7 @@ func SaveProcessedMsgsBatch(db types.BasicDB, cdc codec.Codec, processedMsgsBatc
 }
 
 func LoadProcessedMsgsBatch(db types.DB, cdc codec.Codec) (processedMsgsBatch []btypes.ProcessedMsgs, err error) {
-	iterErr := db.PrefixedIterate(btypes.ProcessedMsgsPrefix, nil, func(_, value []byte) (stop bool, err error) {
+	iterErr := db.Iterate(dbtypes.AppendSplitter(btypes.ProcessedMsgsPrefix), nil, func(_, value []byte) (stop bool, err error) {
 		var processedMsgs btypes.ProcessedMsgs
 		err = processedMsgs.UnmarshalInterfaceJSON(cdc, value)
 		if err != nil {

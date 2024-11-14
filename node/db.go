@@ -1,6 +1,7 @@
 package node
 
 import (
+	dbtypes "github.com/initia-labs/opinit-bots/db/types"
 	btypes "github.com/initia-labs/opinit-bots/node/broadcaster/types"
 	nodetypes "github.com/initia-labs/opinit-bots/node/types"
 	"github.com/initia-labs/opinit-bots/types"
@@ -33,7 +34,7 @@ func DeleteSyncedHeight(db types.BasicDB) error {
 
 // DeleteProcessedMsgs deletes all processed messages
 func DeleteProcessedMsgs(db types.DB) error {
-	return db.PrefixedIterate(btypes.ProcessedMsgsPrefix, nil, func(key, _ []byte) (stop bool, err error) {
+	return db.Iterate(dbtypes.AppendSplitter(btypes.ProcessedMsgsPrefix), nil, func(key, _ []byte) (stop bool, err error) {
 		err = db.Delete(key)
 		if err != nil {
 			return stop, err
@@ -44,7 +45,7 @@ func DeleteProcessedMsgs(db types.DB) error {
 
 // DeletePendingTxs deletes all pending txs
 func DeletePendingTxs(db types.DB) error {
-	return db.PrefixedIterate(btypes.PendingTxsPrefix, nil, func(key, _ []byte) (stop bool, err error) {
+	return db.Iterate(dbtypes.AppendSplitter(btypes.PendingTxsPrefix), nil, func(key, _ []byte) (stop bool, err error) {
 		err = db.Delete(key)
 		if err != nil {
 			return stop, err

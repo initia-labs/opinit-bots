@@ -243,7 +243,7 @@ func (ch *Child) GetSequencesByAddress(address string, offset uint64, limit uint
 			offset = total
 		}
 		startKey := executortypes.PrefixedWithdrawalAddressIndex(address, offset)
-		err = ch.DB().PrefixedReverseIterate(executortypes.PrefixedWithdrawalAddress(address), startKey, fetchFn)
+		err = ch.DB().ReverseIterate(dbtypes.AppendSplitter(executortypes.PrefixedWithdrawalAddress(address)), startKey, fetchFn)
 		if err != nil {
 			return nil, 0, 0, err
 		}
@@ -254,7 +254,7 @@ func (ch *Child) GetSequencesByAddress(address string, offset uint64, limit uint
 			offset = 1
 		}
 		startKey := executortypes.PrefixedWithdrawalAddressIndex(address, offset)
-		err := ch.DB().PrefixedIterate(executortypes.PrefixedWithdrawalAddress(address), startKey, fetchFn)
+		err := ch.DB().Iterate(dbtypes.AppendSplitter(executortypes.PrefixedWithdrawalAddress(address)), startKey, fetchFn)
 		if err != nil {
 			return nil, 0, 0, err
 		}
@@ -302,7 +302,7 @@ func (ch *Child) GetAddressIndex(address string) (uint64, error) {
 }
 
 func (ch *Child) GetLastAddressIndex(address string) (lastIndex uint64, err error) {
-	err = ch.DB().PrefixedReverseIterate(executortypes.PrefixedWithdrawalAddress(address), nil, func(key, _ []byte) (bool, error) {
+	err = ch.DB().ReverseIterate(dbtypes.AppendSplitter(executortypes.PrefixedWithdrawalAddress(address)), nil, func(key, _ []byte) (bool, error) {
 		lastIndex = dbtypes.ToUint64Key(key[len(key)-8:])
 		return true, nil
 	})
@@ -310,7 +310,7 @@ func (ch *Child) GetLastAddressIndex(address string) (lastIndex uint64, err erro
 }
 
 func (ch *Child) DeleteFutureWithdrawals(fromSequence uint64) error {
-	return ch.DB().PrefixedIterate(executortypes.WithdrawalSequencePrefix, nil, func(key, value []byte) (bool, error) {
+	return ch.DB().Iterate(dbtypes.AppendSplitter(executortypes.WithdrawalSequencePrefix), nil, func(key, value []byte) (bool, error) {
 		sequence := dbtypes.ToUint64Key(key[len(key)-8:])
 		if sequence < fromSequence {
 			return false, nil

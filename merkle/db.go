@@ -10,7 +10,7 @@ import (
 )
 
 func DeleteFutureFinalizedTrees(db types.DB, fromSequence uint64) error {
-	return db.PrefixedIterate(merkletypes.FinalizedTreeKey, nil, func(key, _ []byte) (bool, error) {
+	return db.Iterate(dbtypes.AppendSplitter(merkletypes.FinalizedTreeKey), nil, func(key, _ []byte) (bool, error) {
 		sequence := dbtypes.ToUint64Key(key[len(key)-8:])
 		if sequence >= fromSequence {
 			err := db.Delete(key)
@@ -23,7 +23,7 @@ func DeleteFutureFinalizedTrees(db types.DB, fromSequence uint64) error {
 }
 
 func DeleteFutureWorkingTrees(db types.DB, fromVersion uint64) error {
-	return db.PrefixedIterate(merkletypes.WorkingTreeKey, nil, func(key, _ []byte) (bool, error) {
+	return db.Iterate(dbtypes.AppendSplitter(merkletypes.WorkingTreeKey), nil, func(key, _ []byte) (bool, error) {
 		version := dbtypes.ToUint64Key(key[len(key)-8:])
 		if version >= fromVersion {
 			err := db.Delete(key)

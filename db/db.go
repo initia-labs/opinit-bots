@@ -28,24 +28,6 @@ func NewDB(path string) (*LevelDB, error) {
 	}, nil
 }
 
-// RawBatchSet sets the key-value pairs in the database without prefixing the keys.
-//
-// @dev: `LevelDB.prefix“ is not used as the prefix for the keys.
-func (db *LevelDB) RawBatchSet(kvs ...types.RawKV) error {
-	if len(kvs) == 0 {
-		return nil
-	}
-	batch := new(leveldb.Batch)
-	for _, kv := range kvs {
-		if kv.Value == nil {
-			batch.Delete(kv.Key)
-		} else {
-			batch.Put(kv.Key, kv.Value)
-		}
-	}
-	return db.db.Write(batch, nil)
-}
-
 // BatchSet sets the key-value pairs in the database with prefixing the keys.
 func (db *LevelDB) BatchSet(kvs ...types.KV) error {
 	if len(kvs) == 0 {
@@ -82,10 +64,10 @@ func (db *LevelDB) Close() error {
 	return db.db.Close()
 }
 
-// PrefixedIterate iterates over the key-value pairs in the database with prefixing the keys.
+// Iterate iterates over the key-value pairs in the database with prefixing the keys.
 //
 // @dev: `LevelDB.prefix + prefix` is used as the prefix for the iteration.
-func (db *LevelDB) PrefixedIterate(prefix []byte, start []byte, cb func(key, value []byte) (stop bool, err error)) error {
+func (db *LevelDB) Iterate(prefix []byte, start []byte, cb func(key, value []byte) (stop bool, err error)) error {
 	iter := db.db.NewIterator(util.BytesPrefix(db.PrefixedKey(prefix)), nil)
 	defer iter.Release()
 	if start != nil {
@@ -106,7 +88,7 @@ func (db *LevelDB) PrefixedIterate(prefix []byte, start []byte, cb func(key, val
 	return iter.Error()
 }
 
-func (db *LevelDB) PrefixedReverseIterate(prefix []byte, start []byte, cb func(key, value []byte) (stop bool, err error)) error {
+func (db *LevelDB) ReverseIterate(prefix []byte, start []byte, cb func(key, value []byte) (stop bool, err error)) error {
 	iter := db.db.NewIterator(util.BytesPrefix(db.PrefixedKey(prefix)), nil)
 	defer iter.Release()
 	if start != nil {
