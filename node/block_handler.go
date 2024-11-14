@@ -1,7 +1,6 @@
 package node
 
 import (
-	"context"
 	"fmt"
 	"time"
 
@@ -9,17 +8,18 @@ import (
 	prototypes "github.com/cometbft/cometbft/proto/tendermint/types"
 	rpccoretypes "github.com/cometbft/cometbft/rpc/core/types"
 	nodetypes "github.com/initia-labs/opinit-bots/node/types"
+	"github.com/initia-labs/opinit-bots/types"
 	"github.com/pkg/errors"
 )
 
-func (n *Node) checkPendingTxsFromBroadcaster(block *rpccoretypes.ResultBlock, latestHeight int64) error {
+func (n *Node) checkPendingTxsFromBroadcaster(ctx types.Context, block *rpccoretypes.ResultBlock, latestHeight int64) error {
 	if n.HasBroadcaster() {
-		return n.broadcaster.HandleNewBlock(block, latestHeight)
+		return n.broadcaster.HandleNewBlock(ctx, block, latestHeight)
 	}
 	return nil
 }
 
-func (n *Node) handleBeginBlock(ctx context.Context, blockID []byte, protoBlock *prototypes.Block, latestHeight int64) error {
+func (n *Node) handleBeginBlock(ctx types.Context, blockID []byte, protoBlock *prototypes.Block, latestHeight int64) error {
 	if n.beginBlockHandler != nil {
 		return n.beginBlockHandler(ctx, nodetypes.BeginBlockArgs{
 			BlockID:      blockID,
@@ -30,7 +30,7 @@ func (n *Node) handleBeginBlock(ctx context.Context, blockID []byte, protoBlock 
 	return nil
 }
 
-func (n *Node) handleBlockTxs(ctx context.Context, block *rpccoretypes.ResultBlock, blockResult *rpccoretypes.ResultBlockResults, latestHeight int64) error {
+func (n *Node) handleBlockTxs(ctx types.Context, block *rpccoretypes.ResultBlock, blockResult *rpccoretypes.ResultBlockResults, latestHeight int64) error {
 	for txIndex, tx := range block.Block.Txs {
 		if n.txHandler != nil {
 			err := n.txHandler(ctx, nodetypes.TxHandlerArgs{
@@ -54,11 +54,11 @@ func (n *Node) handleBlockTxs(ctx context.Context, block *rpccoretypes.ResultBlo
 	return nil
 }
 
-func (n *Node) handleFinalizeBlock(ctx context.Context, blockHeight int64, blockTime time.Time, blockResult *rpccoretypes.ResultBlockResults, latestHeight int64) error {
+func (n *Node) handleFinalizeBlock(ctx types.Context, blockHeight int64, blockTime time.Time, blockResult *rpccoretypes.ResultBlockResults, latestHeight int64) error {
 	return n.handleEvents(ctx, blockHeight, blockTime, blockResult.FinalizeBlockEvents, latestHeight)
 }
 
-func (n *Node) handleEvents(ctx context.Context, blockHeight int64, blockTime time.Time, events []abcitypes.Event, latestHeight int64) error {
+func (n *Node) handleEvents(ctx types.Context, blockHeight int64, blockTime time.Time, events []abcitypes.Event, latestHeight int64) error {
 	if len(n.eventHandlers) != 0 {
 		for eventIndex, event := range events {
 			err := n.handleEvent(ctx, blockHeight, blockTime, latestHeight, event)
@@ -70,7 +70,7 @@ func (n *Node) handleEvents(ctx context.Context, blockHeight int64, blockTime ti
 	return nil
 }
 
-func (n *Node) handleEndBlock(ctx context.Context, blockID []byte, protoBlock *prototypes.Block, latestHeight int64) error {
+func (n *Node) handleEndBlock(ctx types.Context, blockID []byte, protoBlock *prototypes.Block, latestHeight int64) error {
 	if n.endBlockHandler != nil {
 		return n.endBlockHandler(ctx, nodetypes.EndBlockArgs{
 			BlockID:      blockID,
@@ -81,7 +81,7 @@ func (n *Node) handleEndBlock(ctx context.Context, blockID []byte, protoBlock *p
 	return nil
 }
 
-func (n *Node) handleRawBlock(ctx context.Context, blockHeight int64, latestHeight int64, blockBytes []byte) error {
+func (n *Node) handleRawBlock(ctx types.Context, blockHeight int64, latestHeight int64, blockBytes []byte) error {
 	if n.rawBlockHandler != nil {
 		return n.rawBlockHandler(ctx, nodetypes.RawBlockArgs{
 			BlockHeight:  blockHeight,

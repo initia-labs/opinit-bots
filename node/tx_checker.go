@@ -1,7 +1,6 @@
 package node
 
 import (
-	"context"
 	"time"
 
 	"github.com/initia-labs/opinit-bots/types"
@@ -10,12 +9,12 @@ import (
 )
 
 // txChecker checks pending txs and handle events if the tx is included in the block
-func (n *Node) txChecker(ctx context.Context) error {
+func (n *Node) txChecker(ctx types.Context) error {
 	if !n.HasBroadcaster() {
 		return nil
 	}
 
-	timer := time.NewTicker(types.PollingInterval(ctx))
+	timer := time.NewTicker(ctx.PollingInterval())
 	defer timer.Stop()
 
 	consecutiveErrors := 0
@@ -24,23 +23,25 @@ func (n *Node) txChecker(ctx context.Context) error {
 		case <-ctx.Done():
 			return nil
 		case <-timer.C:
-			types.SleepWithRetry(ctx, consecutiveErrors)
+			if types.SleepWithRetry(ctx, consecutiveErrors) {
+				return nil
+			}
 			consecutiveErrors++
 		}
 
 		pendingTx, res, blockTime, latestHeight, err := n.broadcaster.CheckPendingTx(ctx)
 		if err != nil {
-			n.logger.Error("failed to check pending tx", zap.String("error", err.Error()))
+			ctx.Logger().Error("failed to check pending tx", zap.String("error", err.Error()))
 			continue
 		}
 
 		err = n.handleEvents(ctx, res.Height, blockTime, res.TxResult.GetEvents(), latestHeight)
 		if err != nil {
-			n.logger.Error("failed to handle events", zap.String("tx_hash", pendingTx.TxHash), zap.String("error", err.Error()))
+			ctx.Logger().Error("failed to handle events", zap.String("tx_hash", pendingTx.TxHash), zap.String("error", err.Error()))
 			continue
 		}
 
-		err = n.broadcaster.RemovePendingTx(res.Height, pendingTx.TxHash, pendingTx.Sequence, pendingTx.MsgTypes)
+		err = n.broadcaster.RemovePendingTx(ctx, res.Height, *pendingTx)
 		if err != nil {
 			return errors.Wrap(err, "failed to remove pending tx")
 		}

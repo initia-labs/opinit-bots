@@ -1,28 +1,27 @@
 package node
 
 import (
-	"context"
 	"fmt"
+	"sync"
 
 	"github.com/pkg/errors"
 
 	"cosmossdk.io/core/address"
+	dbtypes "github.com/initia-labs/opinit-bots/db/types"
 	"github.com/initia-labs/opinit-bots/node/broadcaster"
 	btypes "github.com/initia-labs/opinit-bots/node/broadcaster/types"
 	"github.com/initia-labs/opinit-bots/node/rpcclient"
 	nodetypes "github.com/initia-labs/opinit-bots/node/types"
 	"github.com/initia-labs/opinit-bots/types"
 	"go.uber.org/zap"
-	"golang.org/x/sync/errgroup"
 
 	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/codec"
 )
 
 type Node struct {
-	cfg    nodetypes.NodeConfig
-	db     types.DB
-	logger *zap.Logger
+	cfg nodetypes.NodeConfig
+	db  types.DB
 
 	cdc      codec.Codec
 	txConfig client.TxConfig
@@ -40,10 +39,11 @@ type Node struct {
 	// status info
 	startHeightInitialized bool
 	syncedHeight           int64
-	running                bool
+
+	startOnce *sync.Once
 }
 
-func NewNode(cfg nodetypes.NodeConfig, db types.DB, logger *zap.Logger, cdc codec.Codec, txConfig client.TxConfig) (*Node, error) {
+func NewNode(cfg nodetypes.NodeConfig, db types.DB, cdc codec.Codec, txConfig client.TxConfig) (*Node, error) {
 	if err := cfg.Validate(); err != nil {
 		return nil, err
 	}
@@ -56,21 +56,21 @@ func NewNode(cfg nodetypes.NodeConfig, db types.DB, logger *zap.Logger, cdc code
 	n := &Node{
 		rpcClient: rpcClient,
 
-		cfg:    cfg,
-		db:     db,
-		logger: logger,
+		cfg: cfg,
+		db:  db,
 
 		eventHandlers: make(map[string]nodetypes.EventHandlerFn),
 
 		cdc:      cdc,
 		txConfig: txConfig,
+
+		startOnce: &sync.Once{},
 	}
 	// create broadcaster
 	if n.cfg.BroadcasterConfig != nil {
 		n.broadcaster, err = broadcaster.NewBroadcaster(
 			*n.cfg.BroadcasterConfig,
 			n.db,
-			n.logger,
 			n.cdc,
 			n.txConfig,
 			n.rpcClient,
@@ -79,14 +79,13 @@ func NewNode(cfg nodetypes.NodeConfig, db types.DB, logger *zap.Logger, cdc code
 			return nil, errors.Wrap(err, "failed to create broadcaster")
 		}
 	}
-
 	return n, nil
 }
 
 // StartHeight is the height to start processing.
 // If it is 0, the latest height is used.
 // If the latest height exists in the database, this is ignored.
-func (n *Node) Initialize(ctx context.Context, processedHeight int64, keyringConfig *btypes.KeyringConfig) (err error) {
+func (n *Node) Initialize(ctx types.Context, processedHeight int64, keyringConfig *btypes.KeyringConfig) (err error) {
 	// check if node is catching up
 	status, err := n.rpcClient.Status(ctx)
 	if err != nil {
@@ -102,27 +101,39 @@ func (n *Node) Initialize(ctx context.Context, processedHeight int64, keyringCon
 		}
 	}
 
-	// load sync info
-	return n.loadSyncInfo(processedHeight)
+	syncedHeight, err := GetSyncInfo(n.db)
+	// if not found, initialize the height
+	if errors.Is(err, dbtypes.ErrNotFound) {
+		syncedHeight = processedHeight
+		n.startHeightInitialized = true
+		ctx.Logger().Info("initialize height")
+		return nil
+	} else if err != nil {
+		return errors.Wrap(err, "failed to load sync info")
+	}
+
+	n.UpdateSyncedHeight(syncedHeight)
+	ctx.Logger().Debug("load sync info", zap.Int64("synced_height", n.syncedHeight))
+	return nil
 }
 
 func (n *Node) HeightInitialized() bool {
 	return n.startHeightInitialized
 }
 
-func (n *Node) Start(ctx context.Context) {
-	if n.running {
-		return
-	}
-	n.running = true
+func (n *Node) Start(ctx types.Context) {
+	n.startOnce.Do(func() {
+		n.start(ctx)
+	})
+}
 
-	errGrp := ctx.Value(types.ContextKeyErrGrp).(*errgroup.Group)
+func (n *Node) start(ctx types.Context) {
 	if n.HasBroadcaster() {
-		errGrp.Go(func() (err error) {
+		ctx.ErrGrp().Go(func() (err error) {
 			defer func() {
-				n.logger.Info("tx broadcast looper stopped")
+				ctx.Logger().Info("tx broadcast looper stopped")
 				if r := recover(); r != nil {
-					n.logger.Error("tx broadcast looper panic", zap.Any("recover", r))
+					ctx.Logger().Error("tx broadcast looper panic", zap.Any("recover", r))
 					err = fmt.Errorf("tx broadcast looper panic: %v", r)
 				}
 			}()
@@ -139,11 +150,11 @@ func (n *Node) Start(ctx context.Context) {
 			panic("broadcaster cannot be nil with nodetypes.PROCESS_TYPE_ONLY_BROADCAST")
 		}
 
-		errGrp.Go(func() (err error) {
+		ctx.ErrGrp().Go(func() (err error) {
 			defer func() {
-				n.logger.Info("tx checker looper stopped")
+				ctx.Logger().Info("tx checker looper stopped")
 				if r := recover(); r != nil {
-					n.logger.Error("tx checker panic", zap.Any("recover", r))
+					ctx.Logger().Error("tx checker panic", zap.Any("recover", r))
 					err = fmt.Errorf("tx checker panic: %v", r)
 				}
 			}()
@@ -151,11 +162,11 @@ func (n *Node) Start(ctx context.Context) {
 			return n.txChecker(ctx)
 		})
 	} else {
-		errGrp.Go(func() (err error) {
+		ctx.ErrGrp().Go(func() (err error) {
 			defer func() {
-				n.logger.Info("block process looper stopped")
+				ctx.Logger().Info("block process looper stopped")
 				if r := recover(); r != nil {
-					n.logger.Error("block process looper panic", zap.Any("recover", r))
+					ctx.Logger().Error("block process looper panic", zap.Any("recover", r))
 					err = fmt.Errorf("block process looper panic: %v", r)
 				}
 			}()
@@ -169,14 +180,22 @@ func (n Node) AccountCodec() address.Codec {
 	return n.cdc.InterfaceRegistry().SigningContext().AddressCodec()
 }
 
+func (n Node) Codec() codec.Codec {
+	return n.cdc
+}
+
+func (n Node) DB() types.DB {
+	return n.db
+}
+
 func (n Node) GetHeight() int64 {
 	return n.syncedHeight + 1
 }
 
-func (n *Node) SetSyncedHeight(height int64) {
+func (n *Node) UpdateSyncedHeight(height int64) {
 	n.syncedHeight = height
 	if n.HasBroadcaster() {
-		n.broadcaster.SetSyncHeight(height)
+		n.broadcaster.UpdateSyncedHeight(height)
 	}
 }
 

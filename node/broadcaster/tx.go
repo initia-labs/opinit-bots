@@ -22,6 +22,7 @@ import (
 
 	btypes "github.com/initia-labs/opinit-bots/node/broadcaster/types"
 	"github.com/initia-labs/opinit-bots/txutils"
+	"github.com/initia-labs/opinit-bots/types"
 
 	opchildtypes "github.com/initia-labs/OPinit/x/opchild/types"
 )
@@ -35,7 +36,7 @@ var ignoringErrors = []error{
 var accountSeqRegex = regexp.MustCompile("account sequence mismatch, expected ([0-9]+), got ([0-9]+)")
 var outputIndexRegex = regexp.MustCompile("expected ([0-9]+), got ([0-9]+): invalid output index")
 
-func (b *Broadcaster) handleMsgError(err error) error {
+func (b *Broadcaster) handleMsgError(ctx types.Context, err error) error {
 	if strs := accountSeqRegex.FindStringSubmatch(err.Error()); strs != nil {
 		expected, parseErr := strconv.ParseUint(strs[1], 10, 64)
 		if parseErr != nil {
@@ -66,7 +67,7 @@ func (b *Broadcaster) handleMsgError(err error) error {
 		}
 
 		if expected > got {
-			b.logger.Warn("ignoring error", zap.String("error", err.Error()))
+			ctx.Logger().Warn("ignoring error", zap.String("error", err.Error()))
 			return nil
 		}
 
@@ -75,7 +76,7 @@ func (b *Broadcaster) handleMsgError(err error) error {
 
 	for _, e := range ignoringErrors {
 		if strings.Contains(err.Error(), e.Error()) {
-			b.logger.Warn("ignoring error", zap.String("error", e.Error()))
+			ctx.Logger().Warn("ignoring error", zap.String("error", e.Error()))
 			return nil
 		}
 	}
@@ -86,9 +87,9 @@ func (b *Broadcaster) handleMsgError(err error) error {
 
 // HandleProcessedMsgs handles processed messages by broadcasting them to the network.
 // It stores the transaction in the database and local memory and keep track of the successful broadcast.
-func (b *Broadcaster) handleProcessedMsgs(ctx context.Context, data btypes.ProcessedMsgs) error {
+func (b *Broadcaster) handleProcessedMsgs(ctx types.Context, data btypes.ProcessedMsgs) error {
 	sequence := b.txf.Sequence()
-	txBytes, txHash, err := b.cfg.BuildTxWithMessages(ctx, data.Msgs)
+	txBytes, txHash, err := b.cfg.BuildTxWithMsgs(ctx, data.Msgs)
 	if err != nil {
 		return sdkerrors.Wrapf(err, "simulation failed")
 	}
@@ -102,14 +103,11 @@ func (b *Broadcaster) handleProcessedMsgs(ctx context.Context, data btypes.Proce
 		return fmt.Errorf("broadcast txs: %s", res.Log)
 	}
 
-	b.logger.Debug("broadcast tx", zap.String("tx_hash", txHash), zap.Uint64("sequence", sequence))
+	ctx.Logger().Debug("broadcast tx", zap.String("tx_hash", txHash), zap.Uint64("sequence", sequence))
 
-	// @sh-cha: maybe we should use data.Save?
-	if data.Timestamp != 0 {
-		err = b.deleteProcessedMsgs(data.Timestamp)
-		if err != nil {
-			return err
-		}
+	err = DeleteProcessedMsgs(b.db, data)
+	if err != nil {
+		return err
 	}
 
 	b.txf = b.txf.WithSequence(b.txf.Sequence() + 1)
@@ -124,7 +122,7 @@ func (b *Broadcaster) handleProcessedMsgs(ctx context.Context, data btypes.Proce
 	}
 
 	// save pending transaction to the database for handling after restart
-	err = b.savePendingTx(sequence, pendingTx)
+	err = SavePendingTx(b.db, pendingTx)
 	if err != nil {
 		return err
 	}
@@ -133,18 +131,6 @@ func (b *Broadcaster) handleProcessedMsgs(ctx context.Context, data btypes.Proce
 	b.enqueueLocalPendingTx(pendingTx)
 
 	return nil
-}
-
-// BroadcastTxSync broadcasts transaction bytes to txBroadcastLooper.
-func (b Broadcaster) BroadcastMsgs(msgs btypes.ProcessedMsgs) {
-	if b.txChannel == nil {
-		return
-	}
-
-	select {
-	case <-b.txChannelStopped:
-	case b.txChannel <- msgs:
-	}
 }
 
 // CalculateGas simulates a tx to generate the appropriate gas settings before broadcasting a tx.
@@ -259,7 +245,7 @@ func (b *Broadcaster) dequeueLocalPendingTx() {
 }
 
 // buildTxWithMessages creates a transaction from the given messages.
-func (b *Broadcaster) DefaultBuildTxWithMessages(
+func (b *Broadcaster) DefaultBuildTxWithMsgs(
 	ctx context.Context,
 	msgs []sdk.Msg,
 ) (
@@ -291,7 +277,7 @@ func (b *Broadcaster) DefaultBuildTxWithMessages(
 	return txBytes, btypes.TxHash(txBytes), nil
 }
 
-func (b *Broadcaster) DefaultPendingTxToProcessedMsgs(
+func (b *Broadcaster) DefaultMsgsFromTx(
 	txBytes []byte,
 ) ([]sdk.Msg, error) {
 	tx, err := txutils.DecodeTx(b.txConfig, txBytes)

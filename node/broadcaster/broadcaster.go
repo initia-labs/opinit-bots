@@ -1,7 +1,6 @@
 package broadcaster
 
 import (
-	"context"
 	"slices"
 	"sync"
 	"time"
@@ -29,7 +28,6 @@ type Broadcaster struct {
 
 	db        types.DB
 	cdc       codec.Codec
-	logger    *zap.Logger
 	rpcClient *rpcclient.RPCClient
 
 	txf      tx.Factory
@@ -46,7 +44,7 @@ type Broadcaster struct {
 	pendingTxMu *sync.Mutex
 	pendingTxs  []btypes.PendingTxInfo
 
-	pendingProcessedMsgs []btypes.ProcessedMsgs
+	pendingProcessedMsgsBatch []btypes.ProcessedMsgs
 
 	syncedHeight int64
 }
@@ -54,14 +52,12 @@ type Broadcaster struct {
 func NewBroadcaster(
 	cfg btypes.BroadcasterConfig,
 	db types.DB,
-	logger *zap.Logger,
 	cdc codec.Codec,
 	txConfig client.TxConfig,
 	rpcClient *rpcclient.RPCClient,
 ) (*Broadcaster, error) {
 	b := &Broadcaster{
 		cdc:       cdc,
-		logger:    logger,
 		db:        db,
 		rpcClient: rpcClient,
 
@@ -71,17 +67,17 @@ func NewBroadcaster(
 		txChannel:        make(chan btypes.ProcessedMsgs),
 		txChannelStopped: make(chan struct{}),
 
-		pendingTxMu:          &sync.Mutex{},
-		pendingTxs:           make([]btypes.PendingTxInfo, 0),
-		pendingProcessedMsgs: make([]btypes.ProcessedMsgs, 0),
+		pendingTxMu:               &sync.Mutex{},
+		pendingTxs:                make([]btypes.PendingTxInfo, 0),
+		pendingProcessedMsgsBatch: make([]btypes.ProcessedMsgs, 0),
 	}
 
 	// fill cfg with default functions
-	if cfg.PendingTxToProcessedMsgs == nil {
-		cfg.WithPendingTxToProcessedMsgsFn(b.DefaultPendingTxToProcessedMsgs)
+	if cfg.MsgsFromTx == nil {
+		cfg.WithMsgsFromTxFn(b.DefaultMsgsFromTx)
 	}
-	if cfg.BuildTxWithMessages == nil {
-		cfg.WithBuildTxWithMessagesFn(b.DefaultBuildTxWithMessages)
+	if cfg.BuildTxWithMsgs == nil {
+		cfg.WithBuildTxWithMsgsFn(b.DefaultBuildTxWithMsgs)
 	}
 
 	// validate broadcaster config
@@ -99,7 +95,7 @@ func NewBroadcaster(
 	return b, nil
 }
 
-func (b *Broadcaster) Initialize(ctx context.Context, status *rpccoretypes.ResultStatus, keyringConfig *btypes.KeyringConfig) error {
+func (b *Broadcaster) Initialize(ctx types.Context, status *rpccoretypes.ResultStatus, keyringConfig *btypes.KeyringConfig) error {
 	err := keyringConfig.Validate()
 	if err != nil {
 		return err
@@ -134,7 +130,7 @@ func (b Broadcaster) GetTxf() tx.Factory {
 	return b.txf
 }
 
-func (b *Broadcaster) prepareBroadcaster(ctx context.Context, lastBlockTime time.Time) error {
+func (b *Broadcaster) prepareBroadcaster(ctx types.Context, lastBlockTime time.Time) error {
 	b.txf = tx.Factory{}.
 		WithAccountRetriever(b).
 		WithChainID(b.cfg.ChainID).
@@ -149,107 +145,133 @@ func (b *Broadcaster) prepareBroadcaster(ctx context.Context, lastBlockTime time
 		return err
 	}
 
-	dbBatchKVs := make([]types.RawKV, 0)
+	stage := b.db.NewStage()
 
-	loadedPendingTxs, err := b.loadPendingTxs()
+	err = b.loadPendingTxs(ctx, stage, lastBlockTime)
 	if err != nil {
 		return err
 	}
 
-	if len(loadedPendingTxs) > 0 {
-		pendingTxTime := time.Unix(0, loadedPendingTxs[0].Timestamp)
-
-		// if we have pending txs, wait until timeout
-		if timeoutTime := pendingTxTime.Add(b.cfg.TxTimeout); lastBlockTime.Before(timeoutTime) {
-			waitingTime := timeoutTime.Sub(lastBlockTime)
-			timer := time.NewTimer(waitingTime)
-			b.logger.Info("waiting for pending txs to be processed", zap.Duration("waiting_time", waitingTime))
-			select {
-			case <-ctx.Done():
-				return ctx.Err()
-			case <-timer.C:
-			}
-		}
-
-		// convert pending txs to raw kv pairs for deletion
-		pendingKVs, err := b.PendingTxsToRawKV(loadedPendingTxs, true)
-		if err != nil {
-			return err
-		}
-
-		// add pending txs delegation to db batch
-		dbBatchKVs = append(dbBatchKVs, pendingKVs...)
-
-		// convert pending txs to pending msgs
-		for i, txInfo := range loadedPendingTxs {
-			msgs, err := b.cfg.PendingTxToProcessedMsgs(txInfo.Tx)
-			if err != nil {
-				return err
-			}
-
-			if txInfo.Save {
-				for i := 0; i < len(msgs); i += 5 {
-					end := i + 5
-					if end > len(msgs) {
-						end = len(msgs)
-					}
-
-					b.pendingProcessedMsgs = append(b.pendingProcessedMsgs, btypes.ProcessedMsgs{
-						Msgs:      slices.Clone(msgs[i:end]),
-						Timestamp: time.Now().UnixNano(),
-						Save:      true,
-					})
-				}
-			}
-
-			b.logger.Debug("pending tx", zap.Int("index", i), zap.String("tx", txInfo.String()))
-		}
-	}
-
-	loadedProcessedMsgs, err := b.loadProcessedMsgs()
+	err = b.loadProcessedMsgsBatch(ctx, stage)
 	if err != nil {
 		return err
 	}
+
+	err = SaveProcessedMsgsBatch(stage, b.cdc, b.pendingProcessedMsgsBatch)
+	if err != nil {
+		return err
+	}
+
+	return stage.Commit()
+}
+
+func (b *Broadcaster) loadPendingTxs(ctx types.Context, stage types.BasicDB, lastBlockTime time.Time) error {
+	pendingTxs, err := LoadPendingTxs(b.db)
+	if err != nil {
+		return err
+	}
+	ctx.Logger().Debug("load pending txs", zap.Int("count", len(pendingTxs)))
+
+	if len(pendingTxs) == 0 {
+		return nil
+	}
+
+	pendingTxTime := time.Unix(0, pendingTxs[0].Timestamp)
+	// if we have pending txs, wait until timeout
+	if timeoutTime := pendingTxTime.Add(b.cfg.TxTimeout); lastBlockTime.Before(timeoutTime) {
+		waitingTime := timeoutTime.Sub(lastBlockTime)
+		timer := time.NewTimer(waitingTime)
+		ctx.Logger().Info("waiting for pending txs to be processed", zap.Duration("waiting_time", waitingTime))
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-timer.C:
+		}
+	}
+
+	err = DeletePendingTxs(stage, pendingTxs)
+	if err != nil {
+		return err
+	}
+
+	processedMsgsBatch, err := b.pendingTxsToProcessedMsgsBatch(ctx, pendingTxs)
+	if err != nil {
+		return err
+	}
+	b.pendingProcessedMsgsBatch = append(b.pendingProcessedMsgsBatch, processedMsgsBatch...)
+	return nil
+}
+
+func (b *Broadcaster) loadProcessedMsgsBatch(ctx types.Context, stage types.BasicDB) error {
+	processedMsgsBatch, err := LoadProcessedMsgsBatch(b.db, b.cdc)
+	if err != nil {
+		return err
+	}
+	ctx.Logger().Debug("load pending processed msgs", zap.Int("count", len(processedMsgsBatch)))
 
 	// need to remove processed msgs from db before updating the timestamp
 	// because the timestamp is used as a key.
-	kvProcessedMsgs, err := b.ProcessedMsgsToRawKV(loadedProcessedMsgs, true)
+	err = DeleteProcessedMsgsBatch(stage, processedMsgsBatch)
 	if err != nil {
 		return err
 	}
-	dbBatchKVs = append(dbBatchKVs, kvProcessedMsgs...)
 
 	// update timestamp of loaded processed msgs
-	for i, pendingMsgs := range loadedProcessedMsgs {
-		loadedProcessedMsgs[i].Timestamp = time.Now().UnixNano()
-		b.logger.Debug("pending msgs", zap.Int("index", i), zap.String("msgs", pendingMsgs.String()))
+	for i := range processedMsgsBatch {
+		processedMsgsBatch[i].Timestamp = time.Now().UnixNano()
+		ctx.Logger().Debug("pending msgs", zap.Int("index", i), zap.String("msgs", processedMsgsBatch[i].String()))
 	}
 
 	// save all pending msgs with updated timestamp to db
-	b.pendingProcessedMsgs = append(b.pendingProcessedMsgs, loadedProcessedMsgs...)
-	kvProcessedMsgs, err = b.ProcessedMsgsToRawKV(b.pendingProcessedMsgs, false)
-	if err != nil {
-		return err
-	}
-	dbBatchKVs = append(dbBatchKVs, kvProcessedMsgs...)
-
-	// save all pending msgs first, then broadcast them
-	err = b.db.RawBatchSet(dbBatchKVs...)
-	if err != nil {
-		return err
-	}
-
+	b.pendingProcessedMsgsBatch = append(b.pendingProcessedMsgsBatch, processedMsgsBatch...)
 	return nil
+}
+
+func (b *Broadcaster) pendingTxsToProcessedMsgsBatch(ctx types.Context, pendingTxs []btypes.PendingTxInfo) ([]btypes.ProcessedMsgs, error) {
+	pendingProcessedMsgsBatch := make([]btypes.ProcessedMsgs, 0)
+
+	// convert pending txs to pending msgs
+	for i, pendingTx := range pendingTxs {
+		if !pendingTx.Save {
+			continue
+		}
+
+		msgs, err := b.cfg.MsgsFromTx(pendingTx.Tx)
+		if err != nil {
+			return nil, err
+		}
+
+		pendingProcessedMsgsBatch = append(pendingProcessedMsgsBatch, MsgsToProcessedMsgs(msgs)...)
+		ctx.Logger().Debug("pending tx", zap.Int("index", i), zap.String("tx", pendingTx.String()))
+	}
+	return pendingProcessedMsgsBatch, nil
 }
 
 func (b Broadcaster) GetHeight() int64 {
 	return b.syncedHeight + 1
 }
 
-func (b *Broadcaster) SetSyncHeight(height int64) {
+func (b *Broadcaster) UpdateSyncedHeight(height int64) {
 	b.syncedHeight = height
 }
 
 func (b Broadcaster) KeyName() string {
 	return b.keyName
+}
+
+func MsgsToProcessedMsgs(msgs []sdk.Msg) []btypes.ProcessedMsgs {
+	res := make([]btypes.ProcessedMsgs, 0)
+	for i := 0; i < len(msgs); i += 5 {
+		end := i + 5
+		if end > len(msgs) {
+			end = len(msgs)
+		}
+
+		res = append(res, btypes.ProcessedMsgs{
+			Msgs:      slices.Clone(msgs[i:end]),
+			Timestamp: time.Now().UnixNano(),
+			Save:      true,
+		})
+	}
+	return res
 }

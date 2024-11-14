@@ -1,12 +1,12 @@
 package types
 
 import (
-	"context"
 	"time"
 
 	abcitypes "github.com/cometbft/cometbft/abci/types"
 	cmtproto "github.com/cometbft/cometbft/proto/tendermint/types"
 	comettypes "github.com/cometbft/cometbft/types"
+	"github.com/initia-labs/opinit-bots/types"
 )
 
 type EventHandlerArgs struct {
@@ -17,7 +17,7 @@ type EventHandlerArgs struct {
 	EventAttributes []abcitypes.EventAttribute
 }
 
-type EventHandlerFn func(context.Context, EventHandlerArgs) error
+type EventHandlerFn func(types.Context, EventHandlerArgs) error
 
 type TxHandlerArgs struct {
 	BlockHeight  int64
@@ -28,7 +28,7 @@ type TxHandlerArgs struct {
 	Success      bool
 }
 
-type TxHandlerFn func(context.Context, TxHandlerArgs) error
+type TxHandlerFn func(types.Context, TxHandlerArgs) error
 
 type BeginBlockArgs struct {
 	BlockID      []byte
@@ -36,7 +36,7 @@ type BeginBlockArgs struct {
 	LatestHeight int64
 }
 
-type BeginBlockHandlerFn func(context.Context, BeginBlockArgs) error
+type BeginBlockHandlerFn func(types.Context, BeginBlockArgs) error
 
 type EndBlockArgs struct {
 	BlockID      []byte
@@ -44,7 +44,7 @@ type EndBlockArgs struct {
 	LatestHeight int64
 }
 
-type EndBlockHandlerFn func(context.Context, EndBlockArgs) error
+type EndBlockHandlerFn func(types.Context, EndBlockArgs) error
 
 type RawBlockArgs struct {
 	BlockHeight  int64
@@ -52,4 +52,4 @@ type RawBlockArgs struct {
 	BlockBytes   []byte
 }
 
-type RawBlockHandlerFn func(context.Context, RawBlockArgs) error
+type RawBlockHandlerFn func(types.Context, RawBlockArgs) error

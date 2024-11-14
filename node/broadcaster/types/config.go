@@ -12,8 +12,8 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 )
 
-type BuildTxWithMessagesFn func(context.Context, []sdk.Msg) ([]byte, string, error)
-type PendingTxToProcessedMsgsFn func([]byte) ([]sdk.Msg, error)
+type BuildTxWithMsgsFn func(context.Context, []sdk.Msg) ([]byte, string, error)
+type MsgsFromTxFn func([]byte) ([]sdk.Msg, error)
 
 type BroadcasterConfig struct {
 	// ChainID is the chain ID.
@@ -31,22 +31,20 @@ type BroadcasterConfig struct {
 	// Bech32Prefix is the Bech32 prefix.
 	Bech32Prefix string
 
-	// BuildTxWithMessages is the function to build a transaction with messages.
-	BuildTxWithMessages BuildTxWithMessagesFn
+	BuildTxWithMsgs BuildTxWithMsgsFn
 
-	// PendingTxToProcessedMsgs is the function to convert pending tx to processed messages.
-	PendingTxToProcessedMsgs PendingTxToProcessedMsgsFn
+	MsgsFromTx MsgsFromTxFn
 
 	// HomePath is the path to the keyring.
 	HomePath string
 }
 
-func (bc *BroadcasterConfig) WithPendingTxToProcessedMsgsFn(fn PendingTxToProcessedMsgsFn) {
-	bc.PendingTxToProcessedMsgs = fn
+func (bc *BroadcasterConfig) WithMsgsFromTxFn(fn MsgsFromTxFn) {
+	bc.MsgsFromTx = fn
 }
 
-func (bc *BroadcasterConfig) WithBuildTxWithMessagesFn(fn BuildTxWithMessagesFn) {
-	bc.BuildTxWithMessages = fn
+func (bc *BroadcasterConfig) WithBuildTxWithMsgsFn(fn BuildTxWithMsgsFn) {
+	bc.BuildTxWithMsgs = fn
 }
 
 func (bc BroadcasterConfig) Validate() error {
@@ -63,11 +61,11 @@ func (bc BroadcasterConfig) Validate() error {
 		return fmt.Errorf("bech32 prefix is empty")
 	}
 
-	if bc.BuildTxWithMessages == nil {
+	if bc.BuildTxWithMsgs == nil {
 		return fmt.Errorf("build tx with messages is nil")
 	}
 
-	if bc.PendingTxToProcessedMsgs == nil {
+	if bc.MsgsFromTx == nil {
 		return fmt.Errorf("pending tx to processed msgs is nil")
 	}
 
