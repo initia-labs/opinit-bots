@@ -14,19 +14,17 @@ var _ types.DB = (*LevelDB)(nil)
 
 type LevelDB struct {
 	db     *leveldb.DB
-	path   string
 	prefix []byte
 }
 
-func NewDB(path string) (types.DB, error) {
+func NewDB(path string) (*LevelDB, error) {
 	db, err := leveldb.OpenFile(path, nil)
 	if err != nil {
 		return nil, err
 	}
 
 	return &LevelDB{
-		db:   db,
-		path: path,
+		db: db,
 	}, nil
 }
 
@@ -173,14 +171,17 @@ func (db LevelDB) UnprefixedKey(key []byte) []byte {
 	return bytes.TrimPrefix(key, append(db.prefix, dbtypes.Splitter))
 }
 
-func (db LevelDB) GetPath() string {
-	return db.path
-}
-
 func (db LevelDB) GetPrefix() []byte {
 	splits := bytes.Split(db.prefix, []byte{dbtypes.Splitter})
 	if len(splits) == 0 {
 		return nil
 	}
 	return splits[len(splits)-1]
+}
+
+func (db *LevelDB) NewStage() types.CommitDB {
+	return &Stage{
+		kvmap:  make(map[string][]byte),
+		parent: db,
+	}
 }

@@ -1,41 +1,67 @@
 package db
 
-import "github.com/initia-labs/opinit-bots/types"
+import (
+	dbtypes "github.com/initia-labs/opinit-bots/db/types"
+	"github.com/initia-labs/opinit-bots/types"
+	"github.com/syndtr/goleveldb/leveldb"
+	"golang.org/x/exp/maps"
+)
 
 type Stage struct {
-	batch  []types.RawKV
+	batch  leveldb.Batch
 	kvmap  map[string][]byte
-	parent types.DB
+	parent *LevelDB
 }
 
 var _ types.CommitDB = (*Stage)(nil)
 
 func (s *Stage) Set(key []byte, value []byte) error {
-	s.batch = append(s.batch, types.RawKV{
-		Key:   key,
-		Value: value,
-	})
-	s.kvmap[string(key)] = value
+	prefixedKey := s.parent.PrefixedKey(key)
+	s.batch.Put(prefixedKey, value)
+	s.kvmap[string(prefixedKey)] = value
 	return nil
 }
 
 func (s Stage) Get(key []byte) ([]byte, error) {
-	value := s.kvmap[string(key)]
+	prefixedKey := s.parent.PrefixedKey(key)
+	value := s.kvmap[string(prefixedKey)]
 	if value != nil {
 		return value, nil
 	}
-	return s.parent.Get(key)
+	return s.parent.Get(prefixedKey)
 }
 
 func (s *Stage) Delete(key []byte) error {
-	s.batch = append(s.batch, types.RawKV{
-		Key:   key,
-		Value: nil,
-	})
-	s.kvmap[string(key)] = nil
+	prefixedKey := s.parent.PrefixedKey(key)
+	s.batch.Delete(prefixedKey)
+	s.kvmap[string(prefixedKey)] = nil
 	return nil
 }
 
 func (s *Stage) Commit() error {
-	return s.parent.RawBatchSet(s.batch...)
+	err := s.parent.db.Write(&s.batch, nil)
+	if err != nil {
+		return err
+	}
+	maps.Clear(s.kvmap)
+	return nil
+}
+
+func (s *Stage) ExecuteFnWithDB(db types.DB, fn func() error) error {
+	existing := s.parent
+	defer func() {
+		s.parent = existing
+	}()
+
+	leveldb, ok := db.(*LevelDB)
+	if !ok {
+		return dbtypes.ErrInvalidParentDBType
+	}
+	s.parent = leveldb
+
+	return fn()
+}
+
+func (s *Stage) Reset() {
+	s.batch.Reset()
 }
