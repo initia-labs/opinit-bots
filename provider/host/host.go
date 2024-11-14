@@ -16,6 +16,8 @@ import (
 	btypes "github.com/initia-labs/opinit-bots/node/broadcaster/types"
 	nodetypes "github.com/initia-labs/opinit-bots/node/types"
 	"github.com/initia-labs/opinit-bots/types"
+
+	"github.com/pkg/errors"
 )
 
 type BaseHost struct {
@@ -36,12 +38,12 @@ type BaseHost struct {
 func NewBaseHostV1(cfg nodetypes.NodeConfig, db types.DB) *BaseHost {
 	appCodec, txConfig, err := GetCodec(cfg.Bech32Prefix)
 	if err != nil {
-		panic(err)
+		panic(errors.Wrap(err, "failed to get codec"))
 	}
 
 	node, err := node.NewNode(cfg, db, appCodec, txConfig)
 	if err != nil {
-		panic(err)
+		panic(errors.Wrap(err, "failed to create node"))
 	}
 
 	h := &BaseHost{
@@ -73,7 +75,7 @@ func GetCodec(bech32Prefix string) (codec.Codec, client.TxConfig, error) {
 func (b *BaseHost) Initialize(ctx types.Context, processedHeight int64, bridgeInfo ophosttypes.QueryBridgeResponse, keyringConfig *btypes.KeyringConfig) error {
 	err := b.node.Initialize(ctx, processedHeight, keyringConfig)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to initialize node")
 	}
 	b.SetBridgeInfo(bridgeInfo)
 	return nil

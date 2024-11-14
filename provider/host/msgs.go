@@ -1,12 +1,11 @@
 package host
 
 import (
-	"errors"
-
 	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
 	"github.com/initia-labs/opinit-bots/types"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
+	"github.com/pkg/errors"
 )
 
 func (b BaseHost) GetMsgProposeOutput(
@@ -20,7 +19,7 @@ func (b BaseHost) GetMsgProposeOutput(
 		if errors.Is(err, types.ErrKeyNotSet) {
 			return nil, nil
 		}
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get address")
 	}
 
 	msg := ophosttypes.NewMsgProposeOutput(
@@ -32,7 +31,7 @@ func (b BaseHost) GetMsgProposeOutput(
 	)
 	err = msg.Validate(b.node.AccountCodec())
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "failed to validate msg")
 	}
 	return msg, nil
 }
@@ -43,7 +42,7 @@ func (b BaseHost) CreateBatchMsg(batchBytes []byte) (sdk.Msg, error) {
 		if errors.Is(err, types.ErrKeyNotSet) {
 			return nil, nil
 		}
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get address")
 	}
 
 	msg := ophosttypes.NewMsgRecordBatch(
@@ -53,7 +52,7 @@ func (b BaseHost) CreateBatchMsg(batchBytes []byte) (sdk.Msg, error) {
 	)
 	err = msg.Validate(b.node.AccountCodec())
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "failed to validate msg")
 	}
 	return msg, nil
 }

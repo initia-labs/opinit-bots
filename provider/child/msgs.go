@@ -1,12 +1,12 @@
 package child
 
 import (
-	"errors"
-
 	opchildtypes "github.com/initia-labs/OPinit/x/opchild/types"
 	"github.com/initia-labs/opinit-bots/types"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
+
+	"github.com/pkg/errors"
 )
 
 func (b BaseChild) GetMsgFinalizeTokenDeposit(
@@ -23,7 +23,7 @@ func (b BaseChild) GetMsgFinalizeTokenDeposit(
 		if errors.Is(err, types.ErrKeyNotSet) {
 			return nil, nil
 		}
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get address")
 	}
 
 	msg := opchildtypes.NewMsgFinalizeTokenDeposit(
@@ -38,7 +38,7 @@ func (b BaseChild) GetMsgFinalizeTokenDeposit(
 	)
 	err = msg.Validate(b.node.AccountCodec())
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "failed to validate msg")
 	}
 	return msg, nil
 }
@@ -52,7 +52,7 @@ func (b BaseChild) GetMsgUpdateOracle(
 		if errors.Is(err, types.ErrKeyNotSet) {
 			return nil, nil
 		}
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get address")
 	}
 
 	msg := opchildtypes.NewMsgUpdateOracle(
@@ -62,7 +62,7 @@ func (b BaseChild) GetMsgUpdateOracle(
 	)
 	err = msg.Validate(b.node.AccountCodec())
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "failed to validate msg")
 	}
 	return msg, nil
 }

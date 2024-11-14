@@ -7,6 +7,7 @@ import (
 	"cosmossdk.io/math"
 	abcitypes "github.com/cometbft/cometbft/abci/types"
 	opchildtypes "github.com/initia-labs/OPinit/x/opchild/types"
+	"github.com/pkg/errors"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 )
@@ -43,6 +44,7 @@ func ParseFinalizeDeposit(eventAttrs []abcitypes.EventAttribute) (
 		case opchildtypes.AttributeKeyL1Sequence:
 			l1Sequence, err = strconv.ParseUint(attr.Value, 10, 64)
 			if err != nil {
+				err = errors.Wrap(err, "failed to parse l1 sequence")
 				return
 			}
 		case opchildtypes.AttributeKeySender:
@@ -63,6 +65,7 @@ func ParseFinalizeDeposit(eventAttrs []abcitypes.EventAttribute) (
 		case opchildtypes.AttributeKeyFinalizeHeight:
 			l1BlockHeight, err = strconv.ParseInt(attr.Value, 10, 64)
 			if err != nil {
+				err = errors.Wrap(err, "failed to parse l1 block height")
 				return
 			}
 		default:

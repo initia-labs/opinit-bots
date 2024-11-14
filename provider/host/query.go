@@ -2,7 +2,6 @@ package host
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -15,12 +14,13 @@ import (
 
 	"github.com/initia-labs/opinit-bots/node/rpcclient"
 	"github.com/initia-labs/opinit-bots/types"
+	"github.com/pkg/errors"
 )
 
 func (b BaseHost) GetAddress() (sdk.AccAddress, error) {
 	broadcaster, err := b.node.GetBroadcaster()
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get broadcaster")
 	}
 	return broadcaster.GetAddress(), nil
 }
@@ -28,7 +28,7 @@ func (b BaseHost) GetAddress() (sdk.AccAddress, error) {
 func (b BaseHost) GetAddressStr() (string, error) {
 	broadcaster, err := b.node.GetBroadcaster()
 	if err != nil {
-		return "", err
+		return "", errors.Wrap(err, "failed to get broadcaster")
 	}
 	return broadcaster.GetAddressString()
 }

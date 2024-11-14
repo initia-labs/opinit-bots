@@ -1,6 +1,7 @@
 package keys
 
 import (
+	"cosmossdk.io/errors"
 	"cosmossdk.io/x/tx/signing"
 	"github.com/cosmos/gogoproto/proto"
 
@@ -24,7 +25,7 @@ func CreateCodec(registerFns []RegisterInterfaces) (codec.Codec, client.TxConfig
 		},
 	})
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, errors.Wrap(err, "failed to create interface registry")
 	}
 	appCodec := codec.NewProtoCodec(interfaceRegistry)
 	std.RegisterInterfaces(interfaceRegistry)

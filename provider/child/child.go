@@ -1,8 +1,6 @@
 package child
 
 import (
-	"errors"
-
 	"go.uber.org/zap"
 
 	"github.com/cosmos/cosmos-sdk/client"
@@ -21,6 +19,8 @@ import (
 	btypes "github.com/initia-labs/opinit-bots/node/broadcaster/types"
 	nodetypes "github.com/initia-labs/opinit-bots/node/types"
 	"github.com/initia-labs/opinit-bots/types"
+
+	"github.com/pkg/errors"
 )
 
 type BaseChild struct {
@@ -48,17 +48,17 @@ func NewBaseChildV1(
 ) *BaseChild {
 	appCodec, txConfig, err := GetCodec(cfg.Bech32Prefix)
 	if err != nil {
-		panic(err)
+		panic(errors.Wrap(err, "failed to get codec"))
 	}
 
 	node, err := node.NewNode(cfg, db, appCodec, txConfig)
 	if err != nil {
-		panic(err)
+		panic(errors.Wrap(err, "failed to create node"))
 	}
 
 	mk, err := merkle.NewMerkle(ophosttypes.GenerateNodeHash)
 	if err != nil {
-		panic(err)
+		panic(errors.Wrap(err, "failed to create merkle"))
 	}
 
 	ch := &BaseChild{
@@ -98,18 +98,18 @@ func (b *BaseChild) Initialize(ctx types.Context, processedHeight int64, startOu
 	if b.node.HeightInitialized() {
 		l2Sequence, err = b.QueryNextL2Sequence(ctx, processedHeight)
 		if err != nil {
-			return 0, err
+			return 0, errors.Wrap(err, "failed to query next L2 sequence")
 		}
 
 		err = merkle.DeleteFutureFinalizedTrees(b.DB(), l2Sequence)
 		if err != nil {
-			return 0, err
+			return 0, errors.Wrap(err, "failed to delete future finalized trees")
 		}
 
 		version := types.MustInt64ToUint64(processedHeight)
 		err = merkle.DeleteFutureWorkingTrees(b.DB(), version+1)
 		if err != nil {
-			return 0, err
+			return 0, errors.Wrap(err, "failed to delete future working trees")
 		}
 
 		b.initializeTreeFn = func(blockHeight int64) (bool, error) {
@@ -117,7 +117,7 @@ func (b *BaseChild) Initialize(ctx types.Context, processedHeight int64, startOu
 				ctx.Logger().Info("initialize tree", zap.Uint64("index", startOutputIndex))
 				err := b.mk.InitializeWorkingTree(startOutputIndex, 1)
 				if err != nil {
-					return false, err
+					return false, errors.Wrap(err, "failed to initialize working tree")
 				}
 				return true, nil
 			}

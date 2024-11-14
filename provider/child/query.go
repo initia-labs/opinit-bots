@@ -8,12 +8,13 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 
 	"github.com/initia-labs/opinit-bots/node/rpcclient"
+	"github.com/pkg/errors"
 )
 
 func (b BaseChild) GetAddress() (sdk.AccAddress, error) {
 	broadcaster, err := b.node.GetBroadcaster()
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get broadcaster")
 	}
 	return broadcaster.GetAddress(), nil
 }
@@ -21,7 +22,7 @@ func (b BaseChild) GetAddress() (sdk.AccAddress, error) {
 func (b BaseChild) GetAddressStr() (string, error) {
 	broadcaster, err := b.node.GetBroadcaster()
 	if err != nil {
-		return "", err
+		return "", errors.Wrap(err, "failed to get broadcaster")
 	}
 	return broadcaster.GetAddressString()
 }

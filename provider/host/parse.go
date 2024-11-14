@@ -7,6 +7,7 @@ import (
 
 	abcitypes "github.com/cometbft/cometbft/abci/types"
 	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
+	"github.com/pkg/errors"
 )
 
 func missingAttrsError(missingAttrs map[string]struct{}) error {
@@ -58,6 +59,7 @@ func ParseMsgUpdateBatchInfo(eventAttrs []abcitypes.EventAttribute) (
 		case ophosttypes.AttributeKeyBridgeId:
 			bridgeId, err = strconv.ParseUint(attr.Value, 10, 64)
 			if err != nil {
+				err = errors.Wrap(err, "failed to parse bridge id")
 				return
 			}
 		case ophosttypes.AttributeKeyBatchChainType:
@@ -67,11 +69,13 @@ func ParseMsgUpdateBatchInfo(eventAttrs []abcitypes.EventAttribute) (
 		case ophosttypes.AttributeKeyFinalizedOutputIndex:
 			outputIndex, err = strconv.ParseUint(attr.Value, 10, 64)
 			if err != nil {
+				err = errors.Wrap(err, "failed to parse output index")
 				return
 			}
 		case ophosttypes.AttributeKeyFinalizedL2BlockNumber:
 			l2BlockNumber, err = strconv.ParseInt(attr.Value, 10, 64)
 			if err != nil {
+				err = errors.Wrap(err, "failed to parse l2 block number")
 				return
 			}
 		default:
@@ -103,11 +107,13 @@ func ParseMsgInitiateDeposit(eventAttrs []abcitypes.EventAttribute) (
 		case ophosttypes.AttributeKeyBridgeId:
 			bridgeId, err = strconv.ParseUint(attr.Value, 10, 64)
 			if err != nil {
+				err = errors.Wrap(err, "failed to parse bridge id")
 				return
 			}
 		case ophosttypes.AttributeKeyL1Sequence:
 			l1Sequence, err = strconv.ParseUint(attr.Value, 10, 64)
 			if err != nil {
+				err = errors.Wrap(err, "failed to parse l1 sequence")
 				return
 			}
 		case ophosttypes.AttributeKeyFrom:
@@ -156,21 +162,25 @@ func ParseMsgProposeOutput(eventAttrs []abcitypes.EventAttribute) (
 		case ophosttypes.AttributeKeyBridgeId:
 			bridgeId, err = strconv.ParseUint(attr.Value, 10, 64)
 			if err != nil {
+				err = errors.Wrap(err, "failed to parse bridge id")
 				return
 			}
 		case ophosttypes.AttributeKeyOutputIndex:
 			outputIndex, err = strconv.ParseUint(attr.Value, 10, 64)
 			if err != nil {
+				err = errors.Wrap(err, "failed to parse output index")
 				return
 			}
 		case ophosttypes.AttributeKeyL2BlockNumber:
 			l2BlockNumber, err = strconv.ParseInt(attr.Value, 10, 64)
 			if err != nil {
+				err = errors.Wrap(err, "failed to parse l2 block number")
 				return
 			}
 		case ophosttypes.AttributeKeyOutputRoot:
 			outputRoot, err = hex.DecodeString(attr.Value)
 			if err != nil {
+				err = errors.Wrap(err, "failed to decode output root")
 				return
 			}
 		default:
@@ -202,16 +212,19 @@ func ParseMsgFinalizeWithdrawal(eventAttrs []abcitypes.EventAttribute) (
 		case ophosttypes.AttributeKeyBridgeId:
 			bridgeId, err = strconv.ParseUint(attr.Value, 10, 64)
 			if err != nil {
+				err = errors.Wrap(err, "failed to parse bridge id")
 				return
 			}
 		case ophosttypes.AttributeKeyOutputIndex:
 			outputIndex, err = strconv.ParseUint(attr.Value, 10, 64)
 			if err != nil {
+				err = errors.Wrap(err, "failed to parse output index")
 				return
 			}
 		case ophosttypes.AttributeKeyL2Sequence:
 			l2Sequence, err = strconv.ParseUint(attr.Value, 10, 64)
 			if err != nil {
+				err = errors.Wrap(err, "failed to parse l2 sequence")
 				return
 			}
 		case ophosttypes.AttributeKeyFrom:
