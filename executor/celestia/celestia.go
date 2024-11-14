@@ -2,7 +2,6 @@ package celestia
 
 import (
 	"crypto/sha256"
-	"errors"
 
 	"github.com/cometbft/cometbft/crypto/merkle"
 
@@ -21,6 +20,8 @@ import (
 	nodetypes "github.com/initia-labs/opinit-bots/node/types"
 	"github.com/initia-labs/opinit-bots/types"
 	celestiatypes "github.com/initia-labs/opinit-bots/types/celestia"
+
+	"github.com/pkg/errors"
 )
 
 type batchNode interface {
@@ -59,7 +60,7 @@ func NewDACelestia(version uint8, cfg nodetypes.NodeConfig, db types.DB) *Celest
 
 	appCodec, txConfig, err := createCodec(cfg.Bech32Prefix)
 	if err != nil {
-		panic(err)
+		panic(errors.Wrap(err, "failed to create codec"))
 	}
 
 	if cfg.BroadcasterConfig != nil {
@@ -69,7 +70,7 @@ func NewDACelestia(version uint8, cfg nodetypes.NodeConfig, db types.DB) *Celest
 
 	node, err := node.NewNode(cfg, db, appCodec, txConfig)
 	if err != nil {
-		panic(err)
+		panic(errors.Wrap(err, "failed to create node"))
 	}
 
 	c.node = node
@@ -89,14 +90,14 @@ func createCodec(bech32Prefix string) (codec.Codec, client.TxConfig, error) {
 func (c *Celestia) Initialize(ctx types.Context, batch batchNode, bridgeId uint64, keyringConfig *btypes.KeyringConfig) error {
 	err := c.node.Initialize(ctx, 0, keyringConfig)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to initialize node")
 	}
 
 	c.batch = batch
 	c.bridgeId = bridgeId
 	c.namespace, err = sh.NewV0Namespace(c.NamespaceID())
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to create namespace")
 	}
 	return nil
 }
@@ -150,11 +151,11 @@ func (c Celestia) CreateBatchMsg(rawBlob []byte) (sdk.Msg, error) {
 		if errors.Is(err, types.ErrKeyNotSet) {
 			return nil, nil
 		}
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get address")
 	}
 	blob, err := sh.NewV0Blob(c.namespace, rawBlob)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "failed to create blob")
 	}
 	commitment, err := inclusion.CreateCommitment(blob,
 		merkle.HashFromByteSlices,
@@ -162,12 +163,12 @@ func (c Celestia) CreateBatchMsg(rawBlob []byte) (sdk.Msg, error) {
 		64,
 	)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "failed to create commitment")
 	}
 
 	dataLength, err := types.SafeIntToUint32(len(blob.Data()))
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "failed to convert data length")
 	}
 
 	return &celestiatypes.MsgPayForBlobsWithBlob{

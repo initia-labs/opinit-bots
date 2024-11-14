@@ -3,7 +3,6 @@ package batch
 import (
 	"compress/gzip"
 	"context"
-	"errors"
 	"os"
 	"sync"
 
@@ -18,6 +17,7 @@ import (
 	nodetypes "github.com/initia-labs/opinit-bots/node/types"
 	childprovider "github.com/initia-labs/opinit-bots/provider/child"
 	"github.com/initia-labs/opinit-bots/types"
+	"github.com/pkg/errors"
 )
 
 type hostNode interface {
@@ -69,7 +69,7 @@ func NewBatchSubmitterV1(
 	cfg.ProcessType = nodetypes.PROCESS_TYPE_RAW
 	node, err := node.NewNode(cfg, db, appCodec, txConfig)
 	if err != nil {
-		panic(err)
+		panic(errors.Wrap(err, "failed to create node"))
 	}
 
 	ch := &BatchSubmitter{
@@ -96,14 +96,14 @@ func NewBatchSubmitterV1(
 func (bs *BatchSubmitter) Initialize(ctx types.Context, processedHeight int64, host hostNode, bridgeInfo ophosttypes.QueryBridgeResponse) error {
 	err := bs.node.Initialize(ctx, processedHeight, nil)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to initialize node")
 	}
 	bs.host = host
 	bs.bridgeInfo = bridgeInfo
 
 	res, err := bs.host.QueryBatchInfos(ctx, bridgeInfo.BridgeId)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to query batch infos")
 	}
 	bs.batchInfos = res.BatchInfos
 	if len(bs.batchInfos) == 0 {
@@ -119,7 +119,7 @@ func (bs *BatchSubmitter) Initialize(ctx types.Context, processedHeight int64, h
 	fileFlag := os.O_CREATE | os.O_RDWR | os.O_APPEND
 	bs.batchFile, err = os.OpenFile(ctx.HomePath()+"/batch", fileFlag, 0640)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to open batch file")
 	}
 
 	if bs.node.HeightInitialized() {
@@ -129,22 +129,22 @@ func (bs *BatchSubmitter) Initialize(ctx types.Context, processedHeight int64, h
 
 		err = SaveLocalBatchInfo(bs.DB(), *bs.localBatchInfo)
 		if err != nil {
-			return err
+			return errors.Wrap(err, "failed to save local batch info")
 		}
 		// reset batch file
 		err := bs.batchFile.Truncate(0)
 		if err != nil {
-			return err
+			return errors.Wrap(err, "failed to truncate batch file")
 		}
 		_, err = bs.batchFile.Seek(0, 0)
 		if err != nil {
-			return err
+			return errors.Wrap(err, "failed to seek batch file")
 		}
 	}
 	// linux command gzip use level 6 as default
 	bs.batchWriter, err = gzip.NewWriterLevel(bs.batchFile, 6)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to create gzip writer")
 	}
 
 	bs.node.RegisterRawBlockHandler(bs.rawBlockHandler)

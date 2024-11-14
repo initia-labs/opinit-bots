@@ -16,7 +16,7 @@ func (ex *Executor) RegisterQuerier() {
 		}
 		sequence, err := strconv.ParseUint(sequenceStr, 10, 64)
 		if err != nil {
-			return err
+			return errors.Wrap(err, "failed to parse sequence")
 		}
 		res, err := ex.child.QueryWithdrawal(sequence)
 		if err != nil {
@@ -34,7 +34,7 @@ func (ex *Executor) RegisterQuerier() {
 		offset := c.QueryInt("offset", 0)
 		uoffset, err := types.SafeInt64ToUint64(int64(offset))
 		if err != nil {
-			return err
+			return errors.Wrap(err, "failed to convert offset")
 		}
 
 		limit := c.QueryInt("limit", 10)
@@ -44,7 +44,7 @@ func (ex *Executor) RegisterQuerier() {
 
 		ulimit, err := types.SafeInt64ToUint64(int64(limit))
 		if err != nil {
-			return err
+			return errors.Wrap(err, "failed to convert limit")
 		}
 
 		descOrder := true

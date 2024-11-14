@@ -6,13 +6,14 @@ import (
 	nodetypes "github.com/initia-labs/opinit-bots/node/types"
 	hostprovider "github.com/initia-labs/opinit-bots/provider/host"
 	"github.com/initia-labs/opinit-bots/types"
+	"github.com/pkg/errors"
 	"go.uber.org/zap"
 )
 
 func (h *Host) proposeOutputHandler(ctx types.Context, args nodetypes.EventHandlerArgs) error {
 	bridgeId, l2BlockNumber, outputIndex, proposer, outputRoot, err := hostprovider.ParseMsgProposeOutput(args.EventAttributes)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to parse propose output event")
 	}
 	if bridgeId != h.BridgeId() {
 		// pass other bridge output proposal event
@@ -34,7 +35,7 @@ func (h *Host) proposeOutputHandler(ctx types.Context, args nodetypes.EventHandl
 func (h *Host) finalizeWithdrawalHandler(ctx types.Context, args nodetypes.EventHandlerArgs) error {
 	bridgeId, outputIndex, l2Sequence, from, to, l1Denom, l2Denom, amount, err := hostprovider.ParseMsgFinalizeWithdrawal(args.EventAttributes)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to parse finalize withdrawal event")
 	}
 	if bridgeId != h.BridgeId() {
 		// pass other bridge withdrawal event

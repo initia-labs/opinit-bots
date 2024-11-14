@@ -1,6 +1,10 @@
 package types
 
-import "encoding/json"
+import (
+	"encoding/json"
+
+	"github.com/pkg/errors"
+)
 
 type TreeInfo struct {
 	// Index of the tree used as prefix for the keys
@@ -19,12 +23,38 @@ type TreeInfo struct {
 	Done bool `json:"done"`
 }
 
+func NewTreeInfo(index uint64, leafCount uint64, startLeafIndex uint64, lastSiblings map[uint8][]byte, done bool) TreeInfo {
+	return TreeInfo{
+		Index:          index,
+		LeafCount:      leafCount,
+		StartLeafIndex: startLeafIndex,
+		LastSiblings:   lastSiblings,
+		Done:           done,
+	}
+}
+
 func (t TreeInfo) Key() []byte {
 	return PrefixedWorkingTreeKey(t.Index)
 }
 
 func (t TreeInfo) Value() ([]byte, error) {
-	return json.Marshal(t)
+	return t.Marshal()
+}
+
+func (t TreeInfo) Marshal() ([]byte, error) {
+	bz, err := json.Marshal(&t)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to marshal tree info")
+	}
+	return bz, nil
+}
+
+func (t *TreeInfo) Unmarshal(data []byte) error {
+	err := json.Unmarshal(data, t)
+	if err != nil {
+		return errors.Wrap(err, "failed to unmarshal tree info")
+	}
+	return nil
 }
 
 type FinalizedTreeInfo struct {
@@ -40,12 +70,39 @@ type FinalizedTreeInfo struct {
 	ExtraData      []byte `json:"extra_data,omitempty"`
 }
 
+func NewFinalizedTreeInfo(treeIndex uint64, treeHeight uint8, root []byte, startLeafIndex uint64, leafCount uint64, extraData []byte) FinalizedTreeInfo {
+	return FinalizedTreeInfo{
+		TreeIndex:      treeIndex,
+		TreeHeight:     treeHeight,
+		Root:           root,
+		StartLeafIndex: startLeafIndex,
+		LeafCount:      leafCount,
+		ExtraData:      extraData,
+	}
+}
+
 func (f FinalizedTreeInfo) Key() []byte {
 	return PrefixedFinalizedTreeKey(f.StartLeafIndex)
 }
 
 func (f FinalizedTreeInfo) Value() ([]byte, error) {
-	return json.Marshal(f)
+	return f.Marshal()
+}
+
+func (f FinalizedTreeInfo) Marshal() ([]byte, error) {
+	bz, err := json.Marshal(&f)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to marshal finalized tree info")
+	}
+	return bz, nil
+}
+
+func (f *FinalizedTreeInfo) Unmarshal(data []byte) error {
+	err := json.Unmarshal(data, f)
+	if err != nil {
+		return errors.Wrap(err, "failed to unmarshal finalized tree info")
+	}
+	return nil
 }
 
 type Node struct {
@@ -56,6 +113,15 @@ type Node struct {
 	// LocalNodeIndex is the index of the node at the given height
 	LocalNodeIndex uint64 `json:"local_node_index"`
 	Data           []byte `json:"data"`
+}
+
+func NewNode(treeIndex uint64, height uint8, localNodeIndex uint64, data []byte) Node {
+	return Node{
+		TreeIndex:      treeIndex,
+		Height:         height,
+		LocalNodeIndex: localNodeIndex,
+		Data:           data,
+	}
 }
 
 func (n Node) Key() []byte {

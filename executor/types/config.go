@@ -1,11 +1,11 @@
 package types
 
 import (
-	"errors"
 	"time"
 
 	btypes "github.com/initia-labs/opinit-bots/node/broadcaster/types"
 	nodetypes "github.com/initia-labs/opinit-bots/node/types"
+	"github.com/pkg/errors"
 )
 
 type NodeConfig struct {
@@ -143,15 +143,15 @@ func (cfg Config) Validate() error {
 	}
 
 	if err := cfg.L1Node.Validate(); err != nil {
-		return err
+		return errors.Wrap(err, "l1 node validation error")
 	}
 
 	if err := cfg.L2Node.Validate(); err != nil {
-		return err
+		return errors.Wrap(err, "l2 node validation error")
 	}
 
 	if err := cfg.DANode.Validate(); err != nil {
-		return err
+		return errors.Wrap(err, "da node validation error")
 	}
 
 	if cfg.MaxChunks <= 0 {

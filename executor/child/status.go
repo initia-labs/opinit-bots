@@ -1,10 +1,10 @@
 package child
 
 import (
-	"errors"
 	"time"
 
 	nodetypes "github.com/initia-labs/opinit-bots/node/types"
+	"github.com/pkg/errors"
 )
 
 type Status struct {
@@ -28,7 +28,7 @@ func (ch Child) GetStatus() (Status, error) {
 
 	workingTree, err := ch.GetWorkingTree()
 	if err != nil {
-		return Status{}, err
+		return Status{}, errors.Wrap(err, "failed to get working tree")
 	}
 
 	return Status{

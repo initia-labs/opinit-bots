@@ -43,7 +43,7 @@ func (bs *BatchSubmitter) rawBlockHandler(ctx types.Context, args nodetypes.RawB
 
 	blockBytes, err := bs.emptyOracleData(pbb)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to empty oracle data")
 	}
 
 	_, err = bs.handleBatch(blockBytes)
@@ -59,7 +59,7 @@ func (bs *BatchSubmitter) rawBlockHandler(ctx types.Context, args nodetypes.RawB
 	// store the processed state into db with batch operation
 	err = node.SetSyncedHeight(bs.stage, args.BlockHeight)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to set synced height")
 	}
 	if bs.da.HasBroadcaster() {
 		// save processed msgs to stage using host db
@@ -67,17 +67,17 @@ func (bs *BatchSubmitter) rawBlockHandler(ctx types.Context, args nodetypes.RawB
 			return broadcaster.SaveProcessedMsgsBatch(bs.stage, bs.da.Codec(), bs.processedMsgs)
 		})
 		if err != nil {
-			return err
+			return errors.Wrap(err, "failed to save processed msgs")
 		}
 	}
 	err = SaveLocalBatchInfo(bs.stage, *bs.localBatchInfo)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to save local batch info")
 	}
 
 	err = bs.stage.Commit()
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to commit stage")
 	}
 	// broadcast processed messages
 	bs.da.BroadcastProcessedMsgs(bs.processedMsgs...)
@@ -87,7 +87,7 @@ func (bs *BatchSubmitter) rawBlockHandler(ctx types.Context, args nodetypes.RawB
 func (bs *BatchSubmitter) prepareBatch(blockHeight int64) error {
 	localBatchInfo, err := GetLocalBatchInfo(bs.DB())
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to get local batch info")
 	}
 	bs.localBatchInfo = &localBatchInfo
 
@@ -115,12 +115,12 @@ func (bs *BatchSubmitter) prepareBatch(blockHeight int64) error {
 		bs.localBatchInfo.BatchFileSize = 0
 		err = SaveLocalBatchInfo(bs.DB(), *bs.localBatchInfo)
 		if err != nil {
-			return err
+			return errors.Wrap(err, "failed to save local batch info")
 		}
 		// set last processed block height to l2 block number
 		err = node.SetSyncedHeight(bs.DB(), types.MustUint64ToInt64(nextBatchInfo.Output.L2BlockNumber))
 		if err != nil {
-			return err
+			return errors.Wrap(err, "failed to set synced height")
 		}
 		bs.DequeueBatchInfo()
 
@@ -132,11 +132,11 @@ func (bs *BatchSubmitter) prepareBatch(blockHeight int64) error {
 		// reset batch file
 		err := bs.batchFile.Truncate(0)
 		if err != nil {
-			return err
+			return errors.Wrap(err, "failed to truncate batch file")
 		}
 		_, err = bs.batchFile.Seek(0, 0)
 		if err != nil {
-			return err
+			return errors.Wrap(err, "failed to seek batch file")
 		}
 
 		bs.localBatchInfo.BatchFileSize = 0
@@ -170,7 +170,7 @@ func (bs *BatchSubmitter) finalizeBatch(ctx types.Context, blockHeight int64) er
 	}
 	fileSize, err := bs.batchFileSize(false)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to get batch file size")
 	}
 	bs.localBatchInfo.BatchFileSize = fileSize
 
@@ -182,7 +182,7 @@ func (bs *BatchSubmitter) finalizeBatch(ctx types.Context, blockHeight int64) er
 	for offset := int64(0); ; {
 		readLength, err := bs.batchFile.ReadAt(batchBuffer, offset)
 		if err != nil && err != io.EOF {
-			return err
+			return errors.Wrap(err, "failed to read batch file")
 		} else if readLength == 0 {
 			break
 		}
@@ -207,7 +207,7 @@ func (bs *BatchSubmitter) finalizeBatch(ctx types.Context, blockHeight int64) er
 
 	msg, err := bs.da.CreateBatchMsg(headerData)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to create batch msg")
 	} else if msg != nil {
 		bs.processedMsgs = append(bs.processedMsgs, btypes.ProcessedMsgs{
 			Msgs:      []sdk.Msg{msg},
@@ -226,7 +226,7 @@ func (bs *BatchSubmitter) finalizeBatch(ctx types.Context, blockHeight int64) er
 		)
 		msg, err := bs.da.CreateBatchMsg(chunkData)
 		if err != nil {
-			return err
+			return errors.Wrap(err, "failed to create batch msg")
 		} else if msg != nil {
 			bs.processedMsgs = append(bs.processedMsgs, btypes.ProcessedMsgs{
 				Msgs:      []sdk.Msg{msg},
@@ -250,7 +250,7 @@ func (bs *BatchSubmitter) finalizeBatch(ctx types.Context, blockHeight int64) er
 func (bs *BatchSubmitter) checkBatch(ctx types.Context, blockHeight int64, latestHeight int64, blockTime time.Time) error {
 	fileSize, err := bs.batchFileSize(true)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to get batch file size")
 	}
 
 	bs.localBatchInfo.BatchFileSize = fileSize

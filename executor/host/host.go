@@ -14,6 +14,8 @@ import (
 	"github.com/initia-labs/opinit-bots/types"
 
 	hostprovider "github.com/initia-labs/opinit-bots/provider/host"
+
+	"github.com/pkg/errors"
 )
 
 type childNode interface {
@@ -60,13 +62,13 @@ func NewHostV1(cfg nodetypes.NodeConfig, db types.DB) *Host {
 func (h *Host) Initialize(ctx types.Context, processedHeight int64, child childNode, batch batchNode, bridgeInfo ophosttypes.QueryBridgeResponse, keyringConfig *btypes.KeyringConfig) error {
 	err := h.BaseHost.Initialize(ctx, processedHeight, bridgeInfo, keyringConfig)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to initialize base host")
 	}
 	h.child = child
 	h.batch = batch
 	h.initialL1Sequence, err = h.child.QueryNextL1Sequence(ctx, 0)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to query next L1 sequence")
 	}
 	h.registerHandlers()
 	return nil
@@ -75,7 +77,7 @@ func (h *Host) Initialize(ctx types.Context, processedHeight int64, child childN
 func (h *Host) InitializeDA(ctx types.Context, bridgeInfo ophosttypes.QueryBridgeResponse, keyringConfig *btypes.KeyringConfig) error {
 	err := h.BaseHost.Initialize(ctx, 0, bridgeInfo, keyringConfig)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to initialize base DA host")
 	}
 	h.registerDAHandlers()
 	return nil

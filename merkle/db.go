@@ -7,11 +7,17 @@ import (
 	dbtypes "github.com/initia-labs/opinit-bots/db/types"
 	merkletypes "github.com/initia-labs/opinit-bots/merkle/types"
 	types "github.com/initia-labs/opinit-bots/types"
+
+	"github.com/pkg/errors"
 )
 
 func DeleteFutureFinalizedTrees(db types.DB, fromSequence uint64) error {
-	return db.Iterate(dbtypes.AppendSplitter(merkletypes.FinalizedTreeKey), nil, func(key, _ []byte) (bool, error) {
-		sequence := dbtypes.ToUint64Key(key[len(key)-8:])
+	return db.Iterate(dbtypes.AppendSplitter(merkletypes.FinalizedTreePrefix), nil, func(key, _ []byte) (bool, error) {
+		sequence, err := merkletypes.ParseFinalizedTreeKey(key)
+		if err != nil {
+			return true, err
+		}
+
 		if sequence >= fromSequence {
 			err := db.Delete(key)
 			if err != nil {
@@ -23,8 +29,12 @@ func DeleteFutureFinalizedTrees(db types.DB, fromSequence uint64) error {
 }
 
 func DeleteFutureWorkingTrees(db types.DB, fromVersion uint64) error {
-	return db.Iterate(dbtypes.AppendSplitter(merkletypes.WorkingTreeKey), nil, func(key, _ []byte) (bool, error) {
-		version := dbtypes.ToUint64Key(key[len(key)-8:])
+	return db.Iterate(dbtypes.AppendSplitter(merkletypes.WorkingTreePrefix), nil, func(key, _ []byte) (bool, error) {
+		version, err := merkletypes.ParseWorkingTreeKey(key)
+		if err != nil {
+			return true, err
+		}
+
 		if version >= fromVersion {
 			err := db.Delete(key)
 			if err != nil {
@@ -78,19 +88,19 @@ func GetNode(db types.BasicDB, treeIndex uint64, height uint8, localNodeIndex ui
 
 // GetProofs returns the proofs for the leaf with the given index.
 func GetProofs(db types.DB, leafIndex uint64) (proofs [][]byte, treeIndex uint64, rootData []byte, extraData []byte, err error) {
-	_, value, err := db.SeekPrevInclusiveKey(merkletypes.FinalizedTreeKey, merkletypes.PrefixedFinalizedTreeKey(leafIndex))
+	_, value, err := db.SeekPrevInclusiveKey(merkletypes.FinalizedTreePrefix, merkletypes.PrefixedFinalizedTreeKey(leafIndex))
 	if err != nil {
-		return nil, 0, nil, nil, err
+		return nil, 0, nil, nil, errors.Wrap(err, "failed to get finalized tree info")
 	}
 
-	var treeInfo merkletypes.FinalizedTreeInfo
-	if err := json.Unmarshal(value, &treeInfo); err != nil {
+	treeInfo := merkletypes.FinalizedTreeInfo{}
+	if err := treeInfo.Unmarshal(value); err != nil {
 		return nil, 0, nil, nil, err
 	}
 
 	// Check if the leaf index is in the tree
 	if leafIndex < treeInfo.StartLeafIndex || leafIndex-treeInfo.StartLeafIndex >= treeInfo.LeafCount {
-		return nil, 0, nil, nil, fmt.Errorf("leaf (`%d`) is not found in tree (`%d`)", leafIndex, treeInfo.TreeIndex)
+		return nil, 0, nil, nil, fmt.Errorf("leaf index %d is not found in tree index %d", leafIndex, treeInfo.TreeIndex)
 	}
 
 	height := uint8(0)
@@ -99,7 +109,7 @@ func GetProofs(db types.DB, leafIndex uint64) (proofs [][]byte, treeIndex uint64
 		siblingIndex := localNodeIndex ^ 1 // flip the last bit to find the sibling
 		sibling, err := GetNode(db, treeInfo.TreeIndex, height, siblingIndex)
 		if err != nil {
-			return nil, 0, nil, nil, err
+			return nil, 0, nil, nil, errors.Wrap(err, "failed to get sibling node from db")
 		}
 
 		// append the sibling to the proofs

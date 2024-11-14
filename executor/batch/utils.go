@@ -10,6 +10,7 @@ import (
 
 	opchildtypes "github.com/initia-labs/OPinit/x/opchild/types"
 	"github.com/initia-labs/opinit-bots/txutils"
+	"github.com/pkg/errors"
 )
 
 // prependLength prepends the length of the data to the data.
@@ -39,11 +40,11 @@ func (bs *BatchSubmitter) emptyOracleData(pbb *cmtproto.Block) ([]byte, error) {
 			msg.Data = []byte{}
 			tx, err := txutils.ChangeMsgsFromTx(txConfig, tx, []sdk.Msg{msg})
 			if err != nil {
-				return nil, err
+				return nil, errors.Wrap(err, "failed to change msgs from tx")
 			}
 			convertedTxBytes, err := txutils.EncodeTx(txConfig, tx)
 			if err != nil {
-				return nil, err
+				return nil, errors.Wrap(err, "failed to encode tx")
 			}
 			pbb.Data.Txs[i] = convertedTxBytes
 		}
@@ -52,7 +53,7 @@ func (bs *BatchSubmitter) emptyOracleData(pbb *cmtproto.Block) ([]byte, error) {
 	// convert block to bytes
 	blockBytes, err := proto.Marshal(pbb)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "failed to marshal block")
 	}
 	return blockBytes, nil
 }

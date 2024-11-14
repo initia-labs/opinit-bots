@@ -3,7 +3,6 @@ package child
 import (
 	"context"
 	"encoding/base64"
-	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -11,6 +10,7 @@ import (
 	executortypes "github.com/initia-labs/opinit-bots/executor/types"
 	"github.com/initia-labs/opinit-bots/merkle"
 	"github.com/initia-labs/opinit-bots/types"
+	"github.com/pkg/errors"
 	"go.uber.org/zap"
 
 	cmtproto "github.com/cometbft/cometbft/proto/tendermint/types"
@@ -22,36 +22,33 @@ import (
 func (ch *Child) initiateWithdrawalHandler(ctx types.Context, args nodetypes.EventHandlerArgs) error {
 	l2Sequence, amount, from, to, baseDenom, err := childprovider.ParseInitiateWithdrawal(args.EventAttributes)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to parse initiate withdrawal event")
 	}
-	return ch.handleInitiateWithdrawal(ctx, l2Sequence, from, to, baseDenom, amount)
+	err = ch.handleInitiateWithdrawal(ctx, l2Sequence, from, to, baseDenom, amount)
+	if err != nil {
+		return errors.Wrap(err, "failed to handle initiate withdrawal")
+	}
+	return nil
 }
 
 func (ch *Child) handleInitiateWithdrawal(ctx types.Context, l2Sequence uint64, from string, to string, baseDenom string, amount uint64) error {
 	withdrawalHash := ophosttypes.GenerateWithdrawalHash(ch.BridgeId(), l2Sequence, from, to, baseDenom, amount)
-	data := executortypes.WithdrawalData{
-		Sequence:       l2Sequence,
-		From:           from,
-		To:             to,
-		Amount:         amount,
-		BaseDenom:      baseDenom,
-		WithdrawalHash: withdrawalHash[:],
-	}
+	data := executortypes.NewWithdrawalData(l2Sequence, from, to, amount, baseDenom, withdrawalHash[:])
 
 	// store to database
 	err := ch.SaveWithdrawal(l2Sequence, data)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to save withdrawal data")
 	}
 
 	// generate merkle tree
 	newNodes, err := ch.Merkle().InsertLeaf(withdrawalHash[:])
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to insert leaf to merkle tree")
 	}
 	err = merkle.SaveNodes(ch.stage, newNodes...)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to save new tree nodes")
 	}
 
 	ctx.Logger().Info("initiate token withdrawal",
@@ -72,15 +69,16 @@ func (ch *Child) prepareTree(blockHeight int64) error {
 	}
 
 	workingTree, err := merkle.GetWorkingTree(ch.DB(), types.MustInt64ToUint64(blockHeight)-1)
-	if err != nil {
-		return err
-	}
-	err = ch.Merkle().LoadWorkingTree(workingTree)
 	if err == dbtypes.ErrNotFound {
 		// must not happened
 		panic(fmt.Errorf("working tree not found at height: %d, current: %d", blockHeight-1, blockHeight))
 	} else if err != nil {
-		return err
+		return errors.Wrap(err, "failed to get working tree")
+	}
+
+	err = ch.Merkle().LoadWorkingTree(workingTree)
+	if err != nil {
+		return errors.Wrap(err, "failed to load working tree")
 	}
 
 	return nil
@@ -89,7 +87,7 @@ func (ch *Child) prepareTree(blockHeight int64) error {
 func (ch *Child) prepareOutput(ctx context.Context) error {
 	workingTree, err := ch.GetWorkingTree()
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to get working tree")
 	}
 
 	// initialize next output time
@@ -108,7 +106,7 @@ func (ch *Child) prepareOutput(ctx context.Context) error {
 		if strings.Contains(err.Error(), "collections: not found") {
 			return nil
 		}
-		return err
+		return errors.Wrap(err, "failed to query output")
 	} else {
 		// we are syncing
 		ch.finalizingBlockHeight = types.MustUint64ToInt64(output.OutputProposal.L2BlockNumber)
@@ -129,32 +127,30 @@ func (ch *Child) handleTree(ctx types.Context, blockHeight int64, latestHeight i
 			blockHeight == latestHeight &&
 			blockHeader.Time.After(ch.nextOutputTime)) {
 
-		data, err := json.Marshal(executortypes.TreeExtraData{
-			BlockNumber: blockHeight,
-			BlockHash:   blockId,
-		})
+		treeExtraData := executortypes.NewTreeExtraData(blockHeight, blockId)
+		data, err := treeExtraData.Marshal()
 		if err != nil {
 			return nil, err
 		}
 
 		finalizedTree, newNodes, treeRootHash, err := ch.Merkle().FinalizeWorkingTree(data)
 		if err != nil {
-			return nil, err
+			return nil, errors.Wrap(err, "failed to finalize working tree")
 		}
 
 		err = merkle.SaveFinalizedTree(ch.stage, finalizedTree)
 		if err != nil {
-			return nil, err
+			return nil, errors.Wrap(err, "failed to save finalized tree")
 		}
 
 		err = merkle.SaveNodes(ch.stage, newNodes...)
 		if err != nil {
-			return nil, err
+			return nil, errors.Wrap(err, "failed to save new nodes of finalized tree")
 		}
 
 		workingTree, err := ch.GetWorkingTree()
 		if err != nil {
-			return nil, err
+			return nil, errors.Wrap(err, "failed to get working tree")
 		}
 
 		ctx.Logger().Info("finalize working tree",
@@ -177,12 +173,12 @@ func (ch *Child) handleTree(ctx types.Context, blockHeight int64, latestHeight i
 
 	workingTree, err := ch.Merkle().GetWorkingTree()
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get working tree")
 	}
 
 	err = merkle.SaveWorkingTree(ch.stage, workingTree)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "failed to save working tree")
 	}
 
 	return storageRoot, nil
@@ -197,7 +193,7 @@ func (ch *Child) handleOutput(blockHeight int64, version uint8, blockId []byte, 
 		outputRoot[:],
 	)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to get msg propose output")
 	} else if msg != nil {
 		ch.AppendMsgQueue(msg)
 	}
@@ -208,10 +204,10 @@ func (ch *Child) handleOutput(blockHeight int64, version uint8, blockId []byte, 
 func (ch *Child) GetWithdrawal(sequence uint64) (executortypes.WithdrawalData, error) {
 	dataBytes, err := ch.DB().Get(executortypes.PrefixedWithdrawalSequence(sequence))
 	if err != nil {
-		return executortypes.WithdrawalData{}, err
+		return executortypes.WithdrawalData{}, errors.Wrap(err, "failed to get withdrawal data from db")
 	}
-	var data executortypes.WithdrawalData
-	err = json.Unmarshal(dataBytes, &data)
+	data := executortypes.WithdrawalData{}
+	err = data.Unmarshal(dataBytes)
 	return data, err
 }
 
@@ -224,7 +220,7 @@ func (ch *Child) GetSequencesByAddress(address string, offset uint64, limit uint
 	fetchFn := func(key, value []byte) (bool, error) {
 		sequence, err := dbtypes.ToUint64(value)
 		if err != nil {
-			return true, err
+			return true, errors.Wrap(err, "failed to convert value to uint64")
 		}
 		sequences = append(sequences, sequence)
 		count++
@@ -235,7 +231,7 @@ func (ch *Child) GetSequencesByAddress(address string, offset uint64, limit uint
 	}
 	total, err = ch.GetLastAddressIndex(address)
 	if err != nil {
-		return nil, 0, 0, err
+		return nil, 0, 0, errors.Wrap(err, "failed to get last address index")
 	}
 
 	if descOrder {
@@ -245,7 +241,7 @@ func (ch *Child) GetSequencesByAddress(address string, offset uint64, limit uint
 		startKey := executortypes.PrefixedWithdrawalAddressIndex(address, offset)
 		err = ch.DB().ReverseIterate(dbtypes.AppendSplitter(executortypes.PrefixedWithdrawalAddress(address)), startKey, fetchFn)
 		if err != nil {
-			return nil, 0, 0, err
+			return nil, 0, 0, errors.Wrap(err, "failed to iterate withdrawal address indices")
 		}
 
 		next = offset - count
@@ -268,32 +264,32 @@ func (ch *Child) GetSequencesByAddress(address string, offset uint64, limit uint
 func (ch *Child) SaveWithdrawal(sequence uint64, data executortypes.WithdrawalData) error {
 	addressIndex, err := ch.GetAddressIndex(data.To)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to get address index")
 	}
 	ch.addressIndexMap[data.To] = addressIndex + 1
 
-	withdrawalDataWithIndex := executortypes.WithdrawalDataWithIndex{
-		Withdrawal: data,
-		Index:      ch.addressIndexMap[data.To],
-	}
-
-	dataBytes, err := json.Marshal(&withdrawalDataWithIndex)
+	withdrawalDataWithIndex := executortypes.NewWithdrawalDataWithIndex(data, ch.addressIndexMap[data.To])
+	dataBytes, err := withdrawalDataWithIndex.Marshal()
 	if err != nil {
 		return err
 	}
 
 	err = ch.stage.Set(executortypes.PrefixedWithdrawalSequence(sequence), dataBytes)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to save withdrawal data")
 	}
-	return ch.stage.Set(executortypes.PrefixedWithdrawalAddressIndex(data.To, ch.addressIndexMap[data.To]), dbtypes.FromUint64(sequence))
+	err = ch.stage.Set(executortypes.PrefixedWithdrawalAddressIndex(data.To, ch.addressIndexMap[data.To]), dbtypes.FromUint64(sequence))
+	if err != nil {
+		return errors.Wrap(err, "failed to save withdrawal address index")
+	}
+	return nil
 }
 
 func (ch *Child) GetAddressIndex(address string) (uint64, error) {
 	if index, ok := ch.addressIndexMap[address]; !ok {
 		lastIndex, err := ch.GetLastAddressIndex(address)
 		if err != nil {
-			return 0, err
+			return 0, errors.Wrap(err, "failed to get last address index")
 		}
 		return lastIndex, nil
 	} else {
@@ -316,18 +312,18 @@ func (ch *Child) DeleteFutureWithdrawals(fromSequence uint64) error {
 			return false, nil
 		}
 
-		var data executortypes.WithdrawalDataWithIndex
-		err := json.Unmarshal(value, &data)
+		data := executortypes.WithdrawalDataWithIndex{}
+		err := data.Unmarshal(value)
 		if err != nil {
 			return true, err
 		}
 		err = ch.DB().Delete(executortypes.PrefixedWithdrawalAddressIndex(data.Withdrawal.To, data.Index))
 		if err != nil {
-			return true, err
+			return true, errors.Wrap(err, "failed to delete withdrawal address index")
 		}
 		err = ch.DB().Delete(key)
 		if err != nil {
-			return true, err
+			return true, errors.Wrap(err, "failed to delete withdrawal data")
 		}
 
 		return false, nil

@@ -3,6 +3,7 @@ package types
 import (
 	"crypto/sha256"
 	"encoding/binary"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -10,6 +11,7 @@ import (
 	btypes "github.com/initia-labs/opinit-bots/node/broadcaster/types"
 	nodetypes "github.com/initia-labs/opinit-bots/node/types"
 	"github.com/initia-labs/opinit-bots/types"
+	"github.com/pkg/errors"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 )
@@ -35,6 +37,21 @@ type LocalBatchInfo struct {
 
 	LastSubmissionTime time.Time `json:"last_submission_time"`
 	BatchFileSize      int64     `json:"batch_size"`
+}
+
+func (l LocalBatchInfo) Marshal() ([]byte, error) {
+	bz, err := json.Marshal(l)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to marshal local batch info")
+	}
+	return bz, nil
+}
+
+func (l *LocalBatchInfo) Unmarshal(bz []byte) error {
+	if err := json.Unmarshal(bz, l); err != nil {
+		return errors.Wrap(err, "failed to unmarshal local batch info")
+	}
+	return nil
 }
 
 type BatchDataType uint8

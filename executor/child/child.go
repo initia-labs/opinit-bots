@@ -15,6 +15,8 @@ import (
 	"github.com/initia-labs/opinit-bots/types"
 
 	childprovider "github.com/initia-labs/opinit-bots/provider/child"
+
+	"github.com/pkg/errors"
 )
 
 type hostNode interface {
@@ -62,12 +64,12 @@ func NewChildV1(
 func (ch *Child) Initialize(ctx types.Context, processedHeight int64, startOutputIndex uint64, host hostNode, bridgeInfo ophosttypes.QueryBridgeResponse, keyringConfig *btypes.KeyringConfig) error {
 	l2Sequence, err := ch.BaseChild.Initialize(ctx, processedHeight, startOutputIndex, bridgeInfo, keyringConfig)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to initialize base child")
 	}
 	if l2Sequence != 0 {
 		err = ch.DeleteFutureWithdrawals(l2Sequence)
 		if err != nil {
-			return err
+			return errors.Wrap(err, "failed to delete future withdrawals")
 		}
 	}
 

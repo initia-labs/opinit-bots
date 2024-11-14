@@ -1,7 +1,6 @@
 package executor
 
 import (
-	"encoding/json"
 	"fmt"
 
 	dbtypes "github.com/initia-labs/opinit-bots/db/types"
@@ -21,7 +20,7 @@ func ResetHeights(db types.DB) error {
 	}
 	for _, dbName := range dbNames {
 		if err := ResetHeight(db, dbName); err != nil {
-			return err
+			return errors.Wrap(err, fmt.Sprintf("failed to reset height for %s", dbName))
 		}
 	}
 	return nil
@@ -37,13 +36,13 @@ func ResetHeight(db types.DB, nodeName string) error {
 	nodeDB := db.WithPrefix([]byte(nodeName))
 	err := node.DeleteSyncedHeight(nodeDB)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to delete synced height")
 	}
 	if err := node.DeletePendingTxs(nodeDB); err != nil {
-		return err
+		return errors.Wrap(err, "failed to delete pending txs")
 	}
 	if err := node.DeleteProcessedMsgs(nodeDB); err != nil {
-		return err
+		return errors.Wrap(err, "failed to delete processed msgs")
 	}
 	fmt.Printf("reset height to 0 for node %s\n", string(nodeDB.GetPrefix()))
 	return nil
@@ -61,12 +60,12 @@ func Migration016(db types.DB) error {
 		err := nodeDB.Iterate(nil, nil, func(key, value []byte) (bool, error) {
 			err := daDB.Set(key, value)
 			if err != nil {
-				return true, err
+				return true, errors.Wrap(err, "failed to set data to DA")
 			}
 
 			err = nodeDB.Delete(key)
 			if err != nil {
-				return true, err
+				return true, errors.Wrap(err, fmt.Sprintf("failed to delete data from %s", dbName))
 			}
 			return false, nil
 		})
@@ -88,7 +87,7 @@ func Migration016(db types.DB) error {
 		if err == nil {
 			err = nodeDB.Set(nodetypes.SyncedHeightKey, value)
 			if err != nil {
-				return err
+				return errors.Wrap(err, "failed to set synced height")
 			}
 		}
 	}
@@ -97,19 +96,15 @@ func Migration016(db types.DB) error {
 	childDB := db.WithPrefix([]byte(types.ChildName))
 	return childDB.Iterate(dbtypes.AppendSplitter(executortypes.WithdrawalPrefix), nil, func(key, value []byte) (bool, error) {
 		if len(key) == len(executortypes.WithdrawalPrefix)+1+8 {
-			var data executortypes.WithdrawalData
-			err := json.Unmarshal(value, &data)
+			data := executortypes.WithdrawalData{}
+			err := data.Unmarshal(value)
 			if err != nil {
 				return true, err
 			}
 			addressIndexMap[data.To]++
 
-			dataWithIndex := executortypes.WithdrawalDataWithIndex{
-				Withdrawal: data,
-				Index:      addressIndexMap[data.To],
-			}
-
-			dataBz, err := json.Marshal(dataWithIndex)
+			dataWithIndex := executortypes.NewWithdrawalDataWithIndex(data, addressIndexMap[data.To])
+			dataBz, err := dataWithIndex.Marshal()
 			if err != nil {
 				return true, err
 			}

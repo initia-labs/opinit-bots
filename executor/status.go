@@ -5,6 +5,7 @@ import (
 	"github.com/initia-labs/opinit-bots/executor/child"
 	"github.com/initia-labs/opinit-bots/executor/host"
 	nodetypes "github.com/initia-labs/opinit-bots/node/types"
+	"github.com/pkg/errors"
 )
 
 type Status struct {
@@ -23,24 +24,24 @@ func (ex Executor) GetStatus() (Status, error) {
 		s.BridgeId = ex.host.BridgeId()
 		s.Host, err = ex.host.GetStatus()
 		if err != nil {
-			return Status{}, err
+			return Status{}, errors.Wrap(err, "failed to get host status")
 		}
 	}
 	if ex.child != nil {
 		s.Child, err = ex.child.GetStatus()
 		if err != nil {
-			return Status{}, err
+			return Status{}, errors.Wrap(err, "failed to get child status")
 		}
 	}
 	if ex.batch != nil {
 		s.Batch, err = ex.batch.GetStatus()
 		if err != nil {
-			return Status{}, err
+			return Status{}, errors.Wrap(err, "failed to get batch status")
 		}
 		if ex.batch.DA() != nil {
 			s.DA, err = ex.batch.DA().GetNodeStatus()
 			if err != nil {
-				return Status{}, err
+				return Status{}, errors.Wrap(err, "failed to get DA status")
 			}
 		}
 	}

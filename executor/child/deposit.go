@@ -4,13 +4,14 @@ import (
 	nodetypes "github.com/initia-labs/opinit-bots/node/types"
 	childprovider "github.com/initia-labs/opinit-bots/provider/child"
 	"github.com/initia-labs/opinit-bots/types"
+	"github.com/pkg/errors"
 	"go.uber.org/zap"
 )
 
 func (ch *Child) finalizeDepositHandler(ctx types.Context, args nodetypes.EventHandlerArgs) error {
 	l1BlockHeight, l1Sequence, from, to, baseDenom, amount, err := childprovider.ParseFinalizeDeposit(args.EventAttributes)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to parse finalize deposit event")
 	}
 	ch.lastFinalizedDepositL1BlockHeight = l1BlockHeight
 	ch.lastFinalizedDepositL1Sequence = l1Sequence

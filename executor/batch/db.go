@@ -1,8 +1,6 @@
 package batch
 
 import (
-	"encoding/json"
-
 	dbtypes "github.com/initia-labs/opinit-bots/db/types"
 	executortypes "github.com/initia-labs/opinit-bots/executor/types"
 	"github.com/initia-labs/opinit-bots/types"
@@ -19,13 +17,13 @@ func GetLocalBatchInfo(db types.BasicDB) (executortypes.LocalBatchInfo, error) {
 		return executortypes.LocalBatchInfo{}, err
 	}
 
-	var localBatchInfo executortypes.LocalBatchInfo
-	err = json.Unmarshal(val, &localBatchInfo)
+	localBatchInfo := executortypes.LocalBatchInfo{}
+	err = localBatchInfo.Unmarshal(val)
 	return localBatchInfo, err
 }
 
 func SaveLocalBatchInfo(db types.BasicDB, localBatchInfo executortypes.LocalBatchInfo) error {
-	value, err := json.Marshal(&localBatchInfo)
+	value, err := localBatchInfo.Marshal()
 	if err != nil {
 		return err
 	}

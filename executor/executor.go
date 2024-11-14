@@ -85,27 +85,27 @@ func (ex *Executor) Initialize(ctx types.Context) error {
 
 	hostProcessedHeight, childProcessedHeight, processedOutputIndex, batchProcessedHeight, err := ex.getProcessedHeights(ctx, bridgeInfo.BridgeId)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to get processed heights")
 	}
 
 	hostKeyringConfig, childKeyringConfig, daKeyringConfig := ex.getKeyringConfigs(*bridgeInfo)
 
 	err = ex.host.Initialize(ctx, hostProcessedHeight, ex.child, ex.batch, *bridgeInfo, hostKeyringConfig)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to initialize host")
 	}
 	err = ex.child.Initialize(ctx, childProcessedHeight, processedOutputIndex+1, ex.host, *bridgeInfo, childKeyringConfig)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to initialize child")
 	}
 	err = ex.batch.Initialize(ctx, batchProcessedHeight, ex.host, *bridgeInfo)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to initialize batch")
 	}
 
 	da, err := ex.makeDANode(ctx, *bridgeInfo, daKeyringConfig)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to make DA node")
 	}
 	ex.batch.SetDANode(da)
 	ex.RegisterQuerier()
@@ -151,7 +151,7 @@ func (ex *Executor) makeDANode(ctx types.Context, bridgeInfo ophosttypes.QueryBr
 		// might not exist
 		hostAddrStr, err := ex.host.GetAddressStr()
 		if err != nil && !errors.Is(err, types.ErrKeyNotSet) {
-			return nil, err
+			return nil, errors.Wrap(err, "failed to get host address")
 		} else if err == nil && hostAddrStr == batchInfo.BatchInfo.Submitter {
 			return ex.host, nil
 		}
@@ -161,7 +161,7 @@ func (ex *Executor) makeDANode(ctx types.Context, bridgeInfo ophosttypes.QueryBr
 			ex.db.WithPrefix([]byte(types.DAName)),
 		)
 		err = hostda.InitializeDA(ctx, bridgeInfo, daKeyringConfig)
-		return hostda, err
+		return hostda, errors.Wrap(err, "failed to initialize host DA")
 	case ophosttypes.BatchInfo_CHAIN_TYPE_CELESTIA:
 		celestiada := celestia.NewDACelestia(
 			ex.cfg.Version,
@@ -170,7 +170,7 @@ func (ex *Executor) makeDANode(ctx types.Context, bridgeInfo ophosttypes.QueryBr
 		)
 		err := celestiada.Initialize(ctx, ex.batch, bridgeInfo.BridgeId, daKeyringConfig)
 		if err != nil {
-			return nil, err
+			return nil, errors.Wrap(err, "failed to initialize celestia DA")
 		}
 		celestiada.RegisterDAHandlers()
 		return celestiada, nil
@@ -185,7 +185,7 @@ func (ex *Executor) getProcessedHeights(ctx types.Context, bridgeId uint64) (l1P
 	if ex.cfg.L2StartHeight != 0 {
 		output, err := ex.host.QueryOutputByL2BlockNumber(ctx, bridgeId, ex.cfg.L2StartHeight)
 		if err != nil {
-			return 0, 0, 0, 0, err
+			return 0, 0, 0, 0, errors.Wrap(err, "failed to query output by l2 block number")
 		} else if output != nil {
 			outputL1BlockNumber = types.MustUint64ToInt64(output.OutputProposal.L1BlockNumber)
 			l2ProcessedHeight = types.MustUint64ToInt64(output.OutputProposal.L2BlockNumber)
@@ -199,23 +199,23 @@ func (ex *Executor) getProcessedHeights(ctx types.Context, bridgeId uint64) (l1P
 		// get the bridge start height from the host
 		l1ProcessedHeight, err = ex.host.QueryCreateBridgeHeight(ctx, bridgeId)
 		if err != nil {
-			return 0, 0, 0, 0, err
+			return 0, 0, 0, 0, errors.Wrap(err, "failed to query create bridge height")
 		}
 
 		l1Sequence, err := ex.child.QueryNextL1Sequence(ctx, 0)
 		if err != nil {
-			return 0, 0, 0, 0, err
+			return 0, 0, 0, 0, errors.Wrap(err, "failed to query next l1 sequence")
 		}
 
 		// query l1Sequence tx height
 		depositTxHeight, err := ex.host.QueryDepositTxHeight(ctx, bridgeId, l1Sequence)
 		if err != nil {
-			return 0, 0, 0, 0, err
+			return 0, 0, 0, 0, errors.Wrap(err, "failed to query deposit tx height")
 		} else if depositTxHeight == 0 && l1Sequence > 1 {
 			// query l1Sequence - 1 tx height
 			depositTxHeight, err = ex.host.QueryDepositTxHeight(ctx, bridgeId, l1Sequence-1)
 			if err != nil {
-				return 0, 0, 0, 0, err
+				return 0, 0, 0, 0, errors.Wrap(err, "failed to query deposit tx height")
 			}
 		}
 		if depositTxHeight > l1ProcessedHeight {
@@ -233,7 +233,7 @@ func (ex *Executor) getProcessedHeights(ctx types.Context, bridgeId uint64) (l1P
 	if ex.cfg.BatchStartHeight > 0 {
 		batchProcessedHeight = ex.cfg.BatchStartHeight - 1
 	}
-	return l1ProcessedHeight, l2ProcessedHeight, processedOutputIndex, batchProcessedHeight, err
+	return l1ProcessedHeight, l2ProcessedHeight, processedOutputIndex, batchProcessedHeight, nil
 }
 
 func (ex *Executor) getKeyringConfigs(bridgeInfo ophosttypes.QueryBridgeResponse) (hostKeyringConfig *btypes.KeyringConfig, childKeyringConfig *btypes.KeyringConfig, daKeyringConfig *btypes.KeyringConfig) {
