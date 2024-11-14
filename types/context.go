@@ -4,33 +4,98 @@ import (
 	"context"
 	"time"
 
+	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 )
 
-type contextKey string
+type Context struct {
+	baseCtx context.Context
 
-var (
-	ContextKeyErrGrp          = contextKey("ErrGrp")
-	ContextKeyPollingInterval = contextKey("PollingInterval")
-	ContextKeyTxTimeout       = contextKey("TxTimeout")
-)
+	logger *zap.Logger
 
-func WithErrGrp(ctx context.Context, errGrp *errgroup.Group) context.Context {
-	return context.WithValue(ctx, ContextKeyErrGrp, errGrp)
+	errGrp          *errgroup.Group
+	pollingInterval time.Duration
+	txTimeout       time.Duration
+	homePath        string
 }
 
-func ErrGrp(ctx context.Context) *errgroup.Group {
-	return ctx.Value(ContextKeyErrGrp).(*errgroup.Group)
-}
+func NewContext(baseCtx context.Context, logger *zap.Logger, homePath string) *Context {
+	return &Context{
+		baseCtx: baseCtx,
 
-func WithPollingInterval(ctx context.Context, interval time.Duration) context.Context {
-	return context.WithValue(ctx, ContextKeyPollingInterval, interval)
-}
-
-func PollingInterval(ctx context.Context) time.Duration {
-	interval := ctx.Value(ContextKeyPollingInterval)
-	if interval == nil {
-		return 100 * time.Millisecond
+		logger:   logger,
+		homePath: homePath,
 	}
-	return ctx.Value(ContextKeyPollingInterval).(time.Duration)
+}
+
+var _ context.Context = (*Context)(nil)
+
+func (c Context) Value(key any) any {
+	return c.baseCtx.Value(key)
+}
+
+func (c Context) Deadline() (deadline time.Time, ok bool) {
+	return c.baseCtx.Deadline()
+}
+
+func (c Context) Done() <-chan struct{} {
+	return c.baseCtx.Done()
+}
+
+func (c Context) Err() error {
+	return c.baseCtx.Err()
+}
+
+func (c Context) WithContext(ctx context.Context) Context {
+	c.baseCtx = ctx
+	return c
+}
+
+func (c Context) WithLogger(logger *zap.Logger) Context {
+	c.logger = logger
+	return c
+}
+
+func (c Context) WithErrGrp(errGrp *errgroup.Group) Context {
+	c.errGrp = errGrp
+	return c
+}
+
+func (c Context) WithPollingInterval(interval time.Duration) Context {
+	c.pollingInterval = interval
+	return c
+}
+
+func (c Context) WithTxTimeout(timeout time.Duration) Context {
+	c.txTimeout = timeout
+	return c
+}
+
+func (c Context) WithHomePath(homePath string) Context {
+	c.homePath = homePath
+	return c
+}
+
+func (c Context) Context() context.Context {
+	return c.baseCtx
+}
+
+func (c Context) Logger() *zap.Logger {
+	return c.logger
+}
+
+func (c Context) ErrGrp() *errgroup.Group {
+	return c.errGrp
+}
+
+func (c Context) PollingInterval() time.Duration {
+	return c.pollingInterval
+}
+
+func (c Context) TxTimeout() time.Duration {
+	return c.txTimeout
+}
+
+func (c Context) HomePath() string {
+	return c.homePath
 }

@@ -6,6 +6,5 @@ const (
 	BatchName  = "batch"
 	MerkleName = "merkle"
 
-	DAHostName     = "da_host"
-	DACelestiaName = "da_celestia"
+	DAName = "da"
 )

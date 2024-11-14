@@ -12,19 +12,32 @@ type RawKV struct {
 	Value []byte
 }
 
-type DB interface {
+type BasicDB interface {
 	Get([]byte) ([]byte, error)
 	Set([]byte, []byte) error
+	Delete([]byte) error
+}
+
+type DB interface {
+	BasicDB
+
+	NewStage() CommitDB
+
 	RawBatchSet(...RawKV) error
 	BatchSet(...KV) error
-	Delete([]byte) error
-	Close() error
 	PrefixedIterate([]byte, []byte, func([]byte, []byte) (bool, error)) error
 	PrefixedReverseIterate([]byte, []byte, func([]byte, []byte) (bool, error)) error
 	SeekPrevInclusiveKey([]byte, []byte) ([]byte, []byte, error)
 	WithPrefix([]byte) DB
 	PrefixedKey([]byte) []byte
 	UnprefixedKey([]byte) []byte
-	GetPath() string
 	GetPrefix() []byte
+}
+
+type CommitDB interface {
+	BasicDB
+
+	ExecuteFnWithDB(DB, func() error) error
+	Commit() error
+	Reset()
 }
