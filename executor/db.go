@@ -7,6 +7,7 @@ import (
 	dbtypes "github.com/initia-labs/opinit-bots/db/types"
 	executortypes "github.com/initia-labs/opinit-bots/executor/types"
 	"github.com/initia-labs/opinit-bots/node"
+	nodetypes "github.com/initia-labs/opinit-bots/node/types"
 	"github.com/initia-labs/opinit-bots/types"
 	"github.com/pkg/errors"
 )
@@ -52,11 +53,12 @@ func Migration016(db types.DB) error {
 	DAHostName := "da_host"
 	DACelestiaName := "da_celestia"
 
+	// move all data from da_host and da_celestia to da
 	daDB := db.WithPrefix([]byte(types.DAName))
 	for _, dbName := range []string{DAHostName, DACelestiaName} {
 		nodeDB := db.WithPrefix([]byte(dbName))
 
-		err := nodeDB.PrefixedIterate(nil, nil, func(key, value []byte) (bool, error) {
+		err := nodeDB.Iterate(nil, nil, func(key, value []byte) (bool, error) {
 			err := daDB.Set(key, value)
 			if err != nil {
 				return true, err
@@ -73,10 +75,29 @@ func Migration016(db types.DB) error {
 		}
 	}
 
-	addressIndexMap := make(map[string]uint64)
+	// change the last processed block height to synced height
+	for _, nodeName := range []string{
+		types.HostName,
+		types.ChildName,
+		types.BatchName,
+		types.DAName,
+	} {
+		nodeDB := db.WithPrefix([]byte(nodeName))
 
+		value, err := nodeDB.Get(nodetypes.LastProcessedBlockHeightKey)
+		if err != nil {
+			return err
+		}
+
+		err = nodeDB.Set(nodetypes.SyncedHeightKey, value)
+		if err != nil {
+			return err
+		}
+	}
+
+	addressIndexMap := make(map[string]uint64)
 	childDB := db.WithPrefix([]byte(types.ChildName))
-	return childDB.PrefixedIterate(dbtypes.AppendSplitter(executortypes.WithdrawalPrefix), nil, func(key, value []byte) (bool, error) {
+	return childDB.Iterate(dbtypes.AppendSplitter(executortypes.WithdrawalPrefix), nil, func(key, value []byte) (bool, error) {
 		if len(key) == len(executortypes.WithdrawalPrefix)+1+8 {
 			var data executortypes.WithdrawalData
 			err := json.Unmarshal(value, &data)
