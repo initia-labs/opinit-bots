@@ -46,7 +46,7 @@ type Challenger struct {
 	latestChallenges   []challengertypes.Challenge
 }
 
-func NewChallenger(cfg *challengertypes.Config, db types.DB, sv *server.Server, logger *zap.Logger, homePath string) *Challenger {
+func NewChallenger(cfg *challengertypes.Config, db types.DB, logger *zap.Logger, homePath string) *Challenger {
 	err := cfg.Validate()
 	if err != nil {
 		panic(err)
@@ -67,7 +67,7 @@ func NewChallenger(cfg *challengertypes.Config, db types.DB, sv *server.Server, 
 
 		cfg:    cfg,
 		db:     db,
-		server: sv,
+		server: server.NewServer(cfg.Server),
 		logger: logger,
 
 		homePath: homePath,
@@ -162,7 +162,7 @@ func (c *Challenger) Start(ctx context.Context) error {
 		defer func() {
 			c.logger.Info("api server stopped")
 		}()
-		return c.server.Start(c.cfg.ListenAddress)
+		return c.server.Start()
 	})
 
 	errGrp.Go(func() error {

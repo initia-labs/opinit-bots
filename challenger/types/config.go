@@ -4,6 +4,7 @@ import (
 	"errors"
 
 	nodetypes "github.com/initia-labs/opinit-bots/node/types"
+	servertypes "github.com/initia-labs/opinit-bots/server/types"
 )
 
 type NodeConfig struct {
@@ -29,8 +30,8 @@ type Config struct {
 	// Version is the version used to build output root.
 	Version uint8 `json:"version"`
 
-	// ListenAddress is the address to listen for incoming requests.
-	ListenAddress string `json:"listen_address"`
+	// Server is the configuration for the server.
+	Server servertypes.ServerConfig `json:"server"`
 
 	// L1Node is the configuration for the l1 node.
 	L1Node NodeConfig `json:"l1_node"`
@@ -53,8 +54,14 @@ type Config struct {
 
 func DefaultConfig() *Config {
 	return &Config{
-		Version:       1,
-		ListenAddress: "localhost:3001",
+		Version: 1,
+
+		Server: servertypes.ServerConfig{
+			Address:      "localhost:3001",
+			AllowOrigins: "*",
+			AllowHeaders: "Origin, Content-Type, Accept",
+			AllowMethods: "GET",
+		},
 
 		L1Node: NodeConfig{
 			ChainID:      "testnet-l1-1",
@@ -82,8 +89,8 @@ func (cfg Config) Validate() error {
 		return errors.New("only version 1 is supported")
 	}
 
-	if cfg.ListenAddress == "" {
-		return errors.New("listen address is required")
+	if err := cfg.Server.Validate(); err != nil {
+		return err
 	}
 
 	if err := cfg.L1Node.Validate(); err != nil {

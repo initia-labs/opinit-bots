@@ -300,6 +300,9 @@ func (ch *Child) GetLastAddressIndex(address string) (lastIndex uint64, err erro
 
 func (ch *Child) DeleteFutureWithdrawals(fromSequence uint64) error {
 	return ch.DB().PrefixedIterate(executortypes.WithdrawalKey, nil, func(key, _ []byte) (bool, error) {
+		if len(key) != len(executortypes.WithdrawalKey)+1+8 {
+			return false, nil
+		}
 		sequence := dbtypes.ToUint64Key(key[len(key)-8:])
 		if sequence >= fromSequence {
 			err := ch.DB().Delete(key)
