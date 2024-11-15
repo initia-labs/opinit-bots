@@ -24,7 +24,6 @@ import (
 
 	btypes "github.com/initia-labs/opinit-bots/node/broadcaster/types"
 	"github.com/initia-labs/opinit-bots/txutils"
-	"github.com/initia-labs/opinit-bots/types"
 
 	opchildtypes "github.com/initia-labs/OPinit/x/opchild/types"
 )
@@ -49,7 +48,11 @@ func (b *Broadcaster) handleMsgError(err error) error {
 			return parseErr
 		}
 
-		return errors.Wrapf(types.ErrAccountSequenceMismatch, "expected %d, got %d", expected, got)
+		if expected > got {
+			b.txf = b.txf.WithSequence(expected)
+		}
+
+		return err
 	}
 
 	if strs := outputIndexRegex.FindStringSubmatch(err.Error()); strs != nil {
