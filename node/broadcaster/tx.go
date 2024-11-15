@@ -10,6 +10,8 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/pkg/errors"
+
 	sdkerrors "cosmossdk.io/errors"
 	abci "github.com/cometbft/cometbft/abci/types"
 
@@ -22,6 +24,7 @@ import (
 
 	btypes "github.com/initia-labs/opinit-bots/node/broadcaster/types"
 	"github.com/initia-labs/opinit-bots/txutils"
+	"github.com/initia-labs/opinit-bots/types"
 
 	opchildtypes "github.com/initia-labs/OPinit/x/opchild/types"
 )
@@ -46,13 +49,7 @@ func (b *Broadcaster) handleMsgError(err error) error {
 			return parseErr
 		}
 
-		if expected > got {
-			b.txf = b.txf.WithSequence(expected)
-		}
-
-		// account sequence mismatched
-		// TODO: handle mismatched sequence
-		return err
+		return errors.Wrapf(types.ErrAccountSequenceMismatch, "expected %d, got %d", expected, got)
 	}
 
 	if strs := outputIndexRegex.FindStringSubmatch(err.Error()); strs != nil {
@@ -237,11 +234,14 @@ func (b *Broadcaster) enqueueLocalPendingTx(tx btypes.PendingTxInfo) {
 	b.pendingTxs = append(b.pendingTxs, tx)
 }
 
-func (b *Broadcaster) peekLocalPendingTx() btypes.PendingTxInfo {
+func (b *Broadcaster) PeekLocalPendingTx() (btypes.PendingTxInfo, error) {
 	b.pendingTxMu.Lock()
 	defer b.pendingTxMu.Unlock()
 
-	return b.pendingTxs[0]
+	if len(b.pendingTxs) == 0 {
+		return btypes.PendingTxInfo{}, errors.New("no pending txs")
+	}
+	return b.pendingTxs[0], nil
 }
 
 func (b Broadcaster) LenLocalPendingTx() int {

@@ -24,7 +24,9 @@ func (n *Node) blockProcessLooper(ctx context.Context, processType nodetypes.Blo
 		case <-ctx.Done():
 			return nil
 		case <-timer.C:
-			types.SleepWithRetry(ctx, consecutiveErrors)
+			if types.SleepWithRetry(ctx, consecutiveErrors) {
+				return nil
+			}
 			consecutiveErrors++
 		}
 
@@ -130,14 +132,6 @@ func (n *Node) handleNewBlock(ctx context.Context, block *rpccoretypes.ResultBlo
 		return err
 	}
 
-	// handle broadcaster first to check pending txs
-	if n.broadcaster != nil {
-		err := n.broadcaster.HandleNewBlock(block, blockResult, latestChainHeight)
-		if err != nil {
-			return err
-		}
-	}
-
 	if n.beginBlockHandler != nil {
 		err := n.beginBlockHandler(ctx, nodetypes.BeginBlockArgs{
 			BlockID:      block.BlockID.Hash,
@@ -212,7 +206,10 @@ func (n *Node) handleEvent(ctx context.Context, blockHeight int64, blockTime tim
 }
 
 // txChecker checks pending txs and handle events if the tx is included in the block
-func (n *Node) txChecker(ctx context.Context) error {
+// in the case that the tx hash is not indexed by the node even if the tx is processed,
+// event handler will not be called.
+// so, it is recommended to use the event handler only for the check event (e.g. logs)
+func (n *Node) txChecker(ctx context.Context, enableEventHandler bool) error {
 	if n.broadcaster == nil {
 		return nil
 	}
@@ -225,39 +222,64 @@ func (n *Node) txChecker(ctx context.Context) error {
 		case <-ctx.Done():
 			return nil
 		case <-timer.C:
-			types.SleepWithRetry(ctx, consecutiveErrors)
+			if n.broadcaster.LenLocalPendingTx() == 0 {
+				continue
+			}
+
+			n.logger.Debug("remaining pending txs", zap.Int("count", n.broadcaster.LenLocalPendingTx()))
+
+			if types.SleepWithRetry(ctx, consecutiveErrors) {
+				return nil
+			}
 			consecutiveErrors++
 		}
 
-		pendingTx, res, blockTime, err := n.broadcaster.CheckPendingTx(ctx)
+		pendingTx, err := n.broadcaster.PeekLocalPendingTx()
 		if err != nil {
 			return err
-		} else if pendingTx == nil || res == nil {
-			// tx not found
-			continue
 		}
 
-		if len(n.eventHandlers) != 0 {
-			events := res.TxResult.GetEvents()
-			for eventIndex, event := range events {
-				select {
-				case <-ctx.Done():
-					return nil
-				default:
-				}
+		height := int64(0)
 
-				err := n.handleEvent(ctx, res.Height, blockTime, 0, event)
-				if err != nil {
-					n.logger.Error("failed to handle event", zap.String("tx_hash", pendingTx.TxHash), zap.Int("event_index", eventIndex), zap.String("error", err.Error()))
-					break
+		res, blockTime, err := n.broadcaster.CheckPendingTx(ctx, pendingTx)
+		if errors.Is(err, types.ErrTxNotFound) {
+			// tx not found
+			continue
+		} else if err != nil {
+			return err
+		} else if res != nil {
+			// tx found
+			height = res.Height
+			// it only handles the tx if node is only broadcasting txs, not processing blocks
+			if enableEventHandler && len(n.eventHandlers) != 0 {
+				events := res.TxResult.GetEvents()
+				for eventIndex, event := range events {
+					select {
+					case <-ctx.Done():
+						return nil
+					default:
+					}
+
+					err := n.handleEvent(ctx, res.Height, blockTime, 0, event)
+					if err != nil {
+						n.logger.Error("failed to handle event", zap.String("tx_hash", pendingTx.TxHash), zap.Int("event_index", eventIndex), zap.String("error", err.Error()))
+						break
+					}
 				}
 			}
 		}
 
-		err = n.broadcaster.RemovePendingTx(res.Height, pendingTx.TxHash, pendingTx.Sequence, pendingTx.MsgTypes)
+		err = n.broadcaster.RemovePendingTx(pendingTx.Sequence)
 		if err != nil {
 			return err
 		}
+		n.logger.Info("tx inserted",
+			zap.Int64("height", height),
+			zap.Uint64("sequence", pendingTx.Sequence),
+			zap.String("tx_hash", pendingTx.TxHash),
+			zap.Strings("msg_types", pendingTx.MsgTypes),
+			zap.Int("pending_txs", n.broadcaster.LenLocalPendingTx()),
+		)
 		consecutiveErrors = 0
 	}
 }
