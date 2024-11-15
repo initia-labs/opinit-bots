@@ -38,7 +38,7 @@ func (b *Broadcaster) HandleNewBlock(block *rpccoretypes.ResultBlock, blockResul
 	}
 
 	// check timeout of pending txs
-	// @sh-cha: should we rebroadcast pending txs? or rasing monitoring alert?
+	// @sh-cha: should we rebroadcast pending txs? or raising monitoring alert?
 	if length := b.LenLocalPendingTx(); length > 0 {
 		b.logger.Debug("remaining pending txs", zap.Int64("height", block.Block.Height), zap.Int("count", length))
 		pendingTxTime := time.Unix(0, b.peekLocalPendingTx().Timestamp)
@@ -67,7 +67,7 @@ func (b *Broadcaster) CheckPendingTx(ctx context.Context) (*btypes.PendingTxInfo
 		return nil, nil, time.Time{}, err
 	}
 	if lastBlockResult.Block.Time.After(pendingTxTime.Add(b.cfg.TxTimeout)) {
-		// @sh-cha: should we rebroadcast pending txs? or rasing monitoring alert?
+		// @sh-cha: should we rebroadcast pending txs? or raising monitoring alert?
 		panic(fmt.Errorf("something wrong, pending txs are not processed for a long time; current block time: %s, pending tx processing time: %s", time.Now().UTC().String(), pendingTxTime.UTC().String()))
 	}
 
