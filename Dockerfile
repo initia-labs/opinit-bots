@@ -1,6 +1,6 @@
 # Used for running OPinit bots in a Docker container
 # 
-# Useage: 
+# Usage: 
 #  $ docker build --tag opinit-bots .
 
 FROM golang:1.23-alpine AS builder
