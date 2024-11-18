@@ -111,6 +111,7 @@ func (b *Broadcaster) Start(ctx context.Context) error {
 					}
 					break
 				} else if !data.Save {
+					b.logger.Warn("discard msgs: failed to handle processed msgs", zap.String("error", err.Error()))
 					// if the message does not need to be saved, we can skip retry
 					err = nil
 					break

@@ -11,8 +11,6 @@ import (
 
 	"github.com/pkg/errors"
 
-	sdkerrors "cosmossdk.io/errors"
-
 	btypes "github.com/initia-labs/opinit-bots/node/broadcaster/types"
 
 	opchildtypes "github.com/initia-labs/OPinit/x/opchild/types"
@@ -80,7 +78,7 @@ func (b *Broadcaster) handleProcessedMsgs(ctx context.Context, data btypes.Proce
 
 	txBytes, txHash, err := broadcasterAccount.BuildTxWithMessages(ctx, data.Msgs)
 	if err != nil {
-		return sdkerrors.Wrapf(err, "simulation failed")
+		return errors.Wrapf(err, "simulation failed")
 	}
 
 	res, err := b.rpcClient.BroadcastTxSync(ctx, txBytes)

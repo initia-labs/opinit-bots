@@ -55,6 +55,10 @@ func (b BaseChild) GetMsgUpdateOracle(
 		}
 		return nil, "", err
 	}
+	oracleAddressString, err := b.OracleAccountAddressString()
+	if err != nil {
+		return nil, "", err
+	}
 
 	if b.oracleAccountGranter == "" {
 		return nil, "", errors.New("oracle account granter is not set")
@@ -71,5 +75,5 @@ func (b BaseChild) GetMsgUpdateOracle(
 	}
 
 	authzMsgExec := authz.NewMsgExec(oracleAddress, []sdk.Msg{msg})
-	return &authzMsgExec, b.oracleAccountGranter, nil
+	return &authzMsgExec, oracleAddressString, nil
 }
