@@ -109,6 +109,8 @@ func (b *BaseChild) Initialize(
 	keyringConfig *btypes.KeyringConfig,
 	oracleKeyringConfig *btypes.KeyringConfig,
 ) (uint64, error) {
+	b.SetBridgeInfo(bridgeInfo)
+
 	err := b.node.Initialize(ctx, processedHeight, b.keyringConfigs(keyringConfig, oracleKeyringConfig))
 	if err != nil {
 		return 0, err
@@ -178,7 +180,6 @@ func (b *BaseChild) Initialize(
 			return 0, errors.New("oracle account has no grant")
 		}
 	}
-	b.SetBridgeInfo(bridgeInfo)
 	return l2Sequence, nil
 }
 
