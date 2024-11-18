@@ -221,7 +221,7 @@ func (ex *Executor) makeDANode(ctx context.Context, bridgeInfo ophosttypes.Query
 	switch batchInfo.BatchInfo.ChainType {
 	case ophosttypes.BatchInfo_CHAIN_TYPE_INITIA:
 		// might not exist
-		hostAddrStr, err := ex.host.BaseAccountAddress()
+		hostAddrStr, err := ex.host.BaseAccountAddressString()
 		if err != nil && !errors.Is(err, types.ErrKeyNotSet) {
 			return nil, err
 		} else if err == nil && hostAddrStr == batchInfo.BatchInfo.Submitter {

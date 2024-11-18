@@ -20,12 +20,13 @@ import (
 
 type hostNode interface {
 	HasKey() bool
+	BaseAccountAddressString() (string, error)
 	BroadcastMsgs(btypes.ProcessedMsgs)
 	ProcessedMsgsToRawKV([]btypes.ProcessedMsgs, bool) ([]types.RawKV, error)
 	QueryLastOutput(context.Context, uint64) (*ophosttypes.QueryOutputProposalResponse, error)
 	QueryOutput(context.Context, uint64, uint64, int64) (*ophosttypes.QueryOutputProposalResponse, error)
 
-	GetMsgProposeOutput(uint64, uint64, int64, []byte) (sdk.Msg, error)
+	GetMsgProposeOutput(uint64, uint64, int64, []byte) (sdk.Msg, string, error)
 }
 
 type Child struct {

@@ -9,7 +9,6 @@ import (
 
 	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/codec"
-	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/x/auth"
 
 	sh "github.com/celestiaorg/go-square/v2/share"
@@ -42,9 +41,6 @@ type Celestia struct {
 	cfg    nodetypes.NodeConfig
 	db     types.DB
 	logger *zap.Logger
-
-	processedMsgs []btypes.ProcessedMsgs
-	msgQueue      []sdk.Msg
 }
 
 func NewDACelestia(
@@ -57,9 +53,6 @@ func NewDACelestia(
 		cfg:    cfg,
 		db:     db,
 		logger: logger,
-
-		processedMsgs: make([]btypes.ProcessedMsgs, 0),
-		msgQueue:      make([]sdk.Msg, 0),
 	}
 
 	appCodec, txConfig, err := createCodec(cfg.Bech32Prefix)

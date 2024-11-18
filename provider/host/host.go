@@ -35,7 +35,8 @@ type BaseHost struct {
 	ophostQueryClient ophosttypes.QueryClient
 
 	processedMsgs []btypes.ProcessedMsgs
-	msgQueue      []sdk.Msg
+	msgQueue      map[string][]sdk.Msg
+	msgSenders    []string
 }
 
 func NewBaseHostV1(cfg nodetypes.NodeConfig,
@@ -63,7 +64,7 @@ func NewBaseHostV1(cfg nodetypes.NodeConfig,
 		ophostQueryClient: ophosttypes.NewQueryClient(node.GetRPCClient()),
 
 		processedMsgs: make([]btypes.ProcessedMsgs, 0),
-		msgQueue:      make([]sdk.Msg, 0),
+		msgQueue:      make(map[string][]sdk.Msg),
 	}
 
 	return h
@@ -155,16 +156,21 @@ func (b BaseHost) DB() types.DB {
 
 /// MsgQueue
 
-func (b BaseHost) GetMsgQueue() []sdk.Msg {
+func (b BaseHost) GetMsgQueue() map[string][]sdk.Msg {
 	return b.msgQueue
 }
 
-func (b *BaseHost) AppendMsgQueue(msg sdk.Msg) {
-	b.msgQueue = append(b.msgQueue, msg)
+func (b *BaseHost) AppendMsgQueue(msg sdk.Msg, sender string) {
+	if b.msgQueue[sender] == nil {
+		b.msgQueue[sender] = make([]sdk.Msg, 0)
+	}
+	b.msgQueue[sender] = append(b.msgQueue[sender], msg)
 }
 
 func (b *BaseHost) EmptyMsgQueue() {
-	b.msgQueue = b.msgQueue[:0]
+	for sender := range b.msgQueue {
+		b.msgQueue[sender] = b.msgQueue[sender][:0]
+	}
 }
 
 /// ProcessedMsgs
@@ -181,7 +187,7 @@ func (b *BaseHost) EmptyProcessedMsgs() {
 	b.processedMsgs = b.processedMsgs[:0]
 }
 
-func (b BaseHost) BaseAccountAddress() (string, error) {
+func (b BaseHost) BaseAccountAddressString() (string, error) {
 	broadcaster, err := b.node.GetBroadcaster()
 	if err != nil {
 		if errors.Is(err, types.ErrKeyNotSet) {

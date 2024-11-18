@@ -223,7 +223,7 @@ func (cfg Config) L2NodeConfig(homePath string) nodetypes.NodeConfig {
 		Bech32Prefix: cfg.L2Node.Bech32Prefix,
 	}
 
-	if cfg.BridgeExecutor != "" {
+	if cfg.BridgeExecutor != "" || cfg.OracleBridgeExecutor != "" {
 		nc.BroadcasterConfig = &btypes.BroadcasterConfig{
 			ChainID:       cfg.L2Node.ChainID,
 			GasPrice:      cfg.L2Node.GasPrice,

@@ -22,23 +22,27 @@ func (h *Host) beginBlockHandler(_ context.Context, args nodetypes.BeginBlockArg
 func (h *Host) endBlockHandler(_ context.Context, args nodetypes.EndBlockArgs) error {
 	// collect more msgs if block height is not latest
 	blockHeight := args.Block.Header.Height
-	msgQueue := h.GetMsgQueue()
+	msgQueues := h.GetMsgQueue()
 
 	batchKVs := []types.RawKV{
 		h.Node().SyncInfoToRawKV(blockHeight),
 	}
 	if h.child.HasKey() {
-		for i := 0; i < len(msgQueue); i += 5 {
-			end := i + 5
-			if end > len(msgQueue) {
-				end = len(msgQueue)
-			}
+		for sender := range msgQueues {
+			msgQueue := msgQueues[sender]
+			for i := 0; i < len(msgQueue); i += 5 {
+				end := i + 5
+				if end > len(msgQueue) {
+					end = len(msgQueue)
+				}
 
-			h.AppendProcessedMsgs(btypes.ProcessedMsgs{
-				Msgs:      slices.Clone(msgQueue[i:end]),
-				Timestamp: time.Now().UnixNano(),
-				Save:      true,
-			})
+				h.AppendProcessedMsgs(btypes.ProcessedMsgs{
+					Sender:    sender,
+					Msgs:      slices.Clone(msgQueue[i:end]),
+					Timestamp: time.Now().UnixNano(),
+					Save:      true,
+				})
+			}
 		}
 
 		msgkvs, err := h.child.ProcessedMsgsToRawKV(h.GetProcessedMsgs(), false)
@@ -61,10 +65,11 @@ func (h *Host) endBlockHandler(_ context.Context, args nodetypes.EndBlockArgs) e
 
 func (h *Host) txHandler(_ context.Context, args nodetypes.TxHandlerArgs) error {
 	if args.BlockHeight == args.LatestHeight && args.TxIndex == 0 {
-		if msg, err := h.oracleTxHandler(args.BlockHeight, args.Tx); err != nil {
+		if msg, sender, err := h.oracleTxHandler(args.BlockHeight, args.Tx); err != nil {
 			return err
 		} else if msg != nil {
 			h.AppendProcessedMsgs(btypes.ProcessedMsgs{
+				Sender:    sender,
 				Msgs:      []sdk.Msg{msg},
 				Timestamp: time.Now().UnixNano(),
 				Save:      false,

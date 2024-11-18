@@ -14,17 +14,17 @@ import (
 	celestiatypes "github.com/initia-labs/opinit-bots/types/celestia"
 )
 
-func (c Celestia) CreateBatchMsg(rawBlob []byte) (sdk.Msg, error) {
+func (c Celestia) CreateBatchMsg(rawBlob []byte) (sdk.Msg, string, error) {
 	submitter, err := c.BaseAccountAddress()
 	if err != nil {
 		if errors.Is(err, types.ErrKeyNotSet) {
-			return nil, nil
+			return nil, "", nil
 		}
-		return nil, err
+		return nil, "", err
 	}
 	blob, err := sh.NewV0Blob(c.namespace, rawBlob)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 	commitment, err := inclusion.CreateCommitment(blob,
 		merkle.HashFromByteSlices,
@@ -32,12 +32,12 @@ func (c Celestia) CreateBatchMsg(rawBlob []byte) (sdk.Msg, error) {
 		64,
 	)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
 	dataLength, err := types.SafeIntToUint32(len(blob.Data()))
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
 	return &celestiatypes.MsgPayForBlobsWithBlob{
@@ -54,5 +54,5 @@ func (c Celestia) CreateBatchMsg(rawBlob []byte) (sdk.Msg, error) {
 			ShareVersion:     uint32(blob.ShareVersion()),
 			NamespaceVersion: uint32(blob.Namespace().Version()),
 		},
-	}, nil
+	}, submitter, nil
 }

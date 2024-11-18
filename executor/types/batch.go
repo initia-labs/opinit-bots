@@ -17,7 +17,7 @@ import (
 type DANode interface {
 	Start(context.Context)
 	HasKey() bool
-	CreateBatchMsg([]byte) (sdk.Msg, error)
+	CreateBatchMsg([]byte) (sdk.Msg, string, error)
 	BroadcastMsgs(btypes.ProcessedMsgs)
 	ProcessedMsgsToRawKV(processedMsgs []btypes.ProcessedMsgs, delete bool) ([]types.RawKV, error)
 	GetNodeStatus() (nodetypes.Status, error)
