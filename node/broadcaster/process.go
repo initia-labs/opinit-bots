@@ -30,14 +30,14 @@ func (b *Broadcaster) CheckPendingTx(ctx context.Context, pendingTx btypes.Pendi
 	if txerr != nil {
 		// if the tx is not found, it means the tx is not processed yet
 		// or the tx is not indexed by the node in rare cases.
-		lastBlockResult, err := b.rpcClient.Block(ctx, nil)
+		lastHeader, err := b.rpcClient.Header(ctx, nil)
 		if err != nil {
 			return nil, time.Time{}, err
 		}
 		pendingTxTime := time.Unix(0, pendingTx.Timestamp)
 
 		// before timeout
-		if lastBlockResult.Block.Time.Before(pendingTxTime.Add(b.cfg.TxTimeout)) {
+		if lastHeader.Header.Time.Before(pendingTxTime.Add(b.cfg.TxTimeout)) {
 			b.logger.Debug("failed to query tx", zap.String("tx_hash", pendingTx.TxHash), zap.String("error", txerr.Error()))
 			return nil, time.Time{}, types.ErrTxNotFound
 		} else {
@@ -56,11 +56,11 @@ func (b *Broadcaster) CheckPendingTx(ctx context.Context, pendingTx btypes.Pendi
 		}
 	}
 
-	blockResult, err := b.rpcClient.Block(ctx, &res.Height)
+	header, err := b.rpcClient.Header(ctx, &res.Height)
 	if err != nil {
 		return nil, time.Time{}, err
 	}
-	return res, blockResult.Block.Time, nil
+	return res, header.Header.Time, nil
 }
 
 // RemovePendingTx remove pending tx from local pending txs.
