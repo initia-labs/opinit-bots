@@ -134,23 +134,9 @@ func (n *Node) Start(ctx context.Context) {
 		n.broadcaster.BroadcastPendingProcessedMsgs()
 	}
 
-	if n.cfg.ProcessType == nodetypes.PROCESS_TYPE_ONLY_BROADCAST {
-		if n.broadcaster == nil {
-			panic("broadcaster cannot be nil with nodetypes.PROCESS_TYPE_ONLY_BROADCAST")
-		}
-
-		errGrp.Go(func() (err error) {
-			defer func() {
-				n.logger.Info("tx checker looper stopped")
-				if r := recover(); r != nil {
-					n.logger.Error("tx checker panic", zap.Any("recover", r))
-					err = fmt.Errorf("tx checker panic: %v", r)
-				}
-			}()
-
-			return n.txChecker(ctx)
-		})
-	} else {
+	enableEventHandler := true
+	if n.cfg.ProcessType != nodetypes.PROCESS_TYPE_ONLY_BROADCAST {
+		enableEventHandler = false
 		errGrp.Go(func() (err error) {
 			defer func() {
 				n.logger.Info("block process looper stopped")
@@ -163,6 +149,18 @@ func (n *Node) Start(ctx context.Context) {
 			return n.blockProcessLooper(ctx, n.cfg.ProcessType)
 		})
 	}
+
+	errGrp.Go(func() (err error) {
+		defer func() {
+			n.logger.Info("tx checker looper stopped")
+			if r := recover(); r != nil {
+				n.logger.Error("tx checker panic", zap.Any("recover", r))
+				err = fmt.Errorf("tx checker panic: %v", r)
+			}
+		}()
+
+		return n.txChecker(ctx, enableEventHandler)
+	})
 }
 
 func (n Node) AccountCodec() address.Codec {

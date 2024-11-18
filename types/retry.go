@@ -9,12 +9,12 @@ import (
 
 const MaxRetryCount = 7
 
-func SleepWithRetry(ctx context.Context, retry int) {
+func SleepWithRetry(ctx context.Context, retry int) bool {
 	// to avoid to sleep too long
 	if retry > MaxRetryCount {
 		retry = MaxRetryCount
 	} else if retry == 0 {
-		return
+		return false
 	}
 
 	sleepTime := 2 * math.Exp2(float64(retry))
@@ -23,7 +23,8 @@ func SleepWithRetry(ctx context.Context, retry int) {
 	defer timer.Stop()
 	select {
 	case <-ctx.Done():
-		return
+		return true
 	case <-timer.C:
 	}
+	return false
 }

@@ -18,8 +18,8 @@ import (
 
 var _ client.AccountRetriever = &Broadcaster{}
 
-func (b *Broadcaster) loadAccount() error {
-	account, err := b.GetAccount(b.getClientCtx(), b.keyAddress)
+func (b *Broadcaster) loadAccount(ctx context.Context) error {
+	account, err := b.GetAccount(b.getClientCtx(ctx), b.keyAddress)
 	if err != nil {
 		return err
 	}
@@ -45,7 +45,7 @@ func (b *Broadcaster) GetAccount(clientCtx client.Context, addr sdk.AccAddress) 
 // GetAccountWithHeight queries for an account given an address. Returns the
 // height of the query with the account. An error is returned if the query
 // or decoding fails.
-func (b *Broadcaster) GetAccountWithHeight(_ client.Context, addr sdk.AccAddress) (client.Account, int64, error) {
+func (b *Broadcaster) GetAccountWithHeight(clienCtx client.Context, addr sdk.AccAddress) (client.Account, int64, error) {
 	var header metadata.MD
 	address, err := keys.EncodeBech32AccAddr(addr, b.cfg.Bech32Prefix)
 	if err != nil {
@@ -53,7 +53,7 @@ func (b *Broadcaster) GetAccountWithHeight(_ client.Context, addr sdk.AccAddress
 	}
 
 	queryClient := authtypes.NewQueryClient(b.rpcClient)
-	res, err := queryClient.Account(context.Background(), &authtypes.QueryAccountRequest{Address: address}, grpc.Header(&header))
+	res, err := queryClient.Account(clienCtx.CmdContext, &authtypes.QueryAccountRequest{Address: address}, grpc.Header(&header))
 	if err != nil {
 		return nil, 0, err
 	}

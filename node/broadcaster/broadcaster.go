@@ -122,12 +122,13 @@ func (b *Broadcaster) Initialize(ctx context.Context, status *rpccoretypes.Resul
 	return b.prepareBroadcaster(ctx, status.SyncInfo.LatestBlockTime)
 }
 
-func (b Broadcaster) getClientCtx() client.Context {
+func (b Broadcaster) getClientCtx(ctx context.Context) client.Context {
 	return client.Context{}.WithClient(b.rpcClient).
 		WithInterfaceRegistry(b.cdc.InterfaceRegistry()).
 		WithChainID(b.cfg.ChainID).
 		WithCodec(b.cdc).
-		WithFromAddress(b.keyAddress)
+		WithFromAddress(b.keyAddress).
+		WithCmdContext(ctx)
 }
 
 func (b Broadcaster) GetTxf() tx.Factory {
@@ -144,7 +145,7 @@ func (b *Broadcaster) prepareBroadcaster(ctx context.Context, lastBlockTime time
 		WithKeybase(b.keyBase).
 		WithSignMode(signing.SignMode_SIGN_MODE_DIRECT)
 
-	err := b.loadAccount()
+	err := b.loadAccount(ctx)
 	if err != nil {
 		return err
 	}
