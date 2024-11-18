@@ -56,7 +56,7 @@ type Config struct {
 	// which is used to relay oracle transaction from l1 to l2.
 	//
 	// If L2 is using oracle, you need to set this field.
-	OracleBridgeExecutor string `json:"bridge_executor_oracle"`
+	OracleBridgeExecutor string `json:"oracle_bridge_executor"`
 
 	// DisableOutputSubmitter is the flag to disable the output submitter.
 	// If it is true, the output submitter will not be started.

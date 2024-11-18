@@ -16,8 +16,13 @@ To configure the Executor, fill in the values in the `~/.opinit/executor.json` f
   // Version is the version used to build output root.
   // Please refer to `spec_version.json` for the correct version for each network.
   "version": 1,
-  // ListenAddress is the address to listen for incoming requests.
-  "listen_address": "localhost:3000",
+  // Server is the configuration for the server.
+  "server": {
+    "address":      "localhost:3000",
+    "allow_origins": "*",
+    "allow_headers": "Origin, Content-Type, Accept",
+    "allow_methods": "GET",
+  },
   "l1_node": {
     "chain_id": "testnet-l1-1",
     "bech32_prefix": "init",
@@ -47,6 +52,11 @@ To configure the Executor, fill in the values in the `~/.opinit/executor.json` f
   //
   // If you don't want to use the bridge executor feature, you can leave it empty.
   "bridge_executor": "",
+  // OracleBridgeExecutor is the key name in the keyring for the oracle bridge executor,
+  // which is used to relay oracle transaction from l1 to l2.
+  //
+  // If L2 is using oracle, you need to set this field.
+  "oracle_bridge_executor": "",
 
   // DisableOutputSubmitter is the flag to disable the output submitter.
   // If it is true, the output submitter will not be started.

@@ -18,8 +18,13 @@ To configure the Challenger, fill in the values in the `~/.opinit/challenger.jso
   // Version is the version used to build output root.
   // Please refer to `spec_version.json` for the correct version for each network.
   "version": 1,
-  // ListenAddress is the address to listen for incoming requests.
-  "listen_address": "localhost:3001",
+  // Server is the configuration for the server.
+  "server": {
+    "address":      "localhost:3000",
+    "allow_origins": "*",
+    "allow_headers": "Origin, Content-Type, Accept",
+    "allow_methods": "GET",
+  },
   "l1_node": {
     "chain_id": "testnet-l1-1",
     "bech32_prefix": "init",
