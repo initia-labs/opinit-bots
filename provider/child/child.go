@@ -177,8 +177,6 @@ func (b *BaseChild) Initialize(
 			}
 		}
 
-		fmt.Println("oracle account granter", b.oracleAccountGranter)
-
 		if b.oracleAccountGranter == "" {
 			return 0, errors.New("oracle account has no grant")
 		}
