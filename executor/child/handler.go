@@ -69,6 +69,7 @@ func (ch *Child) endBlockHandler(_ context.Context, args nodetypes.EndBlockArgs)
 				}
 
 				ch.AppendProcessedMsgs(btypes.ProcessedMsgs{
+					Sender:    sender,
 					Msgs:      slices.Clone(msgQueue[i:end]),
 					Timestamp: time.Now().UnixNano(),
 					Save:      true,
