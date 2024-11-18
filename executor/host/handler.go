@@ -65,7 +65,8 @@ func (h *Host) endBlockHandler(_ context.Context, args nodetypes.EndBlockArgs) e
 
 func (h *Host) txHandler(_ context.Context, args nodetypes.TxHandlerArgs) error {
 	if args.BlockHeight == args.LatestHeight && args.TxIndex == 0 {
-		if msg, sender, err := h.oracleTxHandler(args.BlockHeight, args.Tx); err != nil {
+		msg, sender, err := h.oracleTxHandler(args.BlockHeight, args.Tx)
+		if err != nil {
 			return err
 		} else if msg != nil {
 			h.AppendProcessedMsgs(btypes.ProcessedMsgs{

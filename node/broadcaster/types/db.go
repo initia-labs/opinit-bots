@@ -83,6 +83,7 @@ func (p *ProcessedMsgs) UnmarshalInterfaceJSON(cdc codec.Codec, data []byte) err
 		return err
 	}
 
+	p.Sender = pms.Sender
 	p.Timestamp = pms.Timestamp
 	p.Save = pms.Save
 
