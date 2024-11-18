@@ -38,7 +38,11 @@ func (b *Broadcaster) CheckPendingTx(ctx context.Context, pendingTx btypes.Pendi
 			return nil, time.Time{}, types.ErrTxNotFound
 		} else {
 			// timeout case
-			accountSequence, err := b.AccountByAddress(pendingTx.Sender).GetLatestSequence(ctx)
+			account, err := b.AccountByAddress(pendingTx.Sender)
+			if err != nil {
+				return nil, time.Time{}, err
+			}
+			accountSequence, err := account.GetLatestSequence(ctx)
 			if err != nil {
 				return nil, time.Time{}, err
 			}
@@ -83,7 +87,10 @@ func (b *Broadcaster) Start(ctx context.Context) error {
 			return nil
 		case data := <-b.txChannel:
 			var err error
-			broadcasterAccount := b.AccountByAddress(data.Sender)
+			broadcasterAccount, err := b.AccountByAddress(data.Sender)
+			if err != nil {
+				return err
+			}
 			for retry := 1; retry <= types.MaxRetryCount; retry++ {
 				err = b.handleProcessedMsgs(ctx, data, broadcasterAccount)
 				if err == nil {

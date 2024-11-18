@@ -33,7 +33,10 @@ func (c *Celestia) BuildTxWithMessages(
 		blobMsgs = append(blobMsgs, withBlobMsg.Blob)
 	}
 
-	broadcasterAccount := c.node.MustGetBroadcaster().AccountByIndex(0)
+	broadcasterAccount, err := c.node.MustGetBroadcaster().AccountByIndex(0)
+	if err != nil {
+		return nil, "", err
+	}
 	tx, err := broadcasterAccount.SimulateAndSignTx(ctx, pfbMsgs...)
 	if err != nil {
 		return nil, "", err

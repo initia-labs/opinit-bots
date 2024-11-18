@@ -2,6 +2,7 @@ package broadcaster
 
 import (
 	"context"
+	"fmt"
 	"slices"
 	"sync"
 	"time"
@@ -146,7 +147,11 @@ func (b *Broadcaster) prepareBroadcaster(ctx context.Context, lastBlockTime time
 
 		// convert pending txs to pending msgs
 		for i, txInfo := range loadedPendingTxs {
-			msgs, err := b.AccountByAddress(txInfo.Sender).PendingTxToProcessedMsgs(txInfo.Tx)
+			account, err := b.AccountByAddress(txInfo.Sender)
+			if err != nil {
+				return err
+			}
+			msgs, err := account.PendingTxToProcessedMsgs(txInfo.Tx)
 			if err != nil {
 				return err
 			}
@@ -206,14 +211,20 @@ func (b *Broadcaster) prepareBroadcaster(ctx context.Context, lastBlockTime time
 	return nil
 }
 
-func (b Broadcaster) AccountByIndex(index int) *BroadcasterAccount {
+func (b Broadcaster) AccountByIndex(index int) (*BroadcasterAccount, error) {
 	b.accountMu.Lock()
 	defer b.accountMu.Unlock()
-	return b.accounts[index]
+	if len(b.accounts) <= index {
+		return nil, fmt.Errorf("broadcaster account not found")
+	}
+	return b.accounts[index], nil
 }
 
-func (b Broadcaster) AccountByAddress(address string) *BroadcasterAccount {
+func (b Broadcaster) AccountByAddress(address string) (*BroadcasterAccount, error) {
 	b.accountMu.Lock()
 	defer b.accountMu.Unlock()
-	return b.accounts[b.addressAccountMap[address]]
+	if _, ok := b.addressAccountMap[address]; !ok {
+		return nil, fmt.Errorf("broadcaster account not found")
+	}
+	return b.accounts[b.addressAccountMap[address]], nil
 }

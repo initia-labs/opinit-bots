@@ -325,7 +325,11 @@ func (b BaseChild) BaseAccountAddressString() (string, error) {
 	if b.baseAccountIndex == -1 {
 		return "", nil
 	}
-	sender := broadcaster.AccountByIndex(b.baseAccountIndex).GetAddressString()
+	account, err := broadcaster.AccountByIndex(b.baseAccountIndex)
+	if err != nil {
+		return "", err
+	}
+	sender := account.GetAddressString()
 	return sender, nil
 }
 
@@ -337,7 +341,11 @@ func (b BaseChild) OracleAccountAddressString() (string, error) {
 	if b.oracleAccountIndex == -1 {
 		return "", nil
 	}
-	sender := broadcaster.AccountByIndex(b.oracleAccountIndex).GetAddressString()
+	account, err := broadcaster.AccountByIndex(b.oracleAccountIndex)
+	if err != nil {
+		return "", err
+	}
+	sender := account.GetAddressString()
 	return sender, nil
 }
 
@@ -349,6 +357,10 @@ func (b BaseChild) OracleAccountAddress() (sdk.AccAddress, error) {
 	if b.oracleAccountIndex == -1 {
 		return nil, nil
 	}
-	sender := broadcaster.AccountByIndex(b.oracleAccountIndex).GetAddress()
+	account, err := broadcaster.AccountByIndex(b.oracleAccountIndex)
+	if err != nil {
+		return nil, err
+	}
+	sender := account.GetAddress()
 	return sender, nil
 }

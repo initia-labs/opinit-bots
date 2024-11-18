@@ -140,7 +140,12 @@ func (c Celestia) BaseAccountAddress() (string, error) {
 		}
 		return "", err
 	}
-	sender := broadcaster.AccountByIndex(0).GetAddressString()
+	account, err := broadcaster.AccountByIndex(0)
+	if err != nil {
+		return "", err
+	}
+
+	sender := account.GetAddressString()
 	return sender, nil
 }
 
