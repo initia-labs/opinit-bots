@@ -101,6 +101,7 @@ func (b *Broadcaster) handleProcessedMsgs(ctx context.Context, data btypes.Proce
 
 	broadcasterAccount.IncreaseSequence()
 	pendingTx := btypes.PendingTxInfo{
+		Sender:          data.Sender,
 		ProcessedHeight: b.GetHeight(),
 		Sequence:        sequence,
 		Tx:              txBytes,
