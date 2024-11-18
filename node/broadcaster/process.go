@@ -54,6 +54,8 @@ func (b *Broadcaster) CheckPendingTx(ctx context.Context, pendingTx btypes.Pendi
 			}
 			panic(fmt.Errorf("something wrong, pending txs are not processed for a long time; current block time: %s, pending tx processing time: %s", time.Now().UTC().String(), pendingTxTime.UTC().String()))
 		}
+	} else if res.TxResult.Code != 0 {
+		panic(fmt.Errorf("tx failed, tx hash: %s, code: %d, log: %s; you might need to check gas adjustment config or balance", pendingTx.TxHash, res.TxResult.Code, res.TxResult.Log))
 	}
 
 	header, err := b.rpcClient.Header(ctx, &res.Height)
