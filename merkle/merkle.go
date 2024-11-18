@@ -310,8 +310,10 @@ func (m *Merkle) GetProofs(leafIndex uint64) (proofs [][]byte, treeIndex uint64,
 	}
 
 	// Check if the leaf index is in the tree
-	if leafIndex < treeInfo.StartLeafIndex || leafIndex-treeInfo.StartLeafIndex >= treeInfo.LeafCount {
+	if leafIndex < treeInfo.StartLeafIndex {
 		return nil, 0, nil, nil, fmt.Errorf("leaf (`%d`) is not found in tree (`%d`)", leafIndex, treeInfo.TreeIndex)
+	} else if leafIndex-treeInfo.StartLeafIndex >= treeInfo.LeafCount {
+		return nil, 0, nil, nil, fmt.Errorf("the tree containing the leaf (`%d`) has not been finalized yet", leafIndex)
 	}
 
 	height := uint8(0)
