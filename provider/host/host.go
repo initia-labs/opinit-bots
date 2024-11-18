@@ -160,9 +160,6 @@ func (b BaseHost) GetMsgQueue() map[string][]sdk.Msg {
 }
 
 func (b *BaseHost) AppendMsgQueue(msg sdk.Msg, sender string) {
-	if b.msgQueue[sender] == nil {
-		b.msgQueue[sender] = make([]sdk.Msg, 0)
-	}
 	b.msgQueue[sender] = append(b.msgQueue[sender], msg)
 }
 
