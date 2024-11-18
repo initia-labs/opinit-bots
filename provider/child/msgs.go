@@ -56,6 +56,10 @@ func (b BaseChild) GetMsgUpdateOracle(
 		return nil, "", err
 	}
 
+	if b.oracleAccountGranter == "" {
+		return nil, "", errors.New("oracle account granter is not set")
+	}
+
 	msg := opchildtypes.NewMsgUpdateOracle(
 		b.oracleAccountGranter,
 		types.MustInt64ToUint64(height),

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 
 	"go.uber.org/zap"
 
@@ -176,6 +177,8 @@ func (b *BaseChild) Initialize(
 			}
 		}
 
+		fmt.Println("oracle account granter", b.oracleAccountGranter)
+
 		if b.oracleAccountGranter == "" {
 			return 0, errors.New("oracle account has no grant")
 		}
@@ -251,6 +254,7 @@ func (b BaseChild) GetMsgQueue() map[string][]sdk.Msg {
 }
 
 func (b *BaseChild) AppendMsgQueue(msg sdk.Msg, sender string) {
+	fmt.Println("appendmsgqueue", sender)
 	if b.msgQueue[sender] == nil {
 		b.msgQueue[sender] = make([]sdk.Msg, 0)
 	}

@@ -103,7 +103,8 @@ func (b *Broadcaster) Initialize(ctx context.Context, status *rpccoretypes.Resul
 	}
 
 	// prepare broadcaster
-	return b.prepareBroadcaster(ctx, status.SyncInfo.LatestBlockTime)
+	err := b.prepareBroadcaster(ctx, status.SyncInfo.LatestBlockTime)
+	return errors.Wrap(err, "failed to prepare broadcaster")
 }
 
 func (b Broadcaster) GetHeight() int64 {
@@ -215,7 +216,7 @@ func (b Broadcaster) AccountByIndex(index int) (*BroadcasterAccount, error) {
 	b.accountMu.Lock()
 	defer b.accountMu.Unlock()
 	if len(b.accounts) <= index {
-		return nil, fmt.Errorf("broadcaster account not found")
+		return nil, fmt.Errorf("broadcaster account not found; length: %d, index: %d", len(b.accounts), index)
 	}
 	return b.accounts[index], nil
 }
@@ -224,7 +225,7 @@ func (b Broadcaster) AccountByAddress(address string) (*BroadcasterAccount, erro
 	b.accountMu.Lock()
 	defer b.accountMu.Unlock()
 	if _, ok := b.addressAccountMap[address]; !ok {
-		return nil, fmt.Errorf("broadcaster account not found")
+		return nil, fmt.Errorf("broadcaster account not found; address: %s", address)
 	}
 	return b.accounts[b.addressAccountMap[address]], nil
 }

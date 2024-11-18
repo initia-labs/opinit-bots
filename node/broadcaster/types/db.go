@@ -98,7 +98,7 @@ func (p *ProcessedMsgs) UnmarshalInterfaceJSON(cdc codec.Codec, data []byte) err
 
 func (p ProcessedMsgs) String() string {
 	tsStr := time.Unix(0, p.Timestamp).UTC().String()
-	return fmt.Sprintf("Pending msgs: sender: %s, %s at %s", p.Sender, strings.Join(p.GetMsgStrings(), ","), tsStr)
+	return fmt.Sprintf("Pending msgs: sender: %s, %s at %s", p.Sender, strings.Join(p.GetMsgTypes(), ","), tsStr)
 }
 
 func (p ProcessedMsgs) GetMsgStrings() []string {

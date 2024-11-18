@@ -34,7 +34,7 @@ func (b BaseHost) GetMsgProposeOutput(
 	if err != nil {
 		return nil, "", err
 	}
-	return msg, "", nil
+	return msg, sender, nil
 }
 
 func (b BaseHost) CreateBatchMsg(batchBytes []byte) (sdk.Msg, string, error) {
@@ -55,5 +55,5 @@ func (b BaseHost) CreateBatchMsg(batchBytes []byte) (sdk.Msg, string, error) {
 	if err != nil {
 		return nil, "", err
 	}
-	return msg, "", nil
+	return msg, submitter, nil
 }

@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"math"
+	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -16,14 +17,19 @@ import (
 	"github.com/initia-labs/opinit-bots/types"
 )
 
+func IsTxNotFoundErr(err error, txHash string) bool {
+	return strings.Contains(err.Error(), fmt.Sprintf("tx (%s) not found", txHash))
+}
+
 // CheckPendingTx query tx info to check if pending tx is processed.
 func (b *Broadcaster) CheckPendingTx(ctx context.Context, pendingTx btypes.PendingTxInfo) (*rpccoretypes.ResultTx, time.Time, error) {
 	txHash, err := hex.DecodeString(pendingTx.TxHash)
 	if err != nil {
 		return nil, time.Time{}, err
 	}
+
 	res, txerr := b.rpcClient.QueryTx(ctx, txHash)
-	if txerr != nil {
+	if txerr != nil && IsTxNotFoundErr(txerr, pendingTx.TxHash) {
 		// if the tx is not found, it means the tx is not processed yet
 		// or the tx is not indexed by the node in rare cases.
 		lastHeader, err := b.rpcClient.Header(ctx, nil)
@@ -54,6 +60,8 @@ func (b *Broadcaster) CheckPendingTx(ctx context.Context, pendingTx btypes.Pendi
 			}
 			panic(fmt.Errorf("something wrong, pending txs are not processed for a long time; current block time: %s, pending tx processing time: %s", time.Now().UTC().String(), pendingTxTime.UTC().String()))
 		}
+	} else if txerr != nil {
+		return nil, time.Time{}, txerr
 	} else if res.TxResult.Code != 0 {
 		panic(fmt.Errorf("tx failed, tx hash: %s, code: %d, log: %s; you might need to check gas adjustment config or balance", pendingTx.TxHash, res.TxResult.Code, res.TxResult.Log))
 	}

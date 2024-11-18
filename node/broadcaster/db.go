@@ -49,7 +49,10 @@ func (b Broadcaster) PendingTxsToRawKV(txInfos []btypes.PendingTxInfo, delete bo
 		var data []byte
 		var err error
 
-		if !delete && txInfo.Save {
+		if !delete {
+			if !txInfo.Save {
+				continue
+			}
 			data, err = txInfo.Marshal()
 			if err != nil {
 				return nil, err
@@ -75,7 +78,11 @@ func (b Broadcaster) ProcessedMsgsToRawKV(ProcessedMsgs []btypes.ProcessedMsgs, 
 		var data []byte
 		var err error
 
-		if !delete && processedMsgs.Save {
+		if !delete {
+			if !processedMsgs.Save {
+				continue
+			}
+
 			data, err = processedMsgs.MarshalInterfaceJSON(b.cdc)
 			if err != nil {
 				return nil, err

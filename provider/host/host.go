@@ -36,7 +36,6 @@ type BaseHost struct {
 
 	processedMsgs []btypes.ProcessedMsgs
 	msgQueue      map[string][]sdk.Msg
-	msgSenders    []string
 }
 
 func NewBaseHostV1(cfg nodetypes.NodeConfig,
