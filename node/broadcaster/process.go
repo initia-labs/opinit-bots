@@ -26,14 +26,14 @@ func (b *Broadcaster) CheckPendingTx(ctx context.Context, pendingTx btypes.Pendi
 	if txerr != nil {
 		// if the tx is not found, it means the tx is not processed yet
 		// or the tx is not indexed by the node in rare cases.
-		lastBlockResult, err := b.rpcClient.Block(ctx, nil)
+		lastHeader, err := b.rpcClient.Header(ctx, nil)
 		if err != nil {
 			return nil, time.Time{}, err
 		}
 		pendingTxTime := time.Unix(0, pendingTx.Timestamp)
 
 		// before timeout
-		if lastBlockResult.Block.Time.Before(pendingTxTime.Add(b.cfg.TxTimeout)) {
+		if lastHeader.Header.Time.Before(pendingTxTime.Add(b.cfg.TxTimeout)) {
 			b.logger.Debug("failed to query tx", zap.String("tx_hash", pendingTx.TxHash), zap.String("error", txerr.Error()))
 			return nil, time.Time{}, types.ErrTxNotFound
 		} else {
@@ -50,13 +50,15 @@ func (b *Broadcaster) CheckPendingTx(ctx context.Context, pendingTx btypes.Pendi
 			}
 			panic(fmt.Errorf("something wrong, pending txs are not processed for a long time; current block time: %s, pending tx processing time: %s", time.Now().UTC().String(), pendingTxTime.UTC().String()))
 		}
+	} else if res.TxResult.Code != 0 {
+		panic(fmt.Errorf("tx failed, tx hash: %s, code: %d, log: %s; you might need to check gas adjustment config or balance", pendingTx.TxHash, res.TxResult.Code, res.TxResult.Log))
 	}
 
-	blockResult, err := b.rpcClient.Block(ctx, &res.Height)
+	header, err := b.rpcClient.Header(ctx, &res.Height)
 	if err != nil {
 		return nil, time.Time{}, err
 	}
-	return res, blockResult.Block.Time, nil
+	return res, header.Header.Time, nil
 }
 
 // RemovePendingTx remove pending tx from local pending txs.
@@ -87,8 +89,6 @@ func (b *Broadcaster) Start(ctx context.Context) error {
 				if err == nil {
 					break
 				} else if err = b.handleMsgError(err, broadcasterAccount); err == nil {
-					break
-				} else if errors.Is(err, types.ErrAccountSequenceMismatch) {
 					break
 				} else if !data.Save {
 					// if the message does not need to be saved, we can skip retry
