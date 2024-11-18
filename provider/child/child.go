@@ -41,6 +41,9 @@ type BaseChild struct {
 
 	processedMsgs []btypes.ProcessedMsgs
 	msgQueue      []sdk.Msg
+
+	baseAccountIndex   int
+	oracleAccountIndex int
 }
 
 func NewBaseChildV1(
@@ -76,6 +79,9 @@ func NewBaseChildV1(
 
 		processedMsgs: make([]btypes.ProcessedMsgs, 0),
 		msgQueue:      make([]sdk.Msg, 0),
+
+		baseAccountIndex:   -1,
+		oracleAccountIndex: -1,
 	}
 	return ch
 }
@@ -90,8 +96,15 @@ func GetCodec(bech32Prefix string) (codec.Codec, client.TxConfig, error) {
 	})
 }
 
-func (b *BaseChild) Initialize(ctx context.Context, processedHeight int64, startOutputIndex uint64, bridgeInfo ophosttypes.QueryBridgeResponse, keyringConfig *btypes.KeyringConfig) (uint64, error) {
-	err := b.node.Initialize(ctx, processedHeight, keyringConfig)
+func (b *BaseChild) Initialize(
+	ctx context.Context,
+	processedHeight int64,
+	startOutputIndex uint64,
+	bridgeInfo ophosttypes.QueryBridgeResponse,
+	keyringConfig *btypes.KeyringConfig,
+	oracleKeyringConfig *btypes.KeyringConfig,
+) (uint64, error) {
+	err := b.node.Initialize(ctx, processedHeight, b.keyringConfigs(keyringConfig, oracleKeyringConfig))
 	if err != nil {
 		return 0, err
 	}
@@ -244,4 +257,41 @@ func (b BaseChild) GetWorkingTreeLeafCount() (uint64, error) {
 		return 0, errors.New("merkle is not initialized")
 	}
 	return b.mk.GetWorkingTreeLeafCount()
+}
+
+func (b *BaseChild) keyringConfigs(baseConfig *btypes.KeyringConfig, oracleConfig *btypes.KeyringConfig) []btypes.KeyringConfig {
+	var configs []btypes.KeyringConfig
+	if baseConfig != nil {
+		configs = append(configs, *baseConfig)
+		b.baseAccountIndex = len(configs) - 1
+	}
+	if oracleConfig != nil {
+		configs = append(configs, *oracleConfig)
+		b.oracleAccountIndex = len(configs) - 1
+	}
+	return configs
+}
+
+func (b BaseChild) BaseAccountAddress() (string, error) {
+	broadcaster, err := b.node.GetBroadcaster()
+	if err != nil {
+		return "", err
+	}
+	if b.baseAccountIndex == -1 {
+		return "", nil
+	}
+	sender := broadcaster.AccountByIndex(b.baseAccountIndex).GetAddressString()
+	return sender, nil
+}
+
+func (b BaseChild) OracleAccountAddress() (string, error) {
+	broadcaster, err := b.node.GetBroadcaster()
+	if err != nil {
+		return "", err
+	}
+	if b.oracleAccountIndex == -1 {
+		return "", nil
+	}
+	sender := broadcaster.AccountByIndex(b.oracleAccountIndex).GetAddressString()
+	return sender, nil
 }

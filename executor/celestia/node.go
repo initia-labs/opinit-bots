@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/cosmos/cosmos-sdk/client/tx"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 
 	btypes "github.com/initia-labs/opinit-bots/node/broadcaster/types"
@@ -34,25 +33,11 @@ func (c *Celestia) BuildTxWithMessages(
 		blobMsgs = append(blobMsgs, withBlobMsg.Blob)
 	}
 
-	b := c.node.MustGetBroadcaster()
-	txf := b.GetTxf()
-
-	_, adjusted, err := b.CalculateGas(ctx, txf, pfbMsgs...)
+	broadcasterAccount := c.node.MustGetBroadcaster().AccountByIndex(0)
+	tx, err := broadcasterAccount.SimulateAndSignTx(ctx, pfbMsgs...)
 	if err != nil {
 		return nil, "", err
 	}
-
-	txf = txf.WithGas(adjusted)
-	txb, err := txf.BuildUnsignedTx(pfbMsgs...)
-	if err != nil {
-		return nil, "", err
-	}
-
-	if err = tx.Sign(ctx, txf, b.KeyName(), txb, false); err != nil {
-		return nil, "", err
-	}
-
-	tx := txb.GetTx()
 	txConfig := c.node.GetTxConfig()
 	txBytes, err = txutils.EncodeTx(txConfig, tx)
 	if err != nil {

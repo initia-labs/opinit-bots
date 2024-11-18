@@ -18,7 +18,7 @@ func (b BaseChild) GetMsgFinalizeTokenDeposit(
 	l1Denom string,
 	data []byte,
 ) (sdk.Msg, error) {
-	sender, err := b.GetAddressStr()
+	sender, err := b.BaseAccountAddress()
 	if err != nil {
 		if errors.Is(err, types.ErrKeyNotSet) {
 			return nil, nil
@@ -47,7 +47,7 @@ func (b BaseChild) GetMsgUpdateOracle(
 	height int64,
 	data []byte,
 ) (sdk.Msg, error) {
-	sender, err := b.GetAddressStr()
+	sender, err := b.OracleAccountAddress()
 	if err != nil {
 		if errors.Is(err, types.ErrKeyNotSet) {
 			return nil, nil

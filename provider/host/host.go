@@ -2,6 +2,7 @@ package host
 
 import (
 	"context"
+	"errors"
 
 	"go.uber.org/zap"
 
@@ -79,7 +80,7 @@ func GetCodec(bech32Prefix string) (codec.Codec, client.TxConfig, error) {
 }
 
 func (b *BaseHost) Initialize(ctx context.Context, processedHeight int64, bridgeInfo ophosttypes.QueryBridgeResponse, keyringConfig *btypes.KeyringConfig) error {
-	err := b.node.Initialize(ctx, processedHeight, keyringConfig)
+	err := b.node.Initialize(ctx, processedHeight, b.keyringConfigs(keyringConfig))
 	if err != nil {
 		return err
 	}
@@ -178,4 +179,24 @@ func (b *BaseHost) AppendProcessedMsgs(msgs btypes.ProcessedMsgs) {
 
 func (b *BaseHost) EmptyProcessedMsgs() {
 	b.processedMsgs = b.processedMsgs[:0]
+}
+
+func (b BaseHost) BaseAccountAddress() (string, error) {
+	broadcaster, err := b.node.GetBroadcaster()
+	if err != nil {
+		if errors.Is(err, types.ErrKeyNotSet) {
+			return "", nil
+		}
+		return "", err
+	}
+	sender := broadcaster.AccountByIndex(0).GetAddressString()
+	return sender, nil
+}
+
+func (b BaseHost) keyringConfigs(baseConfig *btypes.KeyringConfig) []btypes.KeyringConfig {
+	var configs []btypes.KeyringConfig
+	if baseConfig != nil {
+		configs = append(configs, *baseConfig)
+	}
+	return configs
 }

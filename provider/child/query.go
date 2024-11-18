@@ -5,26 +5,8 @@ import (
 
 	opchildtypes "github.com/initia-labs/OPinit/x/opchild/types"
 
-	sdk "github.com/cosmos/cosmos-sdk/types"
-
 	"github.com/initia-labs/opinit-bots/node/rpcclient"
 )
-
-func (b BaseChild) GetAddress() (sdk.AccAddress, error) {
-	broadcaster, err := b.node.GetBroadcaster()
-	if err != nil {
-		return nil, err
-	}
-	return broadcaster.GetAddress(), nil
-}
-
-func (b BaseChild) GetAddressStr() (string, error) {
-	broadcaster, err := b.node.GetBroadcaster()
-	if err != nil {
-		return "", err
-	}
-	return broadcaster.GetAddressString()
-}
 
 func (b BaseChild) QueryBridgeInfo(ctx context.Context) (opchildtypes.BridgeInfo, error) {
 	req := &opchildtypes.QueryBridgeInfoRequest{}

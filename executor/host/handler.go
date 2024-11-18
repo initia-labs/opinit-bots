@@ -27,7 +27,7 @@ func (h *Host) endBlockHandler(_ context.Context, args nodetypes.EndBlockArgs) e
 	batchKVs := []types.RawKV{
 		h.Node().SyncInfoToRawKV(blockHeight),
 	}
-	if h.Node().HasBroadcaster() {
+	if h.child.HasKey() {
 		for i := 0; i < len(msgQueue); i += 5 {
 			end := i + 5
 			if end > len(msgQueue) {

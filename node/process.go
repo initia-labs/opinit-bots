@@ -269,7 +269,7 @@ func (n *Node) txChecker(ctx context.Context, enableEventHandler bool) error {
 			}
 		}
 
-		err = n.broadcaster.RemovePendingTx(pendingTx.Sequence)
+		err = n.broadcaster.RemovePendingTx(pendingTx)
 		if err != nil {
 			return err
 		}

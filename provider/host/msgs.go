@@ -15,7 +15,7 @@ func (b BaseHost) GetMsgProposeOutput(
 	l2BlockNumber int64,
 	outputRoot []byte,
 ) (sdk.Msg, error) {
-	sender, err := b.GetAddressStr()
+	sender, err := b.BaseAccountAddress()
 	if err != nil {
 		if errors.Is(err, types.ErrKeyNotSet) {
 			return nil, nil
@@ -38,7 +38,7 @@ func (b BaseHost) GetMsgProposeOutput(
 }
 
 func (b BaseHost) CreateBatchMsg(batchBytes []byte) (sdk.Msg, error) {
-	submitter, err := b.GetAddressStr()
+	submitter, err := b.BaseAccountAddress()
 	if err != nil {
 		if errors.Is(err, types.ErrKeyNotSet) {
 			return nil, nil

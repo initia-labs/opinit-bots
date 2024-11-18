@@ -86,7 +86,7 @@ func NewNode(cfg nodetypes.NodeConfig, db types.DB, logger *zap.Logger, cdc code
 // StartHeight is the height to start processing.
 // If it is 0, the latest height is used.
 // If the latest height exists in the database, this is ignored.
-func (n *Node) Initialize(ctx context.Context, processedHeight int64, keyringConfig *btypes.KeyringConfig) (err error) {
+func (n *Node) Initialize(ctx context.Context, processedHeight int64, keyringConfig []btypes.KeyringConfig) (err error) {
 	// check if node is catching up
 	status, err := n.rpcClient.Status(ctx)
 	if err != nil {
@@ -193,21 +193,6 @@ func (n Node) MustGetBroadcaster() *broadcaster.Broadcaster {
 	}
 
 	return n.broadcaster
-}
-
-func (n Node) GetStatus() nodetypes.Status {
-	s := nodetypes.Status{}
-	if n.cfg.ProcessType != nodetypes.PROCESS_TYPE_ONLY_BROADCAST {
-		s.LastBlockHeight = n.GetHeight()
-	}
-
-	if n.broadcaster != nil {
-		s.Broadcaster = &nodetypes.BroadcasterStatus{
-			PendingTxs: n.broadcaster.LenLocalPendingTx(),
-			Sequence:   n.broadcaster.GetTxf().Sequence(),
-		}
-	}
-	return s
 }
 
 func (n Node) GetRPCClient() *rpcclient.RPCClient {

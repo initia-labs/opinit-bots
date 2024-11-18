@@ -19,7 +19,6 @@ import (
 )
 
 type hostNode interface {
-	GetAddressStr() (string, error)
 	HasKey() bool
 	BroadcastMsgs(btypes.ProcessedMsgs)
 	ProcessedMsgsToRawKV([]btypes.ProcessedMsgs, bool) ([]types.RawKV, error)
@@ -58,8 +57,16 @@ func NewChildV1(
 	}
 }
 
-func (ch *Child) Initialize(ctx context.Context, processedHeight int64, startOutputIndex uint64, host hostNode, bridgeInfo ophosttypes.QueryBridgeResponse, keyringConfig *btypes.KeyringConfig) error {
-	l2Sequence, err := ch.BaseChild.Initialize(ctx, processedHeight, startOutputIndex, bridgeInfo, keyringConfig)
+func (ch *Child) Initialize(
+	ctx context.Context,
+	processedHeight int64,
+	startOutputIndex uint64,
+	host hostNode,
+	bridgeInfo ophosttypes.QueryBridgeResponse,
+	keyringConfig *btypes.KeyringConfig,
+	oracleKeyringConfig *btypes.KeyringConfig,
+) error {
+	l2Sequence, err := ch.BaseChild.Initialize(ctx, processedHeight, startOutputIndex, bridgeInfo, keyringConfig, oracleKeyringConfig)
 	if err != nil {
 		return err
 	}

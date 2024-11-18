@@ -52,6 +52,12 @@ type Config struct {
 	// If you don't want to use the bridge executor feature, you can leave it empty.
 	BridgeExecutor string `json:"bridge_executor"`
 
+	// OracleBridgeExecutor is the key name in the keyring for the oracle bridge executor,
+	// which is used to relay oracle transaction from l1 to l2.
+	//
+	// If L2 is using oracle, you need to set this field.
+	OracleBridgeExecutor string `json:"bridge_executor_oracle"`
+
 	// DisableOutputSubmitter is the flag to disable the output submitter.
 	// If it is true, the output submitter will not be started.
 	DisableOutputSubmitter bool `json:"disable_output_submitter"`
@@ -123,6 +129,7 @@ func DefaultConfig() *Config {
 		},
 
 		BridgeExecutor:         "",
+		OracleBridgeExecutor:   "",
 		DisableOutputSubmitter: false,
 		DisableBatchSubmitter:  false,
 
