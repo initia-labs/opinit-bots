@@ -104,6 +104,11 @@ func (b *Broadcaster) Start(ctx context.Context) error {
 				if err == nil {
 					break
 				} else if err = b.handleMsgError(err, broadcasterAccount); err == nil {
+					// if the error is handled, we can delete the processed msgs
+					err = b.deleteProcessedMsgs(data.Timestamp)
+					if err != nil {
+						return err
+					}
 					break
 				} else if !data.Save {
 					// if the message does not need to be saved, we can skip retry
