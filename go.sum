@@ -1329,8 +1329,8 @@ github.com/inconshreveable/mousetrap v1.1.0/go.mod h1:vpF70FUmC8bwa3OWnCshd2FqLf
 github.com/influxdata/influxdb1-client v0.0.0-20191209144304-8bf82d3c094d/go.mod h1:qj24IKcXYK6Iy9ceXlo3Tc+vtHo9lIhSX5JddghvEPo=
 github.com/initia-labs/OPinit v0.5.7 h1:25G0o2VXcO4EXzh9afdTdsXl1PTdYG9VMUx4efmWCuM=
 github.com/initia-labs/OPinit v0.5.7/go.mod h1:lx1amLMszculwPu8ln+btJno38UV28fd2nP7XC88ZeE=
-github.com/initia-labs/OPinit/api v0.5.7 h1:jghTmrrDEmowrqSpy7iL7IW9xJh40rn/S1y/LrwPkyE=
-github.com/initia-labs/OPinit/api v0.5.7/go.mod h1:gHK6DEWb3/DqQD5LjKirUx9jilAh2UioXanoQdgqVfU=
+github.com/initia-labs/OPinit/api v0.5.1 h1:zwyJf7HtKJCKvLJ1R9PjVfJO1L+d/jKoeFyT7WTLHFI=
+github.com/initia-labs/OPinit/api v0.5.1/go.mod h1:gHK6DEWb3/DqQD5LjKirUx9jilAh2UioXanoQdgqVfU=
 github.com/jhump/protoreflect v1.15.3 h1:6SFRuqU45u9hIZPJAoZ8c28T3nK64BNdp9w6jFonzls=
 github.com/jhump/protoreflect v1.15.3/go.mod h1:4ORHmSBmlCW8fh3xHmJMGyul1zNqZK4Elxc8qKP+p1k=
 github.com/jmespath/go-jmespath v0.0.0-20180206201540-c2b33e8439af/go.mod h1:Nht3zPeWKUH0NzdCt2Blrr5ys8VGpn0CEB0cQHVjt7k=
