@@ -6,11 +6,11 @@ import (
 	"fmt"
 
 	"cosmossdk.io/errors"
-	"github.com/cosmos/cosmos-sdk/x/authz"
 	"github.com/spf13/cobra"
 	"golang.org/x/sync/errgroup"
 
-	sdk "github.com/cosmos/cosmos-sdk/types"
+	"github.com/cosmos/cosmos-sdk/x/authz"
+
 	"github.com/initia-labs/opinit-bots/bot"
 	bottypes "github.com/initia-labs/opinit-bots/bot/types"
 	executortypes "github.com/initia-labs/opinit-bots/executor/types"
@@ -20,6 +20,8 @@ import (
 	"github.com/initia-labs/opinit-bots/node/rpcclient"
 	"github.com/initia-labs/opinit-bots/provider/child"
 	"github.com/initia-labs/opinit-bots/types"
+
+	sdk "github.com/cosmos/cosmos-sdk/types"
 )
 
 // txCmd represents the tx command
