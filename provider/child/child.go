@@ -164,7 +164,7 @@ func (b *BaseChild) Initialize(
 	GRANTLOOP:
 		for _, grant := range grants {
 			if grant.Authorization.TypeUrl != "/cosmos.authz.v1beta1.GenericAuthorization" ||
-				!bytes.Contains(grant.Authorization.Value, []byte("/opinit.opchild.v1.MsgUpdateOracle")) {
+				!bytes.Contains(grant.Authorization.Value, []byte(types.MsgUpdateOracleTypeUrl)) {
 				continue
 			}
 

@@ -49,6 +49,7 @@ func NewRootCmd() *cobra.Command {
 		resetHeightsCmd(ctx),
 		resetHeightCmd(ctx),
 		migration015Cmd(ctx),
+		txCmd(ctx),
 		version.NewVersionCommand(),
 	)
 	return rootCmd

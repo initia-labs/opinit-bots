@@ -11,6 +11,7 @@ import (
 	"github.com/initia-labs/opinit-bots/node/rpcclient"
 	"github.com/initia-labs/opinit-bots/txutils"
 
+	ctypes "github.com/cometbft/cometbft/rpc/core/types"
 	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/client/tx"
 	"github.com/cosmos/cosmos-sdk/codec"
@@ -104,6 +105,10 @@ func (b BroadcasterAccount) GetAddressString() string {
 	return b.addressString
 }
 
+func (b BroadcasterAccount) Bech32Prefix() string {
+	return b.cfg.Bech32Prefix
+}
+
 func (b *BroadcasterAccount) Load(ctx context.Context) error {
 	account, err := b.GetAccount(b.getClientCtx(ctx), b.address)
 	if err != nil {
@@ -140,6 +145,10 @@ func (b *BroadcasterAccount) IncreaseSequence() {
 
 func (b *BroadcasterAccount) UpdateSequence(sequence uint64) {
 	b.txf = b.txf.WithSequence(sequence)
+}
+
+func (b BroadcasterAccount) BroadcastTxSync(ctx context.Context, txBytes []byte) (*ctypes.ResultBroadcastTx, error) {
+	return b.rpcClient.BroadcastTxSync(ctx, txBytes)
 }
 
 // BuildSimTx creates an unsigned tx with an empty single signature and returns
