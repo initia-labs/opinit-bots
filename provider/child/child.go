@@ -320,7 +320,7 @@ func (b BaseChild) BaseAccountAddressString() (string, error) {
 		return "", err
 	}
 	if b.baseAccountIndex == -1 {
-		return "", nil
+		return "", types.ErrKeyNotSet
 	}
 	account, err := broadcaster.AccountByIndex(b.baseAccountIndex)
 	if err != nil {
@@ -336,7 +336,7 @@ func (b BaseChild) OracleAccountAddressString() (string, error) {
 		return "", err
 	}
 	if b.oracleAccountIndex == -1 {
-		return "", nil
+		return "", types.ErrKeyNotSet
 	}
 	account, err := broadcaster.AccountByIndex(b.oracleAccountIndex)
 	if err != nil {
@@ -352,7 +352,7 @@ func (b BaseChild) OracleAccountAddress() (sdk.AccAddress, error) {
 		return nil, err
 	}
 	if b.oracleAccountIndex == -1 {
-		return nil, nil
+		return nil, types.ErrKeyNotSet
 	}
 	account, err := broadcaster.AccountByIndex(b.oracleAccountIndex)
 	if err != nil {

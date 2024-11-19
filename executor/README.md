@@ -91,7 +91,7 @@ To configure the Executor, fill in the values in the `~/.opinit/executor.json` f
 ```
 
 ### Oracle config
-If the oracle is enabled, the `oracle_bridge_executor` field must be set. The oracle data is stored in the 0th tx of each L1 block. The bridge executor submits a `MsgUpdateOracle` containing the 0th Tx of l1 block to l2 when a block in l1 is created.
+If you want to enable to relay oracle data, the `oracle_bridge_executor` field must be set. The oracle data is stored in the 0th tx of each L1 block. The bridge executor submits a `MsgUpdateOracle` containing the 0th Tx of l1 block to l2 when a block in l1 is created.
 
 The `oracle_bridge_executor` must be an account that has received the authz grant from the executor. If it is not set, you can set the authz with the command below.
 ```bash
