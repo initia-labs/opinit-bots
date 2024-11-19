@@ -186,7 +186,7 @@ func (ch *Child) handleTree(ctx types.Context, blockHeight int64, latestHeight i
 
 func (ch *Child) handleOutput(blockHeight int64, version uint8, blockId []byte, outputIndex uint64, storageRoot []byte) error {
 	outputRoot := ophosttypes.GenerateOutputRoot(version, storageRoot, blockId)
-	msg, err := ch.host.GetMsgProposeOutput(
+	msg, sender, err := ch.host.GetMsgProposeOutput(
 		ch.BridgeId(),
 		outputIndex,
 		blockHeight,
@@ -195,7 +195,7 @@ func (ch *Child) handleOutput(blockHeight int64, version uint8, blockId []byte, 
 	if err != nil {
 		return errors.Wrap(err, "failed to get msg propose output")
 	} else if msg != nil {
-		ch.AppendMsgQueue(msg)
+		ch.AppendMsgQueue(msg, sender)
 	}
 	return nil
 }

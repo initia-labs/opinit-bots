@@ -1,28 +1,17 @@
 package broadcaster
 
 import (
-	"context"
 	"fmt"
-	"math"
+	"go/types"
 	"regexp"
 	"strconv"
 	"strings"
 
 	"go.uber.org/zap"
 
-	sdkerrors "cosmossdk.io/errors"
-	abci "github.com/cometbft/cometbft/abci/types"
-
-	"github.com/cosmos/cosmos-sdk/client/tx"
-	"github.com/cosmos/cosmos-sdk/crypto/keyring"
-	cryptotypes "github.com/cosmos/cosmos-sdk/crypto/types"
-	sdk "github.com/cosmos/cosmos-sdk/types"
-	txtypes "github.com/cosmos/cosmos-sdk/types/tx"
-	"github.com/cosmos/cosmos-sdk/types/tx/signing"
+	"github.com/pkg/errors"
 
 	btypes "github.com/initia-labs/opinit-bots/node/broadcaster/types"
-	"github.com/initia-labs/opinit-bots/txutils"
-	"github.com/initia-labs/opinit-bots/types"
 
 	opchildtypes "github.com/initia-labs/OPinit/x/opchild/types"
 )
@@ -36,7 +25,7 @@ var ignoringErrors = []error{
 var accountSeqRegex = regexp.MustCompile("account sequence mismatch, expected ([0-9]+), got ([0-9]+)")
 var outputIndexRegex = regexp.MustCompile("expected ([0-9]+), got ([0-9]+): invalid output index")
 
-func (b *Broadcaster) handleMsgError(ctx types.Context, err error) error {
+func (b *Broadcaster) handleMsgError(err error, broadcasterAccount *BroadcasterAccount) error {
 	if strs := accountSeqRegex.FindStringSubmatch(err.Error()); strs != nil {
 		expected, parseErr := strconv.ParseUint(strs[1], 10, 64)
 		if parseErr != nil {
@@ -48,11 +37,8 @@ func (b *Broadcaster) handleMsgError(ctx types.Context, err error) error {
 		}
 
 		if expected > got {
-			b.txf = b.txf.WithSequence(expected)
+			broadcasterAccount.UpdateSequence(expected)
 		}
-
-		// account sequence mismatched
-		// TODO: handle mismatched sequence
 		return err
 	}
 
@@ -87,11 +73,12 @@ func (b *Broadcaster) handleMsgError(ctx types.Context, err error) error {
 
 // HandleProcessedMsgs handles processed messages by broadcasting them to the network.
 // It stores the transaction in the database and local memory and keep track of the successful broadcast.
-func (b *Broadcaster) handleProcessedMsgs(ctx types.Context, data btypes.ProcessedMsgs) error {
-	sequence := b.txf.Sequence()
-	txBytes, txHash, err := b.cfg.BuildTxWithMsgs(ctx, data.Msgs)
+func (b *Broadcaster) handleProcessedMsgs(ctx types.Context, data btypes.ProcessedMsgs, broadcasterAccount *BroadcasterAccount) error {
+	sequence := broadcasterAccount.Sequence()
+
+	txBytes, txHash, err := broadcasterAccount.BuildTxWithMsgs(ctx, data.Msgs)
 	if err != nil {
-		return sdkerrors.Wrapf(err, "simulation failed")
+		return errors.Wrapf(err, "simulation failed")
 	}
 
 	res, err := b.rpcClient.BroadcastTxSync(ctx, txBytes)
@@ -110,8 +97,9 @@ func (b *Broadcaster) handleProcessedMsgs(ctx types.Context, data btypes.Process
 		return err
 	}
 
-	b.txf = b.txf.WithSequence(b.txf.Sequence() + 1)
+	broadcasterAccount.IncreaseSequence()
 	pendingTx := btypes.PendingTxInfo{
+		Sender:          data.Sender,
 		ProcessedHeight: b.GetHeight(),
 		Sequence:        sequence,
 		Tx:              txBytes,
@@ -121,99 +109,17 @@ func (b *Broadcaster) handleProcessedMsgs(ctx types.Context, data btypes.Process
 		Save:            data.Save,
 	}
 
-	// save pending transaction to the database for handling after restart
-	err = SavePendingTx(b.db, pendingTx)
-	if err != nil {
-		return err
+	if pendingTx.Save {
+		// save pending transaction to the database for handling after restart
+		err = SavePendingTx(b.db, pendingTx)
+		if err != nil {
+			return err
+		}
 	}
 
 	// save pending tx to local memory to handle this tx in this session
 	b.enqueueLocalPendingTx(pendingTx)
-
 	return nil
-}
-
-// CalculateGas simulates a tx to generate the appropriate gas settings before broadcasting a tx.
-func (b Broadcaster) CalculateGas(ctx context.Context, txf tx.Factory, msgs ...sdk.Msg) (txtypes.SimulateResponse, uint64, error) {
-	keyInfo, err := b.keyBase.Key(b.keyName)
-	if err != nil {
-		return txtypes.SimulateResponse{}, 0, err
-	}
-
-	txBytes, err := b.buildSimTx(keyInfo, txf, msgs...)
-	if err != nil {
-		return txtypes.SimulateResponse{}, 0, err
-	}
-
-	simReq := txtypes.SimulateRequest{TxBytes: txBytes}
-	reqBytes, err := simReq.Marshal()
-	if err != nil {
-		return txtypes.SimulateResponse{}, 0, err
-	}
-
-	simQuery := abci.RequestQuery{
-		Path: "/cosmos.tx.v1beta1.Service/Simulate",
-		Data: reqBytes,
-	}
-
-	res, err := b.rpcClient.QueryABCI(ctx, simQuery)
-	if err != nil {
-		return txtypes.SimulateResponse{}, 0, err
-	}
-
-	var simRes txtypes.SimulateResponse
-	if err := simRes.Unmarshal(res.Value); err != nil {
-		return txtypes.SimulateResponse{}, 0, err
-	}
-
-	gas, err := b.adjustEstimatedGas(simRes.GasInfo.GasUsed)
-	return simRes, gas, err
-}
-
-// AdjustEstimatedGas adjusts the estimated gas usage by multiplying it by the gas adjustment factor
-// and return estimated gas is higher than max gas error. If the gas usage is zero, the adjusted gas
-// is also zero.
-func (b Broadcaster) adjustEstimatedGas(gasUsed uint64) (uint64, error) {
-	if gasUsed == 0 {
-		return gasUsed, nil
-	}
-
-	gas := b.cfg.GasAdjustment * float64(gasUsed)
-	if math.IsInf(gas, 1) {
-		return 0, fmt.Errorf("infinite gas used")
-	}
-
-	return uint64(gas), nil
-}
-
-// BuildSimTx creates an unsigned tx with an empty single signature and returns
-// the encoded transaction or an error if the unsigned transaction cannot be built.
-func (b Broadcaster) buildSimTx(info *keyring.Record, txf tx.Factory, msgs ...sdk.Msg) ([]byte, error) {
-	txb, err := txf.BuildUnsignedTx(msgs...)
-	if err != nil {
-		return nil, err
-	}
-
-	var pk cryptotypes.PubKey
-	pk, err = info.GetPubKey()
-	if err != nil {
-		return nil, err
-	}
-
-	// Create an empty signature literal as the ante handler will populate with a
-	// sentinel pubkey.
-	sig := signing.SignatureV2{
-		PubKey: pk,
-		Data: &signing.SingleSignatureData{
-			SignMode: txf.SignMode(),
-		},
-		Sequence: txf.Sequence(),
-	}
-	if err := txb.SetSignatures(sig); err != nil {
-		return nil, err
-	}
-
-	return txutils.EncodeTx(b.txConfig, txb.GetTx())
 }
 
 func (b *Broadcaster) enqueueLocalPendingTx(tx btypes.PendingTxInfo) {
@@ -223,11 +129,14 @@ func (b *Broadcaster) enqueueLocalPendingTx(tx btypes.PendingTxInfo) {
 	b.pendingTxs = append(b.pendingTxs, tx)
 }
 
-func (b *Broadcaster) peekLocalPendingTx() btypes.PendingTxInfo {
+func (b *Broadcaster) PeekLocalPendingTx() (btypes.PendingTxInfo, error) {
 	b.pendingTxMu.Lock()
 	defer b.pendingTxMu.Unlock()
 
-	return b.pendingTxs[0]
+	if len(b.pendingTxs) == 0 {
+		return btypes.PendingTxInfo{}, errors.New("no pending txs")
+	}
+	return b.pendingTxs[0], nil
 }
 
 func (b Broadcaster) LenLocalPendingTx() int {
@@ -242,48 +151,4 @@ func (b *Broadcaster) dequeueLocalPendingTx() {
 	defer b.pendingTxMu.Unlock()
 
 	b.pendingTxs = b.pendingTxs[1:]
-}
-
-// buildTxWithMessages creates a transaction from the given messages.
-func (b *Broadcaster) DefaultBuildTxWithMsgs(
-	ctx context.Context,
-	msgs []sdk.Msg,
-) (
-	txBytes []byte,
-	txHash string,
-	err error,
-) {
-	txf := b.txf
-	_, adjusted, err := b.CalculateGas(ctx, txf, msgs...)
-	if err != nil {
-		return nil, "", err
-	}
-
-	txf = txf.WithGas(adjusted)
-	txb, err := txf.BuildUnsignedTx(msgs...)
-	if err != nil {
-		return nil, "", err
-	}
-
-	if err = tx.Sign(ctx, txf, b.keyName, txb, false); err != nil {
-		return nil, "", err
-	}
-
-	tx := txb.GetTx()
-	txBytes, err = txutils.EncodeTx(b.txConfig, tx)
-	if err != nil {
-		return nil, "", err
-	}
-	return txBytes, btypes.TxHash(txBytes), nil
-}
-
-func (b *Broadcaster) DefaultMsgsFromTx(
-	txBytes []byte,
-) ([]sdk.Msg, error) {
-	tx, err := txutils.DecodeTx(b.txConfig, txBytes)
-	if err != nil {
-		return nil, err
-	}
-
-	return tx.GetMsgs(), nil
 }

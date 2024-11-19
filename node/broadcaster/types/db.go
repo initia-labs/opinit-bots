@@ -12,6 +12,7 @@ import (
 )
 
 type PendingTxInfo struct {
+	Sender          string   `json:"sender"`
 	ProcessedHeight int64    `json:"height"`
 	Sequence        uint64   `json:"sequence"`
 	Tx              []byte   `json:"tx"`
@@ -43,10 +44,11 @@ func (p *PendingTxInfo) Unmarshal(data []byte) error {
 
 func (p PendingTxInfo) String() string {
 	tsStr := time.Unix(0, p.Timestamp).UTC().String()
-	return fmt.Sprintf("Pending tx: %s, msgs: %s, sequence: %d at height: %d, %s", p.TxHash, strings.Join(p.MsgTypes, ","), p.Sequence, p.ProcessedHeight, tsStr)
+	return fmt.Sprintf("Pending tx: %s, sender: %s, msgs: %s, sequence: %d at height: %d, %s", p.TxHash, p.Sender, strings.Join(p.MsgTypes, ","), p.Sequence, p.ProcessedHeight, tsStr)
 }
 
 type ProcessedMsgs struct {
+	Sender    string    `json:"sender"`
 	Msgs      []sdk.Msg `json:"msgs"`
 	Timestamp int64     `json:"timestamp"`
 
@@ -58,6 +60,7 @@ type ProcessedMsgs struct {
 
 // processedMsgsJSON is a helper struct to JSON encode ProcessedMsgs
 type processedMsgsJSON struct {
+	Sender    string   `json:"sender"`
 	Msgs      []string `json:"msgs"`
 	Timestamp int64    `json:"timestamp"`
 	Save      bool     `json:"save"`
@@ -73,6 +76,7 @@ func (p ProcessedMsgs) Value(cdc codec.Codec) ([]byte, error) {
 
 func (p ProcessedMsgs) MarshalInterfaceJSON(cdc codec.Codec) ([]byte, error) {
 	pms := processedMsgsJSON{
+		Sender:    p.Sender,
 		Msgs:      make([]string, len(p.Msgs)),
 		Timestamp: p.Timestamp,
 		Save:      p.Save,
@@ -96,6 +100,7 @@ func (p *ProcessedMsgs) UnmarshalInterfaceJSON(cdc codec.Codec, data []byte) err
 		return err
 	}
 
+	p.Sender = pms.Sender
 	p.Timestamp = pms.Timestamp
 	p.Save = pms.Save
 
@@ -111,7 +116,7 @@ func (p *ProcessedMsgs) UnmarshalInterfaceJSON(cdc codec.Codec, data []byte) err
 
 func (p ProcessedMsgs) String() string {
 	tsStr := time.Unix(0, p.Timestamp).UTC().String()
-	return fmt.Sprintf("Pending msgs: %s at %s", strings.Join(p.GetMsgStrings(), ","), tsStr)
+	return fmt.Sprintf("Pending msgs: sender: %s, %s at %s", p.Sender, strings.Join(p.GetMsgTypes(), ","), tsStr)
 }
 
 func (p ProcessedMsgs) GetMsgStrings() []string {

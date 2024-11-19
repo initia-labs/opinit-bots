@@ -10,7 +10,7 @@ import (
 )
 
 func (h *Host) recordBatchHandler(ctx types.Context, args nodetypes.EventHandlerArgs) error {
-	hostAddress, err := h.GetAddressStr()
+	hostAddress, err := h.BaseAccountAddressString()
 	if err != nil {
 		if errors.Is(err, types.ErrKeyNotSet) {
 			return nil

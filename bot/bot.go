@@ -15,7 +15,6 @@ import (
 	"github.com/initia-labs/opinit-bots/db"
 	"github.com/initia-labs/opinit-bots/executor"
 	executortypes "github.com/initia-labs/opinit-bots/executor/types"
-	"github.com/initia-labs/opinit-bots/server"
 )
 
 func LoadJsonConfig(path string, config bottypes.Config) error {
@@ -46,7 +45,6 @@ func NewBot(botType bottypes.BotType, logger *zap.Logger, homePath string, confi
 	if err != nil {
 		return nil, err
 	}
-	server := server.NewServer()
 
 	switch botType {
 	case bottypes.BotTypeExecutor:
@@ -55,14 +53,14 @@ func NewBot(botType bottypes.BotType, logger *zap.Logger, homePath string, confi
 		if err != nil {
 			return nil, err
 		}
-		return executor.NewExecutor(cfg, db, server, logger.Named("executor"), homePath), nil
+		return executor.NewExecutor(cfg, db, logger.Named("executor"), homePath), nil
 	case bottypes.BotTypeChallenger:
 		cfg := &challengertypes.Config{}
 		err := LoadJsonConfig(configPath, cfg)
 		if err != nil {
 			return nil, err
 		}
-		return challenger.NewChallenger(cfg, db, server, logger.Named("challenger"), homePath), nil
+		return challenger.NewChallenger(cfg, db, logger.Named("challenger"), homePath), nil
 	}
 	return nil, errors.New("not providing bot name")
 }

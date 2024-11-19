@@ -5,6 +5,8 @@ import (
 
 	btypes "github.com/initia-labs/opinit-bots/node/broadcaster/types"
 	nodetypes "github.com/initia-labs/opinit-bots/node/types"
+
+	servertypes "github.com/initia-labs/opinit-bots/server/types"
 	"github.com/pkg/errors"
 )
 
@@ -34,8 +36,8 @@ type Config struct {
 	// Version is the version used to build output root.
 	Version uint8 `json:"version"`
 
-	// ListenAddress is the address to listen for incoming requests.
-	ListenAddress string `json:"listen_address"`
+	// Server is the configuration for the server.
+	Server servertypes.ServerConfig `json:"server"`
 
 	// L1Node is the configuration for the l1 node.
 	L1Node NodeConfig `json:"l1_node"`
@@ -49,6 +51,12 @@ type Config struct {
 	//
 	// If you don't want to use the bridge executor feature, you can leave it empty.
 	BridgeExecutor string `json:"bridge_executor"`
+
+	// OracleBridgeExecutor is the key name in the keyring for the oracle bridge executor,
+	// which is used to relay oracle transaction from l1 to l2.
+	//
+	// If L2 is using oracle, you need to set this field.
+	OracleBridgeExecutor string `json:"oracle_bridge_executor"`
 
 	// DisableOutputSubmitter is the flag to disable the output submitter.
 	// If it is true, the output submitter will not be started.
@@ -84,8 +92,14 @@ type Config struct {
 
 func DefaultConfig() *Config {
 	return &Config{
-		Version:       1,
-		ListenAddress: "localhost:3000",
+		Version: 1,
+
+		Server: servertypes.ServerConfig{
+			Address:      "localhost:3000",
+			AllowOrigins: "*",
+			AllowHeaders: "Origin, Content-Type, Accept",
+			AllowMethods: "GET",
+		},
 
 		L1Node: NodeConfig{
 			ChainID:       "testnet-l1-1",
@@ -115,6 +129,7 @@ func DefaultConfig() *Config {
 		},
 
 		BridgeExecutor:         "",
+		OracleBridgeExecutor:   "",
 		DisableOutputSubmitter: false,
 		DisableBatchSubmitter:  false,
 
@@ -138,8 +153,8 @@ func (cfg Config) Validate() error {
 		return errors.New("only version 1 is supported")
 	}
 
-	if cfg.ListenAddress == "" {
-		return errors.New("listen address is required")
+	if err := cfg.Server.Validate(); err != nil {
+		return err
 	}
 
 	if err := cfg.L1Node.Validate(); err != nil {
@@ -207,7 +222,7 @@ func (cfg Config) L2NodeConfig() nodetypes.NodeConfig {
 		Bech32Prefix: cfg.L2Node.Bech32Prefix,
 	}
 
-	if cfg.BridgeExecutor != "" {
+	if cfg.BridgeExecutor != "" || cfg.OracleBridgeExecutor != "" {
 		nc.BroadcasterConfig = &btypes.BroadcasterConfig{
 			ChainID:       cfg.L2Node.ChainID,
 			GasPrice:      cfg.L2Node.GasPrice,

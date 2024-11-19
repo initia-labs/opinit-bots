@@ -3,14 +3,10 @@ package celestia
 import (
 	"crypto/sha256"
 
-	"github.com/cometbft/cometbft/crypto/merkle"
-
 	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/codec"
-	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/x/auth"
 
-	inclusion "github.com/celestiaorg/go-square/v2/inclusion"
 	sh "github.com/celestiaorg/go-square/v2/share"
 
 	executortypes "github.com/initia-labs/opinit-bots/executor/types"
@@ -42,9 +38,6 @@ type Celestia struct {
 
 	cfg nodetypes.NodeConfig
 	db  types.DB
-
-	processedMsgs []btypes.ProcessedMsgs
-	msgQueue      []sdk.Msg
 }
 
 func NewDACelestia(version uint8, cfg nodetypes.NodeConfig, db types.DB) *Celestia {
@@ -53,19 +46,11 @@ func NewDACelestia(version uint8, cfg nodetypes.NodeConfig, db types.DB) *Celest
 
 		cfg: cfg,
 		db:  db,
-
-		processedMsgs: make([]btypes.ProcessedMsgs, 0),
-		msgQueue:      make([]sdk.Msg, 0),
 	}
 
 	appCodec, txConfig, err := createCodec(cfg.Bech32Prefix)
 	if err != nil {
 		panic(errors.Wrap(err, "failed to create codec"))
-	}
-
-	if cfg.BroadcasterConfig != nil {
-		cfg.BroadcasterConfig.BuildTxWithMsgs = c.BuildTxWithMessages
-		cfg.BroadcasterConfig.MsgsFromTx = c.PendingTxToProcessedMsgs
 	}
 
 	node, err := node.NewNode(cfg, db, appCodec, txConfig)
@@ -88,7 +73,7 @@ func createCodec(bech32Prefix string) (codec.Codec, client.TxConfig, error) {
 }
 
 func (c *Celestia) Initialize(ctx types.Context, batch batchNode, bridgeId uint64, keyringConfig *btypes.KeyringConfig) error {
-	err := c.node.Initialize(ctx, 0, keyringConfig)
+	err := c.node.Initialize(ctx, 0, c.keyringConfigs(keyringConfig))
 	if err != nil {
 		return errors.Wrap(err, "failed to initialize node")
 	}
@@ -145,66 +130,32 @@ func (c Celestia) GetHeight() int64 {
 	return c.node.GetHeight()
 }
 
-func (c Celestia) CreateBatchMsg(rawBlob []byte) (sdk.Msg, error) {
-	submitter, err := c.GetAddressStr()
-	if err != nil {
-		if errors.Is(err, types.ErrKeyNotSet) {
-			return nil, nil
-		}
-		return nil, errors.Wrap(err, "failed to get address")
-	}
-	blob, err := sh.NewV0Blob(c.namespace, rawBlob)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to create blob")
-	}
-	commitment, err := inclusion.CreateCommitment(blob,
-		merkle.HashFromByteSlices,
-		// https://github.com/celestiaorg/celestia-app/blob/4f4d0f7ff1a43b62b232726e52d1793616423df7/pkg/appconsts/v1/app_consts.go#L6
-		64,
-	)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to create commitment")
-	}
-
-	dataLength, err := types.SafeIntToUint32(len(blob.Data()))
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to convert data length")
-	}
-
-	return &celestiatypes.MsgPayForBlobsWithBlob{
-		MsgPayForBlobs: &celestiatypes.MsgPayForBlobs{
-			Signer:           submitter,
-			Namespaces:       [][]byte{c.namespace.Bytes()},
-			ShareCommitments: [][]byte{commitment},
-			BlobSizes:        []uint32{dataLength},
-			ShareVersions:    []uint32{uint32(blob.ShareVersion())},
-		},
-		Blob: &celestiatypes.Blob{
-			NamespaceId:      blob.Namespace().ID(),
-			Data:             blob.Data(),
-			ShareVersion:     uint32(blob.ShareVersion()),
-			NamespaceVersion: uint32(blob.Namespace().Version()),
-		},
-	}, nil
-}
-
 func (c Celestia) NamespaceID() []byte {
 	chainIDhash := sha256.Sum256([]byte(c.batch.ChainID()))
 	return chainIDhash[:10]
 }
 
-func (c Celestia) GetAddress() (sdk.AccAddress, error) {
+func (c Celestia) BaseAccountAddress() (string, error) {
 	broadcaster, err := c.node.GetBroadcaster()
 	if err != nil {
-		return nil, err
+		if errors.Is(err, types.ErrKeyNotSet) {
+			return "", nil
+		}
+		return "", err
 	}
-	return broadcaster.GetAddress(), nil
-}
-
-func (c Celestia) GetAddressStr() (string, error) {
-	broadcaster, err := c.node.GetBroadcaster()
+	account, err := broadcaster.AccountByIndex(0)
 	if err != nil {
 		return "", err
 	}
-	return broadcaster.GetAddressString()
+
+	sender := account.GetAddressString()
+	return sender, nil
+}
+
+func (c Celestia) keyringConfigs(baseConfig *btypes.KeyringConfig) []btypes.KeyringConfig {
+	var configs []btypes.KeyringConfig
+	if baseConfig != nil {
+		configs = append(configs, *baseConfig)
+	}
+	return configs
 }

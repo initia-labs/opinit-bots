@@ -50,10 +50,12 @@ func (h *Host) endBlockHandler(_ types.Context, args nodetypes.EndBlockArgs) err
 
 func (h *Host) txHandler(_ types.Context, args nodetypes.TxHandlerArgs) error {
 	if args.BlockHeight == args.LatestHeight && args.TxIndex == 0 {
-		if msg, err := h.oracleTxHandler(args.BlockHeight, args.Tx); err != nil {
+		msg, sender, err := h.oracleTxHandler(args.BlockHeight, args.Tx)
+		if err != nil {
 			return errors.Wrap(err, "failed to handle oracle tx")
 		} else if msg != nil {
 			h.AppendProcessedMsgs(btypes.ProcessedMsgs{
+				Sender:    sender,
 				Msgs:      []sdk.Msg{msg},
 				Timestamp: time.Now().UnixNano(),
 				Save:      false,

@@ -25,8 +25,8 @@ type childNode interface {
 	HasBroadcaster() bool
 	BroadcastProcessedMsgs(...btypes.ProcessedMsgs)
 
-	GetMsgFinalizeTokenDeposit(string, string, sdk.Coin, uint64, int64, string, []byte) (sdk.Msg, error)
-	GetMsgUpdateOracle(int64, []byte) (sdk.Msg, error)
+	GetMsgFinalizeTokenDeposit(string, string, sdk.Coin, uint64, int64, string, []byte) (sdk.Msg, string, error)
+	GetMsgUpdateOracle(int64, []byte) (sdk.Msg, string, error)
 
 	QueryNextL1Sequence(context.Context, int64) (uint64, error)
 }
@@ -59,7 +59,14 @@ func NewHostV1(cfg nodetypes.NodeConfig, db types.DB) *Host {
 	}
 }
 
-func (h *Host) Initialize(ctx types.Context, processedHeight int64, child childNode, batch batchNode, bridgeInfo ophosttypes.QueryBridgeResponse, keyringConfig *btypes.KeyringConfig) error {
+func (h *Host) Initialize(
+	ctx types.Context,
+	processedHeight int64,
+	child childNode,
+	batch batchNode,
+	bridgeInfo ophosttypes.QueryBridgeResponse,
+	keyringConfig *btypes.KeyringConfig,
+) error {
 	err := h.BaseHost.Initialize(ctx, processedHeight, bridgeInfo, keyringConfig)
 	if err != nil {
 		return errors.Wrap(err, "failed to initialize base host")
@@ -74,7 +81,11 @@ func (h *Host) Initialize(ctx types.Context, processedHeight int64, child childN
 	return nil
 }
 
-func (h *Host) InitializeDA(ctx types.Context, bridgeInfo ophosttypes.QueryBridgeResponse, keyringConfig *btypes.KeyringConfig) error {
+func (h *Host) InitializeDA(
+	ctx types.Context,
+	bridgeInfo ophosttypes.QueryBridgeResponse,
+	keyringConfig *btypes.KeyringConfig,
+) error {
 	err := h.BaseHost.Initialize(ctx, 0, bridgeInfo, keyringConfig)
 	if err != nil {
 		return errors.Wrap(err, "failed to initialize base DA host")

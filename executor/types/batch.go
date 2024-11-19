@@ -24,7 +24,7 @@ type DANode interface {
 	HasBroadcaster() bool
 	BroadcastProcessedMsgs(...btypes.ProcessedMsgs)
 
-	CreateBatchMsg([]byte) (sdk.Msg, error)
+	CreateBatchMsg([]byte) (sdk.Msg, string, error)
 
 	GetNodeStatus() (nodetypes.Status, error)
 }

@@ -24,6 +24,6 @@ func (n NoopDA) DB() types.DB          { return nil }
 func (n NoopDA) Codec() codec.Codec    { return nil }
 
 func (n NoopDA) HasBroadcaster() bool                               { return false }
-func (n NoopDA) CreateBatchMsg(_ []byte) (sdk.Msg, error)           { return nil, nil }
+func (n NoopDA) CreateBatchMsg(_ []byte) (sdk.Msg, string, error)   { return nil, "", nil }
 func (n NoopDA) BroadcastProcessedMsgs(nil ...btypes.ProcessedMsgs) {}
 func (n NoopDA) GetNodeStatus() (nodetypes.Status, error)           { return nodetypes.Status{}, nil }

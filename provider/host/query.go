@@ -7,7 +7,6 @@ import (
 	"strings"
 	"time"
 
-	sdk "github.com/cosmos/cosmos-sdk/types"
 	query "github.com/cosmos/cosmos-sdk/types/query"
 
 	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
@@ -15,6 +14,8 @@ import (
 	"github.com/initia-labs/opinit-bots/node/rpcclient"
 	"github.com/initia-labs/opinit-bots/types"
 	"github.com/pkg/errors"
+
+	sdk "github.com/cosmos/cosmos-sdk/types"
 )
 
 func (b BaseHost) GetAddress() (sdk.AccAddress, error) {

@@ -85,7 +85,7 @@ func NewNode(cfg nodetypes.NodeConfig, db types.DB, cdc codec.Codec, txConfig cl
 // StartHeight is the height to start processing.
 // If it is 0, the latest height is used.
 // If the latest height exists in the database, this is ignored.
-func (n *Node) Initialize(ctx types.Context, processedHeight int64, keyringConfig *btypes.KeyringConfig) (err error) {
+func (n *Node) Initialize(ctx types.Context, processedHeight int64, keyringConfig []btypes.KeyringConfig) (err error) {
 	// check if node is catching up
 	status, err := n.rpcClient.Status(ctx)
 	if err != nil {
@@ -145,24 +145,10 @@ func (n *Node) start(ctx types.Context) {
 		n.broadcaster.BroadcastPendingProcessedMsgs()
 	}
 
-	if n.cfg.ProcessType == nodetypes.PROCESS_TYPE_ONLY_BROADCAST {
-		if n.broadcaster == nil {
-			panic("broadcaster cannot be nil with nodetypes.PROCESS_TYPE_ONLY_BROADCAST")
-		}
-
-		ctx.ErrGrp().Go(func() (err error) {
-			defer func() {
-				ctx.Logger().Info("tx checker looper stopped")
-				if r := recover(); r != nil {
-					ctx.Logger().Error("tx checker panic", zap.Any("recover", r))
-					err = fmt.Errorf("tx checker panic: %v", r)
-				}
-			}()
-
-			return n.txChecker(ctx)
-		})
-	} else {
-		ctx.ErrGrp().Go(func() (err error) {
+	enableEventHandler := true
+	if n.cfg.ProcessType != nodetypes.PROCESS_TYPE_ONLY_BROADCAST {
+		enableEventHandler = false
+		errGrp.Go(func() (err error) {
 			defer func() {
 				ctx.Logger().Info("block process looper stopped")
 				if r := recover(); r != nil {
@@ -174,6 +160,18 @@ func (n *Node) start(ctx types.Context) {
 			return n.blockProcessLooper(ctx, n.cfg.ProcessType)
 		})
 	}
+
+	errGrp.Go(func() (err error) {
+		defer func() {
+			n.logger.Info("tx checker looper stopped")
+			if r := recover(); r != nil {
+				n.logger.Error("tx checker panic", zap.Any("recover", r))
+				err = fmt.Errorf("tx checker panic: %v", r)
+			}
+		}()
+
+		return n.txChecker(ctx, enableEventHandler)
+	})
 }
 
 func (n Node) AccountCodec() address.Codec {
@@ -224,21 +222,6 @@ func (n Node) MustGetBroadcaster() *broadcaster.Broadcaster {
 		panic("cannot get broadcaster without broadcaster")
 	}
 	return n.broadcaster
-}
-
-func (n Node) GetStatus() nodetypes.Status {
-	s := nodetypes.Status{}
-	if n.cfg.ProcessType != nodetypes.PROCESS_TYPE_ONLY_BROADCAST {
-		s.LastBlockHeight = n.GetHeight()
-	}
-
-	if n.HasBroadcaster() {
-		s.Broadcaster = &nodetypes.BroadcasterStatus{
-			PendingTxs: n.broadcaster.LenLocalPendingTx(),
-			Sequence:   n.broadcaster.GetTxf().Sequence(),
-		}
-	}
-	return s
 }
 
 func (n Node) GetRPCClient() *rpcclient.RPCClient {

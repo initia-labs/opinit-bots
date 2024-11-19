@@ -10,10 +10,10 @@ var (
 	ProcessedMsgsPrefix = []byte("processed_msgs")
 )
 
-func prefixedPendingTx(sequence uint64) []byte {
+func prefixedPendingTx(timestamp uint64) []byte {
 	return dbtypes.GenerateKey([][]byte{
 		PendingTxsPrefix,
-		dbtypes.FromUint64Key(sequence),
+		dbtypes.FromUint64Key(timestamp),
 	})
 }
 

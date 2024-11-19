@@ -205,11 +205,12 @@ func (bs *BatchSubmitter) finalizeBatch(ctx types.Context, blockHeight int64) er
 		checksums,
 	)
 
-	msg, err := bs.da.CreateBatchMsg(headerData)
+	msg, sender, err := bs.da.CreateBatchMsg(headerData)
 	if err != nil {
 		return errors.Wrap(err, "failed to create batch msg")
 	} else if msg != nil {
 		bs.processedMsgs = append(bs.processedMsgs, btypes.ProcessedMsgs{
+			Sender:    sender,
 			Msgs:      []sdk.Msg{msg},
 			Timestamp: time.Now().UnixNano(),
 			Save:      true,
@@ -224,11 +225,12 @@ func (bs *BatchSubmitter) finalizeBatch(ctx types.Context, blockHeight int64) er
 			types.MustInt64ToUint64(int64(len(checksums))),
 			chunk,
 		)
-		msg, err := bs.da.CreateBatchMsg(chunkData)
+		msg, sender, err := bs.da.CreateBatchMsg(chunkData)
 		if err != nil {
 			return errors.Wrap(err, "failed to create batch msg")
 		} else if msg != nil {
 			bs.processedMsgs = append(bs.processedMsgs, btypes.ProcessedMsgs{
+				Sender:    sender,
 				Msgs:      []sdk.Msg{msg},
 				Timestamp: time.Now().UnixNano(),
 				Save:      true,

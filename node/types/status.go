@@ -1,11 +1,10 @@
 package types
 
-type BroadcasterStatus struct {
-	PendingTxs int    `json:"pending_txs"`
-	Sequence   uint64 `json:"sequence"`
-}
+import (
+	btypes "github.com/initia-labs/opinit-bots/node/broadcaster/types"
+)
 
 type Status struct {
-	LastBlockHeight int64              `json:"last_block_height,omitempty"`
-	Broadcaster     *BroadcasterStatus `json:"broadcaster,omitempty"`
+	LastBlockHeight int64                     `json:"last_block_height,omitempty"`
+	Broadcaster     *btypes.BroadcasterStatus `json:"broadcaster,omitempty"`
 }

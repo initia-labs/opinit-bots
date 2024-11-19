@@ -31,20 +31,8 @@ type BroadcasterConfig struct {
 	// Bech32Prefix is the Bech32 prefix.
 	Bech32Prefix string
 
-	BuildTxWithMsgs BuildTxWithMsgsFn
-
-	MsgsFromTx MsgsFromTxFn
-
 	// HomePath is the path to the keyring.
 	HomePath string
-}
-
-func (bc *BroadcasterConfig) WithMsgsFromTxFn(fn MsgsFromTxFn) {
-	bc.MsgsFromTx = fn
-}
-
-func (bc *BroadcasterConfig) WithBuildTxWithMsgsFn(fn BuildTxWithMsgsFn) {
-	bc.BuildTxWithMsgs = fn
 }
 
 func (bc BroadcasterConfig) Validate() error {
@@ -59,14 +47,6 @@ func (bc BroadcasterConfig) Validate() error {
 
 	if bc.Bech32Prefix == "" {
 		return fmt.Errorf("bech32 prefix is empty")
-	}
-
-	if bc.BuildTxWithMsgs == nil {
-		return fmt.Errorf("build tx with messages is nil")
-	}
-
-	if bc.MsgsFromTx == nil {
-		return fmt.Errorf("pending tx to processed msgs is nil")
 	}
 
 	if bc.GasAdjustment == 0 {
@@ -108,6 +88,12 @@ type KeyringConfig struct {
 
 	// Address of key in keyring
 	Address string `json:"address"`
+
+	// BuildTxWithMessages is the function to build a transaction with messages.
+	BuildTxWithMessages BuildTxWithMessagesFn
+
+	// PendingTxToProcessedMsgs is the function to convert pending tx to processed messages.
+	PendingTxToProcessedMsgs PendingTxToProcessedMsgsFn
 }
 
 func (kc KeyringConfig) GetKeyRecord(keyBase keyring.Keyring, bech32Prefix string) (*keyring.Record, error) {
@@ -134,10 +120,17 @@ func (kc KeyringConfig) GetKeyRecord(keyBase keyring.Keyring, bech32Prefix strin
 	return nil, fmt.Errorf("keyring config is invalid")
 }
 
+func (kc *KeyringConfig) WithPendingTxToProcessedMsgsFn(fn PendingTxToProcessedMsgsFn) {
+	kc.PendingTxToProcessedMsgs = fn
+}
+
+func (kc *KeyringConfig) WithBuildTxWithMessagesFn(fn BuildTxWithMessagesFn) {
+	kc.BuildTxWithMessages = fn
+}
+
 func (kc KeyringConfig) Validate() error {
 	if kc.Name == "" && kc.Address == "" {
 		return fmt.Errorf("keyring config is invalid")
 	}
-
 	return nil
 }

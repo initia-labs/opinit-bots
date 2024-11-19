@@ -4,6 +4,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"math"
+	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -15,81 +16,71 @@ import (
 	"github.com/initia-labs/opinit-bots/types"
 )
 
-// HandleNewBlock is called when a new block is received.
-func (b *Broadcaster) HandleNewBlock(ctx types.Context, block *rpccoretypes.ResultBlock, latestChainHeight int64) error {
-	// check pending txs first
-	for _, tx := range block.Block.Txs {
-		if b.LenLocalPendingTx() == 0 {
-			break
-		}
-
-		// check if the first pending tx is included in the block
-		if pendingTx := b.peekLocalPendingTx(); btypes.TxHash(tx) == pendingTx.TxHash {
-			err := b.RemovePendingTx(ctx, block.Block.Height, pendingTx)
-			if err != nil {
-				return errors.Wrap(err, "failed to remove pending tx")
-			}
-		}
-	}
-
-	// check timeout of pending txs
-	// @sh-cha: should we rebroadcast pending txs? or rasing monitoring alert?
-	if length := b.LenLocalPendingTx(); length > 0 {
-		ctx.Logger().Debug("remaining pending txs", zap.Int64("height", block.Block.Height), zap.Int("count", length))
-		pendingTxTime := time.Unix(0, b.peekLocalPendingTx().Timestamp)
-		if block.Block.Time.After(pendingTxTime.Add(b.cfg.TxTimeout)) {
-			panic(fmt.Errorf("something wrong, pending txs are not processed for a long time; current block time: %s, pending tx processing time: %s", block.Block.Time.UTC().String(), pendingTxTime.UTC().String()))
-		}
-	}
-	return nil
+func IsTxNotFoundErr(err error, txHash string) bool {
+	return strings.Contains(err.Error(), fmt.Sprintf("tx (%s) not found", txHash))
 }
 
 // CheckPendingTx query tx info to check if pending tx is processed.
-func (b *Broadcaster) CheckPendingTx(ctx types.Context) (*btypes.PendingTxInfo, *rpccoretypes.ResultTx, time.Time, int64, error) {
-	if b.LenLocalPendingTx() == 0 {
-		return nil, nil, time.Time{}, 0, nil
-	}
-
-	pendingTx := b.peekLocalPendingTx()
-	pendingTxTime := time.Unix(0, b.peekLocalPendingTx().Timestamp)
-
-	latestBlockResult, err := b.rpcClient.Block(ctx, nil)
-	if err != nil {
-		return nil, nil, time.Time{}, 0, errors.Wrap(err, "failed to fetch latest block")
-	}
-	if latestBlockResult.Block.Time.After(pendingTxTime.Add(b.cfg.TxTimeout)) {
-		// @sh-cha: should we rebroadcast pending txs? or rasing monitoring alert?
-		panic(fmt.Errorf("something wrong, pending txs are not processed for a long time; current block time: %s, pending tx processing time: %s", time.Now().UTC().String(), pendingTxTime.UTC().String()))
-	}
-
+func (b *Broadcaster) CheckPendingTx(ctx types.Context, pendingTx btypes.PendingTxInfo) (*rpccoretypes.ResultTx, time.Time, error) {
 	txHash, err := hex.DecodeString(pendingTx.TxHash)
 	if err != nil {
-		return nil, nil, time.Time{}, 0, errors.Wrap(err, "failed to decode tx hash")
-	}
-	res, err := b.rpcClient.QueryTx(ctx, txHash)
-	if err != nil {
-		ctx.Logger().Debug("failed to query tx", zap.String("tx_hash", pendingTx.TxHash), zap.String("error", err.Error()))
-		return nil, nil, time.Time{}, 0, errors.Wrap(err, fmt.Sprintf("failed to query tx; hash: %s", pendingTx.TxHash))
+		return nil, time.Time{}, err
 	}
 
-	blockResult, err := b.rpcClient.Block(ctx, &res.Height)
-	if err != nil {
-		return nil, nil, time.Time{}, 0, errors.Wrap(err, fmt.Sprintf("failed to fetch block; height: %d", res.Height))
+	res, txerr := b.rpcClient.QueryTx(ctx, txHash)
+	if txerr != nil && IsTxNotFoundErr(txerr, pendingTx.TxHash) {
+		// if the tx is not found, it means the tx is not processed yet
+		// or the tx is not indexed by the node in rare cases.
+		lastHeader, err := b.rpcClient.Header(ctx, nil)
+		if err != nil {
+			return nil, time.Time{}, err
+		}
+		pendingTxTime := time.Unix(0, pendingTx.Timestamp)
+
+		// before timeout
+		if lastHeader.Header.Time.Before(pendingTxTime.Add(b.cfg.TxTimeout)) {
+			b.logger.Debug("failed to query tx", zap.String("tx_hash", pendingTx.TxHash), zap.String("error", txerr.Error()))
+			return nil, time.Time{}, types.ErrTxNotFound
+		} else {
+			// timeout case
+			account, err := b.AccountByAddress(pendingTx.Sender)
+			if err != nil {
+				return nil, time.Time{}, err
+			}
+			accountSequence, err := account.GetLatestSequence(ctx)
+			if err != nil {
+				return nil, time.Time{}, err
+			}
+
+			// if sequence is larger than the sequence of the pending tx,
+			// handle it as the tx has already been processed
+			if pendingTx.Sequence < accountSequence {
+				return nil, time.Time{}, nil
+			}
+			panic(fmt.Errorf("something wrong, pending txs are not processed for a long time; current block time: %s, pending tx processing time: %s", time.Now().UTC().String(), pendingTxTime.UTC().String()))
+		}
+	} else if txerr != nil {
+		return nil, time.Time{}, txerr
+	} else if res.TxResult.Code != 0 {
+		panic(fmt.Errorf("tx failed, tx hash: %s, code: %d, log: %s; you might need to check gas adjustment config or balance", pendingTx.TxHash, res.TxResult.Code, res.TxResult.Log))
 	}
-	return &pendingTx, res, blockResult.Block.Time, latestBlockResult.Block.Height, nil
+
+	header, err := b.rpcClient.Header(ctx, &res.Height)
+	if err != nil {
+		return nil, time.Time{}, err
+	}
+	return res, header.Header.Time, nil
 }
 
 // RemovePendingTx remove pending tx from local pending txs.
 // It is called when the pending tx is included in the block.
-func (b *Broadcaster) RemovePendingTx(ctx types.Context, blockHeight int64, pendingTx btypes.PendingTxInfo) error {
+func (b *Broadcaster) RemovePendingTx(ctx types.Context, pendingTx btypes.PendingTxInfo) error {
 	err := DeletePendingTx(b.db, pendingTx)
 	if err != nil {
 		return err
 	}
 
-	ctx.Logger().Info("tx inserted", zap.Int64("height", blockHeight), zap.Uint64("sequence", pendingTx.Sequence), zap.String("tx_hash", pendingTx.TxHash), zap.Strings("msg_types", pendingTx.MsgTypes))
 	b.dequeueLocalPendingTx()
-
 	return nil
 }
 
@@ -103,13 +94,23 @@ func (b *Broadcaster) Start(ctx types.Context) error {
 			return nil
 		case msgs := <-b.txChannel:
 			var err error
+			broadcasterAccount, err := b.AccountByAddress(data.Sender)
+			if err != nil {
+				return err
+			}
 			for retry := 1; retry <= types.MaxRetryCount; retry++ {
-				err = b.handleProcessedMsgs(ctx, msgs)
+				err = b.handleProcessedMsgs(ctx, data, broadcasterAccount)
 				if err == nil {
 					break
-				} else if err = b.handleMsgError(ctx, err); err == nil {
+				} else if err = b.handleMsgError(err, broadcasterAccount); err == nil {
+					// if the error is handled, we can delete the processed msgs
+					err = b.deleteProcessedMsgs(data.Timestamp)
+					if err != nil {
+						return err
+					}
 					break
-				} else if !msgs.Save {
+				} else if !data.Save {
+					b.logger.Warn("discard msgs: failed to handle processed msgs", zap.String("error", err.Error()))
 					// if the message does not need to be saved, we can skip retry
 					err = nil
 					break
@@ -126,8 +127,15 @@ func (b *Broadcaster) Start(ctx types.Context) error {
 	}
 }
 
+// @dev: these pending processed data is filled at initialization(`NewBroadcaster`).
+func (b Broadcaster) BroadcastPendingProcessedMsgs() {
+	for _, processedMsg := range b.pendingProcessedMsgsBatch {
+		b.BroadcastProcessedMsgs(processedMsg)
+	}
+}
+
 // BroadcastTxSync broadcasts transaction bytes to txBroadcastLooper.
-func (b Broadcaster) BroadcastProcessedMsgs(msgs btypes.ProcessedMsgs) {
+func (b Broadcaster) BroadcastMsgs(msgs btypes.ProcessedMsgs) {
 	if b.txChannel == nil {
 		return
 	}
@@ -135,12 +143,5 @@ func (b Broadcaster) BroadcastProcessedMsgs(msgs btypes.ProcessedMsgs) {
 	select {
 	case <-b.txChannelStopped:
 	case b.txChannel <- msgs:
-	}
-}
-
-// @dev: these pending processed data is filled at initialization(`NewBroadcaster`).
-func (b Broadcaster) BroadcastPendingProcessedMsgs() {
-	for _, processedMsg := range b.pendingProcessedMsgsBatch {
-		b.BroadcastProcessedMsgs(processedMsg)
 	}
 }

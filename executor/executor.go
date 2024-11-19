@@ -88,13 +88,13 @@ func (ex *Executor) Initialize(ctx types.Context) error {
 		return errors.Wrap(err, "failed to get processed heights")
 	}
 
-	hostKeyringConfig, childKeyringConfig, daKeyringConfig := ex.getKeyringConfigs(*bridgeInfo)
+	hostKeyringConfig, childKeyringConfig, childOracleKeyringConfig, daKeyringConfig := ex.getKeyringConfigs(*bridgeInfo)
 
 	err = ex.host.Initialize(ctx, hostProcessedHeight, ex.child, ex.batch, *bridgeInfo, hostKeyringConfig)
 	if err != nil {
 		return errors.Wrap(err, "failed to initialize host")
 	}
-	err = ex.child.Initialize(ctx, childProcessedHeight, processedOutputIndex+1, ex.host, *bridgeInfo, childKeyringConfig)
+	err = ex.child.Initialize(ctx, childProcessedHeight, processedOutputIndex+1, ex.host, *bridgeInfo, childKeyringConfig, childOracleKeyringConfig)
 	if err != nil {
 		return errors.Wrap(err, "failed to initialize child")
 	}
@@ -124,7 +124,7 @@ func (ex *Executor) Start(ctx types.Context) error {
 		defer func() {
 			ctx.Logger().Info("api server stopped")
 		}()
-		return ex.server.Start(ex.cfg.ListenAddress)
+		return ex.server.Start()
 	})
 	ex.host.Start(ctx)
 	ex.child.Start(ctx)
@@ -149,7 +149,7 @@ func (ex *Executor) makeDANode(ctx types.Context, bridgeInfo ophosttypes.QueryBr
 	switch batchInfo.BatchInfo.ChainType {
 	case ophosttypes.BatchInfo_CHAIN_TYPE_INITIA:
 		// might not exist
-		hostAddrStr, err := ex.host.GetAddressStr()
+		hostAddrStr, err := ex.host.BaseAccountAddressString()
 		if err != nil && !errors.Is(err, types.ErrKeyNotSet) {
 			return nil, errors.Wrap(err, "failed to get host address")
 		} else if err == nil && hostAddrStr == batchInfo.BatchInfo.Submitter {
@@ -236,7 +236,12 @@ func (ex *Executor) getProcessedHeights(ctx types.Context, bridgeId uint64) (l1P
 	return l1ProcessedHeight, l2ProcessedHeight, processedOutputIndex, batchProcessedHeight, nil
 }
 
-func (ex *Executor) getKeyringConfigs(bridgeInfo ophosttypes.QueryBridgeResponse) (hostKeyringConfig *btypes.KeyringConfig, childKeyringConfig *btypes.KeyringConfig, daKeyringConfig *btypes.KeyringConfig) {
+func (ex *Executor) getKeyringConfigs(bridgeInfo ophosttypes.QueryBridgeResponse) (
+	hostKeyringConfig *btypes.KeyringConfig,
+	childKeyringConfig *btypes.KeyringConfig,
+	childOracleKeyringConfig *btypes.KeyringConfig,
+	daKeyringConfig *btypes.KeyringConfig,
+) {
 	if !ex.cfg.DisableOutputSubmitter {
 		hostKeyringConfig = &btypes.KeyringConfig{
 			Address: bridgeInfo.BridgeConfig.Proposer,
@@ -246,6 +251,12 @@ func (ex *Executor) getKeyringConfigs(bridgeInfo ophosttypes.QueryBridgeResponse
 	if ex.cfg.BridgeExecutor != "" {
 		childKeyringConfig = &btypes.KeyringConfig{
 			Name: ex.cfg.BridgeExecutor,
+		}
+
+		if bridgeInfo.BridgeConfig.OracleEnabled && ex.cfg.OracleBridgeExecutor != "" {
+			childOracleKeyringConfig = &btypes.KeyringConfig{
+				Name: ex.cfg.OracleBridgeExecutor,
+			}
 		}
 	}
 

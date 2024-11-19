@@ -7,4 +7,6 @@ const (
 	MerkleName = "merkle"
 
 	DAName = "da"
+
+	MsgUpdateOracleTypeUrl = "/opinit.opchild.v1.MsgUpdateOracle"
 )

@@ -25,7 +25,7 @@ func (h *Host) initiateDepositHandler(_ types.Context, args nodetypes.EventHandl
 		return nil
 	}
 
-	msg, err := h.handleInitiateDeposit(
+	msg, sender, err := h.handleInitiateDeposit(
 		l1Sequence,
 		args.BlockHeight,
 		from,
@@ -38,7 +38,7 @@ func (h *Host) initiateDepositHandler(_ types.Context, args nodetypes.EventHandl
 	if err != nil {
 		return errors.Wrap(err, "failed to handle initiate deposit")
 	} else if msg != nil {
-		h.AppendMsgQueue(msg)
+		h.AppendMsgQueue(msg, sender)
 	}
 	return nil
 }
@@ -52,10 +52,10 @@ func (h *Host) handleInitiateDeposit(
 	l2Denom string,
 	amount string,
 	data []byte,
-) (sdk.Msg, error) {
+) (sdk.Msg, string, error) {
 	coinAmount, ok := math.NewIntFromString(amount)
 	if !ok {
-		return nil, errors.New("invalid coin amount")
+		return nil, "", errors.New("invalid coin amount")
 	}
 	coin := sdk.NewCoin(l2Denom, coinAmount)
 
