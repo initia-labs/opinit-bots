@@ -11,16 +11,16 @@ import (
 // PendingTx //
 ///////////////
 
-func (b Broadcaster) savePendingTx(sequence uint64, txInfo btypes.PendingTxInfo) error {
-	data, err := txInfo.Marshal()
+func (b Broadcaster) savePendingTx(pendingTx btypes.PendingTxInfo) error {
+	data, err := pendingTx.Marshal()
 	if err != nil {
 		return err
 	}
-	return b.db.Set(btypes.PrefixedPendingTx(sequence), data)
+	return b.db.Set(btypes.PrefixedPendingTx(types.MustInt64ToUint64(pendingTx.Timestamp)), data)
 }
 
-func (b Broadcaster) deletePendingTx(sequence uint64) error {
-	return b.db.Delete(btypes.PrefixedPendingTx(sequence))
+func (b Broadcaster) deletePendingTx(pendingTx btypes.PendingTxInfo) error {
+	return b.db.Delete(btypes.PrefixedPendingTx(types.MustInt64ToUint64(pendingTx.Timestamp)))
 }
 
 func (b Broadcaster) loadPendingTxs() (txs []btypes.PendingTxInfo, err error) {
@@ -49,14 +49,17 @@ func (b Broadcaster) PendingTxsToRawKV(txInfos []btypes.PendingTxInfo, delete bo
 		var data []byte
 		var err error
 
-		if !delete && txInfo.Save {
+		if !delete {
+			if !txInfo.Save {
+				continue
+			}
 			data, err = txInfo.Marshal()
 			if err != nil {
 				return nil, err
 			}
 		}
 		kvs = append(kvs, types.RawKV{
-			Key:   b.db.PrefixedKey(btypes.PrefixedPendingTx(txInfo.Sequence)),
+			Key:   b.db.PrefixedKey(btypes.PrefixedPendingTx(types.MustInt64ToUint64(txInfo.Timestamp))),
 			Value: data,
 		})
 	}
@@ -75,7 +78,11 @@ func (b Broadcaster) ProcessedMsgsToRawKV(ProcessedMsgs []btypes.ProcessedMsgs, 
 		var data []byte
 		var err error
 
-		if !delete && processedMsgs.Save {
+		if !delete {
+			if !processedMsgs.Save {
+				continue
+			}
+
 			data, err = processedMsgs.MarshalInterfaceJSON(b.cdc)
 			if err != nil {
 				return nil, err

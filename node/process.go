@@ -246,7 +246,7 @@ func (n *Node) txChecker(ctx context.Context, enableEventHandler bool) error {
 			// tx not found
 			continue
 		} else if err != nil {
-			return err
+			return errors.Wrap(err, "failed to check pending tx")
 		} else if res != nil {
 			// tx found
 			height = res.Height
@@ -269,9 +269,9 @@ func (n *Node) txChecker(ctx context.Context, enableEventHandler bool) error {
 			}
 		}
 
-		err = n.broadcaster.RemovePendingTx(pendingTx.Sequence)
+		err = n.broadcaster.RemovePendingTx(pendingTx)
 		if err != nil {
-			return err
+			return errors.Wrap(err, "failed to remove pending tx")
 		}
 		n.logger.Info("tx inserted",
 			zap.Int64("height", height),

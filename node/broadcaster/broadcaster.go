@@ -2,6 +2,7 @@ package broadcaster
 
 import (
 	"context"
+	"fmt"
 	"slices"
 	"sync"
 	"time"
@@ -13,11 +14,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/cosmos/cosmos-sdk/client"
-	"github.com/cosmos/cosmos-sdk/client/tx"
 	"github.com/cosmos/cosmos-sdk/codec"
-	"github.com/cosmos/cosmos-sdk/crypto/keyring"
-	sdk "github.com/cosmos/cosmos-sdk/types"
-	"github.com/cosmos/cosmos-sdk/types/tx/signing"
 
 	btypes "github.com/initia-labs/opinit-bots/node/broadcaster/types"
 	"github.com/initia-labs/opinit-bots/node/rpcclient"
@@ -32,12 +29,10 @@ type Broadcaster struct {
 	logger    *zap.Logger
 	rpcClient *rpcclient.RPCClient
 
-	txf      tx.Factory
-	txConfig client.TxConfig
-
-	keyBase    keyring.Keyring
-	keyName    string
-	keyAddress sdk.AccAddress
+	txConfig          client.TxConfig
+	accounts          []*BroadcasterAccount
+	addressAccountMap map[string]int
+	accountMu         *sync.Mutex
 
 	txChannel        chan btypes.ProcessedMsgs
 	txChannelStopped chan struct{}
@@ -65,8 +60,10 @@ func NewBroadcaster(
 		db:        db,
 		rpcClient: rpcClient,
 
-		// txf will be initialized in prepareBroadcaster
-		txConfig: txConfig,
+		txConfig:          txConfig,
+		accounts:          make([]*BroadcasterAccount, 0),
+		addressAccountMap: make(map[string]int),
+		accountMu:         &sync.Mutex{},
 
 		txChannel:        make(chan btypes.ProcessedMsgs),
 		txChannelStopped: make(chan struct{}),
@@ -74,14 +71,6 @@ func NewBroadcaster(
 		pendingTxMu:          &sync.Mutex{},
 		pendingTxs:           make([]btypes.PendingTxInfo, 0),
 		pendingProcessedMsgs: make([]btypes.ProcessedMsgs, 0),
-	}
-
-	// fill cfg with default functions
-	if cfg.PendingTxToProcessedMsgs == nil {
-		cfg.WithPendingTxToProcessedMsgsFn(b.DefaultPendingTxToProcessedMsgs)
-	}
-	if cfg.BuildTxWithMessages == nil {
-		cfg.WithBuildTxWithMessagesFn(b.DefaultBuildTxWithMessages)
 	}
 
 	// validate broadcaster config
@@ -99,64 +88,40 @@ func NewBroadcaster(
 	return b, nil
 }
 
-func (b *Broadcaster) Initialize(ctx context.Context, status *rpccoretypes.ResultStatus, keyringConfig *btypes.KeyringConfig) error {
-	err := keyringConfig.Validate()
-	if err != nil {
-		return err
+func (b *Broadcaster) Initialize(ctx context.Context, status *rpccoretypes.ResultStatus, keyringConfigs []btypes.KeyringConfig) error {
+	for _, keyringConfig := range keyringConfigs {
+		account, err := NewBroadcasterAccount(b.cfg, b.cdc, b.txConfig, b.rpcClient, keyringConfig)
+		if err != nil {
+			return err
+		}
+		err = account.Load(ctx)
+		if err != nil {
+			return err
+		}
+		b.accounts = append(b.accounts, account)
+		b.addressAccountMap[account.GetAddressString()] = len(b.accounts) - 1
 	}
-
-	// setup keyring
-	keyBase, keyringRecord, err := b.cfg.GetKeyringRecord(b.cdc, keyringConfig)
-	if err != nil {
-		return err
-	}
-	b.keyBase = keyBase
-	addr, err := keyringRecord.GetAddress()
-	if err != nil {
-		return err
-	}
-	b.keyAddress = addr
-	b.keyName = keyringRecord.Name
 
 	// prepare broadcaster
-	return b.prepareBroadcaster(ctx, status.SyncInfo.LatestBlockTime)
+	err := b.prepareBroadcaster(ctx, status.SyncInfo.LatestBlockTime)
+	return errors.Wrap(err, "failed to prepare broadcaster")
 }
 
-func (b Broadcaster) getClientCtx(ctx context.Context) client.Context {
-	return client.Context{}.WithClient(b.rpcClient).
-		WithInterfaceRegistry(b.cdc.InterfaceRegistry()).
-		WithChainID(b.cfg.ChainID).
-		WithCodec(b.cdc).
-		WithFromAddress(b.keyAddress).
-		WithCmdContext(ctx)
+func (b Broadcaster) GetHeight() int64 {
+	return b.lastProcessedBlockHeight + 1
 }
 
-func (b Broadcaster) GetTxf() tx.Factory {
-	return b.txf
+func (b *Broadcaster) SetSyncInfo(height int64) {
+	b.lastProcessedBlockHeight = height
 }
 
 func (b *Broadcaster) prepareBroadcaster(ctx context.Context, lastBlockTime time.Time) error {
-	b.txf = tx.Factory{}.
-		WithAccountRetriever(b).
-		WithChainID(b.cfg.ChainID).
-		WithTxConfig(b.txConfig).
-		WithGasAdjustment(b.cfg.GasAdjustment).
-		WithGasPrices(b.cfg.GasPrice).
-		WithKeybase(b.keyBase).
-		WithSignMode(signing.SignMode_SIGN_MODE_DIRECT)
-
-	err := b.loadAccount(ctx)
-	if err != nil {
-		return err
-	}
-
 	dbBatchKVs := make([]types.RawKV, 0)
 
 	loadedPendingTxs, err := b.loadPendingTxs()
 	if err != nil {
 		return err
 	}
-
 	if len(loadedPendingTxs) > 0 {
 		pendingTxTime := time.Unix(0, loadedPendingTxs[0].Timestamp)
 
@@ -183,7 +148,11 @@ func (b *Broadcaster) prepareBroadcaster(ctx context.Context, lastBlockTime time
 
 		// convert pending txs to pending msgs
 		for i, txInfo := range loadedPendingTxs {
-			msgs, err := b.cfg.PendingTxToProcessedMsgs(txInfo.Tx)
+			account, err := b.AccountByAddress(txInfo.Sender)
+			if err != nil {
+				return err
+			}
+			msgs, err := account.PendingTxToProcessedMsgs(txInfo.Tx)
 			if err != nil {
 				return err
 			}
@@ -196,6 +165,7 @@ func (b *Broadcaster) prepareBroadcaster(ctx context.Context, lastBlockTime time
 					}
 
 					b.pendingProcessedMsgs = append(b.pendingProcessedMsgs, btypes.ProcessedMsgs{
+						Sender:    txInfo.Sender,
 						Msgs:      slices.Clone(msgs[i:end]),
 						Timestamp: time.Now().UnixNano(),
 						Save:      true,
@@ -239,14 +209,23 @@ func (b *Broadcaster) prepareBroadcaster(ctx context.Context, lastBlockTime time
 	if err != nil {
 		return err
 	}
-
 	return nil
 }
 
-func (b *Broadcaster) SetSyncInfo(height int64) {
-	b.lastProcessedBlockHeight = height
+func (b Broadcaster) AccountByIndex(index int) (*BroadcasterAccount, error) {
+	b.accountMu.Lock()
+	defer b.accountMu.Unlock()
+	if len(b.accounts) <= index {
+		return nil, fmt.Errorf("broadcaster account not found; length: %d, index: %d", len(b.accounts), index)
+	}
+	return b.accounts[index], nil
 }
 
-func (b Broadcaster) KeyName() string {
-	return b.keyName
+func (b Broadcaster) AccountByAddress(address string) (*BroadcasterAccount, error) {
+	b.accountMu.Lock()
+	defer b.accountMu.Unlock()
+	if _, ok := b.addressAccountMap[address]; !ok {
+		return nil, fmt.Errorf("broadcaster account not found; address: %s", address)
+	}
+	return b.accounts[b.addressAccountMap[address]], nil
 }

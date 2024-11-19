@@ -18,14 +18,15 @@ import (
 )
 
 type childNode interface {
-	GetAddressStr() (string, error)
 	HasKey() bool
 	BroadcastMsgs(btypes.ProcessedMsgs)
 	ProcessedMsgsToRawKV([]btypes.ProcessedMsgs, bool) ([]types.RawKV, error)
 	QueryNextL1Sequence(context.Context, int64) (uint64, error)
+	BaseAccountAddressString() (string, error)
+	OracleAccountAddressString() (string, error)
 
-	GetMsgFinalizeTokenDeposit(string, string, sdk.Coin, uint64, int64, string, []byte) (sdk.Msg, error)
-	GetMsgUpdateOracle(int64, []byte) (sdk.Msg, error)
+	GetMsgFinalizeTokenDeposit(string, string, sdk.Coin, uint64, int64, string, []byte) (sdk.Msg, string, error)
+	GetMsgUpdateOracle(int64, []byte) (sdk.Msg, string, error)
 }
 
 type batchNode interface {
@@ -56,7 +57,14 @@ func NewHostV1(
 	}
 }
 
-func (h *Host) Initialize(ctx context.Context, processedHeight int64, child childNode, batch batchNode, bridgeInfo ophosttypes.QueryBridgeResponse, keyringConfig *btypes.KeyringConfig) error {
+func (h *Host) Initialize(
+	ctx context.Context,
+	processedHeight int64,
+	child childNode,
+	batch batchNode,
+	bridgeInfo ophosttypes.QueryBridgeResponse,
+	keyringConfig *btypes.KeyringConfig,
+) error {
 	err := h.BaseHost.Initialize(ctx, processedHeight, bridgeInfo, keyringConfig)
 	if err != nil {
 		return err
@@ -71,7 +79,11 @@ func (h *Host) Initialize(ctx context.Context, processedHeight int64, child chil
 	return nil
 }
 
-func (h *Host) InitializeDA(ctx context.Context, bridgeInfo ophosttypes.QueryBridgeResponse, keyringConfig *btypes.KeyringConfig) error {
+func (h *Host) InitializeDA(
+	ctx context.Context,
+	bridgeInfo ophosttypes.QueryBridgeResponse,
+	keyringConfig *btypes.KeyringConfig,
+) error {
 	err := h.BaseHost.Initialize(ctx, 0, bridgeInfo, keyringConfig)
 	if err != nil {
 		return err

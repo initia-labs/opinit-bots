@@ -7,6 +7,7 @@ import (
 	"github.com/initia-labs/opinit-bots/types"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
+	"github.com/cosmos/cosmos-sdk/x/authz"
 )
 
 func (b BaseChild) GetMsgFinalizeTokenDeposit(
@@ -17,13 +18,13 @@ func (b BaseChild) GetMsgFinalizeTokenDeposit(
 	blockHeight int64,
 	l1Denom string,
 	data []byte,
-) (sdk.Msg, error) {
-	sender, err := b.GetAddressStr()
+) (sdk.Msg, string, error) {
+	sender, err := b.BaseAccountAddressString()
 	if err != nil {
 		if errors.Is(err, types.ErrKeyNotSet) {
-			return nil, nil
+			return nil, "", nil
 		}
-		return nil, err
+		return nil, "", err
 	}
 
 	msg := opchildtypes.NewMsgFinalizeTokenDeposit(
@@ -38,31 +39,41 @@ func (b BaseChild) GetMsgFinalizeTokenDeposit(
 	)
 	err = msg.Validate(b.node.AccountCodec())
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
-	return msg, nil
+	return msg, sender, nil
 }
 
 func (b BaseChild) GetMsgUpdateOracle(
 	height int64,
 	data []byte,
-) (sdk.Msg, error) {
-	sender, err := b.GetAddressStr()
+) (sdk.Msg, string, error) {
+	oracleAddress, err := b.OracleAccountAddress()
 	if err != nil {
 		if errors.Is(err, types.ErrKeyNotSet) {
-			return nil, nil
+			return nil, "", nil
 		}
-		return nil, err
+		return nil, "", err
+	}
+	oracleAddressString, err := b.OracleAccountAddressString()
+	if err != nil {
+		return nil, "", err
+	}
+
+	if b.oracleAccountGranter == "" {
+		return nil, "", errors.New("oracle account granter is not set")
 	}
 
 	msg := opchildtypes.NewMsgUpdateOracle(
-		sender,
+		b.oracleAccountGranter,
 		types.MustInt64ToUint64(height),
 		data,
 	)
 	err = msg.Validate(b.node.AccountCodec())
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
-	return msg, nil
+
+	authzMsgExec := authz.NewMsgExec(oracleAddress, []sdk.Msg{msg})
+	return &authzMsgExec, oracleAddressString, nil
 }

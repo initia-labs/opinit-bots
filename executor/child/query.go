@@ -2,12 +2,14 @@ package child
 
 import (
 	"encoding/json"
+	"errors"
 
 	"cosmossdk.io/math"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 
 	executortypes "github.com/initia-labs/opinit-bots/executor/types"
+	merkletypes "github.com/initia-labs/opinit-bots/merkle/types"
 )
 
 func (ch Child) QueryWithdrawal(sequence uint64) (executortypes.QueryWithdrawalResponse, error) {
@@ -16,33 +18,35 @@ func (ch Child) QueryWithdrawal(sequence uint64) (executortypes.QueryWithdrawalR
 		return executortypes.QueryWithdrawalResponse{}, err
 	}
 
-	proofs, outputIndex, outputRoot, extraDataBytes, err := ch.Merkle().GetProofs(sequence)
-	if err != nil {
-		return executortypes.QueryWithdrawalResponse{}, err
+	amount := sdk.NewCoin(withdrawal.BaseDenom, math.NewIntFromUint64(withdrawal.Amount))
+
+	res := executortypes.QueryWithdrawalResponse{
+		BridgeId: ch.BridgeId(),
+		From:     withdrawal.From,
+		To:       withdrawal.To,
+		Sequence: sequence,
+		Amount:   amount,
+		Version:  []byte{ch.Version()},
 	}
 
-	amount := sdk.NewCoin(withdrawal.BaseDenom, math.NewIntFromUint64(withdrawal.Amount))
+	proofs, outputIndex, outputRoot, extraDataBytes, err := ch.Merkle().GetProofs(sequence)
+	if errors.Is(err, merkletypes.ErrUnfinalizedTree) {
+		// if the tree is not finalized, we just return only withdrawal info
+		return res, nil
+	} else if err != nil {
+		return executortypes.QueryWithdrawalResponse{}, err
+	}
 
 	treeExtraData := executortypes.TreeExtraData{}
 	err = json.Unmarshal(extraDataBytes, &treeExtraData)
 	if err != nil {
 		return executortypes.QueryWithdrawalResponse{}, err
 	}
-
-	return executortypes.QueryWithdrawalResponse{
-		BridgeId:         ch.BridgeId(),
-		OutputIndex:      outputIndex,
-		WithdrawalProofs: proofs,
-		From:             withdrawal.From,
-		To:               withdrawal.To,
-		Sequence:         sequence,
-		Amount:           amount,
-		Version:          []byte{ch.Version()},
-		StorageRoot:      outputRoot,
-		LastBlockHash:    treeExtraData.BlockHash,
-		// BlockNumber:      treeExtraData.BlockNumber,
-		// WithdrawalHash:   withdrawal.WithdrawalHash,
-	}, nil
+	res.WithdrawalProofs = proofs
+	res.OutputIndex = outputIndex
+	res.StorageRoot = outputRoot
+	res.LastBlockHash = treeExtraData.BlockHash
+	return res, nil
 }
 
 func (ch Child) QueryWithdrawals(address string, offset uint64, limit uint64, descOrder bool) (executortypes.QueryWithdrawalsResponse, error) {

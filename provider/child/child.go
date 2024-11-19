@@ -1,6 +1,7 @@
 package child
 
 import (
+	"bytes"
 	"context"
 	"errors"
 
@@ -10,6 +11,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/codec"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/x/auth"
+	"github.com/cosmos/cosmos-sdk/x/authz"
 
 	"github.com/initia-labs/OPinit/x/opchild"
 	opchildtypes "github.com/initia-labs/OPinit/x/opchild/types"
@@ -40,7 +42,11 @@ type BaseChild struct {
 	opchildQueryClient opchildtypes.QueryClient
 
 	processedMsgs []btypes.ProcessedMsgs
-	msgQueue      []sdk.Msg
+	msgQueue      map[string][]sdk.Msg
+
+	baseAccountIndex     int
+	oracleAccountIndex   int
+	oracleAccountGranter string
 }
 
 func NewBaseChildV1(
@@ -75,7 +81,10 @@ func NewBaseChildV1(
 		opchildQueryClient: opchildtypes.NewQueryClient(node.GetRPCClient()),
 
 		processedMsgs: make([]btypes.ProcessedMsgs, 0),
-		msgQueue:      make([]sdk.Msg, 0),
+		msgQueue:      make(map[string][]sdk.Msg),
+
+		baseAccountIndex:   -1,
+		oracleAccountIndex: -1,
 	}
 	return ch
 }
@@ -86,12 +95,22 @@ func GetCodec(bech32Prefix string) (codec.Codec, client.TxConfig, error) {
 
 	return keys.CreateCodec([]keys.RegisterInterfaces{
 		auth.AppModuleBasic{}.RegisterInterfaces,
+		authz.RegisterInterfaces,
 		opchild.AppModuleBasic{}.RegisterInterfaces,
 	})
 }
 
-func (b *BaseChild) Initialize(ctx context.Context, processedHeight int64, startOutputIndex uint64, bridgeInfo ophosttypes.QueryBridgeResponse, keyringConfig *btypes.KeyringConfig) (uint64, error) {
-	err := b.node.Initialize(ctx, processedHeight, keyringConfig)
+func (b *BaseChild) Initialize(
+	ctx context.Context,
+	processedHeight int64,
+	startOutputIndex uint64,
+	bridgeInfo ophosttypes.QueryBridgeResponse,
+	keyringConfig *btypes.KeyringConfig,
+	oracleKeyringConfig *btypes.KeyringConfig,
+) (uint64, error) {
+	b.SetBridgeInfo(bridgeInfo)
+
+	err := b.node.Initialize(ctx, processedHeight, b.keyringConfigs(keyringConfig, oracleKeyringConfig))
 	if err != nil {
 		return 0, err
 	}
@@ -126,7 +145,41 @@ func (b *BaseChild) Initialize(ctx context.Context, processedHeight int64, start
 			return false, nil
 		}
 	}
-	b.SetBridgeInfo(bridgeInfo)
+
+	if b.OracleEnabled() && oracleKeyringConfig != nil {
+		executors, err := b.QueryExecutors(ctx)
+		if err != nil {
+			return 0, err
+		}
+
+		oracleAddr, err := b.OracleAccountAddressString()
+		if err != nil {
+			return 0, err
+		}
+
+		grants, err := b.QueryGranteeGrants(ctx, oracleAddr)
+		if err != nil {
+			return 0, err
+		}
+	GRANTLOOP:
+		for _, grant := range grants {
+			if grant.Authorization.TypeUrl != "/cosmos.authz.v1beta1.GenericAuthorization" ||
+				!bytes.Contains(grant.Authorization.Value, []byte(types.MsgUpdateOracleTypeUrl)) {
+				continue
+			}
+
+			for _, executor := range executors {
+				if grant.Granter == executor && grant.Grantee == oracleAddr {
+					b.oracleAccountGranter = grant.Granter
+					break GRANTLOOP
+				}
+			}
+		}
+
+		if b.oracleAccountGranter == "" {
+			return 0, errors.New("oracle account has no grant")
+		}
+	}
 	return l2Sequence, nil
 }
 
@@ -193,16 +246,18 @@ func (b BaseChild) DB() types.DB {
 
 /// MsgQueue
 
-func (b BaseChild) GetMsgQueue() []sdk.Msg {
+func (b BaseChild) GetMsgQueue() map[string][]sdk.Msg {
 	return b.msgQueue
 }
 
-func (b *BaseChild) AppendMsgQueue(msg sdk.Msg) {
-	b.msgQueue = append(b.msgQueue, msg)
+func (b *BaseChild) AppendMsgQueue(msg sdk.Msg, sender string) {
+	b.msgQueue[sender] = append(b.msgQueue[sender], msg)
 }
 
 func (b *BaseChild) EmptyMsgQueue() {
-	b.msgQueue = b.msgQueue[:0]
+	for sender := range b.msgQueue {
+		b.msgQueue[sender] = b.msgQueue[sender][:0]
+	}
 }
 
 /// ProcessedMsgs
@@ -244,4 +299,65 @@ func (b BaseChild) GetWorkingTreeLeafCount() (uint64, error) {
 		return 0, errors.New("merkle is not initialized")
 	}
 	return b.mk.GetWorkingTreeLeafCount()
+}
+
+func (b *BaseChild) keyringConfigs(baseConfig *btypes.KeyringConfig, oracleConfig *btypes.KeyringConfig) []btypes.KeyringConfig {
+	var configs []btypes.KeyringConfig
+	if baseConfig != nil {
+		configs = append(configs, *baseConfig)
+		b.baseAccountIndex = len(configs) - 1
+	}
+	if oracleConfig != nil {
+		configs = append(configs, *oracleConfig)
+		b.oracleAccountIndex = len(configs) - 1
+	}
+	return configs
+}
+
+func (b BaseChild) BaseAccountAddressString() (string, error) {
+	broadcaster, err := b.node.GetBroadcaster()
+	if err != nil {
+		return "", err
+	}
+	if b.baseAccountIndex == -1 {
+		return "", types.ErrKeyNotSet
+	}
+	account, err := broadcaster.AccountByIndex(b.baseAccountIndex)
+	if err != nil {
+		return "", err
+	}
+	sender := account.GetAddressString()
+	return sender, nil
+}
+
+func (b BaseChild) OracleAccountAddressString() (string, error) {
+	broadcaster, err := b.node.GetBroadcaster()
+	if err != nil {
+		return "", err
+	}
+	if b.oracleAccountIndex == -1 {
+		return "", types.ErrKeyNotSet
+	}
+	account, err := broadcaster.AccountByIndex(b.oracleAccountIndex)
+	if err != nil {
+		return "", err
+	}
+	sender := account.GetAddressString()
+	return sender, nil
+}
+
+func (b BaseChild) OracleAccountAddress() (sdk.AccAddress, error) {
+	broadcaster, err := b.node.GetBroadcaster()
+	if err != nil {
+		return nil, err
+	}
+	if b.oracleAccountIndex == -1 {
+		return nil, types.ErrKeyNotSet
+	}
+	account, err := broadcaster.AccountByIndex(b.oracleAccountIndex)
+	if err != nil {
+		return nil, err
+	}
+	sender := account.GetAddress()
+	return sender, nil
 }

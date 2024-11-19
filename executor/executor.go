@@ -98,13 +98,13 @@ func (ex *Executor) Initialize(ctx context.Context) error {
 		return err
 	}
 
-	hostKeyringConfig, childKeyringConfig, daKeyringConfig := ex.getKeyringConfigs(*bridgeInfo)
+	hostKeyringConfig, childKeyringConfig, childOracleKeyringConfig, daKeyringConfig := ex.getKeyringConfigs(*bridgeInfo)
 
 	err = ex.host.Initialize(ctx, hostProcessedHeight, ex.child, ex.batch, *bridgeInfo, hostKeyringConfig)
 	if err != nil {
 		return err
 	}
-	err = ex.child.Initialize(ctx, childProcessedHeight, processedOutputIndex+1, ex.host, *bridgeInfo, childKeyringConfig)
+	err = ex.child.Initialize(ctx, childProcessedHeight, processedOutputIndex+1, ex.host, *bridgeInfo, childKeyringConfig, childOracleKeyringConfig)
 	if err != nil {
 		return err
 	}
@@ -221,7 +221,7 @@ func (ex *Executor) makeDANode(ctx context.Context, bridgeInfo ophosttypes.Query
 	switch batchInfo.BatchInfo.ChainType {
 	case ophosttypes.BatchInfo_CHAIN_TYPE_INITIA:
 		// might not exist
-		hostAddrStr, err := ex.host.GetAddressStr()
+		hostAddrStr, err := ex.host.BaseAccountAddressString()
 		if err != nil && !errors.Is(err, types.ErrKeyNotSet) {
 			return nil, err
 		} else if err == nil && hostAddrStr == batchInfo.BatchInfo.Submitter {
@@ -308,7 +308,12 @@ func (ex *Executor) getProcessedHeights(ctx context.Context, bridgeId uint64) (l
 	return l1ProcessedHeight, l2ProcessedHeight, processedOutputIndex, batchProcessedHeight, err
 }
 
-func (ex *Executor) getKeyringConfigs(bridgeInfo ophosttypes.QueryBridgeResponse) (hostKeyringConfig *btypes.KeyringConfig, childKeyringConfig *btypes.KeyringConfig, daKeyringConfig *btypes.KeyringConfig) {
+func (ex *Executor) getKeyringConfigs(bridgeInfo ophosttypes.QueryBridgeResponse) (
+	hostKeyringConfig *btypes.KeyringConfig,
+	childKeyringConfig *btypes.KeyringConfig,
+	childOracleKeyringConfig *btypes.KeyringConfig,
+	daKeyringConfig *btypes.KeyringConfig,
+) {
 	if !ex.cfg.DisableOutputSubmitter {
 		hostKeyringConfig = &btypes.KeyringConfig{
 			Address: bridgeInfo.BridgeConfig.Proposer,
@@ -318,6 +323,12 @@ func (ex *Executor) getKeyringConfigs(bridgeInfo ophosttypes.QueryBridgeResponse
 	if ex.cfg.BridgeExecutor != "" {
 		childKeyringConfig = &btypes.KeyringConfig{
 			Name: ex.cfg.BridgeExecutor,
+		}
+
+		if bridgeInfo.BridgeConfig.OracleEnabled && ex.cfg.OracleBridgeExecutor != "" {
+			childOracleKeyringConfig = &btypes.KeyringConfig{
+				Name: ex.cfg.OracleBridgeExecutor,
+			}
 		}
 	}
 

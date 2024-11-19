@@ -16,8 +16,13 @@ To configure the Executor, fill in the values in the `~/.opinit/executor.json` f
   // Version is the version used to build output root.
   // Please refer to `spec_version.json` for the correct version for each network.
   "version": 1,
-  // ListenAddress is the address to listen for incoming requests.
-  "listen_address": "localhost:3000",
+  // Server is the configuration for the server.
+  "server": {
+    "address":      "localhost:3000",
+    "allow_origins": "*",
+    "allow_headers": "Origin, Content-Type, Accept",
+    "allow_methods": "GET",
+  },
   "l1_node": {
     "chain_id": "testnet-l1-1",
     "bech32_prefix": "init",
@@ -47,6 +52,11 @@ To configure the Executor, fill in the values in the `~/.opinit/executor.json` f
   //
   // If you don't want to use the bridge executor feature, you can leave it empty.
   "bridge_executor": "",
+  // OracleBridgeExecutor is the key name in the keyring for the oracle bridge executor,
+  // which is used to relay oracle transaction from l1 to l2.
+  //
+  // If L2 is using oracle, you need to set this field.
+  "oracle_bridge_executor": "",
 
   // DisableOutputSubmitter is the flag to disable the output submitter.
   // If it is true, the output submitter will not be started.
@@ -78,6 +88,14 @@ To configure the Executor, fill in the values in the `~/.opinit/executor.json` f
   // If the latest height stored in the db is not 0, this config is ignored.
   "batch_start_height": 0
 }
+```
+
+### Oracle config
+If you want to enable to relay oracle data, the `oracle_bridge_executor` field must be set. The oracle data is stored in the 0th tx of each L1 block. The bridge executor submits a `MsgUpdateOracle` containing the 0th Tx of l1 block to l2 when a block in l1 is created.
+
+The `oracle_bridge_executor` must be an account that has received the authz grant from the executor. If it is not set, you can set the authz with the command below.
+```bash
+opinitd tx grant-oracle [oracle-account-address]
 ```
 
 ### Start height config examples
@@ -319,13 +337,18 @@ curl localhost:3000/status
 
 ```json
 {
-  "bridge_id": 1,
+  "bridge_id": 0,
   "host": {
     "node": {
       "last_block_height": 0,
       "broadcaster": {
         "pending_txs": 0,
-        "sequence": 0
+        "accounts_status": [
+          {
+            "address": "",
+            "sequence": 0
+          }
+        ]
       }
     },
     "last_proposed_output_index": 0,
@@ -336,7 +359,16 @@ curl localhost:3000/status
       "last_block_height": 0,
       "broadcaster": {
         "pending_txs": 0,
-        "sequence": 0
+        "accounts_status": [
+          {
+            "address": "",
+            "sequence": 0
+          },
+          {
+            "address": "",
+            "sequence": 0
+          }
+        ]
       }
     },
     "last_updated_oracle_height": 0,
@@ -350,7 +382,7 @@ curl localhost:3000/status
   },
   "batch": {
     "node": {
-      "last_block_height": 0,
+      "last_block_height": 0
     },
     "batch_info": {
       "submitter": "",
@@ -364,7 +396,12 @@ curl localhost:3000/status
   "da": {
     "broadcaster": {
       "pending_txs": 0,
-      "sequence": 0
+      "accounts_status": [
+        {
+          "address": "",
+          "sequence": 0
+        }
+      ]
     }
   }
 }
@@ -379,20 +416,32 @@ initiad tx ophost finalize-token-withdrawal ./withdrawal-info.json --gas= --gas-
 
 ```go
 type QueryWithdrawalResponse struct {
- // fields required to withdraw funds
- BridgeId         uint64   `json:"bridge_id"`
- OutputIndex      uint64   `json:"output_index"`
- WithdrawalProofs [][]byte `json:"withdrawal_proofs"`
- Sender           string   `json:"sender"`
- Sequence         uint64   `json:"sequence"`
- Amount           string   `json:"amount"`
- Version          []byte   `json:"version"`
- StorageRoot      []byte   `json:"storage_root"`
- LatestBlockHash  []byte   `json:"latest_block_hash"`
+  Sequence         uint64     `json:"sequence"`
+  To               string     `json:"to"`
+  From             string     `json:"from"`
+  Amount           types.Coin `json:"amount"`
+  OutputIndex      uint64     `json:"output_index"`
+  BridgeId         uint64     `json:"bridge_id"`
+  WithdrawalProofs [][]byte   `json:"withdrawal_proofs"`
+  Version          []byte     `json:"version"`
+  StorageRoot      []byte     `json:"storage_root"`
+  LastBlockHash    []byte     `json:"last_block_hash"`
+}
+```
 
- // extra info
- BlockNumber    int64 `json:"block_number"`
- Receiver       string `json:"receiver"`
- WithdrawalHash []byte `json:"withdrawal_hash"`
+```bash
+curl localhost:3000/withdrawals/{address}
+```
+default options
+- `limit`: 10
+- `offset`: 0
+- `order`: desc
+
+
+```go
+type QueryWithdrawalsResponse struct {
+  Withdrawals []QueryWithdrawalResponse `json:"withdrawals"`
+  Next        uint64                    `json:"next"`
+  Total       uint64                    `json:"total"`
 }
 ```

@@ -14,13 +14,13 @@ func (b BaseHost) GetMsgProposeOutput(
 	outputIndex uint64,
 	l2BlockNumber int64,
 	outputRoot []byte,
-) (sdk.Msg, error) {
-	sender, err := b.GetAddressStr()
+) (sdk.Msg, string, error) {
+	sender, err := b.BaseAccountAddressString()
 	if err != nil {
 		if errors.Is(err, types.ErrKeyNotSet) {
-			return nil, nil
+			return nil, "", nil
 		}
-		return nil, err
+		return nil, "", err
 	}
 
 	msg := ophosttypes.NewMsgProposeOutput(
@@ -32,18 +32,18 @@ func (b BaseHost) GetMsgProposeOutput(
 	)
 	err = msg.Validate(b.node.AccountCodec())
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
-	return msg, nil
+	return msg, sender, nil
 }
 
-func (b BaseHost) CreateBatchMsg(batchBytes []byte) (sdk.Msg, error) {
-	submitter, err := b.GetAddressStr()
+func (b BaseHost) CreateBatchMsg(batchBytes []byte) (sdk.Msg, string, error) {
+	submitter, err := b.BaseAccountAddressString()
 	if err != nil {
 		if errors.Is(err, types.ErrKeyNotSet) {
-			return nil, nil
+			return nil, "", nil
 		}
-		return nil, err
+		return nil, "", err
 	}
 
 	msg := ophosttypes.NewMsgRecordBatch(
@@ -53,7 +53,7 @@ func (b BaseHost) CreateBatchMsg(batchBytes []byte) (sdk.Msg, error) {
 	)
 	err = msg.Validate(b.node.AccountCodec())
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
-	return msg, nil
+	return msg, submitter, nil
 }
