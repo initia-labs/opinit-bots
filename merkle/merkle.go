@@ -300,7 +300,9 @@ func (m *Merkle) InsertLeaf(data []byte) error {
 // GetProofs returns the proofs for the leaf with the given index.
 func (m *Merkle) GetProofs(leafIndex uint64) (proofs [][]byte, treeIndex uint64, rootData []byte, extraData []byte, err error) {
 	_, value, err := m.db.SeekPrevInclusiveKey(merkletypes.FinalizedTreeKey, merkletypes.PrefixedFinalizedTreeKey(leafIndex))
-	if err != nil {
+	if errors.Is(err, dbtypes.ErrNotFound) {
+		return nil, 0, nil, nil, merkletypes.ErrUnfinalizedTree
+	} else if err != nil {
 		return nil, 0, nil, nil, err
 	}
 
@@ -313,7 +315,7 @@ func (m *Merkle) GetProofs(leafIndex uint64) (proofs [][]byte, treeIndex uint64,
 	if leafIndex < treeInfo.StartLeafIndex {
 		return nil, 0, nil, nil, fmt.Errorf("leaf (`%d`) is not found in tree (`%d`)", leafIndex, treeInfo.TreeIndex)
 	} else if leafIndex-treeInfo.StartLeafIndex >= treeInfo.LeafCount {
-		return nil, 0, nil, nil, fmt.Errorf("the tree containing the leaf (`%d`) has not been finalized yet", leafIndex)
+		return nil, 0, nil, nil, merkletypes.ErrUnfinalizedTree
 	}
 
 	height := uint8(0)
