@@ -164,7 +164,7 @@ func (b *BaseChild) Initialize(
 	GRANTLOOP:
 		for _, grant := range grants {
 			if grant.Authorization.TypeUrl != "/cosmos.authz.v1beta1.GenericAuthorization" ||
-				!bytes.Contains(grant.Authorization.Value, []byte("/opinit.opchild.v1.MsgUpdateOracle")) {
+				!bytes.Contains(grant.Authorization.Value, []byte(types.MsgUpdateOracleTypeUrl)) {
 				continue
 			}
 
@@ -320,7 +320,7 @@ func (b BaseChild) BaseAccountAddressString() (string, error) {
 		return "", err
 	}
 	if b.baseAccountIndex == -1 {
-		return "", nil
+		return "", types.ErrKeyNotSet
 	}
 	account, err := broadcaster.AccountByIndex(b.baseAccountIndex)
 	if err != nil {
@@ -336,7 +336,7 @@ func (b BaseChild) OracleAccountAddressString() (string, error) {
 		return "", err
 	}
 	if b.oracleAccountIndex == -1 {
-		return "", nil
+		return "", types.ErrKeyNotSet
 	}
 	account, err := broadcaster.AccountByIndex(b.oracleAccountIndex)
 	if err != nil {
@@ -352,7 +352,7 @@ func (b BaseChild) OracleAccountAddress() (sdk.AccAddress, error) {
 		return nil, err
 	}
 	if b.oracleAccountIndex == -1 {
-		return nil, nil
+		return nil, types.ErrKeyNotSet
 	}
 	account, err := broadcaster.AccountByIndex(b.oracleAccountIndex)
 	if err != nil {

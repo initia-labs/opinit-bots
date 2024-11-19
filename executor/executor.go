@@ -325,7 +325,7 @@ func (ex *Executor) getKeyringConfigs(bridgeInfo ophosttypes.QueryBridgeResponse
 			Name: ex.cfg.BridgeExecutor,
 		}
 
-		if bridgeInfo.BridgeConfig.OracleEnabled {
+		if bridgeInfo.BridgeConfig.OracleEnabled && ex.cfg.OracleBridgeExecutor != "" {
 			childOracleKeyringConfig = &btypes.KeyringConfig{
 				Name: ex.cfg.OracleBridgeExecutor,
 			}
