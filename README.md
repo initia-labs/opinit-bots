@@ -19,7 +19,7 @@ To ensure compatibility with the node version, check the following versions:
 
 | L1 Node | MiniMove | MiniWasm | MiniEVM |
 | ------- | -------- | -------- | ------- |
-| v0.6.1+ | v0.6.3+  | v0.6.3+  | v0.6.6+ |
+| v0.6.1+ | v0.6.4+  | v0.6.4+  | v0.6.7+ |
 
 ### Build and Configure
 
