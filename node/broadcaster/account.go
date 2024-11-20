@@ -95,6 +95,19 @@ func NewBroadcasterAccount(cfg btypes.BroadcasterConfig, cdc codec.Codec, txConf
 		WithKeybase(keyBase).
 		WithSignMode(signing.SignMode_SIGN_MODE_DIRECT)
 
+	if keyringConfig.FeeGranter != nil {
+		// setup keyring
+		_, feeGranterKeyringRecord, err := cfg.GetKeyringRecord(cdc, keyringConfig.FeeGranter)
+		if err != nil {
+			return nil, err
+		}
+
+		feeGranter, err := feeGranterKeyringRecord.GetAddress()
+		if err != nil {
+			return nil, err
+		}
+		b.txf = b.txf.WithFeeGranter(feeGranter)
+	}
 	return b, nil
 }
 

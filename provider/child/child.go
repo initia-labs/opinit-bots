@@ -104,6 +104,7 @@ func (b *BaseChild) Initialize(
 	bridgeInfo ophosttypes.QueryBridgeResponse,
 	keyringConfig *btypes.KeyringConfig,
 	oracleKeyringConfig *btypes.KeyringConfig,
+	disableDeleteFutureWithdrawals bool,
 ) (uint64, error) {
 	b.SetBridgeInfo(bridgeInfo)
 
@@ -114,10 +115,11 @@ func (b *BaseChild) Initialize(
 
 	var l2Sequence uint64
 	if b.node.HeightInitialized() {
-		l2Sequence, err = b.QueryNextL2Sequence(ctx, processedHeight)
-		if err != nil {
-			return 0, errors.Wrap(err, "failed to query next L2 sequence")
-		}
+		if !disableDeleteFutureWithdrawals {
+			l2Sequence, err = b.QueryNextL2Sequence(ctx, processedHeight)
+			if err != nil {
+				return 0, err
+			}
 
 		err = merkle.DeleteFutureFinalizedTrees(b.DB(), l2Sequence)
 		if err != nil {

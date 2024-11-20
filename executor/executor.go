@@ -94,7 +94,16 @@ func (ex *Executor) Initialize(ctx types.Context) error {
 	if err != nil {
 		return errors.Wrap(err, "failed to initialize host")
 	}
-	err = ex.child.Initialize(ctx, childProcessedHeight, processedOutputIndex+1, ex.host, *bridgeInfo, childKeyringConfig, childOracleKeyringConfig)
+	err = ex.child.Initialize(
+		ctx,
+		childProcessedHeight,
+		processedOutputIndex+1,
+		ex.host,
+		*bridgeInfo,
+		childKeyringConfig,
+		childOracleKeyringConfig,
+		ex.cfg.DisableDeleteFutureWithdrawal,
+	)
 	if err != nil {
 		return errors.Wrap(err, "failed to initialize child")
 	}
@@ -255,7 +264,8 @@ func (ex *Executor) getKeyringConfigs(bridgeInfo ophosttypes.QueryBridgeResponse
 
 		if bridgeInfo.BridgeConfig.OracleEnabled && ex.cfg.OracleBridgeExecutor != "" {
 			childOracleKeyringConfig = &btypes.KeyringConfig{
-				Name: ex.cfg.OracleBridgeExecutor,
+				Name:       ex.cfg.OracleBridgeExecutor,
+				FeeGranter: childKeyringConfig,
 			}
 		}
 	}

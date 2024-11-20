@@ -9,4 +9,5 @@ const (
 	DAName = "da"
 
 	MsgUpdateOracleTypeUrl = "/opinit.opchild.v1.MsgUpdateOracle"
+	MsgAuthzExecTypeUrl    = "/cosmos.authz.v1beta1.MsgExec"
 )
