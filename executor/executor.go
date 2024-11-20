@@ -104,7 +104,16 @@ func (ex *Executor) Initialize(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	err = ex.child.Initialize(ctx, childProcessedHeight, processedOutputIndex+1, ex.host, *bridgeInfo, childKeyringConfig, childOracleKeyringConfig)
+	err = ex.child.Initialize(
+		ctx,
+		childProcessedHeight,
+		processedOutputIndex+1,
+		ex.host,
+		*bridgeInfo,
+		childKeyringConfig,
+		childOracleKeyringConfig,
+		ex.cfg.DisableDeleteFutureWithdrawal,
+	)
 	if err != nil {
 		return err
 	}
