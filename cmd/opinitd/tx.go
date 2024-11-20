@@ -9,6 +9,8 @@ import (
 	"github.com/spf13/cobra"
 	"golang.org/x/sync/errgroup"
 
+	"cosmossdk.io/x/feegrant"
+
 	"github.com/cosmos/cosmos-sdk/x/authz"
 
 	"github.com/initia-labs/opinit-bots/bot"
@@ -69,7 +71,17 @@ func txGrantOracleCmd(baseCtx *cmdContext) *cobra.Command {
 				return err
 			}
 
-			txBytes, _, err := account.BuildTxWithMessages(ctx, []sdk.Msg{grantMsg})
+			msgAllowance, err := feegrant.NewAllowedMsgAllowance(&feegrant.BasicAllowance{}, []string{types.MsgUpdateOracleTypeUrl, types.MsgAuthzExecTypeUrl})
+			if err != nil {
+				return err
+			}
+
+			feegrantMsg, err := feegrant.NewMsgGrantAllowance(msgAllowance, account.GetAddress(), oracleAddress)
+			if err != nil {
+				return err
+			}
+
+			txBytes, _, err := account.BuildTxWithMessages(ctx, []sdk.Msg{grantMsg, feegrantMsg})
 			if err != nil {
 				return errors.Wrapf(err, "simulation failed")
 			}
