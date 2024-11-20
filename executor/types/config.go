@@ -88,6 +88,11 @@ type Config struct {
 	// BatchStartHeight is the height to start the batch. If it is 0, it will start from the latest height.
 	// If the latest height stored in the db is not 0, this config is ignored.
 	BatchStartHeight int64 `json:"batch_start_height"`
+
+	// DisableDeleteFutureWithdrawal is the flag to disable the deletion of future withdrawal.
+	// when the bot is rolled back, it will delete the future withdrawals from DB.
+	// If it is true, it will not delete the future withdrawals.
+	DisableDeleteFutureWithdrawal bool `json:"disable_delete_future_withdrawal"`
 }
 
 func DefaultConfig() *Config {
@@ -137,10 +142,11 @@ func DefaultConfig() *Config {
 		MaxChunkSize:      300000,  // 300KB
 		MaxSubmissionTime: 60 * 60, // 1 hour
 
-		DisableAutoSetL1Height: false,
-		L1StartHeight:          0,
-		L2StartHeight:          0,
-		BatchStartHeight:       0,
+		DisableAutoSetL1Height:        false,
+		L1StartHeight:                 0,
+		L2StartHeight:                 0,
+		BatchStartHeight:              0,
+		DisableDeleteFutureWithdrawal: false,
 	}
 }
 

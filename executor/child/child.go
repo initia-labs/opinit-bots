@@ -66,8 +66,17 @@ func (ch *Child) Initialize(
 	bridgeInfo ophosttypes.QueryBridgeResponse,
 	keyringConfig *btypes.KeyringConfig,
 	oracleKeyringConfig *btypes.KeyringConfig,
+	disableDeleteFutureWithdrawals bool,
 ) error {
-	l2Sequence, err := ch.BaseChild.Initialize(ctx, processedHeight, startOutputIndex, bridgeInfo, keyringConfig, oracleKeyringConfig)
+	l2Sequence, err := ch.BaseChild.Initialize(
+		ctx,
+		processedHeight,
+		startOutputIndex,
+		bridgeInfo,
+		keyringConfig,
+		oracleKeyringConfig,
+		disableDeleteFutureWithdrawals,
+	)
 	if err != nil {
 		return err
 	}
