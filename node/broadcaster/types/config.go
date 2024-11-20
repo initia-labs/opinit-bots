@@ -89,6 +89,9 @@ type KeyringConfig struct {
 	// Address of key in keyring
 	Address string `json:"address"`
 
+	// FeeGranter is the fee granter.
+	FeeGranter *KeyringConfig
+
 	// BuildTxWithMessages is the function to build a transaction with messages.
 	BuildTxWithMessages BuildTxWithMessagesFn
 
