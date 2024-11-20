@@ -20,7 +20,7 @@ func NewRootCmd() *cobra.Command {
 	}
 
 	rootCmd.PersistentPreRunE = func(cmd *cobra.Command, _ []string) (err error) {
-		ctx.logger, err = getLogger(ctx.v.GetString("log-level"))
+		ctx.logger, err = getLogger(ctx.v.GetString("log-level"), ctx.v.GetString("log-format"))
 		if err != nil {
 			return err
 		}
@@ -41,6 +41,11 @@ func NewRootCmd() *cobra.Command {
 		panic(err)
 	}
 
+	rootCmd.PersistentFlags().String("log-format", "plain", "log format (plain or json)")
+	if err := ctx.v.BindPFlag("log-format", rootCmd.PersistentFlags().Lookup("log-format")); err != nil {
+		panic(err)
+	}
+
 	rootCmd.AddCommand(
 		initCmd(ctx),
 		startCmd(ctx),
@@ -55,7 +60,7 @@ func NewRootCmd() *cobra.Command {
 	return rootCmd
 }
 
-func getLogger(logLevel string) (*zap.Logger, error) {
+func getLogger(logLevel string, logFormat string) (*zap.Logger, error) {
 	level := zap.InfoLevel
 	switch logLevel {
 	case "debug":
@@ -70,10 +75,15 @@ func getLogger(logLevel string) (*zap.Logger, error) {
 		level = zap.FatalLevel
 	}
 
-	config := zap.NewDevelopmentConfig()
+	encoding := "console"
+	if logFormat == "json" {
+		encoding = "json"
+	}
+
+	config := zap.NewProductionConfig()
 	config.Level = zap.NewAtomicLevelAt(level)
 	config.EncoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
 	config.EncoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder
-
+	config.Encoding = encoding
 	return config.Build()
 }
