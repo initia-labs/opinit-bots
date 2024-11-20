@@ -10,6 +10,7 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"cosmossdk.io/x/feegrant"
+
 	"github.com/cosmos/cosmos-sdk/x/authz"
 
 	"github.com/initia-labs/opinit-bots/bot"

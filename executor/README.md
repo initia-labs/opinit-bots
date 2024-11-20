@@ -88,9 +88,9 @@ To configure the Executor, fill in the values in the `~/.opinit/executor.json` f
   // If the latest height stored in the db is not 0, this config is ignored.
   "batch_start_height": 0,
   // DisableDeleteFutureWithdrawal is the flag to disable the deletion of future withdrawal.
-	// when the bot is rolled back, it will delete the future withdrawals from DB.
-	// If it is true, it will not delete the future withdrawals.
-	"disable_delete_future_withdrawal": false,
+  // when the bot is rolled back, it will delete the future withdrawals from DB.
+  // If it is true, it will not delete the future withdrawals.
+  "disable_delete_future_withdrawal": false,
 }
 ```
 
