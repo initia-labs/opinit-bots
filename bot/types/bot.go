@@ -1,11 +1,10 @@
 package types
 
 import (
-	"context"
+	"github.com/initia-labs/opinit-bots/types"
 )
 
 type Bot interface {
-	Initialize(context.Context) error
-	Start(context.Context) error
-	Close()
+	Initialize(types.Context) error
+	Start(types.Context) error
 }

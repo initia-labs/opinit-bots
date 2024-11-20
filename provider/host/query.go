@@ -14,25 +14,7 @@ import (
 	"github.com/initia-labs/opinit-bots/node/rpcclient"
 	"github.com/initia-labs/opinit-bots/types"
 	"github.com/pkg/errors"
-
-	sdk "github.com/cosmos/cosmos-sdk/types"
 )
-
-func (b BaseHost) GetAddress() (sdk.AccAddress, error) {
-	broadcaster, err := b.node.GetBroadcaster()
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to get broadcaster")
-	}
-	return broadcaster.GetAddress(), nil
-}
-
-func (b BaseHost) GetAddressStr() (string, error) {
-	broadcaster, err := b.node.GetBroadcaster()
-	if err != nil {
-		return "", errors.Wrap(err, "failed to get broadcaster")
-	}
-	return broadcaster.GetAddressString()
-}
 
 func (b BaseHost) QueryBridgeConfig(ctx context.Context, bridgeId uint64) (*ophosttypes.QueryBridgeResponse, error) {
 	req := &ophosttypes.QueryBridgeRequest{

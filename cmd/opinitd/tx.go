@@ -50,13 +50,16 @@ func txGrantOracleCmd(baseCtx *cmdContext) *cobra.Command {
 			gracefulShutdown(botDone)
 
 			errGrp, ctx := errgroup.WithContext(cmdCtx)
-			ctx = types.WithErrGrp(ctx, errGrp)
 
 			account, err := l2BroadcasterAccount(baseCtx, cmd)
 			if err != nil {
 				return err
 			}
-			err = account.Load(ctx)
+
+			baseCtx := types.NewContext(ctx, baseCtx.logger.Named(string(bottypes.BotTypeExecutor)), baseCtx.homePath).
+				WithErrGrp(errGrp)
+
+			err = account.Load(baseCtx)
 			if err != nil {
 				return err
 			}
@@ -81,12 +84,12 @@ func txGrantOracleCmd(baseCtx *cmdContext) *cobra.Command {
 				return err
 			}
 
-			txBytes, _, err := account.BuildTxWithMessages(ctx, []sdk.Msg{grantMsg, feegrantMsg})
+			txBytes, _, err := account.BuildTxWithMsgs(ctx, []sdk.Msg{grantMsg, feegrantMsg})
 			if err != nil {
 				return errors.Wrapf(err, "simulation failed")
 			}
 
-			res, err := account.BroadcastTxSync(ctx, txBytes)
+			res, err := account.BroadcastTxSync(baseCtx, txBytes)
 			if err != nil {
 				// TODO: handle error, may repeat sending tx
 				return fmt.Errorf("broadcast txs: %w", err)
@@ -116,7 +119,7 @@ func l2BroadcasterAccount(ctx *cmdContext, cmd *cobra.Command) (*broadcaster.Bro
 		return nil, err
 	}
 
-	l2Config := cfg.L2NodeConfig(ctx.homePath)
+	l2Config := cfg.L2NodeConfig()
 	broadcasterConfig := l2Config.BroadcasterConfig
 	cdc, txConfig, err := child.GetCodec(broadcasterConfig.Bech32Prefix)
 	if err != nil {

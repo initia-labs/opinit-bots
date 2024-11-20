@@ -27,7 +27,7 @@ type PendingTxInfo struct {
 }
 
 func (p PendingTxInfo) Key() []byte {
-	return prefixedPendingTx(p.Sequence)
+	return prefixedPendingTx(types.MustInt64ToUint64(p.Timestamp))
 }
 
 func (p PendingTxInfo) Value() ([]byte, error) {

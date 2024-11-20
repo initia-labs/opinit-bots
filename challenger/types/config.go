@@ -111,7 +111,7 @@ func (cfg Config) Validate() error {
 	return nil
 }
 
-func (cfg Config) L1NodeConfig(homePath string) nodetypes.NodeConfig {
+func (cfg Config) L1NodeConfig() nodetypes.NodeConfig {
 	nc := nodetypes.NodeConfig{
 		RPC:          cfg.L1Node.RPCAddress,
 		ProcessType:  nodetypes.PROCESS_TYPE_DEFAULT,
@@ -120,7 +120,7 @@ func (cfg Config) L1NodeConfig(homePath string) nodetypes.NodeConfig {
 	return nc
 }
 
-func (cfg Config) L2NodeConfig(homePath string) nodetypes.NodeConfig {
+func (cfg Config) L2NodeConfig() nodetypes.NodeConfig {
 	nc := nodetypes.NodeConfig{
 		RPC:          cfg.L2Node.RPCAddress,
 		ProcessType:  nodetypes.PROCESS_TYPE_DEFAULT,

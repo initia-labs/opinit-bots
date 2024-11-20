@@ -63,7 +63,7 @@ func NewChildV1(
 
 func (ch *Child) Initialize(
 	ctx types.Context,
-	processedHeight int64,
+	syncedHeight int64,
 	startOutputIndex uint64,
 	host hostNode,
 	bridgeInfo ophosttypes.QueryBridgeResponse,
@@ -73,7 +73,7 @@ func (ch *Child) Initialize(
 ) error {
 	l2Sequence, err := ch.BaseChild.Initialize(
 		ctx,
-		processedHeight,
+		syncedHeight,
 		startOutputIndex,
 		bridgeInfo,
 		keyringConfig,

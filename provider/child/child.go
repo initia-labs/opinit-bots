@@ -121,9 +121,10 @@ func (b *BaseChild) Initialize(
 				return 0, err
 			}
 
-		err = merkle.DeleteFutureFinalizedTrees(b.DB(), l2Sequence)
-		if err != nil {
-			return 0, errors.Wrap(err, "failed to delete future finalized trees")
+			err = merkle.DeleteFutureFinalizedTrees(b.DB(), l2Sequence)
+			if err != nil {
+				return 0, errors.Wrap(err, "failed to delete future finalized trees")
+			}
 		}
 
 		version := types.MustInt64ToUint64(processedHeight)

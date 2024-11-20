@@ -1,7 +1,6 @@
 package challenger
 
 import (
-	"context"
 	"strconv"
 	"sync"
 	"time"
@@ -10,6 +9,7 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/initia-labs/opinit-bots/challenger/child"
+	challengerdb "github.com/initia-labs/opinit-bots/challenger/db"
 	"github.com/initia-labs/opinit-bots/challenger/host"
 	"github.com/initia-labs/opinit-bots/server"
 
@@ -32,9 +32,6 @@ type Challenger struct {
 	cfg    *challengertypes.Config
 	db     types.DB
 	server *server.Server
-	logger *zap.Logger
-
-	homePath string
 
 	challengeCh        chan challengertypes.Challenge
 	challengeChStopped chan struct{}
@@ -44,9 +41,11 @@ type Challenger struct {
 	// status info
 	latestChallengesMu *sync.Mutex
 	latestChallenges   []challengertypes.Challenge
+
+	stage types.CommitDB
 }
 
-func NewChallenger(cfg *challengertypes.Config, db types.DB, logger *zap.Logger, homePath string) *Challenger {
+func NewChallenger(cfg *challengertypes.Config, db types.DB, sv *server.Server) *Challenger {
 	err := cfg.Validate()
 	if err != nil {
 		panic(err)
@@ -55,22 +54,17 @@ func NewChallenger(cfg *challengertypes.Config, db types.DB, logger *zap.Logger,
 	challengeCh := make(chan challengertypes.Challenge)
 	return &Challenger{
 		host: host.NewHostV1(
-			cfg.L1NodeConfig(homePath),
+			cfg.L1NodeConfig(),
 			db.WithPrefix([]byte(types.HostName)),
-			logger.Named(types.HostName),
 		),
 		child: child.NewChildV1(
-			cfg.L2NodeConfig(homePath),
+			cfg.L2NodeConfig(),
 			db.WithPrefix([]byte(types.ChildName)),
-			logger.Named(types.ChildName),
 		),
 
 		cfg:    cfg,
 		db:     db,
-		server: server.NewServer(cfg.Server),
-		logger: logger,
-
-		homePath: homePath,
+		server: sv,
 
 		challengeCh:        challengeCh,
 		challengeChStopped: make(chan struct{}),
@@ -79,10 +73,12 @@ func NewChallenger(cfg *challengertypes.Config, db types.DB, logger *zap.Logger,
 
 		latestChallengesMu: &sync.Mutex{},
 		latestChallenges:   make([]challengertypes.Challenge, 0),
+
+		stage: db.NewStage(),
 	}
 }
 
-func (c *Challenger) Initialize(ctx context.Context) error {
+func (c *Challenger) Initialize(ctx types.Context) error {
 	childBridgeInfo, err := c.child.QueryBridgeInfo(ctx)
 	if err != nil {
 		return err
@@ -96,7 +92,7 @@ func (c *Challenger) Initialize(ctx context.Context) error {
 		return err
 	}
 
-	c.logger.Info(
+	ctx.Logger().Info(
 		"bridge info",
 		zap.Uint64("id", bridgeInfo.BridgeId),
 		zap.Duration("submission_interval", bridgeInfo.BridgeConfig.SubmissionInterval),
@@ -128,7 +124,7 @@ func (c *Challenger) Initialize(ctx context.Context) error {
 	if !initialBlockTime.IsZero() {
 		// The db state is reset to a specific height, so we also
 		// need to delete future challenges which are not applicable anymore.
-		err := c.DeleteFutureChallenges(initialBlockTime)
+		err := challengerdb.DeleteFutureChallenges(c.db, initialBlockTime)
 		if err != nil {
 			return err
 		}
@@ -136,12 +132,12 @@ func (c *Challenger) Initialize(ctx context.Context) error {
 
 	c.RegisterQuerier()
 
-	c.pendingChallenges, err = c.loadPendingChallenges()
+	c.pendingChallenges, err = challengerdb.LoadPendingChallenges(c.db)
 	if err != nil {
 		return err
 	}
 
-	c.latestChallenges, err = c.loadChallenges()
+	c.latestChallenges, err = challengerdb.LoadChallenges(c.db)
 	if err != nil {
 		return err
 	}
@@ -149,43 +145,36 @@ func (c *Challenger) Initialize(ctx context.Context) error {
 	return nil
 }
 
-func (c *Challenger) Start(ctx context.Context) error {
-	defer c.Close()
-
-	errGrp := types.ErrGrp(ctx)
-	errGrp.Go(func() (err error) {
+func (c *Challenger) Start(ctx types.Context) error {
+	ctx.ErrGrp().Go(func() (err error) {
 		<-ctx.Done()
 		return c.server.Shutdown()
 	})
 
-	errGrp.Go(func() (err error) {
+	ctx.ErrGrp().Go(func() (err error) {
 		defer func() {
-			c.logger.Info("api server stopped")
+			ctx.Logger().Info("api server stopped")
 		}()
 		return c.server.Start()
 	})
 
-	errGrp.Go(func() error {
+	ctx.ErrGrp().Go(func() error {
 		for _, ch := range c.pendingChallenges {
 			c.challengeCh <- ch
 		}
 		return nil
 	})
 
-	errGrp.Go(func() (err error) {
+	ctx.ErrGrp().Go(func() (err error) {
 		defer func() {
-			c.logger.Info("challenge handler stopped")
+			ctx.Logger().Info("challenge handler stopped")
 		}()
 		return c.challengeHandler(ctx)
 	})
 
 	c.host.Start(ctx)
 	c.child.Start(ctx)
-	return errGrp.Wait()
-}
-
-func (c *Challenger) Close() {
-	c.db.Close()
+	return ctx.ErrGrp().Wait()
 }
 
 func (c *Challenger) RegisterQuerier() {
@@ -230,7 +219,7 @@ func (c *Challenger) RegisterQuerier() {
 	})
 }
 
-func (c *Challenger) getProcessedHeights(ctx context.Context, bridgeId uint64) (l1ProcessedHeight int64, l2ProcessedHeight int64, processedOutputIndex uint64, err error) {
+func (c *Challenger) getProcessedHeights(ctx types.Context, bridgeId uint64) (l1ProcessedHeight int64, l2ProcessedHeight int64, processedOutputIndex uint64, err error) {
 	var outputL1BlockNumber int64
 	// get the last submitted output height before the start height from the host
 	if c.cfg.L2StartHeight != 0 {
@@ -283,4 +272,8 @@ func (c *Challenger) getProcessedHeights(ctx context.Context, bridgeId uint64) (
 	}
 
 	return l1ProcessedHeight, l2ProcessedHeight, processedOutputIndex, err
+}
+
+func (c Challenger) DB() types.DB {
+	return c.db
 }

@@ -107,7 +107,6 @@ func (n *Node) Initialize(ctx types.Context, processedHeight int64, keyringConfi
 		syncedHeight = processedHeight
 		n.startHeightInitialized = true
 		ctx.Logger().Info("initialize height")
-		return nil
 	} else if err != nil {
 		return errors.Wrap(err, "failed to load sync info")
 	}
@@ -148,7 +147,7 @@ func (n *Node) start(ctx types.Context) {
 	enableEventHandler := true
 	if n.cfg.ProcessType != nodetypes.PROCESS_TYPE_ONLY_BROADCAST {
 		enableEventHandler = false
-		errGrp.Go(func() (err error) {
+		ctx.ErrGrp().Go(func() (err error) {
 			defer func() {
 				ctx.Logger().Info("block process looper stopped")
 				if r := recover(); r != nil {
@@ -161,11 +160,11 @@ func (n *Node) start(ctx types.Context) {
 		})
 	}
 
-	errGrp.Go(func() (err error) {
+	ctx.ErrGrp().Go(func() (err error) {
 		defer func() {
-			n.logger.Info("tx checker looper stopped")
+			ctx.Logger().Info("tx checker looper stopped")
 			if r := recover(); r != nil {
-				n.logger.Error("tx checker panic", zap.Any("recover", r))
+				ctx.Logger().Error("tx checker panic", zap.Any("recover", r))
 				err = fmt.Errorf("tx checker panic: %v", r)
 			}
 		}()

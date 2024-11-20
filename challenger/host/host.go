@@ -4,9 +4,8 @@ import (
 	"context"
 	"time"
 
-	"go.uber.org/zap"
-
 	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
+	"github.com/pkg/errors"
 
 	nodetypes "github.com/initia-labs/opinit-bots/node/types"
 	"github.com/initia-labs/opinit-bots/types"
@@ -18,12 +17,12 @@ import (
 )
 
 type challenger interface {
-	PendingChallengeToRawKVs([]challengertypes.Challenge, bool) ([]types.RawKV, error)
+	DB() types.DB
 	SendPendingChallenges([]challengertypes.Challenge)
 }
 
 type childNode interface {
-	PendingEventsToRawKV([]challengertypes.ChallengeEvent, bool) ([]types.RawKV, error)
+	DB() types.DB
 	SetPendingEvents([]challengertypes.ChallengeEvent)
 }
 
@@ -40,24 +39,27 @@ type Host struct {
 	// status info
 	lastOutputIndex uint64
 	lastOutputTime  time.Time
+
+	stage types.CommitDB
 }
 
 func NewHostV1(
 	cfg nodetypes.NodeConfig,
-	db types.DB, logger *zap.Logger,
+	db types.DB,
 ) *Host {
 	return &Host{
-		BaseHost:                hostprovider.NewBaseHostV1(cfg, db, logger),
-		eventHandler:            eventhandler.NewChallengeEventHandler(db, logger),
+		BaseHost:                hostprovider.NewBaseHostV1(cfg, db),
+		eventHandler:            eventhandler.NewChallengeEventHandler(db),
 		eventQueue:              make([]challengertypes.ChallengeEvent, 0),
 		outputPendingEventQueue: make([]challengertypes.ChallengeEvent, 0),
+		stage:                   db.NewStage(),
 	}
 }
 
-func (h *Host) Initialize(ctx context.Context, processedHeight int64, child childNode, bridgeInfo ophosttypes.QueryBridgeResponse, challenger challenger) (time.Time, error) {
+func (h *Host) Initialize(ctx types.Context, processedHeight int64, child childNode, bridgeInfo ophosttypes.QueryBridgeResponse, challenger challenger) (time.Time, error) {
 	err := h.BaseHost.Initialize(ctx, processedHeight, bridgeInfo, nil)
 	if err != nil {
-		return time.Time{}, err
+		return time.Time{}, errors.Wrap(err, "failed to initialize base host")
 	}
 	h.child = child
 	h.challenger = challenger
@@ -66,7 +68,7 @@ func (h *Host) Initialize(ctx context.Context, processedHeight int64, child chil
 
 	err = h.eventHandler.Initialize(bridgeInfo.BridgeConfig.SubmissionInterval)
 	if err != nil {
-		return time.Time{}, err
+		return time.Time{}, errors.Wrap(err, "failed to initialize event handler")
 	}
 
 	var blockTime time.Time
@@ -75,7 +77,7 @@ func (h *Host) Initialize(ctx context.Context, processedHeight int64, child chil
 	if h.Node().HeightInitialized() {
 		blockTime, err = h.Node().QueryBlockTime(ctx, h.Node().GetHeight())
 		if err != nil {
-			return time.Time{}, err
+			return time.Time{}, errors.Wrap(err, "failed to query block time")
 		}
 	}
 	return blockTime, nil

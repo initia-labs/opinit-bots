@@ -143,14 +143,14 @@ func DefaultConfig() *Config {
 		MaxSubmissionTime: 60 * 60, // 1 hour
 
 		DisableAutoSetL1Height:        false,
-		L1StartHeight:                 0,
-		L2StartHeight:                 0,
-		BatchStartHeight:              0,
+		L1StartHeight:                 1,
+		L2StartHeight:                 1,
+		BatchStartHeight:              1,
 		DisableDeleteFutureWithdrawal: false,
 	}
 }
 
-func (cfg Config) Validate() error {
+func (cfg *Config) Validate() error {
 	if cfg.Version == 0 {
 		return errors.New("version is required")
 	}
@@ -187,16 +187,16 @@ func (cfg Config) Validate() error {
 		return errors.New("max submission time must be greater than 0")
 	}
 
-	if cfg.L1StartHeight < 0 {
-		return errors.New("l1 start height must be greater than or equal to 0")
+	if cfg.L1StartHeight <= 0 {
+		return errors.New("l1 start height must be greater than 0")
 	}
 
-	if cfg.L2StartHeight < 0 {
-		return errors.New("l2 start height must be greater than or equal to 0")
+	if cfg.L2StartHeight <= 0 {
+		return errors.New("l2 start height must be greater than 0")
 	}
 
-	if cfg.BatchStartHeight < 0 {
-		return errors.New("batch start height must be greater than or equal to 0")
+	if cfg.BatchStartHeight <= 0 {
+		return errors.New("batch start height must be greater than 0")
 	}
 	return nil
 }

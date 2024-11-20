@@ -36,8 +36,8 @@ type BroadcasterAccount struct {
 	address       sdk.AccAddress
 	addressString string
 
-	BuildTxWithMessages      btypes.BuildTxWithMessagesFn
-	PendingTxToProcessedMsgs btypes.PendingTxToProcessedMsgsFn
+	BuildTxWithMsgs btypes.BuildTxWithMsgsFn
+	MsgsFromTx      btypes.MsgsFromTxFn
 }
 
 func NewBroadcasterAccount(cfg btypes.BroadcasterConfig, cdc codec.Codec, txConfig client.TxConfig, rpcClient *rpcclient.RPCClient, keyringConfig btypes.KeyringConfig) (*BroadcasterAccount, error) {
@@ -74,16 +74,16 @@ func NewBroadcasterAccount(cfg btypes.BroadcasterConfig, cdc codec.Codec, txConf
 		address:       addr,
 		addressString: addrStr,
 
-		BuildTxWithMessages:      keyringConfig.BuildTxWithMessages,
-		PendingTxToProcessedMsgs: keyringConfig.PendingTxToProcessedMsgs,
+		BuildTxWithMsgs: keyringConfig.BuildTxWithMsgs,
+		MsgsFromTx:      keyringConfig.MsgsFromTx,
 	}
 
-	if b.BuildTxWithMessages == nil {
-		b.BuildTxWithMessages = b.DefaultBuildTxWithMessages
+	if b.BuildTxWithMsgs == nil {
+		b.BuildTxWithMsgs = b.DefaultBuildTxWithMsgs
 	}
 
-	if b.PendingTxToProcessedMsgs == nil {
-		b.PendingTxToProcessedMsgs = b.DefaultPendingTxToProcessedMsgs
+	if b.MsgsFromTx == nil {
+		b.MsgsFromTx = b.DefaultMsgsFromTx
 	}
 
 	b.txf = tx.Factory{}.
@@ -261,7 +261,7 @@ func (b BroadcasterAccount) SimulateAndSignTx(ctx context.Context, msgs ...sdk.M
 }
 
 // buildTxWithMessages creates a transaction from the given messages.
-func (b *BroadcasterAccount) DefaultBuildTxWithMessages(
+func (b *BroadcasterAccount) DefaultBuildTxWithMsgs(
 	ctx context.Context,
 	msgs []sdk.Msg,
 ) (
@@ -281,7 +281,7 @@ func (b *BroadcasterAccount) DefaultBuildTxWithMessages(
 	return txBytes, btypes.TxHash(txBytes), nil
 }
 
-func (b *BroadcasterAccount) DefaultPendingTxToProcessedMsgs(
+func (b *BroadcasterAccount) DefaultMsgsFromTx(
 	txBytes []byte,
 ) ([]sdk.Msg, error) {
 	tx, err := txutils.DecodeTx(b.txConfig, txBytes)

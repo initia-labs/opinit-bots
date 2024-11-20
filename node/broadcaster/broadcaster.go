@@ -1,7 +1,6 @@
 package broadcaster
 
 import (
-	"context"
 	"fmt"
 	"slices"
 	"sync"
@@ -105,18 +104,14 @@ func (b *Broadcaster) Initialize(ctx types.Context, status *rpccoretypes.ResultS
 	return errors.Wrap(err, "failed to prepare broadcaster")
 }
 
-func (b Broadcaster) GetHeight() int64 {
-	return b.lastProcessedBlockHeight + 1
-}
-
 func (b *Broadcaster) SetSyncInfo(height int64) {
-	b.lastProcessedBlockHeight = height
+	b.syncedHeight = height
 }
 
-func (b *Broadcaster) prepareBroadcaster(ctx context.Context, lastBlockTime time.Time) error {
-	dbBatchKVs := make([]types.RawKV, 0)
+func (b *Broadcaster) prepareBroadcaster(ctx types.Context, lastBlockTime time.Time) error {
+	stage := b.db.NewStage()
 
-	err = b.loadPendingTxs(ctx, stage, lastBlockTime)
+	err := b.loadPendingTxs(ctx, stage, lastBlockTime)
 	if err != nil {
 		return err
 	}
@@ -198,6 +193,7 @@ func (b *Broadcaster) loadProcessedMsgsBatch(ctx types.Context, stage types.Basi
 
 func (b *Broadcaster) pendingTxsToProcessedMsgsBatch(ctx types.Context, pendingTxs []btypes.PendingTxInfo) ([]btypes.ProcessedMsgs, error) {
 	pendingProcessedMsgsBatch := make([]btypes.ProcessedMsgs, 0)
+	queues := make(map[string][]sdk.Msg)
 
 	// convert pending txs to pending msgs
 	for i, pendingTx := range pendingTxs {
@@ -205,12 +201,17 @@ func (b *Broadcaster) pendingTxsToProcessedMsgsBatch(ctx types.Context, pendingT
 			continue
 		}
 
-		msgs, err := b.cfg.MsgsFromTx(pendingTx.Tx)
+		account, err := b.AccountByAddress(pendingTx.Sender)
 		if err != nil {
 			return nil, err
 		}
+		msgs, err := account.MsgsFromTx(pendingTx.Tx)
+		if err != nil {
+			return nil, err
+		}
+		queues[pendingTx.Sender] = append(queues[pendingTx.Sender], msgs...)
 
-		pendingProcessedMsgsBatch = append(pendingProcessedMsgsBatch, MsgsToProcessedMsgs(msgs)...)
+		pendingProcessedMsgsBatch = append(pendingProcessedMsgsBatch, MsgsToProcessedMsgs(queues)...)
 		ctx.Logger().Debug("pending tx", zap.Int("index", i), zap.String("tx", pendingTx.String()))
 	}
 	return pendingProcessedMsgsBatch, nil
@@ -224,19 +225,23 @@ func (b *Broadcaster) UpdateSyncedHeight(height int64) {
 	b.syncedHeight = height
 }
 
-func MsgsToProcessedMsgs(msgs []sdk.Msg) []btypes.ProcessedMsgs {
+func MsgsToProcessedMsgs(queues map[string][]sdk.Msg) []btypes.ProcessedMsgs {
 	res := make([]btypes.ProcessedMsgs, 0)
-	for i := 0; i < len(msgs); i += 5 {
-		end := i + 5
-		if end > len(msgs) {
-			end = len(msgs)
-		}
+	for sender := range queues {
+		msgs := queues[sender]
+		for i := 0; i < len(msgs); i += 5 {
+			end := i + 5
+			if end > len(msgs) {
+				end = len(msgs)
+			}
 
-		res = append(res, btypes.ProcessedMsgs{
-			Msgs:      slices.Clone(msgs[i:end]),
-			Timestamp: time.Now().UnixNano(),
-			Save:      true,
-		})
+			res = append(res, btypes.ProcessedMsgs{
+				Sender:    sender,
+				Msgs:      slices.Clone(msgs[i:end]),
+				Timestamp: time.Now().UnixNano(),
+				Save:      true,
+			})
+		}
 	}
 	return res
 }

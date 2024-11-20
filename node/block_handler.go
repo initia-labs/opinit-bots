@@ -12,13 +12,6 @@ import (
 	"github.com/pkg/errors"
 )
 
-func (n *Node) checkPendingTxsFromBroadcaster(ctx types.Context, block *rpccoretypes.ResultBlock, latestHeight int64) error {
-	if n.HasBroadcaster() {
-		return n.broadcaster.HandleNewBlock(ctx, block, latestHeight)
-	}
-	return nil
-}
-
 func (n *Node) handleBeginBlock(ctx types.Context, blockID []byte, protoBlock *prototypes.Block, latestHeight int64) error {
 	if n.beginBlockHandler != nil {
 		return n.beginBlockHandler(ctx, nodetypes.BeginBlockArgs{

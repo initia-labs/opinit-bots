@@ -12,8 +12,6 @@ import (
 	"go.uber.org/zap"
 )
 
-const RAW_BLOCK_QUERY_MAX_SIZE = 100
-
 // blockProcessLooper fetches new blocks and processes them
 func (n *Node) blockProcessLooper(ctx types.Context, processType nodetypes.BlockProcessType) error {
 	consecutiveErrors := 0
@@ -91,7 +89,7 @@ func (n *Node) processBlocksTypeDefault(ctx types.Context, latestHeight int64) e
 
 func (n *Node) processBlocksTypeRaw(ctx types.Context, latestHeight int64) error {
 	start := n.syncedHeight + 1
-	end := n.syncedHeight + RAW_BLOCK_QUERY_MAX_SIZE
+	end := n.syncedHeight + types.RAW_BLOCK_QUERY_MAX_SIZE
 	if end > latestHeight {
 		end = latestHeight
 	}
@@ -134,12 +132,6 @@ func (n *Node) fetchNewBlock(ctx types.Context, height int64) (*rpccoretypes.Res
 }
 
 func (n *Node) handleNewBlock(ctx types.Context, block *rpccoretypes.ResultBlock, blockResult *rpccoretypes.ResultBlockResults, latestChainHeight int64) error {
-	// handle broadcaster first to check pending txs
-	err := n.checkPendingTxsFromBroadcaster(ctx, block, latestChainHeight)
-	if err != nil {
-		return errors.Wrap(err, "failed to check pending txs from broadcaster")
-	}
-
 	protoBlock, err := block.Block.ToProto()
 	if err != nil {
 		return errors.Wrap(err, "failed to convert block to proto block")

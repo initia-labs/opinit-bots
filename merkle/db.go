@@ -89,18 +89,22 @@ func GetNode(db types.BasicDB, treeIndex uint64, height uint8, localNodeIndex ui
 // GetProofs returns the proofs for the leaf with the given index.
 func GetProofs(db types.DB, leafIndex uint64) (proofs [][]byte, treeIndex uint64, rootData []byte, extraData []byte, err error) {
 	_, value, err := db.SeekPrevInclusiveKey(merkletypes.FinalizedTreePrefix, merkletypes.PrefixedFinalizedTreeKey(leafIndex))
-	if err != nil {
-		return nil, 0, nil, nil, errors.Wrap(err, "failed to get finalized tree info")
+	if errors.Is(err, dbtypes.ErrNotFound) {
+		return nil, 0, nil, nil, merkletypes.ErrUnfinalizedTree
+	} else if err != nil {
+		return nil, 0, nil, nil, err
 	}
 
-	treeInfo := merkletypes.FinalizedTreeInfo{}
-	if err := treeInfo.Unmarshal(value); err != nil {
+	var treeInfo merkletypes.FinalizedTreeInfo
+	if err := json.Unmarshal(value, &treeInfo); err != nil {
 		return nil, 0, nil, nil, err
 	}
 
 	// Check if the leaf index is in the tree
-	if leafIndex < treeInfo.StartLeafIndex || leafIndex-treeInfo.StartLeafIndex >= treeInfo.LeafCount {
-		return nil, 0, nil, nil, fmt.Errorf("leaf index %d is not found in tree index %d", leafIndex, treeInfo.TreeIndex)
+	if leafIndex < treeInfo.StartLeafIndex {
+		return nil, 0, nil, nil, fmt.Errorf("leaf (`%d`) is not found in tree (`%d`)", leafIndex, treeInfo.TreeIndex)
+	} else if leafIndex-treeInfo.StartLeafIndex >= treeInfo.LeafCount {
+		return nil, 0, nil, nil, merkletypes.ErrUnfinalizedTree
 	}
 
 	height := uint8(0)

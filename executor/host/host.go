@@ -61,13 +61,13 @@ func NewHostV1(cfg nodetypes.NodeConfig, db types.DB) *Host {
 
 func (h *Host) Initialize(
 	ctx types.Context,
-	processedHeight int64,
+	syncedHeight int64,
 	child childNode,
 	batch batchNode,
 	bridgeInfo ophosttypes.QueryBridgeResponse,
 	keyringConfig *btypes.KeyringConfig,
 ) error {
-	err := h.BaseHost.Initialize(ctx, processedHeight, bridgeInfo, keyringConfig)
+	err := h.BaseHost.Initialize(ctx, syncedHeight, bridgeInfo, keyringConfig)
 	if err != nil {
 		return errors.Wrap(err, "failed to initialize base host")
 	}

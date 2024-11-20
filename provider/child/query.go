@@ -78,19 +78,19 @@ func (b BaseChild) QueryGrantsRequest(ctx context.Context, granter, grantee, msg
 	return res, nil
 }
 
-func (b BaseChild) QueryGranteeGrants(ctx context.Context, grantee string) ([]*authz.GrantAuthorization, error) {
+func (b BaseChild) QueryGranteeGrants(botCtx types.Context, grantee string) ([]*authz.GrantAuthorization, error) {
 	req := &authz.QueryGranteeGrantsRequest{
 		Grantee: grantee,
 		Pagination: &query.PageRequest{
 			Limit: 100,
 		},
 	}
-	ctx, cancel := rpcclient.GetQueryContext(ctx, 0)
+	ctx, cancel := rpcclient.GetQueryContext(botCtx, 0)
 	defer cancel()
 
 	authzClient := authz.NewQueryClient(b.node.GetRPCClient())
 
-	ticker := time.NewTicker(types.PollingInterval(ctx))
+	ticker := time.NewTicker(botCtx.PollingInterval())
 	defer ticker.Stop()
 
 	result := make([]*authz.GrantAuthorization, 0)

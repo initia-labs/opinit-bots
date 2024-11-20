@@ -92,11 +92,11 @@ type KeyringConfig struct {
 	// FeeGranter is the fee granter.
 	FeeGranter *KeyringConfig
 
-	// BuildTxWithMessages is the function to build a transaction with messages.
-	BuildTxWithMessages BuildTxWithMessagesFn
+	// BuildTxWithMsgs is the function to build a transaction with messages.
+	BuildTxWithMsgs BuildTxWithMsgsFn
 
-	// PendingTxToProcessedMsgs is the function to convert pending tx to processed messages.
-	PendingTxToProcessedMsgs PendingTxToProcessedMsgsFn
+	// MsgsFromTx is the function to convert pending tx to processed messages.
+	MsgsFromTx MsgsFromTxFn
 }
 
 func (kc KeyringConfig) GetKeyRecord(keyBase keyring.Keyring, bech32Prefix string) (*keyring.Record, error) {
@@ -123,12 +123,12 @@ func (kc KeyringConfig) GetKeyRecord(keyBase keyring.Keyring, bech32Prefix strin
 	return nil, fmt.Errorf("keyring config is invalid")
 }
 
-func (kc *KeyringConfig) WithPendingTxToProcessedMsgsFn(fn PendingTxToProcessedMsgsFn) {
-	kc.PendingTxToProcessedMsgs = fn
+func (kc *KeyringConfig) WithPendingTxToProcessedMsgsFn(fn MsgsFromTxFn) {
+	kc.MsgsFromTx = fn
 }
 
-func (kc *KeyringConfig) WithBuildTxWithMessagesFn(fn BuildTxWithMessagesFn) {
-	kc.BuildTxWithMessages = fn
+func (kc *KeyringConfig) WithBuildTxWithMessagesFn(fn BuildTxWithMsgsFn) {
+	kc.BuildTxWithMsgs = fn
 }
 
 func (kc KeyringConfig) Validate() error {

@@ -83,31 +83,22 @@ func (ex *Executor) Initialize(ctx types.Context) error {
 		zap.Duration("submission_interval", bridgeInfo.BridgeConfig.SubmissionInterval),
 	)
 
-	hostProcessedHeight, childProcessedHeight, processedOutputIndex, batchProcessedHeight, err := ex.getProcessedHeights(ctx, bridgeInfo.BridgeId)
+	l1StartHeight, l2StartHeight, startOutputIndex, batchStartHeight, err := ex.getNodeStartHeights(ctx, bridgeInfo.BridgeId)
 	if err != nil {
 		return errors.Wrap(err, "failed to get processed heights")
 	}
 
 	hostKeyringConfig, childKeyringConfig, childOracleKeyringConfig, daKeyringConfig := ex.getKeyringConfigs(*bridgeInfo)
 
-	err = ex.host.Initialize(ctx, hostProcessedHeight, ex.child, ex.batch, *bridgeInfo, hostKeyringConfig)
+	err = ex.host.Initialize(ctx, l1StartHeight-1, ex.child, ex.batch, *bridgeInfo, hostKeyringConfig)
 	if err != nil {
 		return errors.Wrap(err, "failed to initialize host")
 	}
-	err = ex.child.Initialize(
-		ctx,
-		childProcessedHeight,
-		processedOutputIndex+1,
-		ex.host,
-		*bridgeInfo,
-		childKeyringConfig,
-		childOracleKeyringConfig,
-		ex.cfg.DisableDeleteFutureWithdrawal,
-	)
+	err = ex.child.Initialize(ctx, l2StartHeight-1, startOutputIndex, ex.host, *bridgeInfo, childKeyringConfig, childOracleKeyringConfig, ex.cfg.DisableDeleteFutureWithdrawal)
 	if err != nil {
 		return errors.Wrap(err, "failed to initialize child")
 	}
-	err = ex.batch.Initialize(ctx, batchProcessedHeight, ex.host, *bridgeInfo)
+	err = ex.batch.Initialize(ctx, batchStartHeight-1, ex.host, *bridgeInfo)
 	if err != nil {
 		return errors.Wrap(err, "failed to initialize batch")
 	}
@@ -188,61 +179,61 @@ func (ex *Executor) makeDANode(ctx types.Context, bridgeInfo ophosttypes.QueryBr
 	return nil, fmt.Errorf("unsupported chain id for DA: %s", ophosttypes.BatchInfo_ChainType_name[int32(batchInfo.BatchInfo.ChainType)])
 }
 
-func (ex *Executor) getProcessedHeights(ctx types.Context, bridgeId uint64) (l1ProcessedHeight int64, l2ProcessedHeight int64, processedOutputIndex uint64, batchProcessedHeight int64, err error) {
-	var outputL1BlockNumber int64
+func (ex *Executor) getNodeStartHeights(ctx types.Context, bridgeId uint64) (l1StartHeight int64, l2StartHeight int64, startOutputIndex uint64, batchStartHeight int64, err error) {
+	var outputL1Height, outputL2Height int64
+	var outputIndex uint64
+
 	// get the last submitted output height before the start height from the host
-	if ex.cfg.L2StartHeight != 0 {
-		output, err := ex.host.QueryOutputByL2BlockNumber(ctx, bridgeId, ex.cfg.L2StartHeight)
-		if err != nil {
-			return 0, 0, 0, 0, errors.Wrap(err, "failed to query output by l2 block number")
-		} else if output != nil {
-			outputL1BlockNumber = types.MustUint64ToInt64(output.OutputProposal.L1BlockNumber)
-			l2ProcessedHeight = types.MustUint64ToInt64(output.OutputProposal.L2BlockNumber)
-			processedOutputIndex = output.OutputIndex
-		}
+	output, err := ex.host.QueryOutputByL2BlockNumber(ctx, bridgeId, ex.cfg.L2StartHeight)
+	if err != nil {
+		return 0, 0, 0, 0, errors.Wrap(err, "failed to query output by l2 block number")
+	} else if output != nil {
+		outputL1Height = types.MustUint64ToInt64(output.OutputProposal.L1BlockNumber)
+		outputL2Height = types.MustUint64ToInt64(output.OutputProposal.L2BlockNumber)
+		outputIndex = output.OutputIndex
 	}
 
+	// use l1 start height from the config if auto set is disabled
 	if ex.cfg.DisableAutoSetL1Height {
-		l1ProcessedHeight = ex.cfg.L1StartHeight
+		l1StartHeight = ex.cfg.L1StartHeight
 	} else {
 		// get the bridge start height from the host
-		l1ProcessedHeight, err = ex.host.QueryCreateBridgeHeight(ctx, bridgeId)
+		l1StartHeight, err = ex.host.QueryCreateBridgeHeight(ctx, bridgeId)
 		if err != nil {
 			return 0, 0, 0, 0, errors.Wrap(err, "failed to query create bridge height")
 		}
 
-		l1Sequence, err := ex.child.QueryNextL1Sequence(ctx, 0)
+		childNextL1Sequence, err := ex.child.QueryNextL1Sequence(ctx, 0)
 		if err != nil {
 			return 0, 0, 0, 0, errors.Wrap(err, "failed to query next l1 sequence")
 		}
 
-		// query l1Sequence tx height
-		depositTxHeight, err := ex.host.QueryDepositTxHeight(ctx, bridgeId, l1Sequence)
+		// query last NextL1Sequence tx height
+		depositTxHeight, err := ex.host.QueryDepositTxHeight(ctx, bridgeId, childNextL1Sequence)
 		if err != nil {
 			return 0, 0, 0, 0, errors.Wrap(err, "failed to query deposit tx height")
-		} else if depositTxHeight == 0 && l1Sequence > 1 {
-			// query l1Sequence - 1 tx height
-			depositTxHeight, err = ex.host.QueryDepositTxHeight(ctx, bridgeId, l1Sequence-1)
+		} else if depositTxHeight == 0 && childNextL1Sequence > 1 {
+			// if the deposit tx with next_l1_sequence is not found
+			// query deposit tx with next_l1_sequence-1 tx
+			depositTxHeight, err = ex.host.QueryDepositTxHeight(ctx, bridgeId, childNextL1Sequence-1)
 			if err != nil {
 				return 0, 0, 0, 0, errors.Wrap(err, "failed to query deposit tx height")
 			}
 		}
-		if depositTxHeight > l1ProcessedHeight {
-			l1ProcessedHeight = depositTxHeight
+
+		if l1StartHeight < depositTxHeight {
+			l1StartHeight = depositTxHeight
 		}
-		if outputL1BlockNumber != 0 && outputL1BlockNumber < l1ProcessedHeight {
-			l1ProcessedHeight = outputL1BlockNumber
+
+		if outputL1Height != 0 && outputL1Height+1 < l1StartHeight {
+			l1StartHeight = outputL1Height + 1
 		}
 	}
 
-	if l1ProcessedHeight > 0 {
-		l1ProcessedHeight--
-	}
-
-	if ex.cfg.BatchStartHeight > 0 {
-		batchProcessedHeight = ex.cfg.BatchStartHeight - 1
-	}
-	return l1ProcessedHeight, l2ProcessedHeight, processedOutputIndex, batchProcessedHeight, nil
+	l2StartHeight = outputL2Height + 1
+	startOutputIndex = outputIndex + 1
+	batchStartHeight = ex.cfg.BatchStartHeight
+	return
 }
 
 func (ex *Executor) getKeyringConfigs(bridgeInfo ophosttypes.QueryBridgeResponse) (
