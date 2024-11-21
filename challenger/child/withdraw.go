@@ -118,9 +118,11 @@ func (ch *Child) handleTree(ctx types.Context, blockHeight int64, blockHeader cm
 			return nil, errors.Wrap(err, "failed to finalize working tree")
 		}
 
-		err = merkle.SaveFinalizedTree(ch.stage, finalizedTree)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to save finalized tree")
+		if finalizedTree != nil {
+			err = merkle.SaveFinalizedTree(ch.stage, *finalizedTree)
+			if err != nil {
+				return nil, errors.Wrap(err, "failed to save finalized tree")
+			}
 		}
 
 		err = merkle.SaveNodes(ch.stage, newNodes...)

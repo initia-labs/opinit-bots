@@ -356,7 +356,7 @@ func TestSeekPrevInclusiveKey(t *testing.T) {
 		{"prefix key4 start 0", []byte("key4"), append([]byte("key4"), dbtypes.FromUint64Key(0)...), []byte("key4"), false},
 		{"prefix key4 start 4997", []byte("key4"), append([]byte("key4"), dbtypes.FromUint64Key(4997)...), append([]byte("key4"), dbtypes.FromUint64Key(4995)...), false},
 		{"prefix key4 start 1000", []byte("key4"), append([]byte("key4"), dbtypes.FromUint64Key(1000)...), append([]byte("key4"), dbtypes.FromUint64Key(1000)...), false},
-		{"prefix key4 start 6000", []byte("key4"), append([]byte("key4"), dbtypes.FromUint64Key(6000)...), append([]byte("key4"), dbtypes.FromUint64Key(5000)...), false},
+		{"prefix key4 start 5005", []byte("key4"), append([]byte("key4"), dbtypes.FromUint64Key(5005)...), append([]byte("key4"), dbtypes.FromUint64Key(5000)...), false},
 	}
 
 	for _, tc := range cases {

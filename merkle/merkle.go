@@ -73,27 +73,27 @@ func (m *Merkle) InitializeWorkingTree(treeIndex uint64, startLeafIndex uint64) 
 }
 
 // FinalizeWorkingTree finalizes the working tree and returns the finalized tree info.
-func (m *Merkle) FinalizeWorkingTree(extraData []byte) (merkletypes.FinalizedTreeInfo, []merkletypes.Node, []byte /* root */, error) {
+func (m *Merkle) FinalizeWorkingTree(extraData []byte) (*merkletypes.FinalizedTreeInfo, []merkletypes.Node, []byte /* root */, error) {
 	if m.workingTree == nil {
-		return merkletypes.FinalizedTreeInfo{}, nil, nil, errors.New("working tree is not initialized")
+		return nil, nil, nil, errors.New("working tree is not initialized")
 	}
 	m.workingTree.Done = true
 	if m.workingTree.LeafCount == 0 {
-		return merkletypes.FinalizedTreeInfo{}, nil, merkletypes.EmptyRootHash[:], nil
+		return nil, nil, merkletypes.EmptyRootHash[:], nil
 	}
 
 	newNodes, err := m.fillLeaves()
 	if err != nil {
-		return merkletypes.FinalizedTreeInfo{}, nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	height, err := m.Height()
 	if err != nil {
-		return merkletypes.FinalizedTreeInfo{}, nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	treeRootHash := m.workingTree.LastSiblings[height]
-	finalizedTreeInfo := merkletypes.FinalizedTreeInfo{
+	finalizedTreeInfo := &merkletypes.FinalizedTreeInfo{
 		TreeIndex:      m.workingTree.Index,
 		TreeHeight:     height,
 		Root:           treeRootHash,

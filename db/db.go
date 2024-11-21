@@ -134,7 +134,12 @@ func (db *LevelDB) ReverseIterate(prefix []byte, start []byte, cb func(key, valu
 // @dev: `LevelDB.prefix + prefix` is used as the prefix for the iteration.
 func (db *LevelDB) SeekPrevInclusiveKey(prefix []byte, key []byte) (k []byte, v []byte, err error) {
 	iter := db.db.NewIterator(util.BytesPrefix(db.PrefixedKey(prefix)), nil)
-	defer iter.Release()
+	defer func() {
+		iter.Release()
+		if err == nil {
+			err = iter.Error()
+		}
+	}()
 	if ok := iter.Seek(db.PrefixedKey(key)); ok || iter.Last() {
 		// if the valid key is not found, the iterator will be at the last key
 		// if the key is found, the iterator will be at the key
@@ -146,9 +151,6 @@ func (db *LevelDB) SeekPrevInclusiveKey(prefix []byte, key []byte) (k []byte, v 
 		v = bytes.Clone(iter.Value())
 	} else {
 		err = dbtypes.ErrNotFound
-	}
-	if iter.Error() != nil {
-		err = iter.Error()
 	}
 	return k, v, err
 }
