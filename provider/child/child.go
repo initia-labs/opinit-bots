@@ -119,14 +119,28 @@ func (b *BaseChild) Initialize(
 	var l2Sequence uint64
 	if b.node.HeightInitialized() {
 		if !disableDeleteFutureWithdrawals {
-			l2Sequence, err = b.QueryNextL2Sequence(ctx, processedHeight)
-			if err != nil {
-				return 0, err
-			}
+			l2Sequence = 1
+			if processedHeight != 0 {
+				l2Sequence, err = b.QueryNextL2Sequence(ctx, processedHeight)
+				if err != nil {
+					return 0, err
+				}
 
-			err = b.mk.DeleteFutureFinalizedTrees(l2Sequence)
-			if err != nil {
-				return 0, err
+				err = b.mk.DeleteFutureFinalizedTrees(l2Sequence)
+				if err != nil {
+					return 0, err
+				}
+			}
+			b.initializeTreeFn = func(blockHeight int64) (bool, error) {
+				if processedHeight+1 == blockHeight {
+					b.logger.Info("initialize tree", zap.Uint64("index", startOutputIndex))
+					err := b.mk.InitializeWorkingTree(startOutputIndex, l2Sequence)
+					if err != nil {
+						return false, err
+					}
+					return true, nil
+				}
+				return false, nil
 			}
 		}
 
@@ -134,18 +148,6 @@ func (b *BaseChild) Initialize(
 		err = b.mk.DeleteFutureWorkingTrees(version + 1)
 		if err != nil {
 			return 0, err
-		}
-
-		b.initializeTreeFn = func(blockHeight int64) (bool, error) {
-			if processedHeight+1 == blockHeight {
-				b.logger.Info("initialize tree", zap.Uint64("index", startOutputIndex))
-				err := b.mk.InitializeWorkingTree(startOutputIndex, 1)
-				if err != nil {
-					return false, err
-				}
-				return true, nil
-			}
-			return false, nil
 		}
 	}
 
