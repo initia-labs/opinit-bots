@@ -24,11 +24,11 @@ func (s *Stage) Set(key []byte, value []byte) error {
 
 func (s Stage) Get(key []byte) ([]byte, error) {
 	prefixedKey := s.parent.PrefixedKey(key)
-	value := s.kvmap[string(prefixedKey)]
-	if value != nil {
+	value, ok := s.kvmap[string(prefixedKey)]
+	if ok {
 		return value, nil
 	}
-	return s.parent.Get(prefixedKey)
+	return s.parent.Get(key)
 }
 
 func (s *Stage) Delete(key []byte) error {
@@ -43,7 +43,6 @@ func (s *Stage) Commit() error {
 	if err != nil {
 		return err
 	}
-	maps.Clear(s.kvmap)
 	return nil
 }
 
@@ -64,4 +63,5 @@ func (s *Stage) ExecuteFnWithDB(db types.DB, fn func() error) error {
 
 func (s *Stage) Reset() {
 	s.batch.Reset()
+	maps.Clear(s.kvmap)
 }

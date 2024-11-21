@@ -371,3 +371,17 @@ func TestSeekPrevInclusiveKey(t *testing.T) {
 		})
 	}
 }
+
+func TestNewStage(t *testing.T) {
+	db, err := NewMemDB()
+	require.NoError(t, err)
+
+	tstage := db.NewStage()
+	require.NotNil(t, tstage)
+
+	stage, ok := tstage.(*Stage)
+	require.True(t, ok)
+	require.Equal(t, stage.batch.Len(), 0)
+	require.Equal(t, len(stage.kvmap), 0)
+	require.Equal(t, stage.parent, db)
+}
