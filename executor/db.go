@@ -106,7 +106,7 @@ func Migration0191(db types.DB) error {
 	changeWorkingTree := false
 	err = merkleDB.PrefixedIterate(merkletypes.WorkingTreeKey, nil, func(key, value []byte) (bool, error) {
 		if len(key) != len(merkletypes.WorkingTreeKey)+1+8 {
-			return false, nil
+			return true, fmt.Errorf("unexpected working tree key; expected: %d; got: %d", len(merkletypes.WorkingTreeKey)+1+8, len(key))
 		}
 
 		version := dbtypes.ToUint64Key(key[len(key)-8:])
@@ -210,6 +210,7 @@ func Migration0192(ctx context.Context, db types.DB, rpcClient *rpcclient.RPCCli
 			height := extraData.BlockNumber + 1
 			header, err := rpcClient.Header(ctx, &height)
 			if err != nil {
+				fmt.Printf("failed to get header for block height: %d; %s\n", height, err.Error())
 				continue
 			}
 
