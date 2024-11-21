@@ -115,23 +115,23 @@ func Migration0191(db types.DB) error {
 			return true, err
 		}
 
+		if nextSequence != workingTree.StartLeafIndex {
+			changeWorkingTree = true
+		}
+
+		if changeWorkingTree {
+			workingTree.StartLeafIndex = nextSequence
+			workingTreeBz, err := json.Marshal(workingTree)
+			if err != nil {
+				return true, err
+			}
+			err = merkleDB.Set(key, workingTreeBz)
+			if err != nil {
+				return true, err
+			}
+		}
+
 		if workingTree.Done && workingTree.LeafCount != 0 {
-			if nextSequence != workingTree.StartLeafIndex {
-				changeWorkingTree = true
-			}
-
-			if changeWorkingTree {
-				workingTree.StartLeafIndex = nextSequence
-				workingTreeBz, err := json.Marshal(workingTree)
-				if err != nil {
-					return true, err
-				}
-				err = merkleDB.Set(key, workingTreeBz)
-				if err != nil {
-					return true, err
-				}
-			}
-
 			data, err := json.Marshal(executortypes.TreeExtraData{
 				BlockNumber: types.MustUint64ToInt64(version),
 			})
