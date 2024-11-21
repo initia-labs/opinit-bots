@@ -101,6 +101,7 @@ func Migration0191(db types.DB) error {
 	}
 
 	nextSequence := uint64(1)
+	changeWorkingTree := false
 	err = merkleDB.PrefixedIterate(merkletypes.WorkingTreeKey, nil, func(key, value []byte) (bool, error) {
 		if len(key) != len(merkletypes.WorkingTreeKey)+1+8 {
 			return false, nil
@@ -114,7 +115,23 @@ func Migration0191(db types.DB) error {
 			return true, err
 		}
 
-		if workingTree.Done && workingTree.LeafCount != 0 && nextSequence == workingTree.StartLeafIndex {
+		if workingTree.Done && workingTree.LeafCount != 0 {
+			if nextSequence != workingTree.StartLeafIndex {
+				changeWorkingTree = true
+			}
+
+			if changeWorkingTree {
+				workingTree.StartLeafIndex = nextSequence
+				workingTreeBz, err := json.Marshal(workingTree)
+				if err != nil {
+					return true, err
+				}
+				err = merkleDB.Set(key, workingTreeBz)
+				if err != nil {
+					return true, err
+				}
+			}
+
 			data, err := json.Marshal(executortypes.TreeExtraData{
 				BlockNumber: types.MustUint64ToInt64(version),
 			})
@@ -146,6 +163,7 @@ func Migration0191(db types.DB) error {
 			if err != nil {
 				return true, err
 			}
+
 			fmt.Printf("finalized tree index: %d, start leaf index: %d, leaf count: %d, block height: %d\n", finalizedTreeInfo.TreeIndex, finalizedTreeInfo.StartLeafIndex, finalizedTreeInfo.LeafCount, version)
 			nextSequence = workingTree.StartLeafIndex + workingTree.LeafCount
 		}
