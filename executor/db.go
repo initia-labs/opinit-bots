@@ -2,11 +2,13 @@ package executor
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"math/bits"
 	"time"
 
+	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
 	dbtypes "github.com/initia-labs/opinit-bots/db/types"
 	executortypes "github.com/initia-labs/opinit-bots/executor/types"
 	merkletypes "github.com/initia-labs/opinit-bots/merkle/types"
@@ -227,7 +229,10 @@ func Migration0192(ctx context.Context, db types.DB, rpcClient *rpcclient.RPCCli
 		if err != nil {
 			return true, err
 		}
-		fmt.Printf("finalized tree index: %d, start leaf index: %d, leaf count: %d, block height: %d, block hash: %X\n", tree.TreeIndex, tree.StartLeafIndex, tree.LeafCount, extraData.BlockNumber, extraData.BlockHash)
+		outputRoot := ophosttypes.GenerateOutputRoot(1, tree.Root, extraData.BlockHash)
+		outputRootStr := base64.StdEncoding.EncodeToString(outputRoot[:])
+
+		fmt.Printf("finalized tree index: %d, start leaf index: %d, leaf count: %d, block height: %d, block hash: %X, outputRoot: %s\n", tree.TreeIndex, tree.StartLeafIndex, tree.LeafCount, extraData.BlockNumber, extraData.BlockHash, outputRootStr)
 		return false, nil
 	})
 }
