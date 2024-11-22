@@ -116,33 +116,35 @@ func (b *BaseChild) Initialize(
 	var l2Sequence uint64
 	if b.node.HeightInitialized() {
 		if !disableDeleteFutureWithdrawals {
-			l2Sequence, err = b.QueryNextL2Sequence(ctx, processedHeight)
-			if err != nil {
-				return 0, err
-			}
+			l2Sequence = 1
+			if processedHeight != 0 {
+				l2Sequence, err = b.QueryNextL2Sequence(ctx, processedHeight)
+				if err != nil {
+					return 0, err
+				}
 
-			err = merkle.DeleteFutureFinalizedTrees(b.DB(), l2Sequence)
-			if err != nil {
-				return 0, errors.Wrap(err, "failed to delete future finalized trees")
+				err = merkle.DeleteFutureFinalizedTrees(b.DB(), l2Sequence)
+				if err != nil {
+					return 0, err
+				}
+			}
+			b.initializeTreeFn = func(blockHeight int64) (bool, error) {
+				if processedHeight+1 == blockHeight {
+					ctx.Logger().Info("initialize tree", zap.Uint64("index", startOutputIndex))
+					err := b.mk.InitializeWorkingTree(startOutputIndex, l2Sequence)
+					if err != nil {
+						return false, errors.Wrap(err, "failed to initialize working tree")
+					}
+					return true, nil
+				}
+				return false, nil
 			}
 		}
 
 		version := types.MustInt64ToUint64(processedHeight)
 		err = merkle.DeleteFutureWorkingTrees(b.DB(), version+1)
 		if err != nil {
-			return 0, errors.Wrap(err, "failed to delete future working trees")
-		}
-
-		b.initializeTreeFn = func(blockHeight int64) (bool, error) {
-			if processedHeight+1 == blockHeight {
-				ctx.Logger().Info("initialize tree", zap.Uint64("index", startOutputIndex))
-				err := b.mk.InitializeWorkingTree(startOutputIndex, 1)
-				if err != nil {
-					return false, errors.Wrap(err, "failed to initialize working tree")
-				}
-				return true, nil
-			}
-			return false, nil
+			return 0, err
 		}
 	}
 

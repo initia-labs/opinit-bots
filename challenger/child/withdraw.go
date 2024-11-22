@@ -56,12 +56,11 @@ func (ch *Child) handleInitiateWithdrawal(ctx types.Context, l2Sequence uint64, 
 }
 
 func (ch *Child) prepareTree(blockHeight int64) error {
-	if ch.InitializeTree(blockHeight) {
-		return nil
-	}
-
-	workingTree, err := merkle.GetWorkingTree(ch.DB(), types.MustInt64ToUint64(blockHeight)-1)
+	err := ch.Merkle().LoadWorkingTree(types.MustInt64ToUint64(blockHeight - 1))
 	if err == dbtypes.ErrNotFound {
+		if ch.InitializeTree(blockHeight) {
+			return nil
+		}
 		// must not happened
 		panic(fmt.Errorf("working tree not found at height: %d, current: %d", blockHeight-1, blockHeight))
 	} else if err != nil {
