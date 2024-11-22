@@ -1,10 +1,11 @@
 package broadcaster
 
 import (
-	"github.com/cosmos/cosmos-sdk/codec"
 	dbtypes "github.com/initia-labs/opinit-bots/db/types"
 	btypes "github.com/initia-labs/opinit-bots/node/broadcaster/types"
 	"github.com/initia-labs/opinit-bots/types"
+
+	"github.com/cosmos/cosmos-sdk/codec"
 )
 
 ///////////////

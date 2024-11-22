@@ -6,9 +6,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/initia-labs/opinit-bots/types"
+
 	"github.com/cosmos/cosmos-sdk/codec"
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	"github.com/initia-labs/opinit-bots/types"
 )
 
 type PendingTxInfo struct {
