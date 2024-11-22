@@ -64,6 +64,17 @@ func SaveWorkingTree(db types.BasicDB, workingTree merkletypes.TreeInfo) error {
 	return db.Set(workingTree.Key(), value)
 }
 
+func GetFinalizedTree(db types.BasicDB, startLeafIndex uint64) (merkletypes.FinalizedTreeInfo, error) {
+	data, err := db.Get(merkletypes.PrefixedFinalizedTreeKey(startLeafIndex))
+	if err != nil {
+		return merkletypes.FinalizedTreeInfo{}, err
+	}
+
+	var finalizedTree merkletypes.FinalizedTreeInfo
+	err = json.Unmarshal(data, &finalizedTree)
+	return finalizedTree, err
+}
+
 func SaveFinalizedTree(db types.BasicDB, finalizedTree merkletypes.FinalizedTreeInfo) error {
 	value, err := json.Marshal(finalizedTree)
 	if err != nil {
@@ -82,7 +93,7 @@ func SaveNodes(db types.BasicDB, nodes ...merkletypes.Node) error {
 	return nil
 }
 
-func GetNode(db types.BasicDB, treeIndex uint64, height uint8, localNodeIndex uint64) ([]byte, error) {
+func GetNodeBytes(db types.BasicDB, treeIndex uint64, height uint8, localNodeIndex uint64) ([]byte, error) {
 	return db.Get(merkletypes.PrefixedNodeKey(treeIndex, height, localNodeIndex))
 }
 
@@ -111,7 +122,7 @@ func GetProofs(db types.DB, leafIndex uint64) (proofs [][]byte, treeIndex uint64
 	localNodeIndex := leafIndex - treeInfo.StartLeafIndex
 	for height < treeInfo.TreeHeight {
 		siblingIndex := localNodeIndex ^ 1 // flip the last bit to find the sibling
-		sibling, err := GetNode(db, treeInfo.TreeIndex, height, siblingIndex)
+		sibling, err := GetNodeBytes(db, treeInfo.TreeIndex, height, siblingIndex)
 		if err != nil {
 			return nil, 0, nil, nil, errors.Wrap(err, "failed to get sibling node from db")
 		}

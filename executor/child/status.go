@@ -26,7 +26,7 @@ func (ch Child) GetStatus() (Status, error) {
 		return Status{}, errors.New("node is not initialized")
 	}
 
-	workingTree, err := ch.GetWorkingTree()
+	workingTree, err := ch.WorkingTree()
 	if err != nil {
 		return Status{}, errors.Wrap(err, "failed to get working tree")
 	}

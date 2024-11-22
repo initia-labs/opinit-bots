@@ -5,8 +5,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"github.com/syndtr/goleveldb/leveldb"
-	"github.com/syndtr/goleveldb/leveldb/storage"
 
 	dbtypes "github.com/initia-labs/opinit-bots/db/types"
 	"github.com/initia-labs/opinit-bots/types"
@@ -29,19 +27,6 @@ func makeTestSet() []types.KV {
 		pairs = append(pairs, types.KV{Key: append([]byte("key4"), dbtypes.FromUint64Key(uint64(i))...), Value: dbtypes.FromInt64(int64(i))})
 	}
 	return pairs
-}
-
-func NewMemDB() (*LevelDB, error) {
-	s := storage.NewMemStorage()
-
-	db, err := leveldb.Open(s, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return &LevelDB{
-		db: db,
-	}, nil
 }
 
 func CreateTestDB(t *testing.T, pairs []types.KV) *LevelDB {

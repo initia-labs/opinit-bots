@@ -278,11 +278,11 @@ func (b BaseChild) Merkle() *merkle.Merkle {
 	return b.mk
 }
 
-func (b BaseChild) GetWorkingTree() (merkletypes.TreeInfo, error) {
+func (b BaseChild) WorkingTree() (merkletypes.TreeInfo, error) {
 	if b.mk == nil {
 		return merkletypes.TreeInfo{}, errors.New("merkle is not initialized")
 	}
-	return b.mk.GetWorkingTree()
+	return b.mk.WorkingTree()
 }
 
 func (b *BaseChild) keyringConfigs(baseConfig *btypes.KeyringConfig, oracleConfig *btypes.KeyringConfig) []btypes.KeyringConfig {

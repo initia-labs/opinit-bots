@@ -40,7 +40,7 @@ func (ch *Child) endBlockHandler(ctx types.Context, args nodetypes.EndBlockArgs)
 	}
 
 	if storageRoot != nil {
-		workingTree, err := ch.GetWorkingTree()
+		workingTree, err := ch.WorkingTree()
 		if err != nil {
 			return errors.Wrap(err, "failed to get working tree")
 		}

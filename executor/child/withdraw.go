@@ -84,7 +84,7 @@ func (ch *Child) prepareTree(blockHeight int64) error {
 }
 
 func (ch *Child) prepareOutput(ctx context.Context) error {
-	workingTree, err := ch.GetWorkingTree()
+	workingTree, err := ch.WorkingTree()
 	if err != nil {
 		return errors.Wrap(err, "failed to get working tree")
 	}
@@ -149,7 +149,7 @@ func (ch *Child) handleTree(ctx types.Context, blockHeight int64, latestHeight i
 			return nil, errors.Wrap(err, "failed to save new nodes of finalized tree")
 		}
 
-		workingTree, err := ch.GetWorkingTree()
+		workingTree, err := ch.WorkingTree()
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to get working tree")
 		}
@@ -172,7 +172,7 @@ func (ch *Child) handleTree(ctx types.Context, blockHeight int64, latestHeight i
 		ch.nextOutputTime = blockHeader.Time.Add(ch.BridgeInfo().BridgeConfig.SubmissionInterval * 2 / 3)
 	}
 
-	workingTree, err := ch.Merkle().GetWorkingTree()
+	workingTree, err := ch.WorkingTree()
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get working tree")
 	}
