@@ -55,79 +55,22 @@ func ResetHeight(db types.DB, nodeName string) error {
 	return nil
 }
 
-func Migration016(db types.DB) error {
-	DAHostName := "da_host"
-	DACelestiaName := "da_celestia"
-
-	// move all data from da_host and da_celestia to da
-	daDB := db.WithPrefix([]byte(types.DAName))
-	for _, dbName := range []string{DAHostName, DACelestiaName} {
-		nodeDB := db.WithPrefix([]byte(dbName))
-
-		err := nodeDB.Iterate(nil, nil, func(key, value []byte) (bool, error) {
-			err := daDB.Set(key, value)
-			if err != nil {
-				return true, errors.Wrap(err, "failed to set data to DA")
-			}
-
-			err = nodeDB.Delete(key)
-			if err != nil {
-				return true, errors.Wrap(err, fmt.Sprintf("failed to delete data from %s", dbName))
-			}
-			return false, nil
-		})
-		if err != nil {
-			return err
-		}
-	}
-
-	// change the last processed block height to synced height
-	for _, nodeName := range []string{
-		types.HostName,
-		types.ChildName,
-		types.BatchName,
-		types.DAName,
-	} {
-		nodeDB := db.WithPrefix([]byte(nodeName))
-
-		value, err := nodeDB.Get(nodetypes.LastProcessedBlockHeightKey)
-		if err == nil {
-			err = nodeDB.Set(nodetypes.SyncedHeightKey, value)
-			if err != nil {
-				return errors.Wrap(err, "failed to set synced height")
-			}
-		}
-	}
-
+func Migration015(db types.DB) error {
+	nodeDB := db.WithPrefix([]byte(types.ChildName))
 	addressIndexMap := make(map[string]uint64)
-	childDB := db.WithPrefix([]byte(types.ChildName))
-	return childDB.Iterate(dbtypes.AppendSplitter(executortypes.WithdrawalPrefix), nil, func(key, value []byte) (bool, error) {
-		if len(key) == len(executortypes.WithdrawalPrefix)+1+8 {
-			data := executortypes.WithdrawalData{}
-			err := data.Unmarshal(value)
-			if err != nil {
-				return true, err
-			}
-			addressIndexMap[data.To]++
-
-			dataWithIndex := executortypes.NewWithdrawalDataWithIndex(data, addressIndexMap[data.To])
-			dataBz, err := dataWithIndex.Marshal()
-			if err != nil {
-				return true, err
-			}
-
-			err = childDB.Set(executortypes.PrefixedWithdrawalSequence(data.Sequence), dataBz)
-			if err != nil {
-				return true, err
-			}
-
-			err = childDB.Set(executortypes.PrefixedWithdrawalAddressIndex(data.To, addressIndexMap[data.To]), dbtypes.FromUint64(data.Sequence))
-			if err != nil {
-				return true, err
-			}
+	return nodeDB.Iterate(executortypes.WithdrawalPrefix, nil, func(key, value []byte) (bool, error) {
+		if len(key) != len(executortypes.WithdrawalPrefix)+1+8 {
+			return false, nil
 		}
 
-		err := childDB.Delete(key)
+		sequence := dbtypes.ToUint64Key(key[len(key)-8:])
+		var data executortypes.WithdrawalData
+		err := json.Unmarshal(value, &data)
+		if err != nil {
+			return true, err
+		}
+		addressIndexMap[data.To]++
+		err = nodeDB.Set(executortypes.PrefixedWithdrawalAddressIndex(data.To, addressIndexMap[data.To]), dbtypes.FromUint64(sequence))
 		if err != nil {
 			return true, err
 		}
@@ -135,7 +78,7 @@ func Migration016(db types.DB) error {
 	})
 }
 
-func Migration0191(db types.DB) error {
+func Migration019_1(db types.DB) error {
 	nodeDB := db.WithPrefix([]byte(types.ChildName))
 	merkleDB := nodeDB.WithPrefix([]byte(types.MerkleName))
 
@@ -232,7 +175,7 @@ func Migration0191(db types.DB) error {
 	return nil
 }
 
-func Migration0192(ctx types.Context, db types.DB, rpcClient *rpcclient.RPCClient) error {
+func Migration019_2(ctx types.Context, db types.DB, rpcClient *rpcclient.RPCClient) error {
 	nodeDB := db.WithPrefix([]byte(types.ChildName))
 	merkleDB := nodeDB.WithPrefix([]byte(types.MerkleName))
 
@@ -289,6 +232,86 @@ func Migration0192(ctx types.Context, db types.DB, rpcClient *rpcclient.RPCClien
 		outputRootStr := base64.StdEncoding.EncodeToString(outputRoot[:])
 
 		fmt.Printf("finalized tree index: %d, start leaf index: %d, leaf count: %d, block height: %d, block hash: %X, outputRoot: %s\n", tree.TreeIndex, tree.StartLeafIndex, tree.LeafCount, extraData.BlockNumber, extraData.BlockHash, outputRootStr)
+		return false, nil
+	})
+}
+
+func Migration0110(db types.DB) error {
+	DAHostName := "da_host"
+	DACelestiaName := "da_celestia"
+
+	// move all data from da_host and da_celestia to da
+	daDB := db.WithPrefix([]byte(types.DAName))
+	for _, dbName := range []string{DAHostName, DACelestiaName} {
+		nodeDB := db.WithPrefix([]byte(dbName))
+
+		err := nodeDB.Iterate(nil, nil, func(key, value []byte) (bool, error) {
+			err := daDB.Set(key, value)
+			if err != nil {
+				return true, errors.Wrap(err, "failed to set data to DA")
+			}
+
+			err = nodeDB.Delete(key)
+			if err != nil {
+				return true, errors.Wrap(err, fmt.Sprintf("failed to delete data from %s", dbName))
+			}
+			return false, nil
+		})
+		if err != nil {
+			return err
+		}
+	}
+
+	// change the last processed block height to synced height
+	for _, nodeName := range []string{
+		types.HostName,
+		types.ChildName,
+		types.BatchName,
+		types.DAName,
+	} {
+		nodeDB := db.WithPrefix([]byte(nodeName))
+
+		value, err := nodeDB.Get(nodetypes.LastProcessedBlockHeightKey)
+		if err == nil {
+			err = nodeDB.Set(nodetypes.SyncedHeightKey, value)
+			if err != nil {
+				return errors.Wrap(err, "failed to set synced height")
+			}
+		}
+	}
+
+	addressIndexMap := make(map[string]uint64)
+	childDB := db.WithPrefix([]byte(types.ChildName))
+	return childDB.Iterate(dbtypes.AppendSplitter(executortypes.WithdrawalPrefix), nil, func(key, value []byte) (bool, error) {
+		if len(key) == len(executortypes.WithdrawalPrefix)+1+8 {
+			data := executortypes.WithdrawalData{}
+			err := data.Unmarshal(value)
+			if err != nil {
+				return true, err
+			}
+			addressIndexMap[data.To]++
+
+			dataWithIndex := executortypes.NewWithdrawalDataWithIndex(data, addressIndexMap[data.To])
+			dataBz, err := dataWithIndex.Marshal()
+			if err != nil {
+				return true, err
+			}
+
+			err = childDB.Set(executortypes.PrefixedWithdrawalSequence(data.Sequence), dataBz)
+			if err != nil {
+				return true, err
+			}
+
+			err = childDB.Set(executortypes.PrefixedWithdrawalAddressIndex(data.To, addressIndexMap[data.To]), dbtypes.FromUint64(data.Sequence))
+			if err != nil {
+				return true, err
+			}
+		}
+
+		err := childDB.Delete(key)
+		if err != nil {
+			return true, err
+		}
 		return false, nil
 	})
 }

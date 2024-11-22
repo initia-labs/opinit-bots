@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/initia-labs/opinit-bots/bot"
 	bottypes "github.com/initia-labs/opinit-bots/bot/types"
 	"github.com/initia-labs/opinit-bots/db"
 	"github.com/initia-labs/opinit-bots/executor"
@@ -30,7 +31,7 @@ v0.1.9-2: Fill block hash of finalized tree
 		RunE: func(cmd *cobra.Command, args []string) error {
 			version := args[0]
 			switch version {
-			case "v0.1.6":
+			case "v0.1.5":
 				// Run migration for v0.1.5
 				db, err := db.NewDB(GetDBPath(ctx.homePath, bottypes.BotTypeExecutor))
 				if err != nil {
@@ -39,14 +40,14 @@ v0.1.9-2: Fill block hash of finalized tree
 				return executor.Migration015(db)
 			case "v0.1.9-1":
 				// Run migration for v0.1.9-1
-				db, err := db.NewDB(bot.GetDBPath(ctx.homePath, bottypes.BotTypeExecutor))
+				db, err := db.NewDB(GetDBPath(ctx.homePath, bottypes.BotTypeExecutor))
 				if err != nil {
 					return err
 				}
-				return executor.Migration0191(db)
+				return executor.Migration019_1(db)
 			case "v0.1.9-2":
 				// Run migration for v0.1.9-2
-				db, err := db.NewDB(bot.GetDBPath(ctx.homePath, bottypes.BotTypeExecutor))
+				db, err := db.NewDB(GetDBPath(ctx.homePath, bottypes.BotTypeExecutor))
 				if err != nil {
 					return err
 				}
@@ -56,7 +57,9 @@ v0.1.9-2: Fill block hash of finalized tree
 				if err != nil {
 					return err
 				}
-				cmdCtx = types.WithPollingInterval(cmdCtx, interval)
+
+				baseCtx := types.NewContext(cmdCtx, ctx.logger.Named(string(bottypes.BotTypeExecutor)), ctx.homePath).
+					WithPollingInterval(interval)
 
 				configPath, err := getConfigPath(cmd, ctx.homePath, string(bottypes.BotTypeExecutor))
 				if err != nil {
@@ -69,7 +72,7 @@ v0.1.9-2: Fill block hash of finalized tree
 					return err
 				}
 
-				l2Config := cfg.L2NodeConfig(ctx.homePath)
+				l2Config := cfg.L2NodeConfig()
 				broadcasterConfig := l2Config.BroadcasterConfig
 				cdc, _, err := child.GetCodec(broadcasterConfig.Bech32Prefix)
 				if err != nil {
@@ -81,7 +84,14 @@ v0.1.9-2: Fill block hash of finalized tree
 					return err
 				}
 
-				return executor.Migration0192(cmdCtx, db, rpcClient)
+				return executor.Migration019_2(baseCtx, db, rpcClient)
+			case "v0.1.10":
+				// Run migration for v0.1.10
+				db, err := db.NewDB(GetDBPath(ctx.homePath, bottypes.BotTypeExecutor))
+				if err != nil {
+					return err
+				}
+				return executor.Migration0110(db)
 			default:
 				return fmt.Errorf("unknown migration version: %s", version)
 			}
