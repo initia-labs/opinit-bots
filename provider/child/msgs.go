@@ -4,6 +4,7 @@ import (
 	opchildtypes "github.com/initia-labs/OPinit/x/opchild/types"
 	"github.com/initia-labs/opinit-bots/types"
 
+	cdctypes "github.com/cosmos/cosmos-sdk/codec/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/x/authz"
 
@@ -48,15 +49,11 @@ func (b BaseChild) GetMsgUpdateOracle(
 	height int64,
 	data []byte,
 ) (sdk.Msg, string, error) {
-	oracleAddress, err := b.OracleAccountAddress()
+	oracleAddressString, err := b.OracleAccountAddressString()
 	if err != nil {
 		if errors.Is(err, types.ErrKeyNotSet) {
 			return nil, "", nil
 		}
-		return nil, "", errors.Wrap(err, "failed to get address")
-	}
-	oracleAddressString, err := b.OracleAccountAddressString()
-	if err != nil {
 		return nil, "", errors.Wrap(err, "failed to get address")
 	}
 
@@ -74,6 +71,23 @@ func (b BaseChild) GetMsgUpdateOracle(
 		return nil, "", errors.Wrap(err, "failed to validate msg")
 	}
 
-	authzMsgExec := authz.NewMsgExec(oracleAddress, []sdk.Msg{msg})
-	return &authzMsgExec, oracleAddressString, nil
+	authzMsg, err := CreateAuthzMsg(oracleAddressString, msg)
+	if err != nil {
+		return nil, "", errors.Wrap(err, "failed to create authz msg")
+	}
+	return authzMsg, oracleAddressString, nil
+}
+
+func CreateAuthzMsg(grantee string, msg sdk.Msg) (sdk.Msg, error) {
+	msgsAny := make([]*cdctypes.Any, 1)
+	any, err := cdctypes.NewAnyWithValue(msg)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to create any")
+	}
+	msgsAny[0] = any
+
+	return &authz.MsgExec{
+		Grantee: grantee,
+		Msgs:    msgsAny,
+	}, err
 }
