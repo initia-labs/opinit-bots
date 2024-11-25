@@ -237,3 +237,36 @@ func Migration0192(ctx context.Context, db types.DB, rpcClient *rpcclient.RPCCli
 		return false, nil
 	})
 }
+
+func Migration0110(db types.DB) error {
+	nodeDB := db.WithPrefix([]byte(types.ChildName))
+	err := nodeDB.PrefixedIterate(executortypes.WithdrawalKey, nil, func(key, value []byte) (bool, error) {
+		// pass PrefixedWithdrawalKey ( WithdrawalKey / Sequence )
+		// we only delete PrefixedWithdrawalKeyAddressIndex ( WithdrawalKey / Address / Sequence )
+		if len(key) == len(executortypes.WithdrawalKey)+1+8 {
+			return false, nil
+		}
+		err := nodeDB.Delete(key)
+		if err != nil {
+			return true, err
+		}
+		return false, nil
+	})
+	if err != nil {
+		return err
+	}
+
+	return nodeDB.PrefixedIterate(executortypes.WithdrawalKey, nil, func(key, value []byte) (bool, error) {
+		sequence := dbtypes.ToUint64Key(key[len(key)-8:])
+		var data executortypes.WithdrawalData
+		err := json.Unmarshal(value, &data)
+		if err != nil {
+			return true, err
+		}
+		err = nodeDB.Set(executortypes.PrefixedWithdrawalKeyAddressIndex(data.To, sequence), dbtypes.FromUint64(sequence))
+		if err != nil {
+			return true, err
+		}
+		return false, nil
+	})
+}

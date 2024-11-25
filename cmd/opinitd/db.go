@@ -83,6 +83,13 @@ v0.1.9-2: Fill block hash of finalized tree
 				}
 
 				return executor.Migration0192(cmdCtx, db, rpcClient)
+			case "v0.1.10":
+				// Run migration for v0.1.10
+				db, err := db.NewDB(bot.GetDBPath(ctx.homePath, bottypes.BotTypeExecutor))
+				if err != nil {
+					return err
+				}
+				return executor.Migration0110(db)
 			default:
 				return fmt.Errorf("unknown migration version: %s", version)
 			}
