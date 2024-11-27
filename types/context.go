@@ -19,8 +19,8 @@ type Context struct {
 	homePath        string
 }
 
-func NewContext(baseCtx context.Context, logger *zap.Logger, homePath string) *Context {
-	return &Context{
+func NewContext(baseCtx context.Context, logger *zap.Logger, homePath string) Context {
+	return Context{
 		baseCtx: baseCtx,
 
 		logger:   logger,

@@ -57,7 +57,7 @@ func (ch *Child) handleInitiateWithdrawal(ctx types.Context, l2Sequence uint64, 
 
 func (ch *Child) prepareTree(blockHeight int64) error {
 	workingTree, err := merkle.GetWorkingTree(ch.DB(), types.MustInt64ToUint64(blockHeight-1))
-	if err == dbtypes.ErrNotFound {
+	if errors.Is(err, dbtypes.ErrNotFound) {
 		if ch.InitializeTree(blockHeight) {
 			return nil
 		}

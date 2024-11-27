@@ -1,8 +1,6 @@
 package host
 
 import (
-	"time"
-
 	"github.com/initia-labs/opinit-bots/node"
 	"github.com/initia-labs/opinit-bots/types"
 
@@ -15,7 +13,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-func (h *Host) beginBlockHandler(_ types.Context, args nodetypes.BeginBlockArgs) error {
+func (h *Host) beginBlockHandler(_ types.Context, _ nodetypes.BeginBlockArgs) error {
 	h.EmptyMsgQueue()
 	h.EmptyProcessedMsgs()
 	h.stage.Reset()
@@ -38,6 +36,8 @@ func (h *Host) endBlockHandler(_ types.Context, args nodetypes.EndBlockArgs) err
 		if err != nil {
 			return errors.Wrap(err, "failed to save processed msgs on child db")
 		}
+	} else {
+		h.EmptyProcessedMsgs()
 	}
 
 	err = h.stage.Commit()
@@ -57,7 +57,7 @@ func (h *Host) txHandler(_ types.Context, args nodetypes.TxHandlerArgs) error {
 			h.AppendProcessedMsgs(btypes.ProcessedMsgs{
 				Sender:    sender,
 				Msgs:      []sdk.Msg{msg},
-				Timestamp: time.Now().UnixNano(),
+				Timestamp: types.CurrentNanoTimestamp(),
 				Save:      false,
 			})
 		}

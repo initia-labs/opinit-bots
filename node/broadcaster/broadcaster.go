@@ -87,7 +87,7 @@ func NewBroadcaster(
 
 func (b *Broadcaster) Initialize(ctx types.Context, status *rpccoretypes.ResultStatus, keyringConfigs []btypes.KeyringConfig) error {
 	for _, keyringConfig := range keyringConfigs {
-		account, err := NewBroadcasterAccount(b.cfg, b.cdc, b.txConfig, b.rpcClient, keyringConfig)
+		account, err := NewBroadcasterAccount(ctx, b.cfg, b.cdc, b.txConfig, b.rpcClient, keyringConfig)
 		if err != nil {
 			return err
 		}
@@ -182,7 +182,7 @@ func (b *Broadcaster) loadProcessedMsgsBatch(ctx types.Context, stage types.Basi
 
 	// update timestamp of loaded processed msgs
 	for i := range processedMsgsBatch {
-		processedMsgsBatch[i].Timestamp = time.Now().UnixNano()
+		processedMsgsBatch[i].Timestamp = types.CurrentNanoTimestamp()
 		ctx.Logger().Debug("pending msgs", zap.Int("index", i), zap.String("msgs", processedMsgsBatch[i].String()))
 	}
 
@@ -238,7 +238,7 @@ func MsgsToProcessedMsgs(queues map[string][]sdk.Msg) []btypes.ProcessedMsgs {
 			res = append(res, btypes.ProcessedMsgs{
 				Sender:    sender,
 				Msgs:      slices.Clone(msgs[i:end]),
-				Timestamp: time.Now().UnixNano(),
+				Timestamp: types.CurrentNanoTimestamp(),
 				Save:      true,
 			})
 		}

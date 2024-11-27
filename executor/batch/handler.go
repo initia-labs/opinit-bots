@@ -69,6 +69,8 @@ func (bs *BatchSubmitter) rawBlockHandler(ctx types.Context, args nodetypes.RawB
 		if err != nil {
 			return errors.Wrap(err, "failed to save processed msgs")
 		}
+	} else {
+		bs.processedMsgs = bs.processedMsgs[:0]
 	}
 	err = SaveLocalBatchInfo(bs.stage, *bs.localBatchInfo)
 	if err != nil {
@@ -212,7 +214,7 @@ func (bs *BatchSubmitter) finalizeBatch(ctx types.Context, blockHeight int64) er
 		bs.processedMsgs = append(bs.processedMsgs, btypes.ProcessedMsgs{
 			Sender:    sender,
 			Msgs:      []sdk.Msg{msg},
-			Timestamp: time.Now().UnixNano(),
+			Timestamp: types.CurrentNanoTimestamp(),
 			Save:      true,
 		})
 	}
@@ -232,7 +234,7 @@ func (bs *BatchSubmitter) finalizeBatch(ctx types.Context, blockHeight int64) er
 			bs.processedMsgs = append(bs.processedMsgs, btypes.ProcessedMsgs{
 				Sender:    sender,
 				Msgs:      []sdk.Msg{msg},
-				Timestamp: time.Now().UnixNano(),
+				Timestamp: types.CurrentNanoTimestamp(),
 				Save:      true,
 			})
 		}

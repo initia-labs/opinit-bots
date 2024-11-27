@@ -3,6 +3,7 @@ package db
 import (
 	"bytes"
 
+	"github.com/pkg/errors"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/util"
 
@@ -51,7 +52,11 @@ func (db *LevelDB) Set(key []byte, value []byte) error {
 
 // Get gets the value of the key in the database with prefixing the key.
 func (db *LevelDB) Get(key []byte) ([]byte, error) {
-	return db.db.Get(db.PrefixedKey(key), nil)
+	v, err := db.db.Get(db.PrefixedKey(key), nil)
+	if errors.Is(err, leveldb.ErrNotFound) {
+		return nil, errors.Wrapf(err, "key: %v", key)
+	}
+	return v, err
 }
 
 // Delete deletes the key in the database with prefixing the key.

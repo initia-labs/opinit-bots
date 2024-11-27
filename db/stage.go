@@ -61,6 +61,10 @@ func (s *Stage) ExecuteFnWithDB(db types.DB, fn func() error) error {
 	return fn()
 }
 
+func (s Stage) Len() int {
+	return s.batch.Len()
+}
+
 func (s *Stage) Reset() {
 	s.batch.Reset()
 	maps.Clear(s.kvmap)

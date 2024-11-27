@@ -36,6 +36,21 @@ func TestStageReset(t *testing.T) {
 	require.Equal(t, len(stage.kvmap), 0)
 }
 
+func TestStageLen(t *testing.T) {
+	_, stage, err := CreateTestStage(t, nil)
+	require.NoError(t, err)
+
+	stage.Reset()
+	require.Equal(t, stage.Len(), 0)
+
+	err = stage.Set([]byte("key"), []byte("value"))
+	require.NoError(t, err)
+	require.Equal(t, stage.Len(), 1)
+
+	stage.Reset()
+	require.Equal(t, stage.Len(), 0)
+}
+
 func TestStageSet(t *testing.T) {
 	_, stage, err := CreateTestStage(t, nil)
 	require.NoError(t, err)

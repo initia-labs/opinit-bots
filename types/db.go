@@ -6,12 +6,6 @@ type KV struct {
 	Value []byte
 }
 
-// RawKV is a key-value pair without prefixing the key.
-type RawKV struct {
-	Key   []byte
-	Value []byte
-}
-
 type BasicDB interface {
 	Get([]byte) ([]byte, error)
 	Set([]byte, []byte) error
@@ -39,4 +33,5 @@ type CommitDB interface {
 	ExecuteFnWithDB(DB, func() error) error
 	Commit() error
 	Reset()
+	Len() int
 }

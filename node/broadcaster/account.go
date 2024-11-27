@@ -10,6 +10,7 @@ import (
 	btypes "github.com/initia-labs/opinit-bots/node/broadcaster/types"
 	"github.com/initia-labs/opinit-bots/node/rpcclient"
 	"github.com/initia-labs/opinit-bots/txutils"
+	"github.com/initia-labs/opinit-bots/types"
 
 	ctypes "github.com/cometbft/cometbft/rpc/core/types"
 
@@ -40,14 +41,14 @@ type BroadcasterAccount struct {
 	MsgsFromTx      btypes.MsgsFromTxFn
 }
 
-func NewBroadcasterAccount(cfg btypes.BroadcasterConfig, cdc codec.Codec, txConfig client.TxConfig, rpcClient *rpcclient.RPCClient, keyringConfig btypes.KeyringConfig) (*BroadcasterAccount, error) {
+func NewBroadcasterAccount(ctx types.Context, cfg btypes.BroadcasterConfig, cdc codec.Codec, txConfig client.TxConfig, rpcClient *rpcclient.RPCClient, keyringConfig btypes.KeyringConfig) (*BroadcasterAccount, error) {
 	err := keyringConfig.Validate()
 	if err != nil {
 		return nil, err
 	}
 
 	// setup keyring
-	keyBase, keyringRecord, err := cfg.GetKeyringRecord(cdc, &keyringConfig)
+	keyBase, keyringRecord, err := cfg.GetKeyringRecord(cdc, &keyringConfig, ctx.HomePath())
 	if err != nil {
 		return nil, err
 	}
@@ -97,7 +98,7 @@ func NewBroadcasterAccount(cfg btypes.BroadcasterConfig, cdc codec.Codec, txConf
 
 	if keyringConfig.FeeGranter != nil {
 		// setup keyring
-		_, feeGranterKeyringRecord, err := cfg.GetKeyringRecord(cdc, keyringConfig.FeeGranter)
+		_, feeGranterKeyringRecord, err := cfg.GetKeyringRecord(cdc, keyringConfig.FeeGranter, ctx.HomePath())
 		if err != nil {
 			return nil, err
 		}

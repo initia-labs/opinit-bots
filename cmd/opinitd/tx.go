@@ -51,13 +51,13 @@ func txGrantOracleCmd(baseCtx *cmdContext) *cobra.Command {
 
 			errGrp, ctx := errgroup.WithContext(cmdCtx)
 
+			baseCtx := types.NewContext(ctx, baseCtx.logger.Named(string(bottypes.BotTypeExecutor)), baseCtx.homePath).
+				WithErrGrp(errGrp)
+
 			account, err := l2BroadcasterAccount(baseCtx, cmd)
 			if err != nil {
 				return err
 			}
-
-			baseCtx := types.NewContext(ctx, baseCtx.logger.Named(string(bottypes.BotTypeExecutor)), baseCtx.homePath).
-				WithErrGrp(errGrp)
 
 			err = account.Load(baseCtx)
 			if err != nil {
@@ -107,8 +107,8 @@ func txGrantOracleCmd(baseCtx *cmdContext) *cobra.Command {
 	return cmd
 }
 
-func l2BroadcasterAccount(ctx *cmdContext, cmd *cobra.Command) (*broadcaster.BroadcasterAccount, error) {
-	configPath, err := getConfigPath(cmd, ctx.homePath, string(bottypes.BotTypeExecutor))
+func l2BroadcasterAccount(ctx types.Context, cmd *cobra.Command) (*broadcaster.BroadcasterAccount, error) {
+	configPath, err := getConfigPath(cmd, ctx.HomePath(), string(bottypes.BotTypeExecutor))
 	if err != nil {
 		return nil, err
 	}
@@ -135,5 +135,5 @@ func l2BroadcasterAccount(ctx *cmdContext, cmd *cobra.Command) (*broadcaster.Bro
 		Name: cfg.BridgeExecutor,
 	}
 
-	return broadcaster.NewBroadcasterAccount(*broadcasterConfig, cdc, txConfig, rpcClient, keyringConfig)
+	return broadcaster.NewBroadcasterAccount(ctx, *broadcasterConfig, cdc, txConfig, rpcClient, keyringConfig)
 }

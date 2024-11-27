@@ -30,9 +30,6 @@ type BroadcasterConfig struct {
 
 	// Bech32Prefix is the Bech32 prefix.
 	Bech32Prefix string
-
-	// HomePath is the path to the keyring.
-	HomePath string
 }
 
 func (bc BroadcasterConfig) Validate() error {
@@ -60,12 +57,12 @@ func (bc BroadcasterConfig) Validate() error {
 	return nil
 }
 
-func (bc BroadcasterConfig) GetKeyringRecord(cdc codec.Codec, keyringConfig *KeyringConfig) (keyring.Keyring, *keyring.Record, error) {
+func (bc BroadcasterConfig) GetKeyringRecord(cdc codec.Codec, keyringConfig *KeyringConfig, homePath string) (keyring.Keyring, *keyring.Record, error) {
 	if keyringConfig == nil {
 		return nil, nil, fmt.Errorf("keyring config cannot be nil")
 	}
 
-	keyBase, err := keys.GetKeyBase(bc.ChainID, bc.HomePath, cdc, nil)
+	keyBase, err := keys.GetKeyBase(bc.ChainID, homePath, cdc, nil)
 	if err != nil {
 		return nil, nil, err
 	} else if keyBase == nil {

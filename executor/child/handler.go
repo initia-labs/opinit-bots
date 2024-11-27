@@ -62,6 +62,8 @@ func (ch *Child) endBlockHandler(ctx types.Context, args nodetypes.EndBlockArgs)
 		if err != nil {
 			return errors.Wrap(err, "failed to save processed msgs")
 		}
+	} else {
+		ch.EmptyProcessedMsgs()
 	}
 
 	err = ch.stage.Commit()

@@ -11,6 +11,8 @@ import (
 	btypes "github.com/initia-labs/opinit-bots/node/broadcaster/types"
 	"github.com/initia-labs/opinit-bots/types"
 	"github.com/pkg/errors"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zaptest/observer"
 )
 
 type mockChild struct {
@@ -106,4 +108,35 @@ func (m *mockChild) QueryNextL1Sequence(ctx context.Context, height int64) (uint
 	return m.nextL1Sequence, nil
 }
 
-var _ childNode = &mockChild{}
+var _ childNode = (*mockChild)(nil)
+
+type mockBatchInfo struct {
+	chain         string
+	submitter     string
+	outputIndex   uint64
+	l2BlockNumber int64
+}
+
+type mockBatch struct {
+	info *mockBatchInfo
+}
+
+func NewMockBatch() *mockBatch {
+	return &mockBatch{}
+}
+
+func (m *mockBatch) UpdateBatchInfo(chain string, submitter string, outputIndex uint64, l2BlockNumber int64) {
+	m.info = &mockBatchInfo{
+		chain:         chain,
+		submitter:     submitter,
+		outputIndex:   outputIndex,
+		l2BlockNumber: l2BlockNumber,
+	}
+}
+
+var _ batchNode = (*mockBatch)(nil)
+
+func logCapturer() (*zap.Logger, *observer.ObservedLogs) {
+	core, logs := observer.New(zap.DebugLevel)
+	return zap.New(core), logs
+}
