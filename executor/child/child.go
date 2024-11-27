@@ -85,7 +85,7 @@ func (ch *Child) Initialize(
 		return errors.Wrap(err, "failed to initialize base child")
 	}
 	if l2Sequence != 0 {
-		err = ch.DeleteFutureWithdrawals(l2Sequence)
+		err = DeleteFutureWithdrawals(ch.DB(), l2Sequence)
 		if err != nil {
 			return errors.Wrap(err, "failed to delete future withdrawals")
 		}

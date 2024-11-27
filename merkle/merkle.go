@@ -108,7 +108,7 @@ func (m *Merkle) FinalizeWorkingTree(extraData []byte) (*merkletypes.FinalizedTr
 // LoadWorkingTree loads the working tree from the database.
 //
 // It is used to load the working tree to handle the case where the bot is stopped.
-func (m *Merkle) LoadWorkingTree(workingTree merkletypes.TreeInfo) error {
+func (m *Merkle) PrepareWorkingTree(workingTree merkletypes.TreeInfo) error {
 	m.workingTree = &workingTree
 	if workingTree.Done {
 		nextTreeIndex := workingTree.Index + 1

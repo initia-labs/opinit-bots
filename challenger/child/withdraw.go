@@ -34,6 +34,16 @@ func (ch *Child) initiateWithdrawalHandler(ctx types.Context, args nodetypes.Eve
 
 func (ch *Child) handleInitiateWithdrawal(ctx types.Context, l2Sequence uint64, from string, to string, baseDenom string, amount uint64) error {
 	withdrawalHash := ophosttypes.GenerateWithdrawalHash(ch.BridgeId(), l2Sequence, from, to, baseDenom, amount)
+
+	workingTree, err := ch.WorkingTree()
+	if err != nil {
+		return errors.Wrap(err, "failed to get working tree")
+	}
+
+	if workingTree.StartLeafIndex+workingTree.LeafCount != l2Sequence {
+		panic(fmt.Errorf("INVARIANT failed; handleInitiateWithdrawal expect to working tree at leaf `%d` (start `%d` + count `%d`) but we got leaf `%d`", workingTree.StartLeafIndex+workingTree.LeafCount, workingTree.StartLeafIndex, workingTree.LeafCount, l2Sequence))
+	}
+
 	// generate merkle tree
 	newNodes, err := ch.Merkle().InsertLeaf(withdrawalHash[:])
 	if err != nil {
@@ -67,7 +77,7 @@ func (ch *Child) prepareTree(blockHeight int64) error {
 		return errors.Wrap(err, "failed to get working tree")
 	}
 
-	err = ch.Merkle().LoadWorkingTree(workingTree)
+	err = ch.Merkle().PrepareWorkingTree(workingTree)
 	if err != nil {
 		return errors.Wrap(err, "failed to load working tree")
 	}

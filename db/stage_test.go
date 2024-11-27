@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"golang.org/x/exp/maps"
 )
 
 func CreateTestStage(t *testing.T, db *LevelDB) (*LevelDB, *Stage, error) {
@@ -222,4 +223,37 @@ func TestExecuteFnWithDB(t *testing.T) {
 
 	require.Equal(t, stage1.kvmap[string(db1.PrefixedKey([]byte("key1")))], []byte("value1"))
 	require.Equal(t, stage1.kvmap[string(db2.PrefixedKey([]byte("key1")))], []byte("value2"))
+}
+
+func TestStageAll(t *testing.T) {
+	db, err := NewMemDB()
+	require.NoError(t, err)
+
+	tdb1 := db.WithPrefix([]byte("123"))
+	db1 := tdb1.(*LevelDB)
+	db2 := db.WithPrefix([]byte("456"))
+
+	_, stage1, err := CreateTestStage(t, db1)
+	require.NoError(t, err)
+
+	err = stage1.Set([]byte("key1"), []byte("value1"))
+	require.NoError(t, err)
+
+	err = stage1.ExecuteFnWithDB(db2, func() error {
+		err := stage1.Set([]byte("key1"), []byte("value2"))
+		require.NoError(t, err)
+		return err
+	})
+	require.NoError(t, err)
+
+	allKVs := stage1.All()
+	require.Equal(t, len(allKVs), 2)
+	require.Equal(t, allKVs["/123/key1"], []byte("value1"))
+	require.Equal(t, allKVs["/456/key1"], []byte("value2"))
+
+	maps.Clear(allKVs)
+	require.Empty(t, allKVs)
+
+	allKVs = stage1.All()
+	require.Equal(t, len(allKVs), 2)
 }

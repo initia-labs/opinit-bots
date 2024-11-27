@@ -13,7 +13,7 @@ import (
 )
 
 func (ch Child) QueryWithdrawal(sequence uint64) (executortypes.QueryWithdrawalResponse, error) {
-	withdrawal, err := ch.GetWithdrawal(sequence)
+	withdrawal, err := GetWithdrawal(ch.DB(), sequence)
 	if err != nil {
 		return executortypes.QueryWithdrawalResponse{}, errors.Wrap(err, "failed to get withdrawal")
 	}
@@ -50,7 +50,7 @@ func (ch Child) QueryWithdrawal(sequence uint64) (executortypes.QueryWithdrawalR
 }
 
 func (ch Child) QueryWithdrawals(address string, offset uint64, limit uint64, descOrder bool) (executortypes.QueryWithdrawalsResponse, error) {
-	sequences, next, err := ch.GetSequencesByAddress(address, offset, limit, descOrder)
+	sequences, next, err := GetSequencesByAddress(ch.DB(), address, offset, limit, descOrder)
 	if err != nil {
 		return executortypes.QueryWithdrawalsResponse{}, errors.Wrap(err, "failed to get sequences by address")
 	}

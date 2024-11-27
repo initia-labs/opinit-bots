@@ -69,3 +69,7 @@ func (s *Stage) Reset() {
 	s.batch.Reset()
 	maps.Clear(s.kvmap)
 }
+
+func (s Stage) All() map[string][]byte {
+	return maps.Clone(s.kvmap)
+}

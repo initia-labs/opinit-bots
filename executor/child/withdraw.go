@@ -36,9 +36,18 @@ func (ch *Child) handleInitiateWithdrawal(ctx types.Context, l2Sequence uint64, 
 	data := executortypes.NewWithdrawalData(l2Sequence, from, to, amount, baseDenom, withdrawalHash[:])
 
 	// store to database
-	err := ch.SaveWithdrawal(l2Sequence, data)
+	err := SaveWithdrawal(ch.stage, l2Sequence, data)
 	if err != nil {
 		return errors.Wrap(err, "failed to save withdrawal data")
+	}
+
+	workingTree, err := ch.WorkingTree()
+	if err != nil {
+		return errors.Wrap(err, "failed to get working tree")
+	}
+
+	if workingTree.StartLeafIndex+workingTree.LeafCount != l2Sequence {
+		panic(fmt.Errorf("INVARIANT failed; handleInitiateWithdrawal expect to working tree at leaf `%d` (start `%d` + count `%d`) but we got leaf `%d`", workingTree.StartLeafIndex+workingTree.LeafCount, workingTree.StartLeafIndex, workingTree.LeafCount, l2Sequence))
 	}
 
 	// generate merkle tree
@@ -75,11 +84,10 @@ func (ch *Child) prepareTree(blockHeight int64) error {
 		return errors.Wrap(err, "failed to get working tree")
 	}
 
-	err = ch.Merkle().LoadWorkingTree(workingTree)
+	err = ch.Merkle().PrepareWorkingTree(workingTree)
 	if err != nil {
 		return errors.Wrap(err, "failed to load working tree")
 	}
-
 	return nil
 }
 
@@ -199,96 +207,4 @@ func (ch *Child) handleOutput(blockHeight int64, version uint8, blockId []byte, 
 		ch.AppendMsgQueue(msg, sender)
 	}
 	return nil
-}
-
-// GetWithdrawal returns the withdrawal data for the given sequence from the database
-func (ch *Child) GetWithdrawal(sequence uint64) (executortypes.WithdrawalData, error) {
-	dataBytes, err := ch.DB().Get(executortypes.PrefixedWithdrawalSequence(sequence))
-	if err != nil {
-		return executortypes.WithdrawalData{}, errors.Wrap(err, "failed to get withdrawal data from db")
-	}
-	data := executortypes.WithdrawalData{}
-	err = data.Unmarshal(dataBytes)
-	return data, err
-}
-
-func (ch *Child) GetSequencesByAddress(address string, offset uint64, limit uint64, descOrder bool) (sequences []uint64, next uint64, err error) {
-	if limit == 0 {
-		return nil, 0, nil
-	}
-
-	count := uint64(0)
-	fetchFn := func(key, value []byte) (bool, error) {
-		sequence, err := dbtypes.ToUint64(value)
-		if err != nil {
-			return true, errors.Wrap(err, "failed to convert value to uint64")
-		}
-		if count >= limit {
-			next = sequence
-			return true, nil
-		}
-		sequences = append(sequences, sequence)
-		count++
-		return false, nil
-	}
-
-	if descOrder {
-		var startKey []byte
-		if offset != 0 {
-			startKey = executortypes.PrefixedWithdrawalAddressSequence(address, offset)
-		}
-		err = ch.DB().ReverseIterate(dbtypes.AppendSplitter(executortypes.PrefixedWithdrawalAddress(address)), startKey, fetchFn)
-		if err != nil {
-			return nil, 0, errors.Wrap(err, "failed to iterate withdrawal address indices")
-		}
-	} else {
-		startKey := executortypes.PrefixedWithdrawalAddressSequence(address, offset)
-		err := ch.DB().Iterate(dbtypes.AppendSplitter(executortypes.PrefixedWithdrawalAddress(address)), startKey, fetchFn)
-		if err != nil {
-			return nil, 0, err
-		}
-	}
-	return sequences, next, nil
-}
-
-func (ch *Child) SaveWithdrawal(sequence uint64, data executortypes.WithdrawalData) error {
-	dataBytes, err := data.Marshal()
-	if err != nil {
-		return err
-	}
-
-	err = ch.stage.Set(executortypes.PrefixedWithdrawalSequence(sequence), dataBytes)
-	if err != nil {
-		return errors.Wrap(err, "failed to save withdrawal data")
-	}
-	err = ch.stage.Set(executortypes.PrefixedWithdrawalAddressSequence(data.To, sequence), dbtypes.FromUint64(sequence))
-	if err != nil {
-		return errors.Wrap(err, "failed to save withdrawal address index")
-	}
-	return nil
-}
-
-func (ch *Child) DeleteFutureWithdrawals(fromSequence uint64) error {
-	return ch.DB().Iterate(dbtypes.AppendSplitter(executortypes.WithdrawalSequencePrefix), nil, func(key, value []byte) (bool, error) {
-		sequence := dbtypes.ToUint64Key(key[len(key)-8:])
-		if sequence < fromSequence {
-			return false, nil
-		}
-
-		data := executortypes.WithdrawalData{}
-		err := data.Unmarshal(value)
-		if err != nil {
-			return true, err
-		}
-		err = ch.DB().Delete(executortypes.PrefixedWithdrawalAddressSequence(data.To, data.Sequence))
-		if err != nil {
-			return true, errors.Wrap(err, "failed to delete withdrawal address index")
-		}
-		err = ch.DB().Delete(key)
-		if err != nil {
-			return true, errors.Wrap(err, "failed to delete withdrawal data")
-		}
-
-		return false, nil
-	})
 }
