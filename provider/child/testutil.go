@@ -3,7 +3,6 @@ package child
 import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 
-	opchildtypes "github.com/initia-labs/OPinit/x/opchild/types"
 	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
 
 	"github.com/initia-labs/opinit-bots/merkle"
@@ -23,12 +22,6 @@ func NewTestBaseChild(
 	initializeTreeFn func(int64) (bool, error),
 
 	cfg nodetypes.NodeConfig,
-
-	opchildQueryClient opchildtypes.QueryClient,
-
-	baseAccountIndex int,
-	oracleAccountIndex int,
-	oracleAccountGranter string,
 ) *BaseChild {
 	return &BaseChild{
 		version: version,
@@ -42,13 +35,7 @@ func NewTestBaseChild(
 
 		cfg: cfg,
 
-		opchildQueryClient: opchildQueryClient,
-
 		processedMsgs: make([]btypes.ProcessedMsgs, 0),
 		msgQueue:      make(map[string][]sdk.Msg),
-
-		baseAccountIndex:     baseAccountIndex,
-		oracleAccountIndex:   oracleAccountIndex,
-		oracleAccountGranter: oracleAccountGranter,
 	}
 }
