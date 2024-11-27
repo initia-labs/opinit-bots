@@ -285,6 +285,14 @@ func (b BaseChild) WorkingTree() (merkletypes.TreeInfo, error) {
 	return b.mk.WorkingTree()
 }
 
+func (b BaseChild) MustGetWorkingTree() merkletypes.TreeInfo {
+	tree, err := b.WorkingTree()
+	if err != nil {
+		panic(err)
+	}
+	return tree
+}
+
 func (b *BaseChild) keyringConfigs(baseConfig *btypes.KeyringConfig, oracleConfig *btypes.KeyringConfig) []btypes.KeyringConfig {
 	var configs []btypes.KeyringConfig
 	if baseConfig != nil {

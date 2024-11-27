@@ -4,6 +4,7 @@ import (
 	"context"
 	"strconv"
 	"testing"
+	"time"
 
 	abcitypes "github.com/cometbft/cometbft/abci/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -273,6 +274,284 @@ func TestInitiateWithdrawalHandler(t *testing.T) {
 						require.Equal(t, kv.Value, allkvs[string(kv.Key)])
 					}
 				}
+			} else {
+				require.Error(t, err)
+			}
+		})
+	}
+}
+
+func TestPrepareTree(t *testing.T) {
+	bridgeInfo := ophosttypes.QueryBridgeResponse{
+		BridgeId: 1,
+	}
+
+	cases := []struct {
+		name                  string
+		childDBState          []types.KV
+		blockHeight           int64
+		initializeTreeFnMaker func(*merkle.Merkle) func(int64) (bool, error)
+		expected              merkletypes.TreeInfo
+		err                   bool
+		panic                 bool
+	}{
+		{
+			name: "new height 6",
+			childDBState: []types.KV{
+				{
+					Key:   append([]byte("working_tree/"), []byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x05}...),
+					Value: []byte(`{"index":2,"leaf_count":0,"start_leaf_index":1,"height_data":{},"done":false}`),
+				},
+			},
+			blockHeight:           6,
+			initializeTreeFnMaker: nil,
+			expected: merkletypes.TreeInfo{
+				Index:          2,
+				LeafCount:      0,
+				StartLeafIndex: 1,
+				LastSiblings:   make(map[uint8][]byte),
+				Done:           false,
+			},
+			err:   false,
+			panic: false,
+		},
+		{
+			name:                  "no tree height 5, new height 6, no initializeTreeFn",
+			childDBState:          nil,
+			blockHeight:           6,
+			initializeTreeFnMaker: nil,
+			expected: merkletypes.TreeInfo{
+				Index:          2,
+				LeafCount:      0,
+				StartLeafIndex: 1,
+				LastSiblings:   make(map[uint8][]byte),
+				Done:           false,
+			},
+			err:   false,
+			panic: true,
+		},
+		{
+			name:         "no tree height 5, new height 6, no initializing tree",
+			childDBState: nil,
+			blockHeight:  6,
+			initializeTreeFnMaker: func(m *merkle.Merkle) func(i int64) (bool, error) {
+				return func(i int64) (bool, error) {
+					return false, nil
+				}
+			},
+			expected: merkletypes.TreeInfo{
+				Index:          2,
+				LeafCount:      0,
+				StartLeafIndex: 1,
+				LastSiblings:   make(map[uint8][]byte),
+				Done:           false,
+			},
+			err:   false,
+			panic: true,
+		},
+		{
+			name: "tree done at 5, new height 6",
+			childDBState: []types.KV{
+				{
+					Key:   append([]byte("working_tree/"), []byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x05}...),
+					Value: []byte(`{"index":2,"leaf_count":2,"start_leaf_index":1,"height_data":{},"done":true}`),
+				},
+			},
+			blockHeight:           6,
+			initializeTreeFnMaker: nil,
+			expected: merkletypes.TreeInfo{
+				Index:          3,
+				LeafCount:      0,
+				StartLeafIndex: 3,
+				LastSiblings:   make(map[uint8][]byte),
+				Done:           false,
+			},
+			err:   false,
+			panic: false,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			basedb, err := db.NewMemDB()
+			require.NoError(t, err)
+
+			childdb := basedb.WithPrefix([]byte("test_child"))
+
+			childNode := node.NewTestNode(nodetypes.NodeConfig{}, childdb, nil, nil, nil, nil)
+
+			mk, err := merkle.NewMerkle(ophosttypes.GenerateNodeHash)
+			require.NoError(t, err)
+
+			var initializeFn func(i int64) (bool, error)
+			if tc.initializeTreeFnMaker != nil {
+				initializeFn = tc.initializeTreeFnMaker(mk)
+			}
+
+			ch := Child{
+				BaseChild: childprovider.NewTestBaseChild(0, childNode, mk, bridgeInfo, initializeFn, nodetypes.NodeConfig{}),
+			}
+
+			for _, kv := range tc.childDBState {
+				err = childdb.Set(kv.Key, kv.Value)
+				require.NoError(t, err)
+			}
+
+			if tc.panic {
+				assert.Panics(t, func() {
+					ch.prepareTree(tc.blockHeight) //nolint
+				})
+				return
+			}
+			err = ch.prepareTree(tc.blockHeight)
+			if !tc.err {
+				require.NoError(t, err)
+
+				tree, err := mk.WorkingTree()
+				require.NoError(t, err)
+
+				require.Equal(t, tc.expected, tree)
+			} else {
+				require.Error(t, err)
+			}
+		})
+	}
+}
+
+func TestPrepareOutput(t *testing.T) {
+	cases := []struct {
+		name        string
+		bridgeInfo  ophosttypes.QueryBridgeResponse
+		hostOutputs map[uint64]ophosttypes.Output
+		workingTree merkletypes.TreeInfo
+		expected    func() (lastOutputTime time.Time, nextOutputTime time.Time, finalizingBlockHeight int64)
+		err         bool
+	}{
+		{
+			name: "no output, index 1",
+			bridgeInfo: ophosttypes.QueryBridgeResponse{
+				BridgeId: 1,
+				BridgeConfig: ophosttypes.BridgeConfig{
+					SubmissionInterval: 100,
+				},
+			},
+			hostOutputs: map[uint64]ophosttypes.Output{},
+			workingTree: merkletypes.TreeInfo{
+				Index:          1,
+				LeafCount:      2,
+				StartLeafIndex: 1,
+				LastSiblings:   make(map[uint8][]byte),
+				Done:           false,
+			},
+			expected: func() (lastOutputTime time.Time, nextOutputTime time.Time, finalizingBlockHeight int64) {
+				return time.Time{}, time.Time{}, 0
+			},
+			err: false,
+		},
+		{
+			name: "no output, index 3", // chain rolled back
+			bridgeInfo: ophosttypes.QueryBridgeResponse{
+				BridgeId: 1,
+				BridgeConfig: ophosttypes.BridgeConfig{
+					SubmissionInterval: 100,
+				},
+			},
+			hostOutputs: map[uint64]ophosttypes.Output{},
+			workingTree: merkletypes.TreeInfo{
+				Index:          3,
+				LeafCount:      2,
+				StartLeafIndex: 1,
+				LastSiblings:   make(map[uint8][]byte),
+				Done:           false,
+			},
+			expected: func() (lastOutputTime time.Time, nextOutputTime time.Time, finalizingBlockHeight int64) {
+				return time.Time{}, time.Time{}, 0
+			},
+			err: true,
+		},
+		{
+			name: "outputs {1}, index 1", // sync
+			bridgeInfo: ophosttypes.QueryBridgeResponse{
+				BridgeId: 1,
+				BridgeConfig: ophosttypes.BridgeConfig{
+					SubmissionInterval: 100,
+				},
+			},
+			hostOutputs: map[uint64]ophosttypes.Output{
+				1: {
+					L1BlockTime:   time.Time{},
+					L2BlockNumber: 10,
+				},
+			},
+			workingTree: merkletypes.TreeInfo{
+				Index:          1,
+				LeafCount:      2,
+				StartLeafIndex: 1,
+				LastSiblings:   make(map[uint8][]byte),
+				Done:           false,
+			},
+			expected: func() (lastOutputTime time.Time, nextOutputTime time.Time, finalizingBlockHeight int64) {
+				return time.Time{}, time.Time{}, 10
+			},
+			err: false,
+		},
+		{
+			name: "outputs {1}, index 2",
+			bridgeInfo: ophosttypes.QueryBridgeResponse{
+				BridgeId: 1,
+				BridgeConfig: ophosttypes.BridgeConfig{
+					SubmissionInterval: 300,
+				},
+			},
+			hostOutputs: map[uint64]ophosttypes.Output{
+				1: {
+					L1BlockTime:   time.Unix(0, 10000),
+					L2BlockNumber: 10,
+				},
+			},
+			workingTree: merkletypes.TreeInfo{
+				Index:          2,
+				LeafCount:      2,
+				StartLeafIndex: 1,
+				LastSiblings:   make(map[uint8][]byte),
+				Done:           false,
+			},
+			expected: func() (lastOutputTime time.Time, nextOutputTime time.Time, finalizingBlockHeight int64) {
+				return time.Unix(0, 10000), time.Unix(0, 10200), 0
+			},
+			err: false,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			basedb, err := db.NewMemDB()
+			require.NoError(t, err)
+
+			childdb := basedb.WithPrefix([]byte("test_child"))
+
+			childNode := node.NewTestNode(nodetypes.NodeConfig{}, childdb, nil, nil, nil, nil)
+
+			mk, err := merkle.NewMerkle(ophosttypes.GenerateNodeHash)
+			require.NoError(t, err)
+			err = mk.PrepareWorkingTree(tc.workingTree)
+			require.NoError(t, err)
+
+			mockHost := NewMockHost(nil, nil, tc.bridgeInfo.BridgeId, "", tc.hostOutputs)
+
+			ch := Child{
+				BaseChild: childprovider.NewTestBaseChild(0, childNode, mk, tc.bridgeInfo, nil, nodetypes.NodeConfig{}),
+				host:      mockHost,
+			}
+
+			err = ch.prepareOutput(context.TODO())
+			if !tc.err {
+				require.NoError(t, err)
+
+				expectedLastOutputTime, expectedNextOutputTime, expectedFinalizingBlockHeight := tc.expected()
+				require.Equal(t, expectedLastOutputTime, ch.lastOutputTime)
+				require.Equal(t, expectedNextOutputTime, ch.nextOutputTime)
+				require.Equal(t, expectedFinalizingBlockHeight, ch.finalizingBlockHeight)
 			} else {
 				require.Error(t, err)
 			}

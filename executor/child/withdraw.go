@@ -41,11 +41,7 @@ func (ch *Child) handleInitiateWithdrawal(ctx types.Context, l2Sequence uint64, 
 		return errors.Wrap(err, "failed to save withdrawal data")
 	}
 
-	workingTree, err := ch.WorkingTree()
-	if err != nil {
-		return errors.Wrap(err, "failed to get working tree")
-	}
-
+	workingTree := ch.MustGetWorkingTree()
 	if workingTree.StartLeafIndex+workingTree.LeafCount != l2Sequence {
 		panic(fmt.Errorf("INVARIANT failed; handleInitiateWithdrawal expect to working tree at leaf `%d` (start `%d` + count `%d`) but we got leaf `%d`", workingTree.StartLeafIndex+workingTree.LeafCount, workingTree.StartLeafIndex, workingTree.LeafCount, l2Sequence))
 	}
@@ -76,6 +72,11 @@ func (ch *Child) prepareTree(blockHeight int64) error {
 	workingTree, err := merkle.GetWorkingTree(ch.DB(), types.MustInt64ToUint64(blockHeight)-1)
 	if errors.Is(err, dbtypes.ErrNotFound) {
 		if ch.InitializeTree(blockHeight) {
+			// working tree should be initialized after the tree is initialized
+			_, err = ch.WorkingTree()
+			if err != nil {
+				panic("working tree not found after initializing tree")
+			}
 			return nil
 		}
 		// must not happened
@@ -86,16 +87,13 @@ func (ch *Child) prepareTree(blockHeight int64) error {
 
 	err = ch.Merkle().PrepareWorkingTree(workingTree)
 	if err != nil {
-		return errors.Wrap(err, "failed to load working tree")
+		return errors.Wrap(err, "failed to prepare working tree")
 	}
 	return nil
 }
 
 func (ch *Child) prepareOutput(ctx context.Context) error {
-	workingTree, err := ch.WorkingTree()
-	if err != nil {
-		return errors.Wrap(err, "failed to get working tree")
-	}
+	workingTree := ch.MustGetWorkingTree()
 
 	// initialize next output time
 	if ch.nextOutputTime.IsZero() && workingTree.Index > 1 {
@@ -157,10 +155,7 @@ func (ch *Child) handleTree(ctx types.Context, blockHeight int64, latestHeight i
 			return nil, errors.Wrap(err, "failed to save new nodes of finalized tree")
 		}
 
-		workingTree, err := ch.WorkingTree()
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to get working tree")
-		}
+		workingTree := ch.MustGetWorkingTree()
 
 		ctx.Logger().Info("finalize working tree",
 			zap.Uint64("tree_index", workingTree.Index),
@@ -180,11 +175,7 @@ func (ch *Child) handleTree(ctx types.Context, blockHeight int64, latestHeight i
 		ch.nextOutputTime = blockHeader.Time.Add(ch.BridgeInfo().BridgeConfig.SubmissionInterval * 2 / 3)
 	}
 
-	workingTree, err := ch.WorkingTree()
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to get working tree")
-	}
-
+	workingTree := ch.MustGetWorkingTree()
 	err = merkle.SaveWorkingTree(ch.stage, workingTree)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to save working tree")

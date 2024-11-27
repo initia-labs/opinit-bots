@@ -8,27 +8,28 @@ import (
 	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
 	btypes "github.com/initia-labs/opinit-bots/node/broadcaster/types"
 	"github.com/initia-labs/opinit-bots/types"
+	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zaptest/observer"
 )
 
 type mockHost struct {
-	db             types.DB
-	cdc            codec.Codec
-	baseAccount    string
-	nextL1Sequence uint64
-	nextL2Sequence uint64
-	processedMsgs  []btypes.ProcessedMsgs
+	db            types.DB
+	cdc           codec.Codec
+	bridgeId      uint64
+	baseAccount   string
+	outputs       map[uint64]ophosttypes.Output
+	processedMsgs []btypes.ProcessedMsgs
 }
 
-func NewMockHost(db types.DB, cdc codec.Codec, baseAccount string, nextL1Sequence uint64, nextL2Sequence uint64) *mockHost {
+func NewMockHost(db types.DB, cdc codec.Codec, bridgeId uint64, baseAccount string, outputs map[uint64]ophosttypes.Output) *mockHost {
 	return &mockHost{
-		db:             db,
-		cdc:            cdc,
-		baseAccount:    baseAccount,
-		nextL1Sequence: nextL1Sequence,
-		nextL2Sequence: nextL2Sequence,
-		processedMsgs:  make([]btypes.ProcessedMsgs, 0),
+		db:            db,
+		cdc:           cdc,
+		bridgeId:      bridgeId,
+		baseAccount:   baseAccount,
+		outputs:       outputs,
+		processedMsgs: make([]btypes.ProcessedMsgs, 0),
 	}
 }
 
@@ -69,11 +70,42 @@ func (m *mockHost) GetMsgProposeOutput(
 }
 
 func (m *mockHost) QueryLastOutput(ctx context.Context, bridgeId uint64) (*ophosttypes.QueryOutputProposalResponse, error) {
-	return nil, nil
+	if m.bridgeId != bridgeId {
+		return nil, nil
+	}
+
+	lastIndex := uint64(0)
+	for outputIndex := range m.outputs {
+		if lastIndex < outputIndex {
+			lastIndex = outputIndex
+		}
+	}
+
+	if _, ok := m.outputs[lastIndex]; !ok {
+		return nil, errors.New("collections: not found")
+	}
+
+	return &ophosttypes.QueryOutputProposalResponse{
+		BridgeId:       bridgeId,
+		OutputIndex:    lastIndex,
+		OutputProposal: m.outputs[lastIndex],
+	}, nil
 }
 
 func (m *mockHost) QueryOutput(ctx context.Context, bridgeId uint64, outputIndex uint64, height int64) (*ophosttypes.QueryOutputProposalResponse, error) {
-	return nil, nil
+	if m.bridgeId != bridgeId {
+		return nil, nil
+	}
+
+	if _, ok := m.outputs[outputIndex]; !ok {
+		return nil, errors.New("collections: not found")
+	}
+
+	return &ophosttypes.QueryOutputProposalResponse{
+		BridgeId:       bridgeId,
+		OutputIndex:    outputIndex,
+		OutputProposal: m.outputs[outputIndex],
+	}, nil
 }
 
 var _ hostNode = (*mockHost)(nil)
