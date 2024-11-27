@@ -50,7 +50,7 @@ func (ch Child) QueryWithdrawal(sequence uint64) (executortypes.QueryWithdrawalR
 }
 
 func (ch Child) QueryWithdrawals(address string, offset uint64, limit uint64, descOrder bool) (executortypes.QueryWithdrawalsResponse, error) {
-	sequences, next, total, err := ch.GetSequencesByAddress(address, offset, limit, descOrder)
+	sequences, next, err := ch.GetSequencesByAddress(address, offset, limit, descOrder)
 	if err != nil {
 		return executortypes.QueryWithdrawalsResponse{}, errors.Wrap(err, "failed to get sequences by address")
 	}
@@ -65,8 +65,9 @@ func (ch Child) QueryWithdrawals(address string, offset uint64, limit uint64, de
 
 	res := executortypes.QueryWithdrawalsResponse{
 		Withdrawals: withdrawals,
-		Next:        next,
-		Total:       total,
+	}
+	if next != 0 {
+		res.Next = &next
 	}
 	return res, nil
 }

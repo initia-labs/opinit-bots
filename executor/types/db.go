@@ -6,38 +6,6 @@ import (
 	"github.com/pkg/errors"
 )
 
-type WithdrawalDataWithIndex struct {
-	Withdrawal WithdrawalData `json:"withdrawal_data"`
-	// index of the receiver address in db
-	Index uint64 `json:"index"`
-}
-
-func NewWithdrawalDataWithIndex(
-	withdrawal WithdrawalData,
-	index uint64,
-) WithdrawalDataWithIndex {
-	return WithdrawalDataWithIndex{
-		Withdrawal: withdrawal,
-		Index:      index,
-	}
-}
-
-func (w WithdrawalDataWithIndex) Marshal() ([]byte, error) {
-	bz, err := json.Marshal(w)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to marshal withdrawal data with index")
-	}
-	return bz, nil
-}
-
-func (w *WithdrawalDataWithIndex) Unmarshal(bz []byte) error {
-	err := json.Unmarshal(bz, w)
-	if err != nil {
-		return errors.Wrap(err, "failed to unmarshal withdrawal data with index")
-	}
-	return nil
-}
-
 type WithdrawalData struct {
 	Sequence       uint64 `json:"sequence"`
 	From           string `json:"from"`

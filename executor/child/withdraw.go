@@ -212,9 +212,9 @@ func (ch *Child) GetWithdrawal(sequence uint64) (executortypes.WithdrawalData, e
 	return data, err
 }
 
-func (ch *Child) GetSequencesByAddress(address string, offset uint64, limit uint64, descOrder bool) (sequences []uint64, next, total uint64, err error) {
+func (ch *Child) GetSequencesByAddress(address string, offset uint64, limit uint64, descOrder bool) (sequences []uint64, next uint64, err error) {
 	if limit == 0 {
-		return nil, 0, 0, nil
+		return nil, 0, nil
 	}
 
 	count := uint64(0)
@@ -223,54 +223,36 @@ func (ch *Child) GetSequencesByAddress(address string, offset uint64, limit uint
 		if err != nil {
 			return true, errors.Wrap(err, "failed to convert value to uint64")
 		}
-		sequences = append(sequences, sequence)
-		count++
 		if count >= limit {
+			next = sequence
 			return true, nil
 		}
+		sequences = append(sequences, sequence)
+		count++
 		return false, nil
-	}
-	total, err = ch.GetLastAddressIndex(address)
-	if err != nil {
-		return nil, 0, 0, errors.Wrap(err, "failed to get last address index")
 	}
 
 	if descOrder {
-		if offset > total || offset == 0 {
-			offset = total
+		var startKey []byte
+		if offset != 0 {
+			startKey = executortypes.PrefixedWithdrawalAddressSequence(address, offset)
 		}
-		startKey := executortypes.PrefixedWithdrawalAddressIndex(address, offset)
 		err = ch.DB().ReverseIterate(dbtypes.AppendSplitter(executortypes.PrefixedWithdrawalAddress(address)), startKey, fetchFn)
 		if err != nil {
-			return nil, 0, 0, errors.Wrap(err, "failed to iterate withdrawal address indices")
+			return nil, 0, errors.Wrap(err, "failed to iterate withdrawal address indices")
 		}
-
-		next = offset - count
 	} else {
-		if offset == 0 {
-			offset = 1
-		}
-		startKey := executortypes.PrefixedWithdrawalAddressIndex(address, offset)
+		startKey := executortypes.PrefixedWithdrawalAddressSequence(address, offset)
 		err := ch.DB().Iterate(dbtypes.AppendSplitter(executortypes.PrefixedWithdrawalAddress(address)), startKey, fetchFn)
 		if err != nil {
-			return nil, 0, 0, err
+			return nil, 0, err
 		}
-
-		next = offset + count
 	}
-
-	return sequences, next, total, nil
+	return sequences, next, nil
 }
 
 func (ch *Child) SaveWithdrawal(sequence uint64, data executortypes.WithdrawalData) error {
-	addressIndex, err := ch.GetAddressIndex(data.To)
-	if err != nil {
-		return errors.Wrap(err, "failed to get address index")
-	}
-	ch.addressIndexMap[data.To] = addressIndex + 1
-
-	withdrawalDataWithIndex := executortypes.NewWithdrawalDataWithIndex(data, ch.addressIndexMap[data.To])
-	dataBytes, err := withdrawalDataWithIndex.Marshal()
+	dataBytes, err := data.Marshal()
 	if err != nil {
 		return err
 	}
@@ -279,31 +261,11 @@ func (ch *Child) SaveWithdrawal(sequence uint64, data executortypes.WithdrawalDa
 	if err != nil {
 		return errors.Wrap(err, "failed to save withdrawal data")
 	}
-	err = ch.stage.Set(executortypes.PrefixedWithdrawalAddressIndex(data.To, ch.addressIndexMap[data.To]), dbtypes.FromUint64(sequence))
+	err = ch.stage.Set(executortypes.PrefixedWithdrawalAddressSequence(data.To, sequence), dbtypes.FromUint64(sequence))
 	if err != nil {
 		return errors.Wrap(err, "failed to save withdrawal address index")
 	}
 	return nil
-}
-
-func (ch *Child) GetAddressIndex(address string) (uint64, error) {
-	if index, ok := ch.addressIndexMap[address]; !ok {
-		lastIndex, err := ch.GetLastAddressIndex(address)
-		if err != nil {
-			return 0, errors.Wrap(err, "failed to get last address index")
-		}
-		return lastIndex, nil
-	} else {
-		return index, nil
-	}
-}
-
-func (ch *Child) GetLastAddressIndex(address string) (lastIndex uint64, err error) {
-	err = ch.DB().ReverseIterate(dbtypes.AppendSplitter(executortypes.PrefixedWithdrawalAddress(address)), nil, func(key, _ []byte) (bool, error) {
-		lastIndex = dbtypes.ToUint64Key(key[len(key)-8:])
-		return true, nil
-	})
-	return lastIndex, err
 }
 
 func (ch *Child) DeleteFutureWithdrawals(fromSequence uint64) error {
@@ -313,12 +275,12 @@ func (ch *Child) DeleteFutureWithdrawals(fromSequence uint64) error {
 			return false, nil
 		}
 
-		data := executortypes.WithdrawalDataWithIndex{}
+		data := executortypes.WithdrawalData{}
 		err := data.Unmarshal(value)
 		if err != nil {
 			return true, err
 		}
-		err = ch.DB().Delete(executortypes.PrefixedWithdrawalAddressIndex(data.Withdrawal.To, data.Index))
+		err = ch.DB().Delete(executortypes.PrefixedWithdrawalAddressSequence(data.To, data.Sequence))
 		if err != nil {
 			return true, errors.Wrap(err, "failed to delete withdrawal address index")
 		}

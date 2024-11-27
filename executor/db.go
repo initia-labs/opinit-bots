@@ -70,7 +70,7 @@ func Migration015(db types.DB) error {
 			return true, err
 		}
 		addressIndexMap[data.To]++
-		err = nodeDB.Set(executortypes.PrefixedWithdrawalAddressIndex(data.To, addressIndexMap[data.To]), dbtypes.FromUint64(sequence))
+		err = nodeDB.Set(executortypes.PrefixedWithdrawalAddressSequence(data.To, addressIndexMap[data.To]), dbtypes.FromUint64(sequence))
 		if err != nil {
 			return true, err
 		}
@@ -237,6 +237,39 @@ func Migration019_2(ctx types.Context, db types.DB, rpcClient *rpcclient.RPCClie
 }
 
 func Migration0110(db types.DB) error {
+	nodeDB := db.WithPrefix([]byte(types.ChildName))
+	err := nodeDB.Iterate(executortypes.WithdrawalPrefix, nil, func(key, value []byte) (bool, error) {
+		// pass PrefixedWithdrawalKey ( WithdrawalKey / Sequence )
+		// we only delete PrefixedWithdrawalKeyAddressIndex ( WithdrawalKey / Address / Sequence )
+		if len(key) == len(executortypes.WithdrawalPrefix)+1+8 {
+			return false, nil
+		}
+		err := nodeDB.Delete(key)
+		if err != nil {
+			return true, err
+		}
+		return false, nil
+	})
+	if err != nil {
+		return err
+	}
+
+	return nodeDB.Iterate(executortypes.WithdrawalPrefix, nil, func(key, value []byte) (bool, error) {
+		sequence := dbtypes.ToUint64Key(key[len(key)-8:])
+		var data executortypes.WithdrawalData
+		err := json.Unmarshal(value, &data)
+		if err != nil {
+			return true, err
+		}
+		err = nodeDB.Set(executortypes.PrefixedWithdrawalAddressSequence(data.To, sequence), dbtypes.FromUint64(sequence))
+		if err != nil {
+			return true, err
+		}
+		return false, nil
+	})
+}
+
+func Migration0111(db types.DB) error {
 	DAHostName := "da_host"
 	DACelestiaName := "da_celestia"
 
@@ -279,39 +312,5 @@ func Migration0110(db types.DB) error {
 			}
 		}
 	}
-
-	addressIndexMap := make(map[string]uint64)
-	childDB := db.WithPrefix([]byte(types.ChildName))
-	return childDB.Iterate(dbtypes.AppendSplitter(executortypes.WithdrawalPrefix), nil, func(key, value []byte) (bool, error) {
-		if len(key) == len(executortypes.WithdrawalPrefix)+1+8 {
-			data := executortypes.WithdrawalData{}
-			err := data.Unmarshal(value)
-			if err != nil {
-				return true, err
-			}
-			addressIndexMap[data.To]++
-
-			dataWithIndex := executortypes.NewWithdrawalDataWithIndex(data, addressIndexMap[data.To])
-			dataBz, err := dataWithIndex.Marshal()
-			if err != nil {
-				return true, err
-			}
-
-			err = childDB.Set(executortypes.PrefixedWithdrawalSequence(data.Sequence), dataBz)
-			if err != nil {
-				return true, err
-			}
-
-			err = childDB.Set(executortypes.PrefixedWithdrawalAddressIndex(data.To, addressIndexMap[data.To]), dbtypes.FromUint64(data.Sequence))
-			if err != nil {
-				return true, err
-			}
-		}
-
-		err := childDB.Delete(key)
-		if err != nil {
-			return true, err
-		}
-		return false, nil
-	})
+	return nil
 }

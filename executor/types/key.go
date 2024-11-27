@@ -26,10 +26,10 @@ func PrefixedWithdrawalAddress(address string) []byte {
 	})
 }
 
-func PrefixedWithdrawalAddressIndex(address string, index uint64) []byte {
+func PrefixedWithdrawalAddressSequence(address string, sequence uint64) []byte {
 	return dbtypes.GenerateKey([][]byte{
 		WithdrawalAddressPrefix,
 		[]byte(address),
-		dbtypes.FromUint64Key(index),
+		dbtypes.FromUint64Key(sequence),
 	})
 }
