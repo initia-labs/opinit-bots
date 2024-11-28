@@ -7,7 +7,7 @@ import (
 )
 
 func TestNewTreeInfo(t *testing.T) {
-	tree := NewTreeInfo(1, 2, 3, map[uint8][]byte{1: {0x1}, 2: {0x2}}, true)
+	tree := NewTreeInfo(10, 1, 2, 3, map[uint8][]byte{1: {0x1}, 2: {0x2}}, true)
 	require.Equal(t, uint64(1), tree.Index)
 	require.Equal(t, uint64(2), tree.LeafCount)
 	require.Equal(t, uint64(3), tree.StartLeafIndex)
@@ -16,30 +16,31 @@ func TestNewTreeInfo(t *testing.T) {
 }
 
 func TestTreeKey(t *testing.T) {
-	tree := NewTreeInfo(1, 2, 3, map[uint8][]byte{1: {0x1}, 2: {0x2}}, true)
-	require.Equal(t, append(WorkingTreePrefix, []byte{byte('/'), 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x1}...), tree.Key())
+	tree := NewTreeInfo(10, 1, 2, 3, map[uint8][]byte{1: {0x1}, 2: {0x2}}, true)
+	require.Equal(t, append(WorkingTreePrefix, []byte{byte('/'), 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0xA}...), tree.Key())
 }
 
 func TestTreeValue(t *testing.T) {
-	tree := NewTreeInfo(1, 2, 3, map[uint8][]byte{1: {0x1}, 2: {0x2}}, true)
+	tree := NewTreeInfo(10, 1, 2, 3, map[uint8][]byte{1: {0x1}, 2: {0x2}}, true)
 	bz, err := tree.Value()
 	require.NoError(t, err)
-	require.Equal(t, []byte(`{"index":1,"leaf_count":2,"start_leaf_index":3,"height_data":{"1":"AQ==","2":"Ag=="},"done":true}`), bz)
+	require.Equal(t, []byte(`{"version":10,"index":1,"leaf_count":2,"start_leaf_index":3,"last_siblings":{"1":"AQ==","2":"Ag=="},"done":true}`), bz)
 }
 
 func TestTreeMarshal(t *testing.T) {
-	tree := NewTreeInfo(1, 2, 3, map[uint8][]byte{1: {0x1}, 2: {0x2}}, true)
+	tree := NewTreeInfo(10, 1, 2, 3, map[uint8][]byte{1: {0x1}, 2: {0x2}}, true)
 	bz, err := tree.Marshal()
 	require.NoError(t, err)
-	require.Equal(t, []byte(`{"index":1,"leaf_count":2,"start_leaf_index":3,"height_data":{"1":"AQ==","2":"Ag=="},"done":true}`), bz)
+	require.Equal(t, []byte(`{"version":10,"index":1,"leaf_count":2,"start_leaf_index":3,"last_siblings":{"1":"AQ==","2":"Ag=="},"done":true}`), bz)
 }
 
 func TestTreeUnmarshal(t *testing.T) {
-	bz := []byte(`{"index":1,"leaf_count":2,"start_leaf_index":3,"height_data":{"1":"AQ==","2":"Ag=="},"done":true}`)
+	bz := []byte(`{"version":10,"index":1,"leaf_count":2,"start_leaf_index":3,"last_siblings":{"1":"AQ==","2":"Ag=="},"done":true}`)
 	tree := &TreeInfo{}
 	err := tree.Unmarshal(bz)
 	require.NoError(t, err)
 
+	require.Equal(t, uint64(10), tree.Version)
 	require.Equal(t, uint64(1), tree.Index)
 	require.Equal(t, uint64(2), tree.LeafCount)
 	require.Equal(t, uint64(3), tree.StartLeafIndex)

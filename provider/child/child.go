@@ -131,7 +131,7 @@ func (b *BaseChild) Initialize(
 			b.initializeTreeFn = func(blockHeight int64) (bool, error) {
 				if processedHeight+1 == blockHeight {
 					ctx.Logger().Info("initialize tree", zap.Uint64("index", startOutputIndex))
-					err := b.mk.InitializeWorkingTree(startOutputIndex, l2Sequence)
+					err := b.mk.InitializeWorkingTree(types.MustInt64ToUint64(blockHeight), startOutputIndex, l2Sequence)
 					if err != nil {
 						return false, errors.Wrap(err, "failed to initialize working tree")
 					}

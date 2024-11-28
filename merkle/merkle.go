@@ -57,12 +57,13 @@ func NewMerkle(nodeGeneratorFn NodeGeneratorFn) (*Merkle, error) {
 }
 
 // InitializeWorkingTree resets the working tree with the given tree index and start leaf index.
-func (m *Merkle) InitializeWorkingTree(treeIndex uint64, startLeafIndex uint64) error {
+func (m *Merkle) InitializeWorkingTree(version uint64, treeIndex uint64, startLeafIndex uint64) error {
 	if treeIndex < 1 || startLeafIndex < 1 {
 		return fmt.Errorf("failed to initialize working tree index: %d, leaf: %d; invalid index", treeIndex, startLeafIndex)
 	}
 
 	m.workingTree = &merkletypes.TreeInfo{
+		Version:        version,
 		Index:          treeIndex,
 		StartLeafIndex: startLeafIndex,
 		LeafCount:      0,
@@ -108,12 +109,14 @@ func (m *Merkle) FinalizeWorkingTree(extraData []byte) (*merkletypes.FinalizedTr
 // LoadWorkingTree loads the working tree from the database.
 //
 // It is used to load the working tree to handle the case where the bot is stopped.
-func (m *Merkle) PrepareWorkingTree(workingTree merkletypes.TreeInfo) error {
-	m.workingTree = &workingTree
-	if workingTree.Done {
-		nextTreeIndex := workingTree.Index + 1
-		nextStartLeafIndex := workingTree.StartLeafIndex + workingTree.LeafCount
-		return m.InitializeWorkingTree(nextTreeIndex, nextStartLeafIndex)
+func (m *Merkle) PrepareWorkingTree(lastWorkingTree merkletypes.TreeInfo) error {
+	m.workingTree = &lastWorkingTree
+	m.workingTree.Version++
+
+	if m.workingTree.Done {
+		nextTreeIndex := m.workingTree.Index + 1
+		nextStartLeafIndex := m.workingTree.StartLeafIndex + m.workingTree.LeafCount
+		return m.InitializeWorkingTree(m.workingTree.Version, nextTreeIndex, nextStartLeafIndex)
 	}
 	return nil
 }

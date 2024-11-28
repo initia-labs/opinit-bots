@@ -27,21 +27,23 @@ func TestInitializeWorkingTree(t *testing.T) {
 
 	cases := []struct {
 		title          string
+		version        uint64
 		treeIndex      uint64
 		startLeafIndex uint64
 		expected       bool
 	}{
-		{"simple treeIndex, startLeafIndex", 5, 10, true},
-		{"zero treeIndex", 0, 3, false},
-		{"zero startLeafIndex", 3, 0, false},
+		{"simple treeIndex, startLeafIndex", 10, 5, 10, true},
+		{"zero treeIndex", 10, 0, 3, false},
+		{"zero startLeafIndex", 10, 3, 0, false},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.title, func(t *testing.T) {
-			err := m.InitializeWorkingTree(tc.treeIndex, tc.startLeafIndex)
+			err := m.InitializeWorkingTree(tc.version, tc.treeIndex, tc.startLeafIndex)
 			if tc.expected {
 				require.NoError(t, err)
 				require.Equal(t, &merkletypes.TreeInfo{
+					Version:        tc.version,
 					Index:          tc.treeIndex,
 					StartLeafIndex: tc.startLeafIndex,
 					LeafCount:      0,
@@ -96,7 +98,7 @@ func TestWorkingTree(t *testing.T) {
 	_, err = m.WorkingTree()
 	require.Error(t, err)
 
-	err = m.InitializeWorkingTree(1, 1)
+	err = m.InitializeWorkingTree(10, 1, 1)
 	require.NoError(t, err)
 
 	_, err = m.WorkingTree()
@@ -198,7 +200,7 @@ func TestFillLeaves(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.title, func(t *testing.T) {
-			err = m.InitializeWorkingTree(1, 1)
+			err = m.InitializeWorkingTree(10, 1, 1)
 			require.NoError(t, err)
 
 			for i := uint64(0); i < tc.leaves; i++ {
@@ -224,7 +226,7 @@ func TestInsertLeaf(t *testing.T) {
 	m, err := NewMerkle(hashFn)
 	require.NoError(t, err)
 
-	require.NoError(t, m.InitializeWorkingTree(1, 1))
+	require.NoError(t, m.InitializeWorkingTree(10, 1, 1))
 
 	// empty tree
 	require.Len(t, m.workingTree.LastSiblings, 0)
@@ -349,7 +351,7 @@ func TestFinalizeWorkingTree(t *testing.T) {
 	m, err := NewMerkle(hashFn)
 	require.NoError(t, err)
 
-	require.NoError(t, m.InitializeWorkingTree(1, 1))
+	require.NoError(t, m.InitializeWorkingTree(10, 1, 1))
 
 	// empty tree
 	finalizedTree, newNodes, root, err := m.FinalizeWorkingTree(nil)

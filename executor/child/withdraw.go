@@ -142,6 +142,7 @@ func (ch *Child) handleTree(ctx types.Context, blockHeight int64, latestHeight i
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to finalize working tree")
 		}
+		storageRoot = treeRootHash
 
 		if finalizedTree != nil {
 			err = merkle.SaveFinalizedTree(ch.stage, *finalizedTree)
@@ -162,7 +163,7 @@ func (ch *Child) handleTree(ctx types.Context, blockHeight int64, latestHeight i
 			zap.Int64("height", blockHeight),
 			zap.Uint64("start_leaf_index", workingTree.StartLeafIndex),
 			zap.Uint64("num_leaves", workingTree.LeafCount),
-			zap.String("storage_root", base64.StdEncoding.EncodeToString(treeRootHash)),
+			zap.String("storage_root", base64.StdEncoding.EncodeToString(storageRoot)),
 		)
 
 		// skip output submission when it is already submitted

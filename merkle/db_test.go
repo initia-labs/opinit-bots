@@ -17,6 +17,7 @@ func TestSaveGetWorkingTree(t *testing.T) {
 	require.Error(t, err)
 
 	workingTree := merkletypes.TreeInfo{
+		Version:        10,
 		Index:          3,
 		LeafCount:      10,
 		StartLeafIndex: 5,
@@ -28,7 +29,7 @@ func TestSaveGetWorkingTree(t *testing.T) {
 	err = SaveWorkingTree(db, workingTree)
 	require.NoError(t, err)
 
-	tree, err := GetWorkingTree(db, 3)
+	tree, err := GetWorkingTree(db, 10)
 	require.NoError(t, err)
 	require.Equal(t, workingTree, tree)
 }
@@ -98,7 +99,7 @@ func TestGetProofs(t *testing.T) {
 	m, err := NewMerkle(hashFn)
 	require.NoError(t, err)
 
-	require.NoError(t, m.InitializeWorkingTree(1, 1))
+	require.NoError(t, m.InitializeWorkingTree(10, 1, 1))
 
 	// insert 6 nodes
 	nodes, err := m.InsertLeaf([]byte("node1"))
@@ -198,7 +199,7 @@ func TestDeleteFutureWorkingTrees(t *testing.T) { //nolint
 	require.NoError(t, err)
 
 	for i := 1; i <= 10; i++ {
-		tree := merkletypes.TreeInfo{Index: uint64(i)}
+		tree := merkletypes.TreeInfo{Version: uint64(i)}
 		err = SaveWorkingTree(db, tree)
 		require.NoError(t, err)
 	}
@@ -208,7 +209,7 @@ func TestDeleteFutureWorkingTrees(t *testing.T) { //nolint
 	for i := 1; i <= 10; i++ {
 		tree, err := GetWorkingTree(db, uint64(i))
 		require.NoError(t, err)
-		require.Equal(t, tree.Index, uint64(i))
+		require.Equal(t, tree.Version, uint64(i))
 	}
 
 	err = DeleteFutureWorkingTrees(db, 5)
@@ -216,7 +217,7 @@ func TestDeleteFutureWorkingTrees(t *testing.T) { //nolint
 	for i := 1; i <= 4; i++ {
 		tree, err := GetWorkingTree(db, uint64(i))
 		require.NoError(t, err)
-		require.Equal(t, tree.Index, uint64(i))
+		require.Equal(t, tree.Version, uint64(i))
 	}
 	for i := 5; i <= 10; i++ {
 		_, err := GetWorkingTree(db, uint64(i))

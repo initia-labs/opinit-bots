@@ -6,7 +6,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-type TreeInfo struct {
+type LegacyTreeInfo struct {
 	// Index of the tree used as prefix for the keys
 	Index uint64 `json:"index"`
 
@@ -23,8 +23,40 @@ type TreeInfo struct {
 	Done bool `json:"done"`
 }
 
-func NewTreeInfo(index uint64, leafCount uint64, startLeafIndex uint64, lastSiblings map[uint8][]byte, done bool) TreeInfo {
+func (t LegacyTreeInfo) Migrate(version uint64) TreeInfo {
 	return TreeInfo{
+		Version:        version,
+		Index:          t.Index,
+		LeafCount:      t.LeafCount,
+		StartLeafIndex: t.StartLeafIndex,
+		LastSiblings:   t.LastSiblings,
+		Done:           t.Done,
+	}
+}
+
+type TreeInfo struct {
+	// Version of the tree
+	Version uint64 `json:"version"`
+
+	// Index of the tree used as prefix for the keys
+	Index uint64 `json:"index"`
+
+	// Number of leaves in the tree
+	LeafCount uint64 `json:"leaf_count"`
+
+	// Cumulative number of leaves all the way up to the current tree
+	StartLeafIndex uint64 `json:"start_leaf_index"`
+
+	// Last sibling of the height(level) of the tree
+	LastSiblings map[uint8][]byte `json:"last_siblings"`
+
+	// Flag to indicate if the tree is finalized
+	Done bool `json:"done"`
+}
+
+func NewTreeInfo(version uint64, index uint64, leafCount uint64, startLeafIndex uint64, lastSiblings map[uint8][]byte, done bool) TreeInfo {
+	return TreeInfo{
+		Version:        version,
 		Index:          index,
 		LeafCount:      leafCount,
 		StartLeafIndex: startLeafIndex,
@@ -34,7 +66,7 @@ func NewTreeInfo(index uint64, leafCount uint64, startLeafIndex uint64, lastSibl
 }
 
 func (t TreeInfo) Key() []byte {
-	return PrefixedWorkingTreeKey(t.Index)
+	return PrefixedWorkingTreeKey(t.Version)
 }
 
 func (t TreeInfo) Value() ([]byte, error) {

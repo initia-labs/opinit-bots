@@ -312,5 +312,30 @@ func Migration0111(db types.DB) error {
 			}
 		}
 	}
-	return nil
+
+	childDB := db.WithPrefix([]byte(types.ChildName))
+	return childDB.Iterate(merkletypes.WorkingTreePrefix, nil, func(key, value []byte) (bool, error) {
+		version, err := merkletypes.ParseWorkingTreeKey(key)
+		if err != nil {
+			return true, errors.Wrap(err, "failed to parse working tree key")
+		}
+
+		var legacyTree merkletypes.LegacyTreeInfo
+		err = json.Unmarshal(value, &legacyTree)
+		if err != nil {
+			return true, errors.Wrap(err, "failed to unmarshal tree info")
+		}
+
+		tree := legacyTree.Migrate(version)
+		treeBz, err := tree.Marshal()
+		if err != nil {
+			return true, errors.Wrap(err, "failed to marshal tree info")
+		}
+
+		err = childDB.Set(key, treeBz)
+		if err != nil {
+			return true, errors.Wrap(err, "failed to set tree info")
+		}
+		return false, nil
+	})
 }
