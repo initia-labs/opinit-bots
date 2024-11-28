@@ -7,7 +7,6 @@ import (
 	"time"
 
 	abcitypes "github.com/cometbft/cometbft/abci/types"
-	sdk "github.com/cosmos/cosmos-sdk/types"
 	opchildtypes "github.com/initia-labs/OPinit/x/opchild/types"
 	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
 	"github.com/initia-labs/opinit-bots/db"
@@ -17,6 +16,8 @@ import (
 	hostprovider "github.com/initia-labs/opinit-bots/provider/host"
 	"github.com/initia-labs/opinit-bots/types"
 	"github.com/stretchr/testify/require"
+
+	sdk "github.com/cosmos/cosmos-sdk/types"
 )
 
 func InitiateTokenDepositEvents(

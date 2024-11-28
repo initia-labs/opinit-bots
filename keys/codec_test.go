@@ -3,12 +3,13 @@ package keys
 import (
 	"testing"
 
-	"github.com/cosmos/cosmos-sdk/client/tx"
-	"github.com/cosmos/cosmos-sdk/x/auth"
 	"github.com/initia-labs/OPinit/x/opchild"
 	opchildtypes "github.com/initia-labs/OPinit/x/opchild/types"
 	"github.com/initia-labs/opinit-bots/txutils"
 	"github.com/stretchr/testify/require"
+
+	"github.com/cosmos/cosmos-sdk/client/tx"
+	"github.com/cosmos/cosmos-sdk/x/auth"
 )
 
 func TestCreateCodec(t *testing.T) {

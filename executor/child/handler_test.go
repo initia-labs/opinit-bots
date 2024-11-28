@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	cmtproto "github.com/cometbft/cometbft/proto/tendermint/types"
-	sdk "github.com/cosmos/cosmos-sdk/types"
 	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
 	"github.com/initia-labs/opinit-bots/db"
 	"github.com/initia-labs/opinit-bots/merkle"
@@ -16,6 +15,8 @@ import (
 	hostprovider "github.com/initia-labs/opinit-bots/provider/host"
 	"github.com/initia-labs/opinit-bots/types"
 	"github.com/stretchr/testify/require"
+
+	sdk "github.com/cosmos/cosmos-sdk/types"
 )
 
 func TestBeginBlockHandler(t *testing.T) {

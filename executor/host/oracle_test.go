@@ -3,7 +3,6 @@ package host
 import (
 	"testing"
 
-	sdk "github.com/cosmos/cosmos-sdk/types"
 	opchildtypes "github.com/initia-labs/OPinit/x/opchild/types"
 	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
 	"github.com/initia-labs/opinit-bots/db"
@@ -12,6 +11,8 @@ import (
 	childprovider "github.com/initia-labs/opinit-bots/provider/child"
 	hostprovider "github.com/initia-labs/opinit-bots/provider/host"
 	"github.com/stretchr/testify/require"
+
+	sdk "github.com/cosmos/cosmos-sdk/types"
 )
 
 func TestOracleTxHandler(t *testing.T) {
