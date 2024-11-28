@@ -854,3 +854,78 @@ func TestHandleTree(t *testing.T) {
 		})
 	}
 }
+
+func TestHandleOutput(t *testing.T) {
+	cases := []struct {
+		name        string
+		blockHeight int64
+		version     uint8
+		blockId     []byte
+		outputIndex uint64
+		storageRoot []byte
+		bridgeInfo  ophosttypes.QueryBridgeResponse
+		host        *mockHost
+		expected    sdk.Msg
+		err         bool
+	}{
+		{
+			name:        "success",
+			blockHeight: 10,
+			version:     1,
+			blockId:     []byte("latestBlockHashlatestBlockHashla"),
+			outputIndex: 1,
+			storageRoot: []byte("storageRootstorageRootstorageRoo"),
+			bridgeInfo:  ophosttypes.QueryBridgeResponse{BridgeId: 1},
+			host:        NewMockHost(nil, nil, 1, "sender0", nil),
+			expected: &ophosttypes.MsgProposeOutput{
+				Proposer:      "sender0",
+				BridgeId:      1,
+				OutputIndex:   1,
+				L2BlockNumber: 10,
+				OutputRoot:    []byte{0xc7, 0x4e, 0xaa, 0x00, 0xbb, 0xc8, 0x16, 0xd2, 0x94, 0x39, 0x01, 0x4c, 0xf7, 0x36, 0x3e, 0x29, 0xb1, 0x85, 0x18, 0x8c, 0xd4, 0x6a, 0x38, 0xfd, 0x64, 0x1f, 0xe5, 0x9f, 0xe4, 0x00, 0xbc, 0xf2},
+			},
+			err: false,
+		},
+		{
+			name:        "host no broadcaster",
+			blockHeight: 10,
+			version:     1,
+			blockId:     []byte("latestBlockHashlatestBlockHashla"),
+			outputIndex: 1,
+			storageRoot: []byte("storageRootstorageRootstorageRoo"),
+			bridgeInfo:  ophosttypes.QueryBridgeResponse{BridgeId: 1},
+			host:        NewMockHost(nil, nil, 1, "", nil),
+			expected:    nil,
+			err:         false,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			basedb, err := db.NewMemDB()
+			require.NoError(t, err)
+
+			childdb := basedb.WithPrefix([]byte("test_child"))
+			childNode := node.NewTestNode(nodetypes.NodeConfig{}, childdb, nil, nil, nil, nil)
+
+			ch := Child{
+				BaseChild: childprovider.NewTestBaseChild(0, childNode, nil, tc.bridgeInfo, nil, nodetypes.NodeConfig{}),
+				host:      tc.host,
+			}
+
+			err = ch.handleOutput(tc.blockHeight, tc.version, tc.blockId, tc.outputIndex, tc.storageRoot)
+			if !tc.err {
+				require.NoError(t, err)
+				msg := ch.GetMsgQueue()
+				if tc.expected != nil {
+					require.Equal(t, 1, len(msg))
+					require.Equal(t, tc.expected, msg[tc.host.baseAccount][0])
+				} else {
+					require.Empty(t, msg[tc.host.baseAccount])
+				}
+			} else {
+				require.Error(t, err)
+			}
+		})
+	}
+}
