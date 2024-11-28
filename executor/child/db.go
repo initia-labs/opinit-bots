@@ -18,11 +18,16 @@ func GetWithdrawal(db types.BasicDB, sequence uint64) (executortypes.WithdrawalD
 	return data, err
 }
 
-func GetSequencesByAddress(db types.DB, address string, offset uint64, limit uint64, descOrder bool) (sequences []uint64, next uint64, err error) {
-	if limit == 0 {
-		return nil, 0, nil
+func GetWithdrawalByAddress(db types.BasicDB, address string, sequence uint64) (uint64, error) {
+	dataBytes, err := db.Get(executortypes.PrefixedWithdrawalAddressSequence(address, sequence))
+	if err != nil {
+		return 0, errors.Wrap(err, "failed to get withdrawal data sequence from db")
 	}
+	return dbtypes.ToUint64(dataBytes)
+}
 
+// GetSequencesByAddress returns the withdrawal sequences for the given address from the database
+func GetSequencesByAddress(db types.DB, address string, offset uint64, limit uint64, descOrder bool) (sequences []uint64, next uint64, err error) {
 	count := uint64(0)
 	fetchFn := func(key, value []byte) (bool, error) {
 		sequence, err := dbtypes.ToUint64(value)
@@ -57,32 +62,37 @@ func GetSequencesByAddress(db types.DB, address string, offset uint64, limit uin
 	return sequences, next, nil
 }
 
-func SaveWithdrawal(db types.BasicDB, sequence uint64, data executortypes.WithdrawalData) error {
+func SaveWithdrawal(db types.BasicDB, data executortypes.WithdrawalData) error {
 	dataBytes, err := data.Marshal()
 	if err != nil {
 		return err
 	}
 
-	err = db.Set(executortypes.PrefixedWithdrawalSequence(sequence), dataBytes)
+	err = db.Set(executortypes.PrefixedWithdrawalSequence(data.Sequence), dataBytes)
 	if err != nil {
 		return errors.Wrap(err, "failed to save withdrawal data")
 	}
-	err = db.Set(executortypes.PrefixedWithdrawalAddressSequence(data.To, sequence), dbtypes.FromUint64(sequence))
+	err = db.Set(executortypes.PrefixedWithdrawalAddressSequence(data.To, data.Sequence), dbtypes.FromUint64(data.Sequence))
 	if err != nil {
 		return errors.Wrap(err, "failed to save withdrawal address index")
 	}
 	return nil
 }
 
+// DeleteFutureWithdrawals deletes all future withdrawals from the database starting from the given sequence
 func DeleteFutureWithdrawals(db types.DB, fromSequence uint64) error {
 	return db.Iterate(dbtypes.AppendSplitter(executortypes.WithdrawalSequencePrefix), nil, func(key, value []byte) (bool, error) {
-		sequence := dbtypes.ToUint64Key(key[len(key)-8:])
+		sequence, err := executortypes.ParseWithdrawalSequenceKey(key)
+		if err != nil {
+			return true, err
+		}
+
 		if sequence < fromSequence {
 			return false, nil
 		}
 
 		data := executortypes.WithdrawalData{}
-		err := data.Unmarshal(value)
+		err = data.Unmarshal(value)
 		if err != nil {
 			return true, err
 		}
@@ -94,7 +104,6 @@ func DeleteFutureWithdrawals(db types.DB, fromSequence uint64) error {
 		if err != nil {
 			return true, errors.Wrap(err, "failed to delete withdrawal data")
 		}
-
 		return false, nil
 	})
 }

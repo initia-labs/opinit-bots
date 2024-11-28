@@ -6,14 +6,12 @@ import (
 	nodetypes "github.com/initia-labs/opinit-bots/node/types"
 	"github.com/initia-labs/opinit-bots/types"
 	"github.com/pkg/errors"
-	"golang.org/x/exp/maps"
 )
 
 func (ch *Child) beginBlockHandler(ctx types.Context, args nodetypes.BeginBlockArgs) error {
 	ch.EmptyMsgQueue()
 	ch.EmptyProcessedMsgs()
 	ch.stage.Reset()
-	maps.Clear(ch.addressIndexMap)
 
 	err := ch.prepareTree(args.Block.Header.Height)
 	if err != nil {

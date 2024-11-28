@@ -47,8 +47,7 @@ type Child struct {
 	lastFinalizedDepositL1Sequence    uint64
 	lastOutputTime                    time.Time
 
-	stage           types.CommitDB
-	addressIndexMap map[string]uint64
+	stage types.CommitDB
 }
 
 func NewChildV1(
@@ -56,9 +55,8 @@ func NewChildV1(
 	db types.DB,
 ) *Child {
 	return &Child{
-		BaseChild:       childprovider.NewBaseChildV1(cfg, db),
-		stage:           db.NewStage(),
-		addressIndexMap: make(map[string]uint64),
+		BaseChild: childprovider.NewBaseChildV1(cfg, db),
+		stage:     db.NewStage(),
 	}
 }
 

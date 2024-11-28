@@ -36,7 +36,7 @@ func (ch *Child) handleInitiateWithdrawal(ctx types.Context, l2Sequence uint64, 
 	data := executortypes.NewWithdrawalData(l2Sequence, from, to, amount, baseDenom, withdrawalHash[:])
 
 	// store to database
-	err := SaveWithdrawal(ch.stage, l2Sequence, data)
+	err := SaveWithdrawal(ch.stage, data)
 	if err != nil {
 		return errors.Wrap(err, "failed to save withdrawal data")
 	}
