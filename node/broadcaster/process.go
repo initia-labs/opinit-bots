@@ -21,55 +21,56 @@ func IsTxNotFoundErr(err error, txHash string) bool {
 }
 
 // CheckPendingTx query tx info to check if pending tx is processed.
-func (b *Broadcaster) CheckPendingTx(ctx types.Context, pendingTx btypes.PendingTxInfo) (*rpccoretypes.ResultTx, time.Time, error) {
+func (b *Broadcaster) CheckPendingTx(ctx types.Context, pendingTx btypes.PendingTxInfo) (*rpccoretypes.ResultTx, time.Time, int64, error) {
 	txHash, err := hex.DecodeString(pendingTx.TxHash)
 	if err != nil {
-		return nil, time.Time{}, err
+		return nil, time.Time{}, 0, err
+	}
+	lastHeader, err := b.rpcClient.Header(ctx, nil)
+	if err != nil {
+		return nil, time.Time{}, 0, err
 	}
 
 	res, txerr := b.rpcClient.QueryTx(ctx, txHash)
 	if txerr != nil && IsTxNotFoundErr(txerr, pendingTx.TxHash) {
 		// if the tx is not found, it means the tx is not processed yet
 		// or the tx is not indexed by the node in rare cases.
-		lastHeader, err := b.rpcClient.Header(ctx, nil)
-		if err != nil {
-			return nil, time.Time{}, err
-		}
+
 		pendingTxTime := time.Unix(0, pendingTx.Timestamp)
 
 		// before timeout
 		if lastHeader.Header.Time.Before(pendingTxTime.Add(b.cfg.TxTimeout)) {
 			ctx.Logger().Debug("failed to query tx", zap.String("tx_hash", pendingTx.TxHash), zap.String("error", txerr.Error()))
-			return nil, time.Time{}, types.ErrTxNotFound
+			return nil, time.Time{}, 0, types.ErrTxNotFound
 		} else {
 			// timeout case
 			account, err := b.AccountByAddress(pendingTx.Sender)
 			if err != nil {
-				return nil, time.Time{}, err
+				return nil, time.Time{}, 0, err
 			}
 			accountSequence, err := account.GetLatestSequence(ctx)
 			if err != nil {
-				return nil, time.Time{}, err
+				return nil, time.Time{}, 0, err
 			}
 
 			// if sequence is larger than the sequence of the pending tx,
 			// handle it as the tx has already been processed
 			if pendingTx.Sequence < accountSequence {
-				return nil, time.Time{}, nil
+				return nil, time.Time{}, 0, nil
 			}
 			panic(fmt.Errorf("something wrong, pending txs are not processed for a long time; current block time: %s, pending tx processing time: %s", time.Now().UTC().String(), pendingTxTime.UTC().String()))
 		}
 	} else if txerr != nil {
-		return nil, time.Time{}, txerr
+		return nil, time.Time{}, 0, txerr
 	} else if res.TxResult.Code != 0 {
 		panic(fmt.Errorf("tx failed, tx hash: %s, code: %d, log: %s; you might need to check gas adjustment config or balance", pendingTx.TxHash, res.TxResult.Code, res.TxResult.Log))
 	}
 
 	header, err := b.rpcClient.Header(ctx, &res.Height)
 	if err != nil {
-		return nil, time.Time{}, err
+		return nil, time.Time{}, 0, err
 	}
-	return res, header.Header.Time, nil
+	return res, header.Header.Time, lastHeader.Header.Height, nil
 }
 
 // RemovePendingTx remove pending tx from local pending txs.

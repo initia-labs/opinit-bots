@@ -2,6 +2,7 @@ package child
 
 import (
 	"encoding/json"
+	"fmt"
 	"testing"
 
 	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
@@ -31,6 +32,9 @@ func saveQueryData(t *testing.T, db types.DB) {
 			Amount:         100,
 			BaseDenom:      "baseDenom",
 			WithdrawalHash: []byte("withdrawalHash"),
+			TxTime:         int64(i),
+			TxHeight:       int64(i),
+			TxHash:         fmt.Sprintf("txHash%d", i),
 		}
 		err := SaveWithdrawal(db, withdrawal)
 		require.NoError(t, err)
@@ -44,12 +48,15 @@ func saveQueryData(t *testing.T, db types.DB) {
 			Amount:         1000,
 			BaseDenom:      "baseDenom",
 			WithdrawalHash: []byte("withdrawalHash"),
+			TxTime:         int64(i),
+			TxHeight:       int64(i),
+			TxHash:         fmt.Sprintf("txHash%d", i),
 		}
 		err := SaveWithdrawal(db, withdrawal)
 		require.NoError(t, err)
 	}
 
-	extraData := executortypes.NewTreeExtraData(10, []byte("00000000000000000000000blockid10"))
+	extraData := executortypes.NewTreeExtraData(10, 10, []byte("00000000000000000000000blockid10"))
 	extraDataBz, err := json.Marshal(extraData)
 	require.NoError(t, err)
 
@@ -73,7 +80,7 @@ func saveQueryData(t *testing.T, db types.DB) {
 	}...)
 	require.NoError(t, err)
 
-	extraData = executortypes.NewTreeExtraData(100, []byte("0000000000000000000000blockid100"))
+	extraData = executortypes.NewTreeExtraData(100, 100, []byte("0000000000000000000000blockid100"))
 	extraDataBz, err = json.Marshal(extraData)
 	require.NoError(t, err)
 	err = merkle.SaveFinalizedTree(db, merkletypes.FinalizedTreeInfo{
@@ -104,7 +111,7 @@ func saveQueryData(t *testing.T, db types.DB) {
 	}...)
 	require.NoError(t, err)
 
-	extraData = executortypes.NewTreeExtraData(1000, []byte("000000000000000000000blockid1000"))
+	extraData = executortypes.NewTreeExtraData(1000, 1000, []byte("000000000000000000000blockid1000"))
 	extraDataBz, err = json.Marshal(extraData)
 	require.NoError(t, err)
 	err = merkle.SaveFinalizedTree(db, merkletypes.FinalizedTreeInfo{
@@ -161,6 +168,9 @@ func TestQueryWithdrawal(t *testing.T) {
 				Version:       []byte{0},
 				StorageRoot:   []byte("000000000000000000000000hash1234"),
 				LastBlockHash: []byte("00000000000000000000000blockid10"),
+				TxTime:        1,
+				TxHeight:      1,
+				TxHash:        "txHash1",
 			},
 			expected: true,
 		},
@@ -182,6 +192,9 @@ func TestQueryWithdrawal(t *testing.T) {
 				Version:       []byte{0},
 				StorageRoot:   []byte("00000000000000000000hash56789999"),
 				LastBlockHash: []byte("0000000000000000000000blockid100"),
+				TxTime:        5,
+				TxHeight:      5,
+				TxHash:        "txHash5",
 			},
 			expected: true,
 		},
@@ -209,6 +222,9 @@ func TestQueryWithdrawal(t *testing.T) {
 				Version:       []byte{0},
 				StorageRoot:   []byte("00000000000000000000hash56789999"),
 				LastBlockHash: []byte("0000000000000000000000blockid100"),
+				TxTime:        7,
+				TxHeight:      7,
+				TxHash:        "txHash7",
 			},
 			expected: true,
 		},
@@ -226,6 +242,9 @@ func TestQueryWithdrawal(t *testing.T) {
 				Version:          []byte{0},
 				StorageRoot:      nil,
 				LastBlockHash:    nil,
+				TxTime:           11,
+				TxHeight:         11,
+				TxHash:           "txHash11",
 			},
 			expected: true,
 		},
@@ -301,6 +320,9 @@ func TestQueryWithdrawals(t *testing.T) {
 						Version:       []byte{0},
 						StorageRoot:   []byte("000000000000000000000000hash1234"),
 						LastBlockHash: []byte("00000000000000000000000blockid10"),
+						TxTime:        1,
+						TxHeight:      1,
+						TxHash:        "txHash1",
 					},
 					{
 						Sequence:    2,
@@ -316,6 +338,9 @@ func TestQueryWithdrawals(t *testing.T) {
 						Version:       []byte{0},
 						StorageRoot:   []byte("000000000000000000000000hash1234"),
 						LastBlockHash: []byte("00000000000000000000000blockid10"),
+						TxTime:        2,
+						TxHeight:      2,
+						TxHash:        "txHash2",
 					},
 					{
 						Sequence:    3,
@@ -331,6 +356,9 @@ func TestQueryWithdrawals(t *testing.T) {
 						Version:       []byte{0},
 						StorageRoot:   []byte("000000000000000000000000hash1234"),
 						LastBlockHash: []byte("00000000000000000000000blockid10"),
+						TxTime:        3,
+						TxHeight:      3,
+						TxHash:        "txHash3",
 					},
 				},
 				Next: uint64Ptr(4),
@@ -371,6 +399,9 @@ func TestQueryWithdrawals(t *testing.T) {
 						Version:       []byte{0},
 						StorageRoot:   []byte("000000000000000000000000hash1234"),
 						LastBlockHash: []byte("00000000000000000000000blockid10"),
+						TxTime:        1,
+						TxHeight:      1,
+						TxHash:        "txHash1",
 					},
 				},
 			},
@@ -395,6 +426,9 @@ func TestQueryWithdrawals(t *testing.T) {
 						Version:          []byte{0},
 						StorageRoot:      nil,
 						LastBlockHash:    nil,
+						TxTime:           11,
+						TxHeight:         11,
+						TxHash:           "txHash11",
 					},
 					{
 						Sequence:    10,
@@ -409,6 +443,9 @@ func TestQueryWithdrawals(t *testing.T) {
 						Version:       []byte{0},
 						StorageRoot:   []byte("000000000000000000000000hash1010"),
 						LastBlockHash: []byte("000000000000000000000blockid1000"),
+						TxTime:        10,
+						TxHeight:      10,
+						TxHash:        "txHash10",
 					},
 					{
 						Sequence:    9,
@@ -425,6 +462,9 @@ func TestQueryWithdrawals(t *testing.T) {
 						Version:       []byte{0},
 						StorageRoot:   []byte("00000000000000000000hash56789999"),
 						LastBlockHash: []byte("0000000000000000000000blockid100"),
+						TxTime:        9,
+						TxHeight:      9,
+						TxHash:        "txHash9",
 					},
 					{
 						Sequence:    8,
@@ -441,6 +481,9 @@ func TestQueryWithdrawals(t *testing.T) {
 						Version:       []byte{0},
 						StorageRoot:   []byte("00000000000000000000hash56789999"),
 						LastBlockHash: []byte("0000000000000000000000blockid100"),
+						TxTime:        8,
+						TxHeight:      8,
+						TxHash:        "txHash8",
 					},
 					{
 						Sequence:    7,
@@ -457,6 +500,9 @@ func TestQueryWithdrawals(t *testing.T) {
 						Version:       []byte{0},
 						StorageRoot:   []byte("00000000000000000000hash56789999"),
 						LastBlockHash: []byte("0000000000000000000000blockid100"),
+						TxTime:        7,
+						TxHeight:      7,
+						TxHash:        "txHash7",
 					},
 				},
 			},

@@ -13,6 +13,11 @@ type WithdrawalData struct {
 	Amount         uint64 `json:"amount"`
 	BaseDenom      string `json:"base_denom"`
 	WithdrawalHash []byte `json:"withdrawal_hash"`
+
+	// extra info
+	TxHeight int64  `json:"tx_height"`
+	TxTime   int64  `json:"tx_time"`
+	TxHash   string `json:"tx_hash"`
 }
 
 func NewWithdrawalData(
@@ -22,6 +27,9 @@ func NewWithdrawalData(
 	amount uint64,
 	baseDenom string,
 	withdrawalHash []byte,
+	txHeight int64,
+	txTime int64,
+	txHash string,
 ) WithdrawalData {
 	return WithdrawalData{
 		Sequence:       sequence,
@@ -30,6 +38,9 @@ func NewWithdrawalData(
 		Amount:         amount,
 		BaseDenom:      baseDenom,
 		WithdrawalHash: withdrawalHash,
+		TxHeight:       txHeight,
+		TxTime:         txTime,
+		TxHash:         txHash,
 	}
 }
 
@@ -51,15 +62,18 @@ func (w *WithdrawalData) Unmarshal(bz []byte) error {
 
 type TreeExtraData struct {
 	BlockNumber int64  `json:"block_number"`
+	BlockTime   int64  `json:"block_time"`
 	BlockHash   []byte `json:"block_hash"`
 }
 
 func NewTreeExtraData(
 	blockNumber int64,
+	blockTime int64,
 	blockHash []byte,
 ) TreeExtraData {
 	return TreeExtraData{
 		BlockNumber: blockNumber,
+		BlockTime:   blockTime,
 		BlockHash:   blockHash,
 	}
 }

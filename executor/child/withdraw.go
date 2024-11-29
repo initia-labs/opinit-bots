@@ -5,10 +5,12 @@ import (
 	"encoding/base64"
 	"fmt"
 	"strings"
+	"time"
 
 	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
 	executortypes "github.com/initia-labs/opinit-bots/executor/types"
 	"github.com/initia-labs/opinit-bots/merkle"
+	"github.com/initia-labs/opinit-bots/txutils"
 	"github.com/initia-labs/opinit-bots/types"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
@@ -24,16 +26,16 @@ func (ch *Child) initiateWithdrawalHandler(ctx types.Context, args nodetypes.Eve
 	if err != nil {
 		return errors.Wrap(err, "failed to parse initiate withdrawal event")
 	}
-	err = ch.handleInitiateWithdrawal(ctx, l2Sequence, from, to, baseDenom, amount)
+	err = ch.handleInitiateWithdrawal(ctx, l2Sequence, from, to, baseDenom, amount, args.BlockTime, args.BlockHeight, txutils.TxHash(args.Tx))
 	if err != nil {
 		return errors.Wrap(err, "failed to handle initiate withdrawal")
 	}
 	return nil
 }
 
-func (ch *Child) handleInitiateWithdrawal(ctx types.Context, l2Sequence uint64, from string, to string, baseDenom string, amount uint64) error {
+func (ch *Child) handleInitiateWithdrawal(ctx types.Context, l2Sequence uint64, from string, to string, baseDenom string, amount uint64, blockTime time.Time, blockHeight int64, txHash string) error {
 	withdrawalHash := ophosttypes.GenerateWithdrawalHash(ch.BridgeId(), l2Sequence, from, to, baseDenom, amount)
-	data := executortypes.NewWithdrawalData(l2Sequence, from, to, amount, baseDenom, withdrawalHash[:])
+	data := executortypes.NewWithdrawalData(l2Sequence, from, to, amount, baseDenom, withdrawalHash[:], blockHeight, blockTime.UnixNano(), txHash)
 
 	// store to database
 	err := SaveWithdrawal(ch.stage, data)
@@ -63,6 +65,8 @@ func (ch *Child) handleInitiateWithdrawal(ctx types.Context, l2Sequence uint64, 
 		zap.Uint64("amount", amount),
 		zap.String("base_denom", baseDenom),
 		zap.String("withdrawal", base64.StdEncoding.EncodeToString(withdrawalHash[:])),
+		zap.Int64("height", blockHeight),
+		zap.String("tx_hash", txHash),
 	)
 
 	return nil
@@ -132,7 +136,7 @@ func (ch *Child) handleTree(ctx types.Context, blockHeight int64, latestHeight i
 			blockHeight == latestHeight &&
 			blockHeader.Time.After(ch.nextOutputTime)) {
 
-		treeExtraData := executortypes.NewTreeExtraData(blockHeight, blockId)
+		treeExtraData := executortypes.NewTreeExtraData(blockHeight, blockHeader.Time.UnixNano(), blockId)
 		data, err := treeExtraData.Marshal()
 		if err != nil {
 			return nil, err

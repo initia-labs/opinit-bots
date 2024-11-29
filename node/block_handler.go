@@ -7,6 +7,7 @@ import (
 	abcitypes "github.com/cometbft/cometbft/abci/types"
 	prototypes "github.com/cometbft/cometbft/proto/tendermint/types"
 	rpccoretypes "github.com/cometbft/cometbft/rpc/core/types"
+	comettypes "github.com/cometbft/cometbft/types"
 	nodetypes "github.com/initia-labs/opinit-bots/node/types"
 	"github.com/initia-labs/opinit-bots/types"
 	"github.com/pkg/errors"
@@ -39,7 +40,7 @@ func (n *Node) handleBlockTxs(ctx types.Context, block *rpccoretypes.ResultBlock
 			}
 		}
 
-		err := n.handleEvents(ctx, block.Block.Height, block.Block.Time, blockResult.TxsResults[txIndex].GetEvents(), latestHeight)
+		err := n.handleEvents(ctx, block.Block.Height, block.Block.Time, blockResult.TxsResults[txIndex].GetEvents(), latestHeight, tx, int64(txIndex))
 		if err != nil {
 			return errors.Wrap(err, fmt.Sprintf("failed to handle events: tx_index: %d", txIndex))
 		}
@@ -48,13 +49,13 @@ func (n *Node) handleBlockTxs(ctx types.Context, block *rpccoretypes.ResultBlock
 }
 
 func (n *Node) handleFinalizeBlock(ctx types.Context, blockHeight int64, blockTime time.Time, blockResult *rpccoretypes.ResultBlockResults, latestHeight int64) error {
-	return n.handleEvents(ctx, blockHeight, blockTime, blockResult.FinalizeBlockEvents, latestHeight)
+	return n.handleEvents(ctx, blockHeight, blockTime, blockResult.FinalizeBlockEvents, latestHeight, nil, 0)
 }
 
-func (n *Node) handleEvents(ctx types.Context, blockHeight int64, blockTime time.Time, events []abcitypes.Event, latestHeight int64) error {
+func (n *Node) handleEvents(ctx types.Context, blockHeight int64, blockTime time.Time, events []abcitypes.Event, latestHeight int64, tx comettypes.Tx, txIndex int64) error {
 	if len(n.eventHandlers) != 0 {
 		for eventIndex, event := range events {
-			err := n.handleEvent(ctx, blockHeight, blockTime, latestHeight, event)
+			err := n.handleEvent(ctx, blockHeight, blockTime, latestHeight, tx, txIndex, event)
 			if err != nil {
 				return errors.Wrap(err, fmt.Sprintf("failed to handle event: event_index: %d", eventIndex))
 			}

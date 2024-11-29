@@ -6,6 +6,7 @@ import (
 
 	abcitypes "github.com/cometbft/cometbft/abci/types"
 	rpccoretypes "github.com/cometbft/cometbft/rpc/core/types"
+	comettypes "github.com/cometbft/cometbft/types"
 	nodetypes "github.com/initia-labs/opinit-bots/node/types"
 	"github.com/initia-labs/opinit-bots/types"
 	"github.com/pkg/errors"
@@ -159,7 +160,7 @@ func (n *Node) handleNewBlock(ctx types.Context, block *rpccoretypes.ResultBlock
 	return nil
 }
 
-func (n *Node) handleEvent(ctx types.Context, blockHeight int64, blockTime time.Time, latestHeight int64, event abcitypes.Event) error {
+func (n *Node) handleEvent(ctx types.Context, blockHeight int64, blockTime time.Time, latestHeight int64, tx comettypes.Tx, txIndex int64, event abcitypes.Event) error {
 	// ignore if no event handlers
 	if n.eventHandlers[event.GetType()] == nil {
 		return nil
@@ -170,6 +171,8 @@ func (n *Node) handleEvent(ctx types.Context, blockHeight int64, blockTime time.
 		BlockHeight:     blockHeight,
 		BlockTime:       blockTime,
 		LatestHeight:    latestHeight,
+		TxIndex:         txIndex,
+		Tx:              tx,
 		EventAttributes: event.GetAttributes(),
 	})
 }

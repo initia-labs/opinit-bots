@@ -279,7 +279,7 @@ func (b *BroadcasterAccount) DefaultBuildTxWithMsgs(
 	if err != nil {
 		return nil, "", err
 	}
-	return txBytes, btypes.TxHash(txBytes), nil
+	return txBytes, txutils.TxHash(txBytes), nil
 }
 
 func (b *BroadcasterAccount) DefaultMsgsFromTx(
