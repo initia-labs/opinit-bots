@@ -1,4 +1,4 @@
-package batch
+package batchsubmitter
 
 import (
 	executortypes "github.com/initia-labs/opinit-bots/executor/types"

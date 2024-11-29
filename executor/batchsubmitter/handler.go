@@ -1,7 +1,8 @@
-package batch
+package batchsubmitter
 
 import (
 	"bytes"
+	"encoding/binary"
 	"fmt"
 	"io"
 	"time"
@@ -14,8 +15,6 @@ import (
 	"github.com/cosmos/gogoproto/proto"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
-
-	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
 
 	executortypes "github.com/initia-labs/opinit-bots/executor/types"
 	"github.com/initia-labs/opinit-bots/node"
@@ -30,20 +29,26 @@ func (bs *BatchSubmitter) rawBlockHandler(ctx types.Context, args nodetypes.RawB
 	bs.processedMsgs = bs.processedMsgs[:0]
 	bs.stage.Reset()
 
-	pbb := new(cmtproto.Block)
-	err := proto.Unmarshal(args.BlockBytes, pbb)
-	if err != nil {
-		return errors.Wrap(err, "failed to unmarshal block")
-	}
-
-	err = bs.prepareBatch(args.BlockHeight)
+	err := bs.prepareBatch(args.BlockHeight)
 	if err != nil {
 		return errors.Wrap(err, "failed to prepare batch")
 	}
 
-	blockBytes, err := bs.emptyOracleData(pbb)
+	pbb := new(cmtproto.Block)
+	err = proto.Unmarshal(args.BlockBytes, pbb)
+	if err != nil {
+		return errors.Wrap(err, "failed to unmarshal block")
+	}
+
+	pbb, err = bs.emptyOracleData(pbb)
 	if err != nil {
 		return errors.Wrap(err, "failed to empty oracle data")
+	}
+
+	// convert block to bytes
+	blockBytes, err := proto.Marshal(pbb)
+	if err != nil {
+		return errors.Wrap(err, "failed to marshal block")
 	}
 
 	_, err = bs.handleBatch(blockBytes)
@@ -297,49 +302,9 @@ func (bs *BatchSubmitter) batchFileSize(flush bool) (int64, error) {
 	return info.Size(), nil
 }
 
-// UpdateBatchInfo appends the batch info with the given chain, submitter, output index, and l2 block number
-func (bs *BatchSubmitter) UpdateBatchInfo(chain string, submitter string, outputIndex uint64, l2BlockNumber int64) {
-	bs.batchInfoMu.Lock()
-	defer bs.batchInfoMu.Unlock()
-
-	// check if the batch info is already updated
-	if types.MustUint64ToInt64(bs.batchInfos[len(bs.batchInfos)-1].Output.L2BlockNumber) >= l2BlockNumber {
-		return
-	}
-
-	bs.batchInfos = append(bs.batchInfos, ophosttypes.BatchInfoWithOutput{
-		BatchInfo: ophosttypes.BatchInfo{
-			ChainType: ophosttypes.BatchInfo_ChainType(ophosttypes.BatchInfo_ChainType_value["CHAIN_TYPE_"+chain]),
-			Submitter: submitter,
-		},
-		Output: ophosttypes.Output{
-			L2BlockNumber: types.MustInt64ToUint64(l2BlockNumber),
-		},
-	})
-}
-
-// BatchInfo returns the current batch info
-func (bs *BatchSubmitter) BatchInfo() *ophosttypes.BatchInfoWithOutput {
-	bs.batchInfoMu.Lock()
-	defer bs.batchInfoMu.Unlock()
-
-	return &bs.batchInfos[0]
-}
-
-// NextBatchInfo returns the next batch info in the queue
-func (bs *BatchSubmitter) NextBatchInfo() *ophosttypes.BatchInfoWithOutput {
-	bs.batchInfoMu.Lock()
-	defer bs.batchInfoMu.Unlock()
-	if len(bs.batchInfos) == 1 {
-		return nil
-	}
-	return &bs.batchInfos[1]
-}
-
-// DequeueBatchInfo removes the first batch info from the queue
-func (bs *BatchSubmitter) DequeueBatchInfo() {
-	bs.batchInfoMu.Lock()
-	defer bs.batchInfoMu.Unlock()
-
-	bs.batchInfos = bs.batchInfos[1:]
+// prependLength prepends the length of the data to the data.
+func prependLength(data []byte) []byte {
+	lengthBytes := make([]byte, 8)
+	binary.LittleEndian.PutUint64(lengthBytes, uint64(len(data)))
+	return append(lengthBytes, data...)
 }

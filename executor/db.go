@@ -304,7 +304,7 @@ func Migration0111(db types.DB) error {
 	} {
 		nodeDB := db.WithPrefix([]byte(nodeName))
 
-		value, err := nodeDB.Get(nodetypes.LastProcessedBlockHeightKey)
+		value, err := nodeDB.Get([]byte("last_processed_block_height"))
 		if err == nil {
 			err = nodeDB.Set(nodetypes.SyncedHeightKey, value)
 			if err != nil {

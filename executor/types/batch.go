@@ -30,6 +30,8 @@ type DANode interface {
 	GetNodeStatus() (nodetypes.Status, error)
 }
 
+var LocalBatchInfoKey = []byte("local_batch_info")
+
 type LocalBatchInfo struct {
 	// start l2 block height which is included in the batch
 	Start int64 `json:"start"`
@@ -38,6 +40,18 @@ type LocalBatchInfo struct {
 
 	LastSubmissionTime time.Time `json:"last_submission_time"`
 	BatchFileSize      int64     `json:"batch_size"`
+}
+
+func (l LocalBatchInfo) Key() []byte {
+	return LocalBatchInfoKey
+}
+
+func (l LocalBatchInfo) Value() ([]byte, error) {
+	bz, err := l.Marshal()
+	if err != nil {
+		return nil, err
+	}
+	return bz, nil
 }
 
 func (l LocalBatchInfo) Marshal() ([]byte, error) {

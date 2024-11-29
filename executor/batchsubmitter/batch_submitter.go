@@ -1,4 +1,4 @@
-package batch
+package batchsubmitter
 
 import (
 	"compress/gzip"
@@ -8,7 +8,6 @@ import (
 
 	"go.uber.org/zap"
 
-	opchildtypes "github.com/initia-labs/OPinit/x/opchild/types"
 	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
 
 	executortypes "github.com/initia-labs/opinit-bots/executor/types"
@@ -35,8 +34,6 @@ type BatchSubmitter struct {
 
 	cfg      nodetypes.NodeConfig
 	batchCfg executortypes.BatchConfig
-
-	opchildQueryClient opchildtypes.QueryClient
 
 	batchInfoMu    *sync.Mutex
 	batchInfos     []ophosttypes.BatchInfoWithOutput
@@ -79,8 +76,6 @@ func NewBatchSubmitterV1(
 
 		cfg:      cfg,
 		batchCfg: batchCfg,
-
-		opchildQueryClient: opchildtypes.NewQueryClient(node.GetRPCClient()),
 
 		batchInfoMu:    &sync.Mutex{},
 		localBatchInfo: &executortypes.LocalBatchInfo{},

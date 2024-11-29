@@ -1,7 +1,7 @@
 package executor
 
 import (
-	"github.com/initia-labs/opinit-bots/executor/batch"
+	"github.com/initia-labs/opinit-bots/executor/batchsubmitter"
 	"github.com/initia-labs/opinit-bots/executor/child"
 	"github.com/initia-labs/opinit-bots/executor/host"
 	nodetypes "github.com/initia-labs/opinit-bots/node/types"
@@ -9,11 +9,11 @@ import (
 )
 
 type Status struct {
-	BridgeId uint64           `json:"bridge_id"`
-	Host     host.Status      `json:"host,omitempty"`
-	Child    child.Status     `json:"child,omitempty"`
-	Batch    batch.Status     `json:"batch,omitempty"`
-	DA       nodetypes.Status `json:"da,omitempty"`
+	BridgeId       uint64                `json:"bridge_id"`
+	Host           host.Status           `json:"host,omitempty"`
+	Child          child.Status          `json:"child,omitempty"`
+	BatchSubmitter batchsubmitter.Status `json:"batch_submitter,omitempty"`
+	DA             nodetypes.Status      `json:"da,omitempty"`
 }
 
 func (ex Executor) GetStatus() (Status, error) {
@@ -33,13 +33,13 @@ func (ex Executor) GetStatus() (Status, error) {
 			return Status{}, errors.Wrap(err, "failed to get child status")
 		}
 	}
-	if ex.batch != nil {
-		s.Batch, err = ex.batch.GetStatus()
+	if ex.batchSubmitter != nil {
+		s.BatchSubmitter, err = ex.batchSubmitter.GetStatus()
 		if err != nil {
 			return Status{}, errors.Wrap(err, "failed to get batch status")
 		}
-		if ex.batch.DA() != nil {
-			s.DA, err = ex.batch.DA().GetNodeStatus()
+		if ex.batchSubmitter.DA() != nil {
+			s.DA, err = ex.batchSubmitter.DA().GetNodeStatus()
 			if err != nil {
 				return Status{}, errors.Wrap(err, "failed to get DA status")
 			}

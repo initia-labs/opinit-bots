@@ -5,7 +5,7 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/initia-labs/opinit-bots/executor/batch"
+	"github.com/initia-labs/opinit-bots/executor/batchsubmitter"
 	"github.com/initia-labs/opinit-bots/executor/celestia"
 	"github.com/initia-labs/opinit-bots/executor/child"
 	"github.com/initia-labs/opinit-bots/executor/host"
@@ -26,9 +26,9 @@ var _ bottypes.Bot = &Executor{}
 // - relay l1 deposit messages to l2
 // - generate l2 output root and submit to l1
 type Executor struct {
-	host  *host.Host
-	child *child.Child
-	batch *batch.BatchSubmitter
+	host           *host.Host
+	child          *child.Child
+	batchSubmitter *batchsubmitter.BatchSubmitter
 
 	cfg    *executortypes.Config
 	db     types.DB
@@ -50,7 +50,7 @@ func NewExecutor(cfg *executortypes.Config, db types.DB, sv *server.Server) *Exe
 			cfg.L2NodeConfig(),
 			db.WithPrefix([]byte(types.ChildName)),
 		),
-		batch: batch.NewBatchSubmitterV1(
+		batchSubmitter: batchsubmitter.NewBatchSubmitterV1(
 			cfg.L2NodeConfig(),
 			cfg.BatchConfig(),
 			db.WithPrefix([]byte(types.BatchName)),
@@ -90,7 +90,7 @@ func (ex *Executor) Initialize(ctx types.Context) error {
 
 	hostKeyringConfig, childKeyringConfig, childOracleKeyringConfig, daKeyringConfig := ex.getKeyringConfigs(*bridgeInfo)
 
-	err = ex.host.Initialize(ctx, l1StartHeight-1, ex.child, ex.batch, *bridgeInfo, hostKeyringConfig)
+	err = ex.host.Initialize(ctx, l1StartHeight-1, ex.child, ex.batchSubmitter, *bridgeInfo, hostKeyringConfig)
 	if err != nil {
 		return errors.Wrap(err, "failed to initialize host")
 	}
@@ -98,7 +98,7 @@ func (ex *Executor) Initialize(ctx types.Context) error {
 	if err != nil {
 		return errors.Wrap(err, "failed to initialize child")
 	}
-	err = ex.batch.Initialize(ctx, batchStartHeight-1, ex.host, *bridgeInfo)
+	err = ex.batchSubmitter.Initialize(ctx, batchStartHeight-1, ex.host, *bridgeInfo)
 	if err != nil {
 		return errors.Wrap(err, "failed to initialize batch")
 	}
@@ -107,7 +107,7 @@ func (ex *Executor) Initialize(ctx types.Context) error {
 	if err != nil {
 		return errors.Wrap(err, "failed to make DA node")
 	}
-	ex.batch.SetDANode(da)
+	ex.batchSubmitter.SetDANode(da)
 	ex.RegisterQuerier()
 	return nil
 }
@@ -128,21 +128,21 @@ func (ex *Executor) Start(ctx types.Context) error {
 	})
 	ex.host.Start(ctx)
 	ex.child.Start(ctx)
-	ex.batch.Start(ctx)
-	ex.batch.DA().Start(ctx)
+	ex.batchSubmitter.Start(ctx)
+	ex.batchSubmitter.DA().Start(ctx)
 	return ctx.ErrGrp().Wait()
 }
 
 func (ex *Executor) Close() {
-	ex.batch.Close()
+	ex.batchSubmitter.Close()
 }
 
 func (ex *Executor) makeDANode(ctx types.Context, bridgeInfo ophosttypes.QueryBridgeResponse, daKeyringConfig *btypes.KeyringConfig) (executortypes.DANode, error) {
 	if ex.cfg.DisableBatchSubmitter {
-		return batch.NewNoopDA(), nil
+		return batchsubmitter.NewNoopDA(), nil
 	}
 
-	batchInfo := ex.batch.BatchInfo()
+	batchInfo := ex.batchSubmitter.BatchInfo()
 	if batchInfo == nil {
 		return nil, errors.New("batch info is not set")
 	}
@@ -168,7 +168,7 @@ func (ex *Executor) makeDANode(ctx types.Context, bridgeInfo ophosttypes.QueryBr
 			ex.cfg.DANodeConfig(),
 			ex.db.WithPrefix([]byte(types.DAName)),
 		)
-		err := celestiada.Initialize(ctx, ex.batch, bridgeInfo.BridgeId, daKeyringConfig)
+		err := celestiada.Initialize(ctx, ex.batchSubmitter, bridgeInfo.BridgeId, daKeyringConfig)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to initialize celestia DA")
 		}

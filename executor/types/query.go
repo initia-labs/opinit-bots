@@ -14,10 +14,6 @@ type QueryWithdrawalResponse struct {
 	Version          []byte     `json:"version"`
 	StorageRoot      []byte     `json:"storage_root"`
 	LastBlockHash    []byte     `json:"last_block_hash"`
-
-	// extra info
-	// BlockNumber    int64  `json:"block_number"`
-	// WithdrawalHash []byte `json:"withdrawal_hash"`
 }
 
 type QueryWithdrawalsResponse struct {

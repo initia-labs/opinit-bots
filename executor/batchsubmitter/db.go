@@ -1,4 +1,4 @@
-package batch
+package batchsubmitter
 
 import (
 	dbtypes "github.com/initia-labs/opinit-bots/db/types"
@@ -7,10 +7,8 @@ import (
 	"github.com/pkg/errors"
 )
 
-var LocalBatchInfoKey = []byte("local_batch_info")
-
 func GetLocalBatchInfo(db types.BasicDB) (executortypes.LocalBatchInfo, error) {
-	val, err := db.Get(LocalBatchInfoKey)
+	val, err := db.Get(executortypes.LocalBatchInfoKey)
 	if err != nil {
 		if errors.Is(err, dbtypes.ErrNotFound) {
 			return executortypes.LocalBatchInfo{}, nil
@@ -24,9 +22,9 @@ func GetLocalBatchInfo(db types.BasicDB) (executortypes.LocalBatchInfo, error) {
 }
 
 func SaveLocalBatchInfo(db types.BasicDB, localBatchInfo executortypes.LocalBatchInfo) error {
-	value, err := localBatchInfo.Marshal()
+	bz, err := localBatchInfo.Value()
 	if err != nil {
 		return err
 	}
-	return db.Set(LocalBatchInfoKey, value)
+	return db.Set(localBatchInfo.Key(), bz)
 }
