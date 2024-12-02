@@ -20,7 +20,7 @@ func TestSaveGetLocalBatchInfo(t *testing.T) {
 	localBatchInfo := executortypes.LocalBatchInfo{
 		Start:              1,
 		End:                2,
-		LastSubmissionTime: time.Unix(0, 10000),
+		LastSubmissionTime: time.Unix(0, 10000).UTC(),
 		BatchFileSize:      1000,
 	}
 

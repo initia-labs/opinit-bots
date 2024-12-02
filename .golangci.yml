@@ -5,7 +5,7 @@ linters:
     - dogsled
     - dupl
     - errcheck
-    - exportloopref
+    - copyloopvar
     - goconst
     - gofmt
     - goimports
@@ -23,12 +23,12 @@ linters:
     - typecheck
     - unconvert
     - unused
-
 issues:
   exclude-rules:
     - path: _test\.go
       linters:
         - gosec
+        - unused
     - linters:
         - stylecheck
       text: "ST1003:"
