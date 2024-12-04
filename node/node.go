@@ -73,7 +73,7 @@ func NewNode(cfg nodetypes.NodeConfig, db types.DB, cdc codec.Codec, txConfig cl
 			n.db,
 			n.cdc,
 			n.txConfig,
-			n.rpcClient,
+			rpcClient,
 		)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to create broadcaster")

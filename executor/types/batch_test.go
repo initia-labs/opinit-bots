@@ -12,7 +12,7 @@ func TestLocalBatchInfo(t *testing.T) {
 		Start:              1,
 		End:                100,
 		LastSubmissionTime: time.Unix(0, 10000),
-		BatchFileSize:      100,
+		BatchSize:          100,
 	}
 
 	bz, err := batchInfo.Marshal()

@@ -122,7 +122,7 @@ func TestUpdateBatchInfo(t *testing.T) {
 			}
 
 			if tc.panic {
-				assert.Panics(t, func() {
+				require.Panics(t, func() {
 					batchSubmitter.UpdateBatchInfo(tc.chain, tc.submitter, tc.outputIndex, tc.l2BlockNumber)
 				})
 				return
