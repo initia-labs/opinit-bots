@@ -10,6 +10,10 @@ func (bs *BatchSubmitter) UpdateBatchInfo(chain string, submitter string, output
 	bs.batchInfoMu.Lock()
 	defer bs.batchInfoMu.Unlock()
 
+	if len(bs.batchInfos) == 0 {
+		panic("batch info must be set before starting the batch submitter")
+	}
+
 	// check if the batch info is already updated
 	if types.MustUint64ToInt64(bs.batchInfos[len(bs.batchInfos)-1].Output.L2BlockNumber) >= l2BlockNumber {
 		return
