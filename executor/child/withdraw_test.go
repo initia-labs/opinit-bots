@@ -17,7 +17,6 @@ import (
 	nodetypes "github.com/initia-labs/opinit-bots/node/types"
 	childprovider "github.com/initia-labs/opinit-bots/provider/child"
 	"github.com/initia-labs/opinit-bots/types"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -266,7 +265,7 @@ func TestInitiateWithdrawalHandler(t *testing.T) {
 			}
 
 			if tc.panic {
-				assert.Panics(t, func() {
+				require.Panics(t, func() {
 					ch.initiateWithdrawalHandler(ctx, tc.eventHandlerArgs) //nolint
 				})
 				return
@@ -420,7 +419,7 @@ func TestPrepareTree(t *testing.T) {
 			}
 
 			if tc.panic {
-				assert.Panics(t, func() {
+				require.Panics(t, func() {
 					ch.prepareTree(tc.blockHeight) //nolint
 				})
 				return
@@ -844,7 +843,7 @@ func TestHandleTree(t *testing.T) {
 
 			ctx := types.NewContext(context.Background(), zap.NewNop(), "")
 			if tc.panic {
-				assert.Panics(t, func() {
+				require.Panics(t, func() {
 					ch.handleTree(ctx, tc.blockHeight, tc.latestHeight, blockId, tc.blockHeader) //nolint
 				})
 				return

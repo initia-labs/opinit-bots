@@ -19,6 +19,7 @@ import (
 	ctypes "github.com/cometbft/cometbft/rpc/core/types"
 	jsonrpcclient "github.com/cometbft/cometbft/rpc/jsonrpc/client"
 	"github.com/cometbft/cometbft/types"
+	clienttypes "github.com/initia-labs/opinit-bots/client/types"
 )
 
 /*
@@ -145,6 +146,13 @@ func NewWithClient(remote, wsEndpoint string, client *http.Client) (*HTTP, error
 	}
 
 	return httpClient, nil
+}
+
+// NewWithCaller allows for setting a custom caller for testing purposes.
+func NewWithCaller(caller jsonrpcclient.Caller) *HTTP {
+	return &HTTP{
+		baseRPCClient: &baseRPCClient{caller: caller},
+	}
 }
 
 var _ rpcclient.Client = (*HTTP)(nil)
@@ -412,7 +420,7 @@ func (c *baseRPCClient) Block(ctx context.Context, height *int64) (*ctypes.Resul
 }
 
 func (c *baseRPCClient) BlockBulk(ctx context.Context, start *int64, end *int64) ([][]byte, error) {
-	result := new(ResultBlockBulk)
+	result := new(clienttypes.ResultBlockBulk)
 	params := make(map[string]interface{})
 	if start != nil {
 		params["start"] = start
@@ -494,7 +502,7 @@ func (c *baseRPCClient) Commit(ctx context.Context, height *int64) (*ctypes.Resu
 }
 
 func (c *baseRPCClient) RawCommit(ctx context.Context, height *int64) ([]byte, error) {
-	result := new(ResultRawCommit)
+	result := new(clienttypes.ResultRawCommit)
 	params := make(map[string]interface{})
 	if height != nil {
 		params["height"] = height

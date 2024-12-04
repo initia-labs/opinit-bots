@@ -39,7 +39,7 @@ type LocalBatchInfo struct {
 	End int64 `json:"end"`
 
 	LastSubmissionTime time.Time `json:"last_submission_time"`
-	BatchFileSize      int64     `json:"batch_size"`
+	BatchSize          int64     `json:"batch_size"`
 }
 
 func (l LocalBatchInfo) Key() []byte {

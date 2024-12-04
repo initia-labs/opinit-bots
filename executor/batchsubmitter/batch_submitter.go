@@ -120,7 +120,7 @@ func (bs *BatchSubmitter) Initialize(ctx types.Context, syncedHeight int64, host
 	if bs.node.HeightInitialized() {
 		bs.localBatchInfo.Start = bs.node.GetHeight()
 		bs.localBatchInfo.End = 0
-		bs.localBatchInfo.BatchFileSize = 0
+		bs.localBatchInfo.BatchSize = 0
 
 		err = SaveLocalBatchInfo(bs.DB(), *bs.localBatchInfo)
 		if err != nil {

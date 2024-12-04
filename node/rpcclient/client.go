@@ -50,6 +50,13 @@ func NewRPCClient(cdc codec.Codec, rpcAddr string) (*RPCClient, error) {
 	}, nil
 }
 
+func NewRPCClientWithClient(cdc codec.Codec, client *clienthttp.HTTP) *RPCClient {
+	return &RPCClient{
+		HTTP: client,
+		cdc:  cdc,
+	}
+}
+
 // Invoke implements the grpc ClientConq.Invoke method
 func (q RPCClient) Invoke(ctx context.Context, method string, req, reply interface{}, opts ...grpc.CallOption) (err error) {
 	// In both cases, we don't allow empty request req (it will panic unexpectedly).

@@ -21,7 +21,7 @@ func TestSaveGetLocalBatchInfo(t *testing.T) {
 		Start:              1,
 		End:                2,
 		LastSubmissionTime: time.Unix(0, 10000).UTC(),
-		BatchFileSize:      1000,
+		BatchSize:          1000,
 	}
 
 	err = SaveLocalBatchInfo(db, localBatchInfo)

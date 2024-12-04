@@ -10,6 +10,10 @@ func (bs *BatchSubmitter) UpdateBatchInfo(chain string, submitter string, output
 	bs.batchInfoMu.Lock()
 	defer bs.batchInfoMu.Unlock()
 
+	if len(bs.batchInfos) == 0 {
+		panic("batch info must be set before starting the batch submitter")
+	}
+
 	// check if the batch info is already updated
 	if types.MustUint64ToInt64(bs.batchInfos[len(bs.batchInfos)-1].Output.L2BlockNumber) >= l2BlockNumber {
 		return
@@ -27,6 +31,7 @@ func (bs *BatchSubmitter) UpdateBatchInfo(chain string, submitter string, output
 }
 
 // BatchInfo returns the current batch info
+// There is always at least one batch info in the queue
 func (bs *BatchSubmitter) BatchInfo() *ophosttypes.BatchInfoWithOutput {
 	bs.batchInfoMu.Lock()
 	defer bs.batchInfoMu.Unlock()
@@ -45,6 +50,7 @@ func (bs *BatchSubmitter) NextBatchInfo() *ophosttypes.BatchInfoWithOutput {
 }
 
 // DequeueBatchInfo removes the first batch info from the queue
+// There is always at least one batch info in the queue
 func (bs *BatchSubmitter) DequeueBatchInfo() {
 	bs.batchInfoMu.Lock()
 	defer bs.batchInfoMu.Unlock()
