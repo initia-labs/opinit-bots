@@ -11,7 +11,7 @@ func TestLocalBatchInfo(t *testing.T) {
 	batchInfo := LocalBatchInfo{
 		Start:              1,
 		End:                100,
-		LastSubmissionTime: time.Unix(0, 10000),
+		LastSubmissionTime: time.Unix(0, 10000).UTC(),
 		BatchSize:          100,
 	}
 

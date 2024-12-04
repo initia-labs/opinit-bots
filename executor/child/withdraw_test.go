@@ -87,12 +87,15 @@ func TestInitiateWithdrawalHandler(t *testing.T) {
 				Done:           false,
 			},
 			eventHandlerArgs: nodetypes.EventHandlerArgs{
+				BlockHeight:     11,
+				BlockTime:       time.Unix(0, 10000),
+				Tx:              []byte("txbytes"), // EA58654919E6F3E08370DE723D8DA223F1DFE78DD28D0A23E6F18BFA0815BB99
 				EventAttributes: InitiateWithdrawalEvents("from", "to", "denom", "uinit", sdk.NewInt64Coin("uinit", 10000), 1),
 			},
 			expectedStage: []types.KV{
 				{
 					Key:   append([]byte("/test_child/withdrawal_sequence/"), []byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01}...),
-					Value: []byte(`{"sequence":1,"from":"from","to":"to","amount":10000,"base_denom":"uinit","withdrawal_hash":"V+7ukqwrq0Ba6kj63TEZ1C7m4Ze7pqERmid/OQtNneY="}`),
+					Value: []byte(`{"sequence":1,"from":"from","to":"to","amount":10000,"base_denom":"uinit","withdrawal_hash":"V+7ukqwrq0Ba6kj63TEZ1C7m4Ze7pqERmid/OQtNneY=","tx_height":11,"tx_time":10000,"tx_hash":"EA58654919E6F3E08370DE723D8DA223F1DFE78DD28D0A23E6F18BFA0815BB99"}`),
 				},
 				{
 					Key:   append([]byte("/test_child/withdrawal_address/to/"), []byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01}...),
@@ -112,6 +115,8 @@ func TestInitiateWithdrawalHandler(t *testing.T) {
 					zap.Uint64("amount", 10000),
 					zap.String("base_denom", "uinit"),
 					zap.String("withdrawal", "V+7ukqwrq0Ba6kj63TEZ1C7m4Ze7pqERmid/OQtNneY="),
+					zap.Int64("height", 11),
+					zap.String("tx_hash", "EA58654919E6F3E08370DE723D8DA223F1DFE78DD28D0A23E6F18BFA0815BB99"),
 				}
 				return msg, fields
 			},
@@ -131,12 +136,15 @@ func TestInitiateWithdrawalHandler(t *testing.T) {
 				Done: false,
 			},
 			eventHandlerArgs: nodetypes.EventHandlerArgs{
+				BlockHeight:     11,
+				BlockTime:       time.Unix(0, 10000),
+				Tx:              []byte("txbytes"),
 				EventAttributes: InitiateWithdrawalEvents("from", "to", "denom", "uinit", sdk.NewInt64Coin("uinit", 10000), 101),
 			},
 			expectedStage: []types.KV{
 				{
 					Key:   append([]byte("/test_child/withdrawal_sequence/"), []byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x65}...),
-					Value: []byte(`{"sequence":101,"from":"from","to":"to","amount":10000,"base_denom":"uinit","withdrawal_hash":"Hzn58U22rfXK2VZCOIFzjudpdYkw5v0eZ2QnspIFlBs="}`),
+					Value: []byte(`{"sequence":101,"from":"from","to":"to","amount":10000,"base_denom":"uinit","withdrawal_hash":"Hzn58U22rfXK2VZCOIFzjudpdYkw5v0eZ2QnspIFlBs=","tx_height":11,"tx_time":10000,"tx_hash":"EA58654919E6F3E08370DE723D8DA223F1DFE78DD28D0A23E6F18BFA0815BB99"}`),
 				},
 				{
 					Key:   append([]byte("/test_child/withdrawal_address/to/"), []byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x65}...),
@@ -160,6 +168,8 @@ func TestInitiateWithdrawalHandler(t *testing.T) {
 					zap.Uint64("amount", 10000),
 					zap.String("base_denom", "uinit"),
 					zap.String("withdrawal", "Hzn58U22rfXK2VZCOIFzjudpdYkw5v0eZ2QnspIFlBs="),
+					zap.Int64("height", 11),
+					zap.String("tx_hash", "EA58654919E6F3E08370DE723D8DA223F1DFE78DD28D0A23E6F18BFA0815BB99"),
 				}
 				return msg, fields
 			},
@@ -177,6 +187,9 @@ func TestInitiateWithdrawalHandler(t *testing.T) {
 				Done:           false,
 			},
 			eventHandlerArgs: nodetypes.EventHandlerArgs{
+				BlockHeight:     10,
+				BlockTime:       time.Unix(0, 10000),
+				Tx:              []byte("txbytes"),
 				EventAttributes: InitiateWithdrawalEvents("from", "to", "denom", "uinit", sdk.NewInt64Coin("uinit", 10000), 101),
 			},
 			expectedStage: nil,
@@ -608,6 +621,7 @@ func TestHandleTree(t *testing.T) {
 				LeafCount:      0,
 				StartLeafIndex: 10,
 				LastSiblings:   make(map[uint8][]byte),
+				Done:           false,
 			},
 			lastOutputTime:        time.Time{},
 			nextOutputTime:        time.Unix(0, 10000),
@@ -642,6 +656,7 @@ func TestHandleTree(t *testing.T) {
 					0: {0xf7, 0x58, 0xe5, 0x5d, 0xb1, 0x30, 0x74, 0x4b, 0x05, 0xad, 0x66, 0x94, 0xb2, 0x8b, 0xe4, 0xab, 0x73, 0x0d, 0xe0, 0xdc, 0x09, 0xde, 0x5c, 0x0c, 0x42, 0xab, 0x64, 0x66, 0xc8, 0x06, 0xdc, 0x10},
 					1: {0x50, 0x26, 0x55, 0x2e, 0x7b, 0x21, 0xca, 0xb5, 0x27, 0xe4, 0x16, 0x9e, 0x66, 0x46, 0x02, 0xb8, 0x5d, 0x03, 0x67, 0x0b, 0xb5, 0x57, 0xe3, 0x29, 0x18, 0xd9, 0x33, 0xe3, 0xd5, 0x92, 0x5c, 0x7e},
 				},
+				Done: false,
 			},
 			lastOutputTime:        time.Time{},
 			nextOutputTime:        time.Unix(0, 10000),
@@ -658,7 +673,7 @@ func TestHandleTree(t *testing.T) {
 				},
 				{
 					Key:   append([]byte("/test_child/finalized_tree/"), []byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0a}...),
-					Value: []byte(`{"tree_index":3,"tree_height":1,"root":"UCZVLnshyrUn5BaeZkYCuF0DZwu1V+MpGNkz49WSXH4=","start_leaf_index":10,"leaf_count":2,"extra_data":"eyJibG9ja19udW1iZXIiOjUsImJsb2NrX2hhc2giOiJkR1Z6ZEY5aWJHOWphMTlwWkE9PSJ9"}`),
+					Value: []byte(`{"tree_index":3,"tree_height":1,"root":"UCZVLnshyrUn5BaeZkYCuF0DZwu1V+MpGNkz49WSXH4=","start_leaf_index":10,"leaf_count":2,"extra_data":"eyJibG9ja19udW1iZXIiOjUsImJsb2NrX3RpbWUiOjEwMTAwLCJibG9ja19oYXNoIjoiZEdWemRGOWliRzlqYTE5cFpBPT0ifQ=="}`),
 				},
 			},
 			err:   false,
@@ -680,6 +695,7 @@ func TestHandleTree(t *testing.T) {
 					0: {0xd9, 0xf8, 0x70, 0xb0, 0x6d, 0x46, 0x43, 0xc5, 0x9f, 0xbd, 0x0a, 0x9a, 0xd1, 0xe5, 0x5c, 0x43, 0x98, 0xdd, 0xae, 0xf1, 0xca, 0xc2, 0xd7, 0xfb, 0xcf, 0xd5, 0xe0, 0x11, 0xb6, 0x83, 0xb8, 0x33},
 					1: {0x50, 0x26, 0x55, 0x2e, 0x7b, 0x21, 0xca, 0xb5, 0x27, 0xe4, 0x16, 0x9e, 0x66, 0x46, 0x02, 0xb8, 0x5d, 0x03, 0x67, 0x0b, 0xb5, 0x57, 0xe3, 0x29, 0x18, 0xd9, 0x33, 0xe3, 0xd5, 0x92, 0x5c, 0x7e},
 				},
+				Done: false,
 			},
 			lastOutputTime:        time.Time{},
 			nextOutputTime:        time.Unix(0, 10000),
@@ -696,7 +712,7 @@ func TestHandleTree(t *testing.T) {
 				},
 				{
 					Key:   append([]byte("/test_child/finalized_tree/"), []byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0a}...),
-					Value: []byte(`{"tree_index":3,"tree_height":2,"root":"/9R6cfY6ilAJVu80sfq71C8HyF53960hJwHgZNq99qM=","start_leaf_index":10,"leaf_count":3,"extra_data":"eyJibG9ja19udW1iZXIiOjUsImJsb2NrX2hhc2giOiJkR1Z6ZEY5aWJHOWphMTlwWkE9PSJ9"}`),
+					Value: []byte(`{"tree_index":3,"tree_height":2,"root":"/9R6cfY6ilAJVu80sfq71C8HyF53960hJwHgZNq99qM=","start_leaf_index":10,"leaf_count":3,"extra_data":"eyJibG9ja19udW1iZXIiOjUsImJsb2NrX3RpbWUiOjEwMTAwLCJibG9ja19oYXNoIjoiZEdWemRGOWliRzlqYTE5cFpBPT0ifQ=="}`),
 				},
 				{ // height 0, index 3
 					Key:   append([]byte("/test_child/node/"), []byte{0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x3, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x3}...),
@@ -727,6 +743,7 @@ func TestHandleTree(t *testing.T) {
 				LeafCount:      3,
 				StartLeafIndex: 10,
 				LastSiblings:   map[uint8][]byte{},
+				Done:           false,
 			},
 			finalizingBlockHeight: 5,
 
@@ -751,6 +768,7 @@ func TestHandleTree(t *testing.T) {
 					0: {0xd9, 0xf8, 0x70, 0xb0, 0x6d, 0x46, 0x43, 0xc5, 0x9f, 0xbd, 0x0a, 0x9a, 0xd1, 0xe5, 0x5c, 0x43, 0x98, 0xdd, 0xae, 0xf1, 0xca, 0xc2, 0xd7, 0xfb, 0xcf, 0xd5, 0xe0, 0x11, 0xb6, 0x83, 0xb8, 0x33},
 					1: {0x50, 0x26, 0x55, 0x2e, 0x7b, 0x21, 0xca, 0xb5, 0x27, 0xe4, 0x16, 0x9e, 0x66, 0x46, 0x02, 0xb8, 0x5d, 0x03, 0x67, 0x0b, 0xb5, 0x57, 0xe3, 0x29, 0x18, 0xd9, 0x33, 0xe3, 0xd5, 0x92, 0x5c, 0x7e},
 				},
+				Done: false,
 			},
 			lastOutputTime:        time.Time{},
 			nextOutputTime:        time.Unix(0, 10000),
@@ -782,6 +800,7 @@ func TestHandleTree(t *testing.T) {
 					0: {0xd9, 0xf8, 0x70, 0xb0, 0x6d, 0x46, 0x43, 0xc5, 0x9f, 0xbd, 0x0a, 0x9a, 0xd1, 0xe5, 0x5c, 0x43, 0x98, 0xdd, 0xae, 0xf1, 0xca, 0xc2, 0xd7, 0xfb, 0xcf, 0xd5, 0xe0, 0x11, 0xb6, 0x83, 0xb8, 0x33},
 					1: {0x50, 0x26, 0x55, 0x2e, 0x7b, 0x21, 0xca, 0xb5, 0x27, 0xe4, 0x16, 0x9e, 0x66, 0x46, 0x02, 0xb8, 0x5d, 0x03, 0x67, 0x0b, 0xb5, 0x57, 0xe3, 0x29, 0x18, 0xd9, 0x33, 0xe3, 0xd5, 0x92, 0x5c, 0x7e},
 				},
+				Done: false,
 			},
 			lastOutputTime:        time.Time{},
 			nextOutputTime:        time.Unix(0, 10000),

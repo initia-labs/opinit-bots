@@ -31,11 +31,12 @@ func (b *Broadcaster) CheckPendingTx(ctx types.Context, pendingTx btypes.Pending
 	if txerr != nil && IsTxNotFoundErr(txerr, pendingTx.TxHash) {
 		// if the tx is not found, it means the tx is not processed yet
 		// or the tx is not indexed by the node in rare cases.
+		pendingTxTime := time.Unix(0, pendingTx.Timestamp)
+
 		lastHeader, err := b.rpcClient.Header(ctx, nil)
 		if err != nil {
 			return nil, time.Time{}, err
 		}
-		pendingTxTime := time.Unix(0, pendingTx.Timestamp)
 
 		// before timeout
 		if lastHeader.Header.Time.Before(pendingTxTime.Add(b.cfg.TxTimeout)) {

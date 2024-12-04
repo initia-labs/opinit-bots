@@ -64,7 +64,7 @@ func (n *Node) txChecker(ctx types.Context, enableEventHandler bool) error {
 					default:
 					}
 
-					err := n.handleEvent(ctx, res.Height, blockTime, 0, event)
+					err := n.handleEvent(ctx, res.Height, blockTime, 0, res.Tx, types.MustUint64ToInt64(uint64(res.Index)), event)
 					if err != nil {
 						ctx.Logger().Error("failed to handle event", zap.String("tx_hash", pendingTx.TxHash), zap.Int("event_index", eventIndex), zap.String("error", err.Error()))
 						break

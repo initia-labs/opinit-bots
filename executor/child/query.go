@@ -27,6 +27,9 @@ func (ch Child) QueryWithdrawal(sequence uint64) (executortypes.QueryWithdrawalR
 		Sequence: sequence,
 		Amount:   amount,
 		Version:  []byte{ch.Version()},
+		TxHeight: withdrawal.TxHeight,
+		TxTime:   withdrawal.TxTime,
+		TxHash:   withdrawal.TxHash,
 	}
 
 	proofs, outputIndex, outputRoot, extraDataBytes, err := merkle.GetProofs(ch.DB(), sequence)

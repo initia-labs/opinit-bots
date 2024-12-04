@@ -8,7 +8,6 @@ import (
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 
-	btypes "github.com/initia-labs/opinit-bots/node/broadcaster/types"
 	"github.com/initia-labs/opinit-bots/txutils"
 	celestiatypes "github.com/initia-labs/opinit-bots/types/celestia"
 )
@@ -59,7 +58,7 @@ func (c *Celestia) BuildTxWithMessages(
 		return nil, "", errors.Wrap(err, "failed to marshal blob tx")
 	}
 
-	return blobTxBytes, btypes.TxHash(txBytes), nil
+	return blobTxBytes, txutils.TxHash(txBytes), nil
 }
 
 func (c *Celestia) PendingTxToProcessedMsgs(

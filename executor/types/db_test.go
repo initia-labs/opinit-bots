@@ -14,8 +14,11 @@ func TestWithdrawalData(t *testing.T) {
 		Amount:         100,
 		BaseDenom:      "base_denom",
 		WithdrawalHash: []byte("withdrawal_hash"),
+		TxHeight:       1000,
+		TxTime:         10000,
+		TxHash:         "tx_hash",
 	}
-	wd2 := NewWithdrawalData(100, "from", "to", 100, "base_denom", []byte("withdrawal_hash"))
+	wd2 := NewWithdrawalData(100, "from", "to", 100, "base_denom", []byte("withdrawal_hash"), 1000, 10000, "tx_hash")
 	require.Equal(t, wd, wd2)
 
 	bz, err := wd.Marshal()
@@ -30,9 +33,10 @@ func TestWithdrawalData(t *testing.T) {
 func TestTreeExtraData(t *testing.T) {
 	td := TreeExtraData{
 		BlockNumber: 100,
+		BlockTime:   100,
 		BlockHash:   []byte("block_hash"),
 	}
-	td2 := NewTreeExtraData(100, []byte("block_hash"))
+	td2 := NewTreeExtraData(100, 100, []byte("block_hash"))
 	require.Equal(t, td, td2)
 
 	bz, err := td.Marshal()

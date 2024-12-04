@@ -14,6 +14,11 @@ type QueryWithdrawalResponse struct {
 	Version          []byte     `json:"version"`
 	StorageRoot      []byte     `json:"storage_root"`
 	LastBlockHash    []byte     `json:"last_block_hash"`
+
+	// extra info
+	TxTime   int64  `json:"tx_time"`
+	TxHeight int64  `json:"tx_height"`
+	TxHash   string `json:"tx_hash"`
 }
 
 type QueryWithdrawalsResponse struct {
