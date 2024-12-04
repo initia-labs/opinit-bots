@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	sdk "github.com/cosmos/cosmos-sdk/types"
 	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
 	client "github.com/initia-labs/opinit-bots/client"
 	mockclient "github.com/initia-labs/opinit-bots/client/mock"
@@ -25,6 +24,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
+
+	sdk "github.com/cosmos/cosmos-sdk/types"
 )
 
 func TestPrepareBatch(t *testing.T) {
