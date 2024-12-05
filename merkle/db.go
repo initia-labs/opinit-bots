@@ -11,6 +11,7 @@ import (
 	"github.com/pkg/errors"
 )
 
+// DeleteFutureFinalizedTrees deletes all finalized trees with sequence number greater than or equal to fromSequence.
 func DeleteFutureFinalizedTrees(db types.DB, fromSequence uint64) error {
 	return db.Iterate(dbtypes.AppendSplitter(merkletypes.FinalizedTreePrefix), nil, func(key, _ []byte) (bool, error) {
 		sequence, err := merkletypes.ParseFinalizedTreeKey(key)
@@ -28,6 +29,7 @@ func DeleteFutureFinalizedTrees(db types.DB, fromSequence uint64) error {
 	})
 }
 
+// DeleteFutureWorkingTrees deletes all working trees with version greater than or equal to fromVersion.
 func DeleteFutureWorkingTrees(db types.DB, fromVersion uint64) error {
 	return db.Iterate(dbtypes.AppendSplitter(merkletypes.WorkingTreePrefix), nil, func(key, _ []byte) (bool, error) {
 		version, err := merkletypes.ParseWorkingTreeKey(key)
@@ -45,6 +47,7 @@ func DeleteFutureWorkingTrees(db types.DB, fromVersion uint64) error {
 	})
 }
 
+// GetWorkingTree returns the working tree with the given version.
 func GetWorkingTree(db types.BasicDB, version uint64) (merkletypes.TreeInfo, error) {
 	data, err := db.Get(merkletypes.PrefixedWorkingTreeKey(version))
 	if err != nil {
@@ -56,6 +59,7 @@ func GetWorkingTree(db types.BasicDB, version uint64) (merkletypes.TreeInfo, err
 	return workingTree, err
 }
 
+// SaveWorkingTree saves the working tree to the db.
 func SaveWorkingTree(db types.BasicDB, workingTree merkletypes.TreeInfo) error {
 	value, err := workingTree.Value()
 	if err != nil {
@@ -64,6 +68,7 @@ func SaveWorkingTree(db types.BasicDB, workingTree merkletypes.TreeInfo) error {
 	return db.Set(workingTree.Key(), value)
 }
 
+// GetFinalizedTree returns the finalized tree with the given start leaf index.
 func GetFinalizedTree(db types.BasicDB, startLeafIndex uint64) (merkletypes.FinalizedTreeInfo, error) {
 	data, err := db.Get(merkletypes.PrefixedFinalizedTreeKey(startLeafIndex))
 	if err != nil {
@@ -75,6 +80,7 @@ func GetFinalizedTree(db types.BasicDB, startLeafIndex uint64) (merkletypes.Fina
 	return finalizedTree, err
 }
 
+// SaveFinalizedTree saves the finalized tree to the db.
 func SaveFinalizedTree(db types.BasicDB, finalizedTree merkletypes.FinalizedTreeInfo) error {
 	value, err := json.Marshal(finalizedTree)
 	if err != nil {
@@ -83,6 +89,7 @@ func SaveFinalizedTree(db types.BasicDB, finalizedTree merkletypes.FinalizedTree
 	return db.Set(finalizedTree.Key(), value)
 }
 
+// SaveNodes saves the nodes to the db.
 func SaveNodes(db types.BasicDB, nodes ...merkletypes.Node) error {
 	for _, node := range nodes {
 		err := db.Set(node.Key(), node.Value())
@@ -93,6 +100,7 @@ func SaveNodes(db types.BasicDB, nodes ...merkletypes.Node) error {
 	return nil
 }
 
+// GetNodeBytes returns the node with the given tree index, height, and local node index.
 func GetNodeBytes(db types.BasicDB, treeIndex uint64, height uint8, localNodeIndex uint64) ([]byte, error) {
 	return db.Get(merkletypes.PrefixedNodeKey(treeIndex, height, localNodeIndex))
 }

@@ -12,6 +12,7 @@ import (
 // PendingTx //
 ///////////////
 
+// SavePendingTx saves pending tx
 func SavePendingTx(db types.BasicDB, pendingTx btypes.PendingTxInfo) error {
 	data, err := pendingTx.Value()
 	if err != nil {
@@ -20,10 +21,12 @@ func SavePendingTx(db types.BasicDB, pendingTx btypes.PendingTxInfo) error {
 	return db.Set(pendingTx.Key(), data)
 }
 
+// DeletePendingTx deletes pending tx
 func DeletePendingTx(db types.BasicDB, pendingTx btypes.PendingTxInfo) error {
 	return db.Delete(pendingTx.Key())
 }
 
+// LoadPendingTxs loads all pending txs
 func LoadPendingTxs(db types.DB) (txs []btypes.PendingTxInfo, err error) {
 	iterErr := db.Iterate(dbtypes.AppendSplitter(btypes.PendingTxsPrefix), nil, func(_, value []byte) (stop bool, err error) {
 		txInfo := btypes.PendingTxInfo{}
@@ -40,6 +43,7 @@ func LoadPendingTxs(db types.DB) (txs []btypes.PendingTxInfo, err error) {
 	return txs, err
 }
 
+// SavePendingTxs saves all pending txs
 func SavePendingTxs(db types.BasicDB, txInfos []btypes.PendingTxInfo) error {
 	for _, txInfo := range txInfos {
 		if !txInfo.Save {
@@ -53,6 +57,7 @@ func SavePendingTxs(db types.BasicDB, txInfos []btypes.PendingTxInfo) error {
 	return nil
 }
 
+// DeletePendingTxs deletes all pending txs
 func DeletePendingTxs(db types.BasicDB, txInfos []btypes.PendingTxInfo) error {
 	for _, txInfo := range txInfos {
 		if err := DeletePendingTx(db, txInfo); err != nil {
@@ -66,6 +71,7 @@ func DeletePendingTxs(db types.BasicDB, txInfos []btypes.PendingTxInfo) error {
 // ProcessedMsgs //
 ///////////////////
 
+// SaveProcessedMsgs saves processed messages
 func SaveProcessedMsgs(db types.BasicDB, cdc codec.Codec, processedMsgs btypes.ProcessedMsgs) error {
 	data, err := processedMsgs.Value(cdc)
 	if err != nil {
@@ -79,10 +85,12 @@ func SaveProcessedMsgs(db types.BasicDB, cdc codec.Codec, processedMsgs btypes.P
 	return nil
 }
 
+// DeleteProcessedMsgs deletes processed messages
 func DeleteProcessedMsgs(db types.BasicDB, processedMsgs btypes.ProcessedMsgs) error {
 	return db.Delete(processedMsgs.Key())
 }
 
+// SaveProcessedMsgsBatch saves all processed messages in the batch
 func SaveProcessedMsgsBatch(db types.BasicDB, cdc codec.Codec, processedMsgsBatch []btypes.ProcessedMsgs) error {
 	for _, processedMsgs := range processedMsgsBatch {
 		if !processedMsgs.Save {
@@ -102,6 +110,7 @@ func SaveProcessedMsgsBatch(db types.BasicDB, cdc codec.Codec, processedMsgsBatc
 	return nil
 }
 
+// LoadProcessedMsgsBatch loads all processed messages in the batch
 func LoadProcessedMsgsBatch(db types.DB, cdc codec.Codec) (processedMsgsBatch []btypes.ProcessedMsgs, err error) {
 	iterErr := db.Iterate(dbtypes.AppendSplitter(btypes.ProcessedMsgsPrefix), nil, func(_, value []byte) (stop bool, err error) {
 		var processedMsgs btypes.ProcessedMsgs
@@ -119,6 +128,7 @@ func LoadProcessedMsgsBatch(db types.DB, cdc codec.Codec) (processedMsgsBatch []
 	return processedMsgsBatch, nil
 }
 
+// DeleteProcessedMsgsBatch deletes all processed messages in the batch
 func DeleteProcessedMsgsBatch(db types.BasicDB, processedMsgsBatch []btypes.ProcessedMsgs) error {
 	for _, processedMsgs := range processedMsgsBatch {
 		err := DeleteProcessedMsgs(db, processedMsgs)

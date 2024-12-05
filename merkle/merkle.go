@@ -134,7 +134,7 @@ func (m *Merkle) Height() (uint8, error) {
 	return types.MustIntToUint8(bits.Len64(leafCount - 1)), nil
 }
 
-// GetWorkingTreeIndex returns the index of the working tree.
+// WorkingTree returns the working tree.
 func (m *Merkle) WorkingTree() (merkletypes.TreeInfo, error) {
 	if m.workingTree == nil {
 		return merkletypes.TreeInfo{}, errors.New("working tree is not initialized")

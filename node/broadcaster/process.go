@@ -128,14 +128,15 @@ func (b *Broadcaster) Start(ctx types.Context) error {
 	}
 }
 
-// @dev: these pending processed data is filled at initialization(`NewBroadcaster`).
+// BroadcastPendingProcessedMsgs broadcasts pending processed messages to the Broadcaster.
+// It is called before the node process the block.
 func (b Broadcaster) BroadcastPendingProcessedMsgs() {
 	for _, processedMsg := range b.pendingProcessedMsgsBatch {
 		b.BroadcastProcessedMsgs(processedMsg)
 	}
 }
 
-// BroadcastTxSync broadcasts transaction bytes to txBroadcastLooper.
+// BroadcastProcessedMsgs broadcasts processed messages to the Broadcaster.
 func (b Broadcaster) BroadcastProcessedMsgs(msgs btypes.ProcessedMsgs) {
 	if b.txChannel == nil {
 		return

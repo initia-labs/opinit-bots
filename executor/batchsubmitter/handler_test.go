@@ -9,10 +9,6 @@ import (
 	"time"
 
 	cmtproto "github.com/cometbft/cometbft/proto/tendermint/types"
-	"github.com/cosmos/cosmos-sdk/client/tx"
-	cdctypes "github.com/cosmos/cosmos-sdk/codec/types"
-	sdk "github.com/cosmos/cosmos-sdk/types"
-	"github.com/cosmos/cosmos-sdk/x/authz"
 	"github.com/cosmos/gogoproto/proto"
 	opchildtypes "github.com/initia-labs/OPinit/x/opchild/types"
 	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
@@ -30,6 +26,11 @@ import (
 	"github.com/initia-labs/opinit-bots/types"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
+
+	"github.com/cosmos/cosmos-sdk/client/tx"
+	cdctypes "github.com/cosmos/cosmos-sdk/codec/types"
+	sdk "github.com/cosmos/cosmos-sdk/types"
+	"github.com/cosmos/cosmos-sdk/x/authz"
 )
 
 func TestRawBlockHandler(t *testing.T) {

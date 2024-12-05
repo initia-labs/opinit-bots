@@ -116,6 +116,7 @@ func (n *Node) Initialize(ctx types.Context, processedHeight int64, keyringConfi
 	return nil
 }
 
+// HeightInitialized returns true if the start height is initialized.
 func (n *Node) HeightInitialized() bool {
 	return n.startHeightInitialized
 }

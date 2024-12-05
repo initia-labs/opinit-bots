@@ -137,6 +137,10 @@ func (ex *Executor) Close() {
 	ex.batchSubmitter.Close()
 }
 
+// makeDANode creates a DA node based on the bridge info
+// - if the bridge chain type is INITIA and the host address is the same as the submitter, it returns the existing host node
+// - if the bridge chain type is INITIA and the host address is different from the submitter, it returns a new host node
+// - if the bridge chain type is CELESTIA, it returns a new celestia node
 func (ex *Executor) makeDANode(ctx types.Context, bridgeInfo ophosttypes.QueryBridgeResponse, daKeyringConfig *btypes.KeyringConfig) (executortypes.DANode, error) {
 	if ex.cfg.DisableBatchSubmitter {
 		return batchsubmitter.NewNoopDA(), nil
@@ -179,6 +183,7 @@ func (ex *Executor) makeDANode(ctx types.Context, bridgeInfo ophosttypes.QueryBr
 	return nil, fmt.Errorf("unsupported chain id for DA: %s", ophosttypes.BatchInfo_ChainType_name[int32(batchInfo.BatchInfo.ChainType)])
 }
 
+// getNodeStartHeights returns the start heights of the host, the child node, and the batch submitter, and the start output index
 func (ex *Executor) getNodeStartHeights(ctx types.Context, bridgeId uint64) (l1StartHeight int64, l2StartHeight int64, startOutputIndex uint64, batchStartHeight int64, err error) {
 	var outputL1Height, outputL2Height int64
 	var outputIndex uint64
@@ -236,6 +241,7 @@ func (ex *Executor) getNodeStartHeights(ctx types.Context, bridgeId uint64) (l1S
 	return
 }
 
+// getKeyringConfigs returns the keyring configs for the host, the child node, the child oracle node, and the DA node
 func (ex *Executor) getKeyringConfigs(bridgeInfo ophosttypes.QueryBridgeResponse) (
 	hostKeyringConfig *btypes.KeyringConfig,
 	childKeyringConfig *btypes.KeyringConfig,

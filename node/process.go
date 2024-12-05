@@ -50,6 +50,9 @@ func (n *Node) blockProcessLooper(ctx types.Context, processType nodetypes.Block
 	}
 }
 
+// processBlocks fetches new blocks and processes them
+// if the process type is default, it will fetch blocks one by one and handle txs and events
+// if the process type is raw, it will fetch blocks in bulk and send them to the raw block handler
 func (n *Node) processBlocks(ctx types.Context, processType nodetypes.BlockProcessType, latestHeight int64) error {
 	switch processType {
 	case nodetypes.PROCESS_TYPE_DEFAULT:
@@ -61,6 +64,7 @@ func (n *Node) processBlocks(ctx types.Context, processType nodetypes.BlockProce
 	}
 }
 
+// processBlocksTypeDefault fetches new blocks one by one and processes them
 func (n *Node) processBlocksTypeDefault(ctx types.Context, latestHeight int64) error {
 	timer := time.NewTicker(ctx.PollingInterval())
 	defer timer.Stop()
@@ -88,6 +92,7 @@ func (n *Node) processBlocksTypeDefault(ctx types.Context, latestHeight int64) e
 	return nil
 }
 
+// processBlocksTypeRaw fetches new blocks in bulk and sends them to the raw block handler
 func (n *Node) processBlocksTypeRaw(ctx types.Context, latestHeight int64) error {
 	start := n.syncedHeight + 1
 	end := n.syncedHeight + types.RAW_BLOCK_QUERY_MAX_SIZE
@@ -116,7 +121,7 @@ func (n *Node) processBlocksTypeRaw(ctx types.Context, latestHeight int64) error
 	return nil
 }
 
-// fetch new block from the chain
+// fetchNewBlock fetches a new block and block results given the height
 func (n *Node) fetchNewBlock(ctx types.Context, height int64) (*rpccoretypes.ResultBlock, *rpccoretypes.ResultBlockResults, error) {
 	ctx.Logger().Debug("fetch new block", zap.Int64("height", height))
 
@@ -132,6 +137,8 @@ func (n *Node) fetchNewBlock(ctx types.Context, height int64) (*rpccoretypes.Res
 	return block, blockResult, nil
 }
 
+// handleNewBlock handles a new block and block results given the height
+// it sends txs and events to the respective registered handlers
 func (n *Node) handleNewBlock(ctx types.Context, block *rpccoretypes.ResultBlock, blockResult *rpccoretypes.ResultBlockResults, latestChainHeight int64) error {
 	protoBlock, err := block.Block.ToProto()
 	if err != nil {
@@ -160,6 +167,7 @@ func (n *Node) handleNewBlock(ctx types.Context, block *rpccoretypes.ResultBlock
 	return nil
 }
 
+// handleEvent handles the event for the given transaction
 func (n *Node) handleEvent(ctx types.Context, blockHeight int64, blockTime time.Time, latestHeight int64, tx comettypes.Tx, txIndex int64, event abcitypes.Event) error {
 	// ignore if no event handlers
 	if n.eventHandlers[event.GetType()] == nil {

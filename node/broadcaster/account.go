@@ -24,6 +24,7 @@ import (
 	authsigning "github.com/cosmos/cosmos-sdk/x/auth/signing"
 )
 
+// BroadcasterAccount is an account that can be used to sign and broadcast transactions.
 type BroadcasterAccount struct {
 	cfg       btypes.BroadcasterConfig
 	txf       tx.Factory
@@ -37,8 +38,10 @@ type BroadcasterAccount struct {
 	address       sdk.AccAddress
 	addressString string
 
+	// Custom tx building functions, if not provided, the default functions will be used.
 	BuildTxWithMsgs btypes.BuildTxWithMsgsFn
-	MsgsFromTx      btypes.MsgsFromTxFn
+	// Custom tx message extraction function, if not provided, the default function will be used.
+	MsgsFromTx btypes.MsgsFromTxFn
 }
 
 func NewBroadcasterAccount(ctx types.Context, cfg btypes.BroadcasterConfig, cdc codec.Codec, txConfig client.TxConfig, rpcClient *rpcclient.RPCClient, keyringConfig btypes.KeyringConfig) (*BroadcasterAccount, error) {
@@ -124,6 +127,7 @@ func (b BroadcasterAccount) Bech32Prefix() string {
 	return b.cfg.Bech32Prefix
 }
 
+// Load function loads the account sequence number and account number.
 func (b *BroadcasterAccount) Load(ctx context.Context) error {
 	account, err := b.GetAccount(b.getClientCtx(ctx), b.address)
 	if err != nil {
@@ -243,6 +247,7 @@ func (b BroadcasterAccount) adjustEstimatedGas(gasUsed uint64) (uint64, error) {
 	return uint64(gas), nil
 }
 
+// SimulateAndSignTx simulates the transaction, adjusts the gas, and signs the transaction.
 func (b BroadcasterAccount) SimulateAndSignTx(ctx context.Context, msgs ...sdk.Msg) (authsigning.Tx, error) {
 	_, adjusted, err := b.CalculateGas(ctx, msgs...)
 	if err != nil {
@@ -261,7 +266,7 @@ func (b BroadcasterAccount) SimulateAndSignTx(ctx context.Context, msgs ...sdk.M
 	return txb.GetTx(), nil
 }
 
-// buildTxWithMessages creates a transaction from the given messages.
+// DefaultBuildTxWithMsgs creates a transaction with the provided messages and returns the encoded transaction.
 func (b *BroadcasterAccount) DefaultBuildTxWithMsgs(
 	ctx context.Context,
 	msgs []sdk.Msg,
@@ -282,6 +287,7 @@ func (b *BroadcasterAccount) DefaultBuildTxWithMsgs(
 	return txBytes, txutils.TxHash(txBytes), nil
 }
 
+// DefaultMsgsFromTx extracts the messages from the transaction bytes.
 func (b *BroadcasterAccount) DefaultMsgsFromTx(
 	txBytes []byte,
 ) ([]sdk.Msg, error) {

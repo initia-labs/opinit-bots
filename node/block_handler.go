@@ -13,6 +13,7 @@ import (
 	"github.com/pkg/errors"
 )
 
+// handleBeginBlock handles the begin block.
 func (n *Node) handleBeginBlock(ctx types.Context, blockID []byte, protoBlock *prototypes.Block, latestHeight int64) error {
 	if n.beginBlockHandler != nil {
 		return n.beginBlockHandler(ctx, nodetypes.BeginBlockArgs{
@@ -24,6 +25,7 @@ func (n *Node) handleBeginBlock(ctx types.Context, blockID []byte, protoBlock *p
 	return nil
 }
 
+// handleBlockTxs handles the block transactions.
 func (n *Node) handleBlockTxs(ctx types.Context, block *rpccoretypes.ResultBlock, blockResult *rpccoretypes.ResultBlockResults, latestHeight int64) error {
 	for txIndex, tx := range block.Block.Txs {
 		if n.txHandler != nil {
@@ -48,10 +50,12 @@ func (n *Node) handleBlockTxs(ctx types.Context, block *rpccoretypes.ResultBlock
 	return nil
 }
 
+// handleFinalizeBlock handles the finalize block.
 func (n *Node) handleFinalizeBlock(ctx types.Context, blockHeight int64, blockTime time.Time, blockResult *rpccoretypes.ResultBlockResults, latestHeight int64) error {
 	return n.handleEvents(ctx, blockHeight, blockTime, blockResult.FinalizeBlockEvents, latestHeight, nil, 0)
 }
 
+// handleEvent handles the event for the given transaction.
 func (n *Node) handleEvents(ctx types.Context, blockHeight int64, blockTime time.Time, events []abcitypes.Event, latestHeight int64, tx comettypes.Tx, txIndex int64) error {
 	if len(n.eventHandlers) != 0 {
 		for eventIndex, event := range events {
@@ -64,6 +68,7 @@ func (n *Node) handleEvents(ctx types.Context, blockHeight int64, blockTime time
 	return nil
 }
 
+// handleEndBlock handles the end block.
 func (n *Node) handleEndBlock(ctx types.Context, blockID []byte, protoBlock *prototypes.Block, latestHeight int64) error {
 	if n.endBlockHandler != nil {
 		return n.endBlockHandler(ctx, nodetypes.EndBlockArgs{
@@ -75,6 +80,7 @@ func (n *Node) handleEndBlock(ctx types.Context, blockID []byte, protoBlock *pro
 	return nil
 }
 
+// handleRawBlock handles the raw block bytes.
 func (n *Node) handleRawBlock(ctx types.Context, blockHeight int64, latestHeight int64, blockBytes []byte) error {
 	if n.rawBlockHandler != nil {
 		return n.rawBlockHandler(ctx, nodetypes.RawBlockArgs{

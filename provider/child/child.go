@@ -97,6 +97,8 @@ func GetCodec(bech32Prefix string) (codec.Codec, client.TxConfig, error) {
 	})
 }
 
+// Initialize initializes the child node.
+// if the synced height of the node is initialized, it will delete the future working trees and set initializeTreeFn.
 func (b *BaseChild) Initialize(
 	ctx types.Context,
 	processedHeight int64,
@@ -148,6 +150,7 @@ func (b *BaseChild) Initialize(
 		}
 	}
 
+	// if oracle config is set in the bridge config, check if the oracle account has the grant from one of the executors
 	if b.OracleEnabled() && oracleKeyringConfig != nil {
 		executors, err := b.QueryExecutors(ctx)
 		if err != nil {
@@ -293,6 +296,7 @@ func (b BaseChild) MustGetWorkingTree() merkletypes.TreeInfo {
 	return tree
 }
 
+// keyringConfigs returns the keyring configs for the base and oracle accounts.
 func (b *BaseChild) keyringConfigs(baseConfig *btypes.KeyringConfig, oracleConfig *btypes.KeyringConfig) []btypes.KeyringConfig {
 	var configs []btypes.KeyringConfig
 	if baseConfig != nil {

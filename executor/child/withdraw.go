@@ -33,6 +33,10 @@ func (ch *Child) initiateWithdrawalHandler(ctx types.Context, args nodetypes.Eve
 	return nil
 }
 
+// handleInitiateWithdrawal handles initiate withdrawal event
+// 1. save withdrawal data to database
+// 2. insert leaf to merkle tree
+// 3. save new tree nodes
 func (ch *Child) handleInitiateWithdrawal(ctx types.Context, l2Sequence uint64, from string, to string, baseDenom string, amount uint64, blockTime time.Time, blockHeight int64, txHash string) error {
 	withdrawalHash := ophosttypes.GenerateWithdrawalHash(ch.BridgeId(), l2Sequence, from, to, baseDenom, amount)
 	data := executortypes.NewWithdrawalData(l2Sequence, from, to, amount, baseDenom, withdrawalHash[:], blockHeight, blockTime.UnixNano(), txHash)
@@ -72,6 +76,9 @@ func (ch *Child) handleInitiateWithdrawal(ctx types.Context, l2Sequence uint64, 
 	return nil
 }
 
+// prepareTree prepares the working tree for the given block height.
+// if the working tree does not exist, it initializes the tree.
+// if the working tree exists, it prepares the working tree.
 func (ch *Child) prepareTree(blockHeight int64) error {
 	workingTree, err := merkle.GetWorkingTree(ch.DB(), types.MustInt64ToUint64(blockHeight)-1)
 	if errors.Is(err, dbtypes.ErrNotFound) {
@@ -96,6 +103,7 @@ func (ch *Child) prepareTree(blockHeight int64) error {
 	return nil
 }
 
+// prepareOutput prepares the output for the given block height.
 func (ch *Child) prepareOutput(ctx context.Context) error {
 	workingTree := ch.MustGetWorkingTree()
 
@@ -123,6 +131,7 @@ func (ch *Child) prepareOutput(ctx context.Context) error {
 	return nil
 }
 
+// handleTree handles the working tree for the given block height.
 func (ch *Child) handleTree(ctx types.Context, blockHeight int64, latestHeight int64, blockId []byte, blockHeader cmtproto.Header) (storageRoot []byte, err error) {
 	// panic if we are syncing and passed the finalizing block height
 	// this must not happened
@@ -189,6 +198,7 @@ func (ch *Child) handleTree(ctx types.Context, blockHeight int64, latestHeight i
 	return storageRoot, nil
 }
 
+// handleOutput handles the output for the given block height.
 func (ch *Child) handleOutput(blockHeight int64, version uint8, blockId []byte, outputIndex uint64, storageRoot []byte) error {
 	outputRoot := ophosttypes.GenerateOutputRoot(version, storageRoot, blockId)
 	msg, sender, err := ch.host.GetMsgProposeOutput(

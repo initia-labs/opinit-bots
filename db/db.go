@@ -99,6 +99,7 @@ func (db *LevelDB) Iterate(prefix []byte, start []byte, cb func(key, value []byt
 	return
 }
 
+// ReverseIterate iterates over the key-value pairs in the database with prefixing the keys in reverse order.
 func (db *LevelDB) ReverseIterate(prefix []byte, start []byte, cb func(key, value []byte) (stop bool, err error)) (iterErr error) {
 	iter := db.db.NewIterator(util.BytesPrefix(db.PrefixedKey(prefix)), nil)
 	defer func() {
@@ -135,6 +136,7 @@ func (db *LevelDB) ReverseIterate(prefix []byte, start []byte, cb func(key, valu
 }
 
 // SeekPrevInclusiveKey seeks the previous key-value pair in the database with prefixing the keys.
+// If the key is found, it returns the key-value pair.
 //
 // @dev: `LevelDB.prefix + prefix` is used as the prefix for the iteration.
 func (db *LevelDB) SeekPrevInclusiveKey(prefix []byte, key []byte) (k []byte, v []byte, err error) {

@@ -25,6 +25,8 @@ var ignoringErrors = []error{
 var accountSeqRegex = regexp.MustCompile("account sequence mismatch, expected ([0-9]+), got ([0-9]+)")
 var outputIndexRegex = regexp.MustCompile("expected ([0-9]+), got ([0-9]+): invalid output index")
 
+// handleMsgError handles error when processing messages.
+// If there is an error known to be ignored, it will be ignored.
 func (b *Broadcaster) handleMsgError(ctx types.Context, err error, broadcasterAccount *BroadcasterAccount) error {
 	if strs := accountSeqRegex.FindStringSubmatch(err.Error()); strs != nil {
 		expected, parseErr := strconv.ParseUint(strs[1], 10, 64)

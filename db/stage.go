@@ -46,6 +46,8 @@ func (s *Stage) Commit() error {
 	return nil
 }
 
+// ExecuteFnWithDB executes the given function with the given db.
+// It temporarily sets the given db as the parent db of the stage and restores the original parent db after the function execution.
 func (s *Stage) ExecuteFnWithDB(db types.DB, fn func() error) error {
 	existing := s.parent
 	defer func() {
