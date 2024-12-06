@@ -115,8 +115,8 @@ func (c Celestia) ProcessedMsgsToRawKV(msgs []btypes.ProcessedMsgs, delete bool)
 	return c.node.MustGetBroadcaster().ProcessedMsgsToRawKV(msgs, delete)
 }
 
-func (c *Celestia) SetBridgeId(brigeId uint64) {
-	c.bridgeId = brigeId
+func (c *Celestia) SetBridgeId(bridgeId uint64) {
+	c.bridgeId = bridgeId
 }
 
 func (c Celestia) HasKey() bool {
