@@ -1,96 +1,72 @@
 package child
 
 import (
-	"context"
-	"errors"
-	"slices"
-	"time"
-
-	btypes "github.com/initia-labs/opinit-bots/node/broadcaster/types"
+	"github.com/initia-labs/opinit-bots/node"
+	"github.com/initia-labs/opinit-bots/node/broadcaster"
 	nodetypes "github.com/initia-labs/opinit-bots/node/types"
-	"golang.org/x/exp/maps"
+	"github.com/initia-labs/opinit-bots/types"
+	"github.com/pkg/errors"
 )
 
-func (ch *Child) beginBlockHandler(ctx context.Context, args nodetypes.BeginBlockArgs) (err error) {
-	blockHeight := args.Block.Header.Height
+func (ch *Child) beginBlockHandler(ctx types.Context, args nodetypes.BeginBlockArgs) error {
 	ch.EmptyMsgQueue()
 	ch.EmptyProcessedMsgs()
-	ch.batchKVs = ch.batchKVs[:0]
-	maps.Clear(ch.addressIndexMap)
+	ch.stage.Reset()
 
-	if ch.Merkle() == nil {
-		return errors.New("merkle is not initialized")
-	}
-
-	err = ch.prepareTree(blockHeight)
+	err := ch.prepareTree(args.Block.Header.Height)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to prepare tree")
 	}
 
 	err = ch.prepareOutput(ctx)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to prepare output")
 	}
 	return nil
 }
 
-func (ch *Child) endBlockHandler(_ context.Context, args nodetypes.EndBlockArgs) error {
+func (ch *Child) endBlockHandler(ctx types.Context, args nodetypes.EndBlockArgs) error {
 	blockHeight := args.Block.Header.Height
-	treeKVs, storageRoot, err := ch.handleTree(blockHeight, args.LatestHeight, args.BlockID, args.Block.Header)
+	storageRoot, err := ch.handleTree(ctx, blockHeight, args.LatestHeight, args.BlockID, args.Block.Header)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to handle tree")
 	}
 
-	ch.batchKVs = append(ch.batchKVs, treeKVs...)
 	if storageRoot != nil {
-		workingTreeIndex, err := ch.GetWorkingTreeIndex()
+		workingTree, err := ch.WorkingTree()
 		if err != nil {
-			return err
+			return errors.Wrap(err, "failed to get working tree")
 		}
-		err = ch.handleOutput(blockHeight, ch.Version(), args.BlockID, workingTreeIndex, storageRoot)
+		err = ch.handleOutput(blockHeight, ch.Version(), args.BlockID, workingTree.Index, storageRoot)
 		if err != nil {
-			return err
+			return errors.Wrap(err, "failed to handle output")
 		}
 	}
 
 	// update the sync info
-	ch.batchKVs = append(ch.batchKVs, ch.Node().SyncInfoToRawKV(blockHeight))
+	err = node.SetSyncedHeight(ch.stage, args.Block.Header.Height)
+	if err != nil {
+		return errors.Wrap(err, "failed to set synced height")
+	}
 
 	// if has key, then process the messages
-	if ch.host.HasKey() {
-		msgQueues := ch.GetMsgQueue()
+	if ch.host.HasBroadcaster() {
+		ch.AppendProcessedMsgs(broadcaster.MsgsToProcessedMsgs(ch.GetMsgQueue())...)
 
-		for sender := range msgQueues {
-			msgQueue := msgQueues[sender]
-			for i := 0; i < len(msgQueue); i += 5 {
-				end := i + 5
-				if end > len(msgQueue) {
-					end = len(msgQueue)
-				}
-
-				ch.AppendProcessedMsgs(btypes.ProcessedMsgs{
-					Sender:    sender,
-					Msgs:      slices.Clone(msgQueue[i:end]),
-					Timestamp: time.Now().UnixNano(),
-					Save:      true,
-				})
-			}
-		}
-
-		msgKVs, err := ch.host.ProcessedMsgsToRawKV(ch.GetProcessedMsgs(), false)
+		// save processed msgs to stage using host db
+		err := broadcaster.SaveProcessedMsgsBatch(ch.stage.WithPrefixedKey(ch.host.DB().PrefixedKey), ch.host.Codec(), ch.GetProcessedMsgs())
 		if err != nil {
-			return err
+			return errors.Wrap(err, "failed to save processed msgs")
 		}
-		ch.batchKVs = append(ch.batchKVs, msgKVs...)
+	} else {
+		ch.EmptyProcessedMsgs()
 	}
 
-	err = ch.DB().RawBatchSet(ch.batchKVs...)
+	err = ch.stage.Commit()
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to commit stage")
 	}
 
-	for _, processedMsg := range ch.GetProcessedMsgs() {
-		ch.host.BroadcastMsgs(processedMsg)
-	}
+	ch.host.BroadcastProcessedMsgs(ch.GetProcessedMsgs()...)
 	return nil
 }

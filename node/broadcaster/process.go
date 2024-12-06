@@ -1,7 +1,6 @@
 package broadcaster
 
 import (
-	"context"
 	"encoding/hex"
 	"fmt"
 	"math"
@@ -22,7 +21,7 @@ func IsTxNotFoundErr(err error, txHash string) bool {
 }
 
 // CheckPendingTx query tx info to check if pending tx is processed.
-func (b *Broadcaster) CheckPendingTx(ctx context.Context, pendingTx btypes.PendingTxInfo) (*rpccoretypes.ResultTx, time.Time, error) {
+func (b *Broadcaster) CheckPendingTx(ctx types.Context, pendingTx btypes.PendingTxInfo) (*rpccoretypes.ResultTx, time.Time, error) {
 	txHash, err := hex.DecodeString(pendingTx.TxHash)
 	if err != nil {
 		return nil, time.Time{}, err
@@ -32,15 +31,16 @@ func (b *Broadcaster) CheckPendingTx(ctx context.Context, pendingTx btypes.Pendi
 	if txerr != nil && IsTxNotFoundErr(txerr, pendingTx.TxHash) {
 		// if the tx is not found, it means the tx is not processed yet
 		// or the tx is not indexed by the node in rare cases.
+		pendingTxTime := time.Unix(0, pendingTx.Timestamp).UTC()
+
 		lastHeader, err := b.rpcClient.Header(ctx, nil)
 		if err != nil {
 			return nil, time.Time{}, err
 		}
-		pendingTxTime := time.Unix(0, pendingTx.Timestamp)
 
 		// before timeout
 		if lastHeader.Header.Time.Before(pendingTxTime.Add(b.cfg.TxTimeout)) {
-			b.logger.Debug("failed to query tx", zap.String("tx_hash", pendingTx.TxHash), zap.String("error", txerr.Error()))
+			ctx.Logger().Debug("failed to query tx", zap.String("tx_hash", pendingTx.TxHash), zap.String("error", txerr.Error()))
 			return nil, time.Time{}, types.ErrTxNotFound
 		} else {
 			// timeout case
@@ -75,8 +75,8 @@ func (b *Broadcaster) CheckPendingTx(ctx context.Context, pendingTx btypes.Pendi
 
 // RemovePendingTx remove pending tx from local pending txs.
 // It is called when the pending tx is included in the block.
-func (b *Broadcaster) RemovePendingTx(pendingTx btypes.PendingTxInfo) error {
-	err := b.deletePendingTx(pendingTx)
+func (b *Broadcaster) RemovePendingTx(ctx types.Context, pendingTx btypes.PendingTxInfo) error {
+	err := DeletePendingTx(b.db, pendingTx)
 	if err != nil {
 		return err
 	}
@@ -86,37 +86,37 @@ func (b *Broadcaster) RemovePendingTx(pendingTx btypes.PendingTxInfo) error {
 }
 
 // Start broadcaster loop
-func (b *Broadcaster) Start(ctx context.Context) error {
+func (b *Broadcaster) Start(ctx types.Context) error {
 	defer close(b.txChannelStopped)
 
 	for {
 		select {
 		case <-ctx.Done():
 			return nil
-		case data := <-b.txChannel:
+		case msgs := <-b.txChannel:
 			var err error
-			broadcasterAccount, err := b.AccountByAddress(data.Sender)
+			broadcasterAccount, err := b.AccountByAddress(msgs.Sender)
 			if err != nil {
 				return err
 			}
 			for retry := 1; retry <= types.MaxRetryCount; retry++ {
-				err = b.handleProcessedMsgs(ctx, data, broadcasterAccount)
+				err = b.handleProcessedMsgs(ctx, msgs, broadcasterAccount)
 				if err == nil {
 					break
-				} else if err = b.handleMsgError(err, broadcasterAccount); err == nil {
+				} else if err = b.handleMsgError(ctx, err, broadcasterAccount); err == nil {
 					// if the error is handled, we can delete the processed msgs
-					err = b.deleteProcessedMsgs(data.Timestamp)
+					err = DeleteProcessedMsgs(b.db, msgs)
 					if err != nil {
 						return err
 					}
 					break
-				} else if !data.Save {
-					b.logger.Warn("discard msgs: failed to handle processed msgs", zap.String("error", err.Error()))
+				} else if !msgs.Save {
+					ctx.Logger().Warn("discard msgs: failed to handle processed msgs", zap.String("error", err.Error()))
 					// if the message does not need to be saved, we can skip retry
 					err = nil
 					break
 				}
-				b.logger.Warn(fmt.Sprintf("retry to handle processed msgs after %d seconds", int(2*math.Exp2(float64(retry)))), zap.Int("count", retry), zap.String("error", err.Error()))
+				ctx.Logger().Warn("retry to handle processed msgs", zap.Int("seconds", int(2*math.Exp2(float64(retry)))), zap.Int("count", retry), zap.String("error", err.Error()))
 				if types.SleepWithRetry(ctx, retry) {
 					return nil
 				}
@@ -128,15 +128,16 @@ func (b *Broadcaster) Start(ctx context.Context) error {
 	}
 }
 
-// @dev: these pending processed data is filled at initialization(`NewBroadcaster`).
+// BroadcastPendingProcessedMsgs broadcasts pending processed messages to the Broadcaster.
+// It is called before the node process the block.
 func (b Broadcaster) BroadcastPendingProcessedMsgs() {
-	for _, processedMsg := range b.pendingProcessedMsgs {
-		b.BroadcastMsgs(processedMsg)
+	for _, processedMsg := range b.pendingProcessedMsgsBatch {
+		b.BroadcastProcessedMsgs(processedMsg)
 	}
 }
 
-// BroadcastTxSync broadcasts transaction bytes to txBroadcastLooper.
-func (b Broadcaster) BroadcastMsgs(msgs btypes.ProcessedMsgs) {
+// BroadcastProcessedMsgs broadcasts processed messages to the Broadcaster.
+func (b Broadcaster) BroadcastProcessedMsgs(msgs btypes.ProcessedMsgs) {
 	if b.txChannel == nil {
 		return
 	}

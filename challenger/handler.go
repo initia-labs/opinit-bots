@@ -1,40 +1,40 @@
 package challenger
 
 import (
-	"context"
 	"sort"
 
+	challengerdb "github.com/initia-labs/opinit-bots/challenger/db"
 	challengertypes "github.com/initia-labs/opinit-bots/challenger/types"
 	"github.com/initia-labs/opinit-bots/types"
 	"go.uber.org/zap"
 )
 
-func (c *Challenger) challengeHandler(ctx context.Context) error {
+func (c *Challenger) challengeHandler(ctx types.Context) error {
 	defer close(c.challengeChStopped)
 	for {
 		select {
 		case <-ctx.Done():
 			return nil
 		case challenge := <-c.challengeCh:
-			kvs := make([]types.RawKV, 0)
-			kv := c.deletePendingChallenge(challenge)
-			kvs = append(kvs, kv)
-			kv, err := c.saveChallenge(challenge)
+			c.stage.Reset()
+			err := challengerdb.DeletePendingChallenge(c.stage, challenge)
 			if err != nil {
 				return err
 			}
-			kvs = append(kvs, kv)
-
-			err = c.handleChallenge(challenge)
+			err = challengerdb.SaveChallenge(c.stage, challenge)
 			if err != nil {
 				return err
 			}
 
-			err = c.db.RawBatchSet(kvs...)
+			err = c.handleChallenge(ctx, challenge)
 			if err != nil {
 				return err
 			}
 
+			err = c.stage.Commit()
+			if err != nil {
+				return err
+			}
 			c.insertLatestChallenges(challenge)
 		}
 	}
@@ -68,9 +68,9 @@ func (c *Challenger) getLatestChallenges() []challengertypes.Challenge {
 	return res
 }
 
-func (c *Challenger) handleChallenge(challenge challengertypes.Challenge) error {
+func (c *Challenger) handleChallenge(ctx types.Context, challenge challengertypes.Challenge) error {
 	// TODO: warning log or send to alerting system
-	c.logger.Error("challenge", zap.Any("challenge", challenge))
+	ctx.Logger().Error("challenge", zap.Any("challenge", challenge))
 
 	return nil
 }

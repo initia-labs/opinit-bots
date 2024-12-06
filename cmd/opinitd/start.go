@@ -13,6 +13,7 @@ import (
 
 	"github.com/initia-labs/opinit-bots/bot"
 	bottypes "github.com/initia-labs/opinit-bots/bot/types"
+	"github.com/initia-labs/opinit-bots/db"
 	"github.com/initia-labs/opinit-bots/types"
 )
 
@@ -20,7 +21,7 @@ const (
 	flagPollingInterval = "polling-interval"
 )
 
-func startCmd(ctx *cmdContext) *cobra.Command {
+func startCmd(baseCtx *cmdContext) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "start [bot-name]",
 		Args:  cobra.ExactArgs(1),
@@ -36,12 +37,18 @@ Currently supported bots:
 				return err
 			}
 
-			configPath, err := getConfigPath(cmd, ctx.homePath, args[0])
+			configPath, err := getConfigPath(cmd, baseCtx.homePath, args[0])
 			if err != nil {
 				return err
 			}
 
-			bot, err := bot.NewBot(botType, ctx.logger, ctx.homePath, configPath)
+			db, err := db.NewDB(GetDBPath(baseCtx.homePath, botType))
+			if err != nil {
+				return err
+			}
+			defer db.Close()
+
+			bot, err := bot.NewBot(botType, db, configPath)
 			if err != nil {
 				return err
 			}
@@ -50,21 +57,23 @@ Currently supported bots:
 			gracefulShutdown(botDone)
 
 			errGrp, ctx := errgroup.WithContext(cmdCtx)
-			ctx = types.WithErrGrp(ctx, errGrp)
 			interval, err := cmd.Flags().GetDuration(flagPollingInterval)
 			if err != nil {
 				return err
 			}
-			ctx = types.WithPollingInterval(ctx, interval)
-			err = bot.Initialize(ctx)
+
+			baseCtx := types.NewContext(ctx, baseCtx.logger.Named(string(botType)), baseCtx.homePath).
+				WithErrGrp(errGrp).
+				WithPollingInterval(interval)
+			err = bot.Initialize(baseCtx)
 			if err != nil {
 				return err
 			}
-			return bot.Start(ctx)
+			return bot.Start(baseCtx)
 		},
 	}
 
-	cmd = configFlag(ctx.v, cmd)
+	cmd = configFlag(baseCtx.v, cmd)
 	cmd.Flags().Duration(flagPollingInterval, 100*time.Millisecond, "Polling interval in milliseconds")
 	return cmd
 }
@@ -77,4 +86,8 @@ func gracefulShutdown(done context.CancelFunc) {
 		fmt.Println("Received signal to stop. Shutting down...")
 		done()
 	}()
+}
+
+func GetDBPath(homePath string, botName bottypes.BotType) string {
+	return fmt.Sprintf(homePath+"/%s.db", botName)
 }

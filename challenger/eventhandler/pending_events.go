@@ -5,6 +5,7 @@ import (
 	"sort"
 
 	challengertypes "github.com/initia-labs/opinit-bots/challenger/types"
+	"github.com/pkg/errors"
 )
 
 func (ch *ChallengeEventHandler) GetPendingEvent(id challengertypes.ChallengeId) (challengertypes.ChallengeEvent, bool) {
@@ -96,15 +97,15 @@ func (ch *ChallengeEventHandler) SetPendingEvents(events []challengertypes.Chall
 }
 
 func (ch *ChallengeEventHandler) loadPendingEvents() (events []challengertypes.ChallengeEvent, err error) {
-	iterErr := ch.db.PrefixedIterate(challengertypes.PendingEventKey, nil, func(key, value []byte) (stop bool, err error) {
+	iterErr := ch.db.Iterate(challengertypes.PendingEventKey, nil, func(key, value []byte) (stop bool, err error) {
 		id, err := challengertypes.ParsePendingEvent(key)
 		if err != nil {
-			return true, err
+			return true, errors.Wrap(err, "failed to parse pending event key")
 		}
 
 		event, err := challengertypes.UnmarshalChallengeEvent(id.Type, value)
 		if err != nil {
-			return true, err
+			return true, errors.Wrap(err, "failed to unmarshal challenge event")
 		}
 		events = append(events, event)
 		return false, nil

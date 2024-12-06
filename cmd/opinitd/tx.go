@@ -50,13 +50,16 @@ func txGrantOracleCmd(baseCtx *cmdContext) *cobra.Command {
 			gracefulShutdown(botDone)
 
 			errGrp, ctx := errgroup.WithContext(cmdCtx)
-			ctx = types.WithErrGrp(ctx, errGrp)
+
+			baseCtx := types.NewContext(ctx, baseCtx.logger.Named(string(bottypes.BotTypeExecutor)), baseCtx.homePath).
+				WithErrGrp(errGrp)
 
 			account, err := l2BroadcasterAccount(baseCtx, cmd)
 			if err != nil {
 				return err
 			}
-			err = account.Load(ctx)
+
+			err = account.Load(baseCtx)
 			if err != nil {
 				return err
 			}
@@ -81,12 +84,12 @@ func txGrantOracleCmd(baseCtx *cmdContext) *cobra.Command {
 				return err
 			}
 
-			txBytes, _, err := account.BuildTxWithMessages(ctx, []sdk.Msg{grantMsg, feegrantMsg})
+			txBytes, _, err := account.BuildTxWithMsgs(ctx, []sdk.Msg{grantMsg, feegrantMsg})
 			if err != nil {
 				return errors.Wrapf(err, "simulation failed")
 			}
 
-			res, err := account.BroadcastTxSync(ctx, txBytes)
+			res, err := account.BroadcastTxSync(baseCtx, txBytes)
 			if err != nil {
 				// TODO: handle error, may repeat sending tx
 				return fmt.Errorf("broadcast txs: %w", err)
@@ -104,8 +107,8 @@ func txGrantOracleCmd(baseCtx *cmdContext) *cobra.Command {
 	return cmd
 }
 
-func l2BroadcasterAccount(ctx *cmdContext, cmd *cobra.Command) (*broadcaster.BroadcasterAccount, error) {
-	configPath, err := getConfigPath(cmd, ctx.homePath, string(bottypes.BotTypeExecutor))
+func l2BroadcasterAccount(ctx types.Context, cmd *cobra.Command) (*broadcaster.BroadcasterAccount, error) {
+	configPath, err := getConfigPath(cmd, ctx.HomePath(), string(bottypes.BotTypeExecutor))
 	if err != nil {
 		return nil, err
 	}
@@ -116,7 +119,7 @@ func l2BroadcasterAccount(ctx *cmdContext, cmd *cobra.Command) (*broadcaster.Bro
 		return nil, err
 	}
 
-	l2Config := cfg.L2NodeConfig(ctx.homePath)
+	l2Config := cfg.L2NodeConfig()
 	broadcasterConfig := l2Config.BroadcasterConfig
 	cdc, txConfig, err := child.GetCodec(broadcasterConfig.Bech32Prefix)
 	if err != nil {
@@ -132,5 +135,5 @@ func l2BroadcasterAccount(ctx *cmdContext, cmd *cobra.Command) (*broadcaster.Bro
 		Name: cfg.BridgeExecutor,
 	}
 
-	return broadcaster.NewBroadcasterAccount(*broadcasterConfig, cdc, txConfig, rpcClient, keyringConfig)
+	return broadcaster.NewBroadcasterAccount(ctx, *broadcasterConfig, cdc, txConfig, rpcClient, keyringConfig)
 }

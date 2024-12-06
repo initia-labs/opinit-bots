@@ -4,10 +4,9 @@ import (
 	"context"
 	"time"
 
-	"go.uber.org/zap"
-
 	opchildtypes "github.com/initia-labs/OPinit/x/opchild/types"
 	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
+	"github.com/pkg/errors"
 
 	nodetypes "github.com/initia-labs/opinit-bots/node/types"
 	"github.com/initia-labs/opinit-bots/types"
@@ -18,7 +17,7 @@ import (
 )
 
 type challenger interface {
-	PendingChallengeToRawKVs([]challengertypes.Challenge, bool) ([]types.RawKV, error)
+	DB() types.DB
 	SendPendingChallenges([]challengertypes.Challenge)
 }
 
@@ -43,21 +42,24 @@ type Child struct {
 	lastFinalizedDepositL1Sequence    uint64
 	lastOutputTime                    time.Time
 	nextOutputTime                    time.Time
+
+	stage types.CommitDB
 }
 
 func NewChildV1(
 	cfg nodetypes.NodeConfig,
-	db types.DB, logger *zap.Logger,
+	db types.DB,
 ) *Child {
 	return &Child{
-		BaseChild:    childprovider.NewBaseChildV1(cfg, db, logger),
-		eventHandler: eventhandler.NewChallengeEventHandler(db, logger),
+		BaseChild:    childprovider.NewBaseChildV1(cfg, db),
+		eventHandler: eventhandler.NewChallengeEventHandler(db),
 		eventQueue:   make([]challengertypes.ChallengeEvent, 0),
+		stage:        db.NewStage(),
 	}
 }
 
 func (ch *Child) Initialize(
-	ctx context.Context,
+	ctx types.Context,
 	processedHeight int64,
 	startOutputIndex uint64,
 	host hostNode,
@@ -74,7 +76,7 @@ func (ch *Child) Initialize(
 		true,
 	)
 	if err != nil {
-		return time.Time{}, err
+		return time.Time{}, errors.Wrap(err, "failed to initialize base child")
 	}
 	ch.host = host
 	ch.challenger = challenger
@@ -82,7 +84,7 @@ func (ch *Child) Initialize(
 
 	err = ch.eventHandler.Initialize(bridgeInfo.BridgeConfig.SubmissionInterval)
 	if err != nil {
-		return time.Time{}, err
+		return time.Time{}, errors.Wrap(err, "failed to initialize event handler")
 	}
 
 	var blockTime time.Time
@@ -91,7 +93,7 @@ func (ch *Child) Initialize(
 	if ch.Node().HeightInitialized() {
 		blockTime, err = ch.Node().QueryBlockTime(ctx, ch.Node().GetHeight())
 		if err != nil {
-			return time.Time{}, err
+			return time.Time{}, errors.Wrap(err, "failed to query block time")
 		}
 	}
 	return blockTime, nil
@@ -103,10 +105,6 @@ func (ch *Child) registerHandlers() {
 	ch.Node().RegisterEventHandler(opchildtypes.EventTypeFinalizeTokenDeposit, ch.finalizeDepositHandler)
 	ch.Node().RegisterEventHandler(opchildtypes.EventTypeInitiateTokenWithdrawal, ch.initiateWithdrawalHandler)
 	ch.Node().RegisterEndBlockHandler(ch.endBlockHandler)
-}
-
-func (ch *Child) PendingEventsToRawKV(events []challengertypes.ChallengeEvent, delete bool) ([]types.RawKV, error) {
-	return ch.eventHandler.PendingEventsToRawKV(events, delete)
 }
 
 func (ch *Child) SetPendingEvents(events []challengertypes.ChallengeEvent) {

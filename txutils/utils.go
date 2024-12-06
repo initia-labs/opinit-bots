@@ -1,6 +1,10 @@
 package txutils
 
 import (
+	"fmt"
+
+	comettypes "github.com/cometbft/cometbft/types"
+
 	"github.com/cosmos/cosmos-sdk/client"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	authsigning "github.com/cosmos/cosmos-sdk/x/auth/signing"
@@ -36,4 +40,8 @@ func ChangeMsgsFromTx(txConfig client.TxConfig, tx authsigning.Tx, msgs []sdk.Ms
 	}
 
 	return builder.GetTx(), nil
+}
+
+func TxHash(txBytes []byte) string {
+	return fmt.Sprintf("%X", comettypes.Tx(txBytes).Hash())
 }

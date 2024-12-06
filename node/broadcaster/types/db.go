@@ -6,6 +6,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/initia-labs/opinit-bots/types"
+
 	"github.com/cosmos/cosmos-sdk/codec"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 )
@@ -23,6 +25,14 @@ type PendingTxInfo struct {
 	// Save is false if the pending tx can be discarded even if it is not processed
 	// like oracle tx.
 	Save bool `json:"save"`
+}
+
+func (p PendingTxInfo) Key() []byte {
+	return prefixedPendingTx(types.MustInt64ToUint64(p.Timestamp))
+}
+
+func (p PendingTxInfo) Value() ([]byte, error) {
+	return p.Marshal()
 }
 
 func (p PendingTxInfo) Marshal() ([]byte, error) {
@@ -55,6 +65,14 @@ type processedMsgsJSON struct {
 	Msgs      []string `json:"msgs"`
 	Timestamp int64    `json:"timestamp"`
 	Save      bool     `json:"save"`
+}
+
+func (p ProcessedMsgs) Key() []byte {
+	return prefixedProcessedMsgs(types.MustInt64ToUint64(p.Timestamp))
+}
+
+func (p ProcessedMsgs) Value(cdc codec.Codec) ([]byte, error) {
+	return p.MarshalInterfaceJSON(cdc)
 }
 
 func (p ProcessedMsgs) MarshalInterfaceJSON(cdc codec.Codec) ([]byte, error) {
