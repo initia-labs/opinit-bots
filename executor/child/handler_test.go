@@ -221,7 +221,7 @@ func TestEndBlockHandler(t *testing.T) {
 
 			childdb := basedb.WithPrefix([]byte("test_child"))
 			childNode := node.NewTestNode(nodetypes.NodeConfig{}, childdb, nil, nil, nil, nil)
-			stage := childdb.NewStage().(*db.Stage)
+			stage := childdb.NewStage().(db.Stage)
 			mk, err := merkle.NewMerkle(ophosttypes.GenerateNodeHash)
 			require.NoError(t, err)
 			err = mk.PrepareWorkingTree(merkletypes.TreeInfo{

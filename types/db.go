@@ -30,7 +30,7 @@ type DB interface {
 type CommitDB interface {
 	BasicDB
 
-	ExecuteFnWithDB(DB, func() error) error
+	WithPrefixedKey(prefixedKey func(key []byte) []byte) CommitDB
 	Commit() error
 	Reset()
 	Len() int
