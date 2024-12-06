@@ -74,7 +74,7 @@ func TestPrepareBatch(t *testing.T) {
 			existingLocalBatchInfo: executortypes.LocalBatchInfo{
 				Start:              1,
 				End:                100,
-				LastSubmissionTime: time.Unix(0, 10000),
+				LastSubmissionTime: time.Unix(0, 10000).UTC(),
 				BatchSize:          100,
 			},
 			batchInfoQueue: []ophosttypes.BatchInfoWithOutput{
@@ -89,7 +89,7 @@ func TestPrepareBatch(t *testing.T) {
 			expectedLocalBatchInfo: executortypes.LocalBatchInfo{
 				Start:              101,
 				End:                0,
-				LastSubmissionTime: time.Unix(0, 10000),
+				LastSubmissionTime: time.Unix(0, 10000).UTC(),
 				BatchSize:          0,
 			},
 			expectedChanges: []types.KV{},
@@ -546,7 +546,7 @@ func TestCheckBatch(t *testing.T) {
 			name: "block time >= last submission time + 2/3 interval, block height == latest height",
 			localBatchInfo: &executortypes.LocalBatchInfo{
 				Start:              1,
-				LastSubmissionTime: time.Unix(0, 0),
+				LastSubmissionTime: time.Unix(0, 0).UTC(),
 			},
 			batchConfig: executortypes.BatchConfig{
 				MaxChunks:         100,
@@ -555,7 +555,7 @@ func TestCheckBatch(t *testing.T) {
 			},
 			blockHeight:  10,
 			latestHeight: 10,
-			blockTime:    time.Unix(0, 10001),
+			blockTime:    time.Unix(0, 10001).UTC(),
 			expected:     true,
 		},
 		{
@@ -571,14 +571,14 @@ func TestCheckBatch(t *testing.T) {
 			},
 			blockHeight:  10,
 			latestHeight: 20,
-			blockTime:    time.Unix(0, 10001),
+			blockTime:    time.Unix(0, 10001).UTC(),
 			expected:     false,
 		},
 		{
 			name: "block time < last submission time + 2/3 interval, block height == latest height",
 			localBatchInfo: &executortypes.LocalBatchInfo{
 				Start:              1,
-				LastSubmissionTime: time.Unix(0, 10000),
+				LastSubmissionTime: time.Unix(0, 10000).UTC(),
 			},
 			batchConfig: executortypes.BatchConfig{
 				MaxChunks:         100,
@@ -587,14 +587,14 @@ func TestCheckBatch(t *testing.T) {
 			},
 			blockHeight:  10,
 			latestHeight: 10,
-			blockTime:    time.Unix(0, 10001),
+			blockTime:    time.Unix(0, 10001).UTC(),
 			expected:     false,
 		},
 		{
 			name: "block time > last submission time + max submission time, block height == latest height",
 			localBatchInfo: &executortypes.LocalBatchInfo{
 				Start:              1,
-				LastSubmissionTime: time.Unix(0, 0),
+				LastSubmissionTime: time.Unix(0, 0).UTC(),
 			},
 			batchConfig: executortypes.BatchConfig{
 				MaxChunks:         100,
@@ -603,14 +603,14 @@ func TestCheckBatch(t *testing.T) {
 			},
 			blockHeight:  10,
 			latestHeight: 10,
-			blockTime:    time.Unix(0, 1000*1000*1000+1),
+			blockTime:    time.Unix(0, 1000*1000*1000+1).UTC(),
 			expected:     true,
 		},
 		{
 			name: "block time > last submission time + max submission time, block height != latest height",
 			localBatchInfo: &executortypes.LocalBatchInfo{
 				Start:              1,
-				LastSubmissionTime: time.Unix(0, 0),
+				LastSubmissionTime: time.Unix(0, 0).UTC(),
 			},
 			batchConfig: executortypes.BatchConfig{
 				MaxChunks:         100,
@@ -619,14 +619,14 @@ func TestCheckBatch(t *testing.T) {
 			},
 			blockHeight:  10,
 			latestHeight: 20,
-			blockTime:    time.Unix(0, 1000*1000*1000+1),
+			blockTime:    time.Unix(0, 1000*1000*1000+1).UTC(),
 			expected:     false,
 		},
 		{
 			name: "block time < last submission time + max submission time, block height == latest height",
 			localBatchInfo: &executortypes.LocalBatchInfo{
 				Start:              1,
-				LastSubmissionTime: time.Unix(0, 0),
+				LastSubmissionTime: time.Unix(0, 0).UTC(),
 			},
 			batchConfig: executortypes.BatchConfig{
 				MaxChunks:         100,
@@ -635,14 +635,14 @@ func TestCheckBatch(t *testing.T) {
 			},
 			blockHeight:  10,
 			latestHeight: 10,
-			blockTime:    time.Unix(0, 1000*1000*1000),
+			blockTime:    time.Unix(0, 1000*1000*1000).UTC(),
 			expected:     true,
 		},
 		{
 			name: "batch size >= (max chunks - 1) * max chunk size",
 			localBatchInfo: &executortypes.LocalBatchInfo{
 				Start:              1,
-				LastSubmissionTime: time.Unix(0, 0),
+				LastSubmissionTime: time.Unix(0, 0).UTC(),
 				BatchSize:          1000,
 			},
 			batchConfig: executortypes.BatchConfig{
@@ -652,7 +652,7 @@ func TestCheckBatch(t *testing.T) {
 			},
 			blockHeight:  10,
 			latestHeight: 20,
-			blockTime:    time.Unix(0, 500),
+			blockTime:    time.Unix(0, 500).UTC(),
 			expected:     true,
 		},
 		{
@@ -669,7 +669,7 @@ func TestCheckBatch(t *testing.T) {
 			},
 			blockHeight:  10,
 			latestHeight: 20,
-			blockTime:    time.Unix(0, 500),
+			blockTime:    time.Unix(0, 500).UTC(),
 			expected:     false,
 		},
 	}

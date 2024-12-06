@@ -71,5 +71,5 @@ func ParseChallenge(key []byte) (time.Time, ChallengeId, error) {
 	typeBz := key[cursor : cursor+1]
 	cursor += 1 + 1 // u8 + splitter
 	idBz := key[cursor:]
-	return time.Unix(0, types.MustUint64ToInt64(dbtypes.ToUint64Key(timeBz))), ChallengeId{Type: EventType(typeBz[0]), Id: dbtypes.ToUint64Key(idBz)}, nil
+	return time.Unix(0, types.MustUint64ToInt64(dbtypes.ToUint64Key(timeBz))).UTC(), ChallengeId{Type: EventType(typeBz[0]), Id: dbtypes.ToUint64Key(idBz)}, nil
 }

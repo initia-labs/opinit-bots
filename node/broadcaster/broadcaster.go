@@ -146,7 +146,7 @@ func (b *Broadcaster) loadPendingTxs(ctx types.Context, stage types.BasicDB, las
 		return nil
 	}
 
-	pendingTxTime := time.Unix(0, pendingTxs[0].Timestamp)
+	pendingTxTime := time.Unix(0, pendingTxs[0].Timestamp).UTC()
 	// if we have pending txs, wait until timeout
 	if timeoutTime := pendingTxTime.Add(b.cfg.TxTimeout); lastBlockTime.Before(timeoutTime) {
 		waitingTime := timeoutTime.Sub(lastBlockTime)

@@ -106,7 +106,7 @@ func TestRawBlockHandler(t *testing.T) {
 	pbb := &cmtproto.Block{
 		Header: cmtproto.Header{
 			Height: 1,
-			Time:   time.Unix(0, 10),
+			Time:   time.Unix(0, 10).UTC(),
 		},
 		Data: cmtproto.Data{
 			Txs: [][]byte{},
@@ -127,7 +127,7 @@ func TestRawBlockHandler(t *testing.T) {
 	err = SaveLocalBatchInfo(batchDB, executortypes.LocalBatchInfo{
 		Start:              1,
 		End:                0,
-		LastSubmissionTime: time.Unix(0, 0),
+		LastSubmissionTime: time.Unix(0, 0).UTC(),
 	})
 	require.NoError(t, err)
 
@@ -147,7 +147,7 @@ func TestRawBlockHandler(t *testing.T) {
 	require.Equal(t, executortypes.LocalBatchInfo{
 		Start:              1,
 		End:                0,
-		LastSubmissionTime: time.Unix(0, 0),
+		LastSubmissionTime: time.Unix(0, 0).UTC(),
 		BatchSize:          localBatchInfo.BatchSize,
 	}, localBatchInfo)
 
@@ -156,7 +156,7 @@ func TestRawBlockHandler(t *testing.T) {
 	pbb = &cmtproto.Block{
 		Header: cmtproto.Header{
 			Height: 2,
-			Time:   time.Unix(0, 110),
+			Time:   time.Unix(0, 110).UTC(),
 		},
 		Data: cmtproto.Data{
 			Txs: [][]byte{},
