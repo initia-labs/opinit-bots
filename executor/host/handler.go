@@ -30,9 +30,7 @@ func (h *Host) endBlockHandler(_ types.Context, args nodetypes.EndBlockArgs) err
 		h.AppendProcessedMsgs(broadcaster.MsgsToProcessedMsgs(h.GetMsgQueue())...)
 
 		// save processed msgs to stage using child db
-		err := h.stage.ExecuteFnWithDB(h.child.DB(), func() error {
-			return broadcaster.SaveProcessedMsgsBatch(h.stage, h.child.Codec(), h.GetProcessedMsgs())
-		})
+		err := broadcaster.SaveProcessedMsgsBatch(h.stage.WithPrefixedKey(h.child.DB().PrefixedKey), h.child.Codec(), h.GetProcessedMsgs())
 		if err != nil {
 			return errors.Wrap(err, "failed to save processed msgs on child db")
 		}

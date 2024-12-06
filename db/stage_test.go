@@ -7,14 +7,14 @@ import (
 	"golang.org/x/exp/maps"
 )
 
-func CreateTestStage(t *testing.T, db *LevelDB) (*LevelDB, *Stage, error) {
+func CreateTestStage(t *testing.T, db *LevelDB) (*LevelDB, Stage, error) {
 	var err error
 	if db == nil {
 		db, err = NewMemDB()
 		require.NoError(t, err)
 	}
 	tstage := db.NewStage()
-	stage, ok := tstage.(*Stage)
+	stage, ok := tstage.(Stage)
 	require.True(t, ok)
 	return db, stage, nil
 }
@@ -200,7 +200,7 @@ func TestStageCommit(t *testing.T) {
 	require.Error(t, err)
 }
 
-func TestExecuteFnWithDB(t *testing.T) {
+func TestWithPrefixedKey(t *testing.T) {
 	db, err := NewMemDB()
 	require.NoError(t, err)
 
@@ -214,14 +214,15 @@ func TestExecuteFnWithDB(t *testing.T) {
 	err = stage1.Set([]byte("key1"), []byte("value1"))
 	require.NoError(t, err)
 
-	err = stage1.ExecuteFnWithDB(db2, func() error {
-		err := stage1.Set([]byte("key1"), []byte("value2"))
-		require.NoError(t, err)
-		return err
-	})
+	err = stage1.WithPrefixedKey(db2.PrefixedKey).Set([]byte("key1"), []byte("value2"))
+	require.NoError(t, err)
+
+	// previous WithPrefixedKey should not affect the new one
+	err = stage1.Set([]byte("key2"), []byte("value2"))
 	require.NoError(t, err)
 
 	require.Equal(t, stage1.kvmap[string(db1.PrefixedKey([]byte("key1")))], []byte("value1"))
+	require.Equal(t, stage1.kvmap[string(db1.PrefixedKey([]byte("key2")))], []byte("value2"))
 	require.Equal(t, stage1.kvmap[string(db2.PrefixedKey([]byte("key1")))], []byte("value2"))
 }
 
@@ -239,11 +240,7 @@ func TestStageAll(t *testing.T) {
 	err = stage1.Set([]byte("key1"), []byte("value1"))
 	require.NoError(t, err)
 
-	err = stage1.ExecuteFnWithDB(db2, func() error {
-		err := stage1.Set([]byte("key1"), []byte("value2"))
-		require.NoError(t, err)
-		return err
-	})
+	err = stage1.WithPrefixedKey(db2.PrefixedKey).Set([]byte("key1"), []byte("value2"))
 	require.NoError(t, err)
 
 	allKVs := stage1.All()

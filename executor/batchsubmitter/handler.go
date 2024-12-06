@@ -70,9 +70,7 @@ func (bs *BatchSubmitter) rawBlockHandler(ctx types.Context, args nodetypes.RawB
 	}
 	if bs.da.HasBroadcaster() {
 		// save processed msgs to stage using host db
-		err := bs.stage.ExecuteFnWithDB(bs.da.DB(), func() error {
-			return broadcaster.SaveProcessedMsgsBatch(bs.stage, bs.da.Codec(), bs.processedMsgs)
-		})
+		err := broadcaster.SaveProcessedMsgsBatch(bs.stage.WithPrefixedKey(bs.da.DB().PrefixedKey), bs.da.Codec(), bs.processedMsgs)
 		if err != nil {
 			return errors.Wrap(err, "failed to save processed msgs")
 		}
