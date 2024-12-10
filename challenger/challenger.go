@@ -220,6 +220,10 @@ func (c *Challenger) RegisterQuerier() {
 }
 
 func (c *Challenger) getProcessedHeights(ctx types.Context, bridgeId uint64) (l1ProcessedHeight int64, l2ProcessedHeight int64, processedOutputIndex uint64, err error) {
+	if c.host.Node().GetSyncedHeight() != 0 && c.child.Node().GetSyncedHeight() != 0 {
+		return 0, 0, 0, nil
+	}
+
 	var outputL1BlockNumber int64
 	// get the last submitted output height before the start height from the host
 	if c.cfg.L2StartHeight != 0 {
