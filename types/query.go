@@ -1,0 +1,4 @@
+package types
+
+const QUERY_MAX_LIMIT_SIZE = 100
+const RAW_BLOCK_QUERY_MAX_SIZE = 100

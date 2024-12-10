@@ -2,8 +2,6 @@ package child
 
 import (
 	"bytes"
-	"context"
-	"errors"
 
 	"go.uber.org/zap"
 
@@ -19,10 +17,13 @@ import (
 
 	"github.com/initia-labs/opinit-bots/keys"
 	"github.com/initia-labs/opinit-bots/merkle"
+	merkletypes "github.com/initia-labs/opinit-bots/merkle/types"
 	"github.com/initia-labs/opinit-bots/node"
 	btypes "github.com/initia-labs/opinit-bots/node/broadcaster/types"
 	nodetypes "github.com/initia-labs/opinit-bots/node/types"
 	"github.com/initia-labs/opinit-bots/types"
+
+	"github.com/pkg/errors"
 )
 
 type BaseChild struct {
@@ -35,9 +36,7 @@ type BaseChild struct {
 
 	initializeTreeFn func(int64) (bool, error)
 
-	cfg    nodetypes.NodeConfig
-	db     types.DB
-	logger *zap.Logger
+	cfg nodetypes.NodeConfig
 
 	opchildQueryClient opchildtypes.QueryClient
 
@@ -51,21 +50,21 @@ type BaseChild struct {
 
 func NewBaseChildV1(
 	cfg nodetypes.NodeConfig,
-	db types.DB, logger *zap.Logger,
+	db types.DB,
 ) *BaseChild {
 	appCodec, txConfig, err := GetCodec(cfg.Bech32Prefix)
 	if err != nil {
-		panic(err)
+		panic(errors.Wrap(err, "failed to get codec"))
 	}
 
-	node, err := node.NewNode(cfg, db, logger, appCodec, txConfig)
+	node, err := node.NewNode(cfg, db, appCodec, txConfig)
 	if err != nil {
-		panic(err)
+		panic(errors.Wrap(err, "failed to create node"))
 	}
 
-	mk, err := merkle.NewMerkle(db.WithPrefix([]byte(types.MerkleName)), ophosttypes.GenerateNodeHash)
+	mk, err := merkle.NewMerkle(ophosttypes.GenerateNodeHash)
 	if err != nil {
-		panic(err)
+		panic(errors.Wrap(err, "failed to create merkle"))
 	}
 
 	ch := &BaseChild{
@@ -74,9 +73,7 @@ func NewBaseChildV1(
 		node: node,
 		mk:   mk,
 
-		cfg:    cfg,
-		db:     db,
-		logger: logger,
+		cfg: cfg,
 
 		opchildQueryClient: opchildtypes.NewQueryClient(node.GetRPCClient()),
 
@@ -100,8 +97,10 @@ func GetCodec(bech32Prefix string) (codec.Codec, client.TxConfig, error) {
 	})
 }
 
+// Initialize initializes the child node.
+// if the synced height of the node is initialized, it will delete the future working trees and set initializeTreeFn.
 func (b *BaseChild) Initialize(
-	ctx context.Context,
+	ctx types.Context,
 	processedHeight int64,
 	startOutputIndex uint64,
 	bridgeInfo ophosttypes.QueryBridgeResponse,
@@ -126,17 +125,17 @@ func (b *BaseChild) Initialize(
 					return 0, err
 				}
 
-				err = b.mk.DeleteFutureFinalizedTrees(l2Sequence)
+				err = merkle.DeleteFutureFinalizedTrees(b.DB(), l2Sequence)
 				if err != nil {
 					return 0, err
 				}
 			}
 			b.initializeTreeFn = func(blockHeight int64) (bool, error) {
 				if processedHeight+1 == blockHeight {
-					b.logger.Info("initialize tree", zap.Uint64("index", startOutputIndex))
-					err := b.mk.InitializeWorkingTree(startOutputIndex, l2Sequence)
+					ctx.Logger().Info("initialize tree", zap.Uint64("index", startOutputIndex))
+					err := b.mk.InitializeWorkingTree(types.MustInt64ToUint64(blockHeight), startOutputIndex, l2Sequence)
 					if err != nil {
-						return false, err
+						return false, errors.Wrap(err, "failed to initialize working tree")
 					}
 					return true, nil
 				}
@@ -145,12 +144,13 @@ func (b *BaseChild) Initialize(
 		}
 
 		version := types.MustInt64ToUint64(processedHeight)
-		err = b.mk.DeleteFutureWorkingTrees(version + 1)
+		err = merkle.DeleteFutureWorkingTrees(b.DB(), version+1)
 		if err != nil {
 			return 0, err
 		}
 	}
 
+	// if oracle config is set in the bridge config, check if the oracle account has the grant from one of the executors
 	if b.OracleEnabled() && oracleKeyringConfig != nil {
 		executors, err := b.QueryExecutors(ctx)
 		if err != nil {
@@ -188,25 +188,30 @@ func (b *BaseChild) Initialize(
 	return l2Sequence, nil
 }
 
-func (b *BaseChild) Start(ctx context.Context) {
-	b.logger.Info("child start", zap.Int64("height", b.Height()))
+func (b *BaseChild) Start(ctx types.Context) {
+	ctx.Logger().Info("child start", zap.Int64("height", b.Height()))
 	b.node.Start(ctx)
 }
-
-func (b BaseChild) BroadcastMsgs(msgs btypes.ProcessedMsgs) {
-	if len(msgs.Msgs) == 0 {
+func (b BaseChild) BroadcastProcessedMsgs(batch ...btypes.ProcessedMsgs) {
+	if len(batch) == 0 {
 		return
 	}
+	broadcaster := b.node.MustGetBroadcaster()
 
-	b.node.MustGetBroadcaster().BroadcastMsgs(msgs)
+	for _, processedMsgs := range batch {
+		if len(processedMsgs.Msgs) == 0 {
+			continue
+		}
+		broadcaster.BroadcastProcessedMsgs(processedMsgs)
+	}
 }
 
-func (b BaseChild) ProcessedMsgsToRawKV(msgs []btypes.ProcessedMsgs, delete bool) ([]types.RawKV, error) {
-	if len(msgs) == 0 {
-		return nil, nil
-	}
+func (b BaseChild) DB() types.DB {
+	return b.node.DB()
+}
 
-	return b.node.MustGetBroadcaster().ProcessedMsgsToRawKV(msgs, delete)
+func (b BaseChild) Codec() codec.Codec {
+	return b.node.Codec()
 }
 
 func (b BaseChild) BridgeId() uint64 {
@@ -217,7 +222,7 @@ func (b BaseChild) OracleEnabled() bool {
 	return b.bridgeInfo.BridgeConfig.OracleEnabled
 }
 
-func (b BaseChild) HasKey() bool {
+func (b BaseChild) HasBroadcaster() bool {
 	return b.node.HasBroadcaster()
 }
 
@@ -239,14 +244,6 @@ func (b BaseChild) Version() uint8 {
 
 func (b BaseChild) Node() *node.Node {
 	return b.node
-}
-
-func (b BaseChild) Logger() *zap.Logger {
-	return b.logger
-}
-
-func (b BaseChild) DB() types.DB {
-	return b.db
 }
 
 /// MsgQueue
@@ -271,41 +268,35 @@ func (b BaseChild) GetProcessedMsgs() []btypes.ProcessedMsgs {
 	return b.processedMsgs
 }
 
-func (b *BaseChild) AppendProcessedMsgs(msgs btypes.ProcessedMsgs) {
-	b.processedMsgs = append(b.processedMsgs, msgs)
+func (b *BaseChild) AppendProcessedMsgs(msgs ...btypes.ProcessedMsgs) {
+	b.processedMsgs = append(b.processedMsgs, msgs...)
 }
 
 func (b *BaseChild) EmptyProcessedMsgs() {
 	b.processedMsgs = b.processedMsgs[:0]
 }
 
-/// Merkle
-
+// / Merkle
 func (b BaseChild) Merkle() *merkle.Merkle {
 	return b.mk
 }
 
-func (b BaseChild) GetWorkingTreeIndex() (uint64, error) {
+func (b BaseChild) WorkingTree() (merkletypes.TreeInfo, error) {
 	if b.mk == nil {
-		return 0, errors.New("merkle is not initialized")
+		return merkletypes.TreeInfo{}, errors.New("merkle is not initialized")
 	}
-	return b.mk.GetWorkingTreeIndex()
+	return b.mk.WorkingTree()
 }
 
-func (b BaseChild) GetStartLeafIndex() (uint64, error) {
-	if b.mk == nil {
-		return 0, errors.New("merkle is not initialized")
+func (b BaseChild) MustGetWorkingTree() merkletypes.TreeInfo {
+	tree, err := b.WorkingTree()
+	if err != nil {
+		panic(err)
 	}
-	return b.mk.GetStartLeafIndex()
+	return tree
 }
 
-func (b BaseChild) GetWorkingTreeLeafCount() (uint64, error) {
-	if b.mk == nil {
-		return 0, errors.New("merkle is not initialized")
-	}
-	return b.mk.GetWorkingTreeLeafCount()
-}
-
+// keyringConfigs returns the keyring configs for the base and oracle accounts.
 func (b *BaseChild) keyringConfigs(baseConfig *btypes.KeyringConfig, oracleConfig *btypes.KeyringConfig) []btypes.KeyringConfig {
 	var configs []btypes.KeyringConfig
 	if baseConfig != nil {

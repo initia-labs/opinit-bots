@@ -1,10 +1,10 @@
 package child
 
 import (
-	"errors"
 	"time"
 
 	nodetypes "github.com/initia-labs/opinit-bots/node/types"
+	"github.com/pkg/errors"
 )
 
 type Status struct {
@@ -26,17 +26,9 @@ func (ch Child) GetStatus() (Status, error) {
 		return Status{}, errors.New("node is not initialized")
 	}
 
-	workingTreeLeafCount, err := ch.GetWorkingTreeLeafCount()
+	workingTree, err := ch.WorkingTree()
 	if err != nil {
-		return Status{}, err
-	}
-	startLeafIndex, err := ch.GetStartLeafIndex()
-	if err != nil {
-		return Status{}, err
-	}
-	workingTreeIndex, err := ch.GetWorkingTreeIndex()
-	if err != nil {
-		return Status{}, err
+		return Status{}, errors.Wrap(err, "failed to get working tree")
 	}
 
 	return Status{
@@ -44,8 +36,8 @@ func (ch Child) GetStatus() (Status, error) {
 		LastUpdatedOracleL1Height:         ch.lastUpdatedOracleL1Height,
 		LastFinalizedDepositL1BlockHeight: ch.lastFinalizedDepositL1BlockHeight,
 		LastFinalizedDepositL1Sequence:    ch.lastFinalizedDepositL1Sequence,
-		LastWithdrawalL2Sequence:          workingTreeLeafCount + startLeafIndex - 1,
-		WorkingTreeIndex:                  workingTreeIndex,
+		LastWithdrawalL2Sequence:          workingTree.LeafCount + workingTree.StartLeafIndex - 1,
+		WorkingTreeIndex:                  workingTree.Index,
 		FinalizingBlockHeight:             ch.finalizingBlockHeight,
 		LastOutputSubmissionTime:          ch.lastOutputTime,
 		NextOutputSubmissionTime:          ch.nextOutputTime,

@@ -4,9 +4,10 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/pkg/errors"
+
 	sdk "github.com/cosmos/cosmos-sdk/types"
 
-	btypes "github.com/initia-labs/opinit-bots/node/broadcaster/types"
 	"github.com/initia-labs/opinit-bots/txutils"
 	celestiatypes "github.com/initia-labs/opinit-bots/types/celestia"
 )
@@ -35,16 +36,16 @@ func (c *Celestia) BuildTxWithMessages(
 
 	broadcasterAccount, err := c.node.MustGetBroadcaster().AccountByIndex(0)
 	if err != nil {
-		return nil, "", err
+		return nil, "", errors.Wrap(err, "failed to calculate gas")
 	}
 	tx, err := broadcasterAccount.SimulateAndSignTx(ctx, pfbMsgs...)
 	if err != nil {
-		return nil, "", err
+		return nil, "", errors.Wrap(err, "failed to simulate and sign tx")
 	}
 	txConfig := c.node.GetTxConfig()
 	txBytes, err = txutils.EncodeTx(txConfig, tx)
 	if err != nil {
-		return nil, "", err
+		return nil, "", errors.Wrap(err, "failed to encode tx")
 	}
 
 	blobTx := celestiatypes.BlobTx{
@@ -54,10 +55,10 @@ func (c *Celestia) BuildTxWithMessages(
 	}
 	blobTxBytes, err := blobTx.Marshal()
 	if err != nil {
-		return nil, "", err
+		return nil, "", errors.Wrap(err, "failed to marshal blob tx")
 	}
 
-	return blobTxBytes, btypes.TxHash(txBytes), nil
+	return blobTxBytes, txutils.TxHash(txBytes), nil
 }
 
 func (c *Celestia) PendingTxToProcessedMsgs(
@@ -69,7 +70,7 @@ func (c *Celestia) PendingTxToProcessedMsgs(
 	if err := blobTx.Unmarshal(txBytes); err == nil {
 		pfbTx, err := txutils.DecodeTx(txConfig, blobTx.Tx)
 		if err != nil {
-			return nil, err
+			return nil, errors.Wrap(err, "failed to decode blob tx")
 		}
 		pfbMsg := pfbTx.GetMsgs()[0]
 
@@ -83,7 +84,7 @@ func (c *Celestia) PendingTxToProcessedMsgs(
 
 	tx, err := txutils.DecodeTx(txConfig, txBytes)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "failed to decode tx")
 	}
 	return tx.GetMsgs(), nil
 }

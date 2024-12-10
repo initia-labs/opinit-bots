@@ -6,8 +6,7 @@ const (
 	BatchName  = "batch"
 	MerkleName = "merkle"
 
-	DAHostName     = "da_host"
-	DACelestiaName = "da_celestia"
+	DAName = "da"
 
 	MsgUpdateOracleTypeUrl = "/opinit.opchild.v1.MsgUpdateOracle"
 	MsgAuthzExecTypeUrl    = "/cosmos.authz.v1beta1.MsgExec"

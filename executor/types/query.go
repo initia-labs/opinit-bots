@@ -16,8 +16,9 @@ type QueryWithdrawalResponse struct {
 	LastBlockHash    []byte     `json:"last_block_hash"`
 
 	// extra info
-	// BlockNumber    int64  `json:"block_number"`
-	// WithdrawalHash []byte `json:"withdrawal_hash"`
+	TxTime   int64  `json:"tx_time"`
+	TxHeight int64  `json:"tx_height"`
+	TxHash   string `json:"tx_hash"`
 }
 
 type QueryWithdrawalsResponse struct {

@@ -12,8 +12,8 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 )
 
-type BuildTxWithMessagesFn func(context.Context, []sdk.Msg) ([]byte, string, error)
-type PendingTxToProcessedMsgsFn func([]byte) ([]sdk.Msg, error)
+type BuildTxWithMsgsFn func(context.Context, []sdk.Msg) ([]byte, string, error)
+type MsgsFromTxFn func([]byte) ([]sdk.Msg, error)
 
 type BroadcasterConfig struct {
 	// ChainID is the chain ID.
@@ -30,9 +30,6 @@ type BroadcasterConfig struct {
 
 	// Bech32Prefix is the Bech32 prefix.
 	Bech32Prefix string
-
-	// HomePath is the path to the keyring.
-	HomePath string
 }
 
 func (bc BroadcasterConfig) Validate() error {
@@ -60,12 +57,12 @@ func (bc BroadcasterConfig) Validate() error {
 	return nil
 }
 
-func (bc BroadcasterConfig) GetKeyringRecord(cdc codec.Codec, keyringConfig *KeyringConfig) (keyring.Keyring, *keyring.Record, error) {
+func (bc BroadcasterConfig) GetKeyringRecord(cdc codec.Codec, keyringConfig *KeyringConfig, homePath string) (keyring.Keyring, *keyring.Record, error) {
 	if keyringConfig == nil {
 		return nil, nil, fmt.Errorf("keyring config cannot be nil")
 	}
 
-	keyBase, err := keys.GetKeyBase(bc.ChainID, bc.HomePath, cdc, nil)
+	keyBase, err := keys.GetKeyBase(bc.ChainID, homePath, cdc, nil)
 	if err != nil {
 		return nil, nil, err
 	} else if keyBase == nil {
@@ -92,11 +89,11 @@ type KeyringConfig struct {
 	// FeeGranter is the fee granter.
 	FeeGranter *KeyringConfig
 
-	// BuildTxWithMessages is the function to build a transaction with messages.
-	BuildTxWithMessages BuildTxWithMessagesFn
+	// BuildTxWithMsgs is the function to build a transaction with messages.
+	BuildTxWithMsgs BuildTxWithMsgsFn
 
-	// PendingTxToProcessedMsgs is the function to convert pending tx to processed messages.
-	PendingTxToProcessedMsgs PendingTxToProcessedMsgsFn
+	// MsgsFromTx is the function to convert pending tx to processed messages.
+	MsgsFromTx MsgsFromTxFn
 }
 
 func (kc KeyringConfig) GetKeyRecord(keyBase keyring.Keyring, bech32Prefix string) (*keyring.Record, error) {
@@ -123,12 +120,12 @@ func (kc KeyringConfig) GetKeyRecord(keyBase keyring.Keyring, bech32Prefix strin
 	return nil, fmt.Errorf("keyring config is invalid")
 }
 
-func (kc *KeyringConfig) WithPendingTxToProcessedMsgsFn(fn PendingTxToProcessedMsgsFn) {
-	kc.PendingTxToProcessedMsgs = fn
+func (kc *KeyringConfig) WithPendingTxToProcessedMsgsFn(fn MsgsFromTxFn) {
+	kc.MsgsFromTx = fn
 }
 
-func (kc *KeyringConfig) WithBuildTxWithMessagesFn(fn BuildTxWithMessagesFn) {
-	kc.BuildTxWithMessages = fn
+func (kc *KeyringConfig) WithBuildTxWithMessagesFn(fn BuildTxWithMsgsFn) {
+	kc.BuildTxWithMsgs = fn
 }
 
 func (kc KeyringConfig) Validate() error {

@@ -1,7 +1,7 @@
 package broadcaster
 
 import (
-	"context"
+	"encoding/hex"
 	"fmt"
 	"slices"
 	"sync"
@@ -15,6 +15,7 @@ import (
 
 	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/codec"
+	sdk "github.com/cosmos/cosmos-sdk/types"
 
 	btypes "github.com/initia-labs/opinit-bots/node/broadcaster/types"
 	"github.com/initia-labs/opinit-bots/node/rpcclient"
@@ -26,37 +27,36 @@ type Broadcaster struct {
 
 	db        types.DB
 	cdc       codec.Codec
-	logger    *zap.Logger
 	rpcClient *rpcclient.RPCClient
 
-	txConfig          client.TxConfig
-	accounts          []*BroadcasterAccount
+	txConfig client.TxConfig
+	accounts []*BroadcasterAccount
+	// address -> account index
 	addressAccountMap map[string]int
 	accountMu         *sync.Mutex
 
+	// tx channel to receive processed msgs
 	txChannel        chan btypes.ProcessedMsgs
 	txChannelStopped chan struct{}
 
-	// local pending txs, which is following Queue data structure
 	pendingTxMu *sync.Mutex
-	pendingTxs  []btypes.PendingTxInfo
+	// local pending txs, which is following Queue data structure
+	pendingTxs []btypes.PendingTxInfo
 
-	pendingProcessedMsgs []btypes.ProcessedMsgs
+	pendingProcessedMsgsBatch []btypes.ProcessedMsgs
 
-	lastProcessedBlockHeight int64
+	syncedHeight int64
 }
 
 func NewBroadcaster(
 	cfg btypes.BroadcasterConfig,
 	db types.DB,
-	logger *zap.Logger,
 	cdc codec.Codec,
 	txConfig client.TxConfig,
 	rpcClient *rpcclient.RPCClient,
 ) (*Broadcaster, error) {
 	b := &Broadcaster{
 		cdc:       cdc,
-		logger:    logger,
 		db:        db,
 		rpcClient: rpcClient,
 
@@ -68,9 +68,9 @@ func NewBroadcaster(
 		txChannel:        make(chan btypes.ProcessedMsgs),
 		txChannelStopped: make(chan struct{}),
 
-		pendingTxMu:          &sync.Mutex{},
-		pendingTxs:           make([]btypes.PendingTxInfo, 0),
-		pendingProcessedMsgs: make([]btypes.ProcessedMsgs, 0),
+		pendingTxMu:               &sync.Mutex{},
+		pendingTxs:                make([]btypes.PendingTxInfo, 0),
+		pendingProcessedMsgsBatch: make([]btypes.ProcessedMsgs, 0),
 	}
 
 	// validate broadcaster config
@@ -88,9 +88,11 @@ func NewBroadcaster(
 	return b, nil
 }
 
-func (b *Broadcaster) Initialize(ctx context.Context, status *rpccoretypes.ResultStatus, keyringConfigs []btypes.KeyringConfig) error {
+// Initialize initializes the broadcaster with the given keyring configs.
+// It loads pending txs and processed msgs batch from the db and prepares the broadcaster.
+func (b *Broadcaster) Initialize(ctx types.Context, status *rpccoretypes.ResultStatus, keyringConfigs []btypes.KeyringConfig) error {
 	for _, keyringConfig := range keyringConfigs {
-		account, err := NewBroadcasterAccount(b.cfg, b.cdc, b.txConfig, b.rpcClient, keyringConfig)
+		account, err := NewBroadcasterAccount(ctx, b.cfg, b.cdc, b.txConfig, b.rpcClient, keyringConfig)
 		if err != nil {
 			return err
 		}
@@ -102,125 +104,199 @@ func (b *Broadcaster) Initialize(ctx context.Context, status *rpccoretypes.Resul
 		b.addressAccountMap[account.GetAddressString()] = len(b.accounts) - 1
 	}
 
-	// prepare broadcaster
 	err := b.prepareBroadcaster(ctx, status.SyncInfo.LatestBlockTime)
 	return errors.Wrap(err, "failed to prepare broadcaster")
 }
 
-func (b Broadcaster) GetHeight() int64 {
-	return b.lastProcessedBlockHeight + 1
-}
-
+// SetSyncInfo sets the synced height of the broadcaster.
 func (b *Broadcaster) SetSyncInfo(height int64) {
-	b.lastProcessedBlockHeight = height
+	b.syncedHeight = height
 }
 
-func (b *Broadcaster) prepareBroadcaster(ctx context.Context, lastBlockTime time.Time) error {
-	dbBatchKVs := make([]types.RawKV, 0)
+// prepareBroadcaster prepares the broadcaster by loading pending txs and processed msgs batch from the db.
+func (b *Broadcaster) prepareBroadcaster(ctx types.Context, lastBlockTime time.Time) error {
+	stage := b.db.NewStage()
 
-	loadedPendingTxs, err := b.loadPendingTxs()
+	err := b.loadPendingTxs(ctx, stage, lastBlockTime)
 	if err != nil {
 		return err
 	}
-	if len(loadedPendingTxs) > 0 {
-		pendingTxTime := time.Unix(0, loadedPendingTxs[0].Timestamp)
 
-		// if we have pending txs, wait until timeout
-		if timeoutTime := pendingTxTime.Add(b.cfg.TxTimeout); lastBlockTime.Before(timeoutTime) {
-			waitingTime := timeoutTime.Sub(lastBlockTime)
-			timer := time.NewTimer(waitingTime)
-			b.logger.Info("waiting for pending txs to be processed", zap.Duration("waiting_time", waitingTime))
+	err = b.loadProcessedMsgsBatch(ctx, stage)
+	if err != nil {
+		return err
+	}
+
+	err = SaveProcessedMsgsBatch(stage, b.cdc, b.pendingProcessedMsgsBatch)
+	if err != nil {
+		return err
+	}
+
+	return stage.Commit()
+}
+
+// loadPendingTxs loads pending txs from db and waits until timeout if there are pending txs.
+func (b *Broadcaster) loadPendingTxs(ctx types.Context, stage types.BasicDB, lastBlockTime time.Time) error {
+	pendingTxs, err := LoadPendingTxs(b.db)
+	if err != nil {
+		return err
+	}
+	ctx.Logger().Debug("load pending txs", zap.Int("count", len(pendingTxs)))
+
+	if len(pendingTxs) == 0 {
+		return nil
+	}
+
+	pendingTxTime := time.Unix(0, pendingTxs[0].Timestamp).UTC()
+
+	// if we have pending txs, wait until timeout
+	if timeoutTime := pendingTxTime.Add(b.cfg.TxTimeout); lastBlockTime.Before(timeoutTime) {
+		waitingTime := timeoutTime.Sub(lastBlockTime)
+		timer := time.NewTimer(waitingTime)
+		defer timer.Stop()
+
+		ctx.Logger().Info("waiting for pending txs to be processed", zap.Duration("waiting_time", waitingTime))
+
+		pollingTimer := time.NewTicker(ctx.PollingInterval())
+		defer pollingTimer.Stop()
+
+		for {
 			select {
 			case <-ctx.Done():
 				return ctx.Err()
 			case <-timer.C:
+				break
+			case <-pollingTimer.C:
 			}
-		}
 
-		// convert pending txs to raw kv pairs for deletion
-		pendingKVs, err := b.PendingTxsToRawKV(loadedPendingTxs, true)
-		if err != nil {
-			return err
-		}
-
-		// add pending txs delegation to db batch
-		dbBatchKVs = append(dbBatchKVs, pendingKVs...)
-
-		// convert pending txs to pending msgs
-		for i, txInfo := range loadedPendingTxs {
-			account, err := b.AccountByAddress(txInfo.Sender)
-			if err != nil {
-				return err
+			if len(pendingTxs) == 0 {
+				return nil
 			}
-			msgs, err := account.PendingTxToProcessedMsgs(txInfo.Tx)
+
+			txHash, err := hex.DecodeString(pendingTxs[0].TxHash)
 			if err != nil {
 				return err
 			}
 
-			if txInfo.Save {
-				for i := 0; i < len(msgs); i += 5 {
-					end := i + 5
-					if end > len(msgs) {
-						end = len(msgs)
-					}
-
-					b.pendingProcessedMsgs = append(b.pendingProcessedMsgs, btypes.ProcessedMsgs{
-						Sender:    txInfo.Sender,
-						Msgs:      slices.Clone(msgs[i:end]),
-						Timestamp: time.Now().UnixNano(),
-						Save:      true,
-					})
+			res, err := b.rpcClient.QueryTx(ctx, txHash)
+			if err == nil && res != nil && res.TxResult.Code == 0 {
+				ctx.Logger().Debug("transaction successfully included",
+					zap.String("hash", pendingTxs[0].TxHash),
+					zap.Int64("height", res.Height))
+				err = DeletePendingTx(b.db, pendingTxs[0])
+				if err != nil {
+					return err
 				}
+				pendingTxs = pendingTxs[1:]
+			} else if err == nil && res != nil {
+				ctx.Logger().Warn("transaction failed",
+					zap.String("hash", pendingTxs[0].TxHash),
+					zap.Uint32("code", res.TxResult.Code),
+					zap.String("log", res.TxResult.Log))
 			}
-
-			b.logger.Debug("pending tx", zap.Int("index", i), zap.String("tx", txInfo.String()))
 		}
 	}
 
-	loadedProcessedMsgs, err := b.loadProcessedMsgs()
+	err = DeletePendingTxs(stage, pendingTxs)
 	if err != nil {
 		return err
 	}
 
-	// need to remove processed msgs from db before updating the timestamp
-	// because the timestamp is used as a key.
-	kvProcessedMsgs, err := b.ProcessedMsgsToRawKV(loadedProcessedMsgs, true)
+	processedMsgsBatch, err := b.pendingTxsToProcessedMsgsBatch(ctx, pendingTxs)
 	if err != nil {
 		return err
 	}
-	dbBatchKVs = append(dbBatchKVs, kvProcessedMsgs...)
-
-	// update timestamp of loaded processed msgs
-	for i, pendingMsgs := range loadedProcessedMsgs {
-		loadedProcessedMsgs[i].Timestamp = time.Now().UnixNano()
-		b.logger.Debug("pending msgs", zap.Int("index", i), zap.String("msgs", pendingMsgs.String()))
-	}
-
-	// save all pending msgs with updated timestamp to db
-	b.pendingProcessedMsgs = append(b.pendingProcessedMsgs, loadedProcessedMsgs...)
-	kvProcessedMsgs, err = b.ProcessedMsgsToRawKV(b.pendingProcessedMsgs, false)
-	if err != nil {
-		return err
-	}
-	dbBatchKVs = append(dbBatchKVs, kvProcessedMsgs...)
-
-	// save all pending msgs first, then broadcast them
-	err = b.db.RawBatchSet(dbBatchKVs...)
-	if err != nil {
-		return err
-	}
+	b.pendingProcessedMsgsBatch = append(b.pendingProcessedMsgsBatch, processedMsgsBatch...)
 	return nil
 }
 
-func (b Broadcaster) AccountByIndex(index int) (*BroadcasterAccount, error) {
-	b.accountMu.Lock()
-	defer b.accountMu.Unlock()
-	if len(b.accounts) <= index {
-		return nil, fmt.Errorf("broadcaster account not found; length: %d, index: %d", len(b.accounts), index)
+// loadProcessedMsgsBatch loads processed msgs batch from db and updates the timestamp.
+func (b *Broadcaster) loadProcessedMsgsBatch(ctx types.Context, stage types.BasicDB) error {
+	processedMsgsBatch, err := LoadProcessedMsgsBatch(b.db, b.cdc)
+	if err != nil {
+		return err
 	}
-	return b.accounts[index], nil
+	ctx.Logger().Debug("load pending processed msgs", zap.Int("count", len(processedMsgsBatch)))
+
+	// need to remove processed msgs from db before updating the timestamp
+	// because the timestamp is used as a key.
+	err = DeleteProcessedMsgsBatch(stage, processedMsgsBatch)
+	if err != nil {
+		return err
+	}
+
+	// update timestamp of loaded processed msgs
+	for i := range processedMsgsBatch {
+		processedMsgsBatch[i].Timestamp = types.CurrentNanoTimestamp()
+		ctx.Logger().Debug("pending msgs", zap.Int("index", i), zap.String("msgs", processedMsgsBatch[i].String()))
+	}
+
+	// save all pending msgs with updated timestamp to db
+	b.pendingProcessedMsgsBatch = append(b.pendingProcessedMsgsBatch, processedMsgsBatch...)
+	return nil
 }
 
+// pendingTxsToProcessedMsgsBatch converts pending txs to processed msgs batch.
+func (b *Broadcaster) pendingTxsToProcessedMsgsBatch(ctx types.Context, pendingTxs []btypes.PendingTxInfo) ([]btypes.ProcessedMsgs, error) {
+	pendingProcessedMsgsBatch := make([]btypes.ProcessedMsgs, 0)
+	queues := make(map[string][]sdk.Msg)
+
+	// convert pending txs to pending msgs
+	for i, pendingTx := range pendingTxs {
+		if !pendingTx.Save {
+			continue
+		}
+
+		account, err := b.AccountByAddress(pendingTx.Sender)
+		if err != nil {
+			return nil, err
+		}
+		msgs, err := account.MsgsFromTx(pendingTx.Tx)
+		if err != nil {
+			return nil, err
+		}
+		queues[pendingTx.Sender] = append(queues[pendingTx.Sender], msgs...)
+
+		pendingProcessedMsgsBatch = append(pendingProcessedMsgsBatch, MsgsToProcessedMsgs(queues)...)
+		ctx.Logger().Debug("pending tx", zap.Int("index", i), zap.String("tx", pendingTx.String()))
+	}
+	return pendingProcessedMsgsBatch, nil
+}
+
+// GetHeight returns the current height of the broadcaster.
+func (b Broadcaster) GetHeight() int64 {
+	return b.syncedHeight + 1
+}
+
+// UpdateSyncedHeight updates the synced height of the broadcaster.
+func (b *Broadcaster) UpdateSyncedHeight(height int64) {
+	b.syncedHeight = height
+}
+
+// MsgsToProcessedMsgs converts msgs to processed msgs.
+// It splits msgs into chunks of 5 msgs and creates processed msgs for each chunk.
+func MsgsToProcessedMsgs(queues map[string][]sdk.Msg) []btypes.ProcessedMsgs {
+	res := make([]btypes.ProcessedMsgs, 0)
+	for sender := range queues {
+		msgs := queues[sender]
+		for i := 0; i < len(msgs); i += 5 {
+			end := i + 5
+			if end > len(msgs) {
+				end = len(msgs)
+			}
+
+			res = append(res, btypes.ProcessedMsgs{
+				Sender:    sender,
+				Msgs:      slices.Clone(msgs[i:end]),
+				Timestamp: types.CurrentNanoTimestamp(),
+				Save:      true,
+			})
+		}
+	}
+	return res
+}
+
+// AccountByAddress returns the broadcaster account by the given address.
 func (b Broadcaster) AccountByAddress(address string) (*BroadcasterAccount, error) {
 	b.accountMu.Lock()
 	defer b.accountMu.Unlock()
@@ -228,4 +304,14 @@ func (b Broadcaster) AccountByAddress(address string) (*BroadcasterAccount, erro
 		return nil, fmt.Errorf("broadcaster account not found; address: %s", address)
 	}
 	return b.accounts[b.addressAccountMap[address]], nil
+}
+
+// AccountByIndex returns the broadcaster account by the given index.
+func (b Broadcaster) AccountByIndex(index int) (*BroadcasterAccount, error) {
+	b.accountMu.Lock()
+	defer b.accountMu.Unlock()
+	if len(b.accounts) <= index {
+		return nil, fmt.Errorf("broadcaster account not found; length: %d, index: %d", len(b.accounts), index)
+	}
+	return b.accounts[index], nil
 }

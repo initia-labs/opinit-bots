@@ -1,15 +1,13 @@
-package batch
+package batchsubmitter
 
 import (
 	"compress/gzip"
 	"context"
-	"errors"
 	"os"
 	"sync"
 
 	"go.uber.org/zap"
 
-	opchildtypes "github.com/initia-labs/OPinit/x/opchild/types"
 	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
 
 	executortypes "github.com/initia-labs/opinit-bots/executor/types"
@@ -18,6 +16,7 @@ import (
 	nodetypes "github.com/initia-labs/opinit-bots/node/types"
 	childprovider "github.com/initia-labs/opinit-bots/provider/child"
 	"github.com/initia-labs/opinit-bots/types"
+	"github.com/pkg/errors"
 )
 
 type hostNode interface {
@@ -35,10 +34,6 @@ type BatchSubmitter struct {
 
 	cfg      nodetypes.NodeConfig
 	batchCfg executortypes.BatchConfig
-	db       types.DB
-	logger   *zap.Logger
-
-	opchildQueryClient opchildtypes.QueryClient
 
 	batchInfoMu    *sync.Mutex
 	batchInfos     []ophosttypes.BatchInfoWithOutput
@@ -48,8 +43,9 @@ type BatchSubmitter struct {
 
 	processedMsgs []btypes.ProcessedMsgs
 
-	chainID  string
-	homePath string
+	chainID string
+
+	stage types.CommitDB
 
 	// status info
 	LastBatchEndBlockNumber int64
@@ -58,8 +54,8 @@ type BatchSubmitter struct {
 func NewBatchSubmitterV1(
 	cfg nodetypes.NodeConfig,
 	batchCfg executortypes.BatchConfig,
-	db types.DB, logger *zap.Logger,
-	chainID, homePath string,
+	db types.DB,
+	chainID string,
 ) *BatchSubmitter {
 	appCodec, txConfig, err := childprovider.GetCodec(cfg.Bech32Prefix)
 	if err != nil {
@@ -68,9 +64,9 @@ func NewBatchSubmitterV1(
 
 	cfg.BroadcasterConfig = nil
 	cfg.ProcessType = nodetypes.PROCESS_TYPE_RAW
-	node, err := node.NewNode(cfg, db, logger, appCodec, txConfig)
+	node, err := node.NewNode(cfg, db, appCodec, txConfig)
 	if err != nil {
-		panic(err)
+		panic(errors.Wrap(err, "failed to create node"))
 	}
 
 	ch := &BatchSubmitter{
@@ -81,32 +77,28 @@ func NewBatchSubmitterV1(
 		cfg:      cfg,
 		batchCfg: batchCfg,
 
-		db:     db,
-		logger: logger,
-
-		opchildQueryClient: opchildtypes.NewQueryClient(node.GetRPCClient()),
-
 		batchInfoMu:    &sync.Mutex{},
 		localBatchInfo: &executortypes.LocalBatchInfo{},
 
 		processedMsgs: make([]btypes.ProcessedMsgs, 0),
-		homePath:      homePath,
 		chainID:       chainID,
+
+		stage: db.NewStage(),
 	}
 	return ch
 }
 
-func (bs *BatchSubmitter) Initialize(ctx context.Context, processedHeight int64, host hostNode, bridgeInfo ophosttypes.QueryBridgeResponse) error {
-	err := bs.node.Initialize(ctx, processedHeight, nil)
+func (bs *BatchSubmitter) Initialize(ctx types.Context, syncedHeight int64, host hostNode, bridgeInfo ophosttypes.QueryBridgeResponse) error {
+	err := bs.node.Initialize(ctx, syncedHeight, nil)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to initialize node")
 	}
 	bs.host = host
 	bs.bridgeInfo = bridgeInfo
 
 	res, err := bs.host.QueryBatchInfos(ctx, bridgeInfo.BridgeId)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to query batch infos")
 	}
 	bs.batchInfos = res.BatchInfos
 	if len(bs.batchInfos) == 0 {
@@ -120,34 +112,30 @@ func (bs *BatchSubmitter) Initialize(ctx context.Context, processedHeight int64,
 	}
 
 	fileFlag := os.O_CREATE | os.O_RDWR | os.O_APPEND
-	bs.batchFile, err = os.OpenFile(bs.homePath+"/batch", fileFlag, 0640)
+	bs.batchFile, err = os.OpenFile(ctx.HomePath()+"/batch", fileFlag, 0640)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to open batch file")
 	}
 
 	if bs.node.HeightInitialized() {
 		bs.localBatchInfo.Start = bs.node.GetHeight()
 		bs.localBatchInfo.End = 0
-		bs.localBatchInfo.BatchFileSize = 0
+		bs.localBatchInfo.BatchSize = 0
 
-		err = bs.saveLocalBatchInfo()
+		err = SaveLocalBatchInfo(bs.DB(), *bs.localBatchInfo)
 		if err != nil {
-			return err
+			return errors.Wrap(err, "failed to save local batch info")
 		}
 		// reset batch file
-		err := bs.batchFile.Truncate(0)
+		err = bs.emptyBatchFile()
 		if err != nil {
-			return err
-		}
-		_, err = bs.batchFile.Seek(0, 0)
-		if err != nil {
-			return err
+			return errors.Wrap(err, "failed to empty batch file")
 		}
 	}
 	// linux command gzip use level 6 as default
 	bs.batchWriter, err = gzip.NewWriterLevel(bs.batchFile, 6)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to create gzip writer")
 	}
 
 	bs.node.RegisterRawBlockHandler(bs.rawBlockHandler)
@@ -158,8 +146,8 @@ func (bs *BatchSubmitter) SetDANode(da executortypes.DANode) {
 	bs.da = da
 }
 
-func (bs *BatchSubmitter) Start(ctx context.Context) {
-	bs.logger.Info("batch start", zap.Int64("height", bs.node.GetHeight()))
+func (bs *BatchSubmitter) Start(ctx types.Context) {
+	ctx.Logger().Info("batch start", zap.Int64("height", bs.node.GetHeight()))
 	bs.node.Start(ctx)
 }
 
@@ -186,4 +174,8 @@ func (bs *BatchSubmitter) DA() executortypes.DANode {
 
 func (bs BatchSubmitter) Node() *node.Node {
 	return bs.node
+}
+
+func (bs BatchSubmitter) DB() types.DB {
+	return bs.node.DB()
 }

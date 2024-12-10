@@ -151,7 +151,7 @@ $ keys add l2 key2 --output json`),
 			outputFormat, _ := cmd.Flags().GetString(flagOutput)
 			var output string
 			switch outputFormat {
-			case "json":
+			case "json": //nolint
 				jsonOutput := make(keyJsonOutput)
 				jsonOutput[account.Name] = keyJsonOutputElem{
 					Address:  addrString,

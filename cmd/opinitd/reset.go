@@ -7,9 +7,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/initia-labs/opinit-bots/bot"
 	bottypes "github.com/initia-labs/opinit-bots/bot/types"
-	"github.com/initia-labs/opinit-bots/challenger"
+	challengerdb "github.com/initia-labs/opinit-bots/challenger/db"
 	"github.com/initia-labs/opinit-bots/db"
 	"github.com/initia-labs/opinit-bots/executor"
 )
@@ -58,7 +57,7 @@ func resetHeightsCmd(ctx *cmdContext) *cobra.Command {
 				return err
 			}
 
-			db, err := db.NewDB(bot.GetDBPath(ctx.homePath, botType))
+			db, err := db.NewDB(GetDBPath(ctx.homePath, botType))
 			if err != nil {
 				return err
 			}
@@ -67,7 +66,7 @@ func resetHeightsCmd(ctx *cmdContext) *cobra.Command {
 			case bottypes.BotTypeExecutor:
 				return executor.ResetHeights(db)
 			case bottypes.BotTypeChallenger:
-				return challenger.ResetHeights(db)
+				return challengerdb.ResetHeights(db)
 			}
 			return errors.New("unknown bot type")
 		},
@@ -96,16 +95,17 @@ Challenger node types:
 				return err
 			}
 
-			db, err := db.NewDB(bot.GetDBPath(ctx.homePath, botType))
+			db, err := db.NewDB(GetDBPath(ctx.homePath, botType))
 			if err != nil {
 				return err
 			}
+			defer db.Close()
 
 			switch botType {
 			case bottypes.BotTypeExecutor:
 				return executor.ResetHeight(db, args[1])
 			case bottypes.BotTypeChallenger:
-				return challenger.ResetHeight(db, args[1])
+				return challengerdb.ResetHeight(db, args[1])
 			}
 			return errors.New("unknown bot type")
 		},

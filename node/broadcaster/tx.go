@@ -1,7 +1,6 @@
 package broadcaster
 
 import (
-	"context"
 	"fmt"
 	"regexp"
 	"strconv"
@@ -14,6 +13,7 @@ import (
 	btypes "github.com/initia-labs/opinit-bots/node/broadcaster/types"
 
 	opchildtypes "github.com/initia-labs/OPinit/x/opchild/types"
+	"github.com/initia-labs/opinit-bots/types"
 )
 
 var ignoringErrors = []error{
@@ -25,7 +25,9 @@ var ignoringErrors = []error{
 var accountSeqRegex = regexp.MustCompile("account sequence mismatch, expected ([0-9]+), got ([0-9]+)")
 var outputIndexRegex = regexp.MustCompile("expected ([0-9]+), got ([0-9]+): invalid output index")
 
-func (b *Broadcaster) handleMsgError(err error, broadcasterAccount *BroadcasterAccount) error {
+// handleMsgError handles error when processing messages.
+// If there is an error known to be ignored, it will be ignored.
+func (b *Broadcaster) handleMsgError(ctx types.Context, err error, broadcasterAccount *BroadcasterAccount) error {
 	if strs := accountSeqRegex.FindStringSubmatch(err.Error()); strs != nil {
 		expected, parseErr := strconv.ParseUint(strs[1], 10, 64)
 		if parseErr != nil {
@@ -53,7 +55,7 @@ func (b *Broadcaster) handleMsgError(err error, broadcasterAccount *BroadcasterA
 		}
 
 		if expected > got {
-			b.logger.Warn("ignoring error", zap.String("error", err.Error()))
+			ctx.Logger().Warn("ignoring error", zap.String("error", err.Error()))
 			return nil
 		}
 
@@ -62,7 +64,7 @@ func (b *Broadcaster) handleMsgError(err error, broadcasterAccount *BroadcasterA
 
 	for _, e := range ignoringErrors {
 		if strings.Contains(err.Error(), e.Error()) {
-			b.logger.Warn("ignoring error", zap.String("error", e.Error()))
+			ctx.Logger().Warn("ignoring error", zap.String("error", e.Error()))
 			return nil
 		}
 	}
@@ -73,10 +75,10 @@ func (b *Broadcaster) handleMsgError(err error, broadcasterAccount *BroadcasterA
 
 // HandleProcessedMsgs handles processed messages by broadcasting them to the network.
 // It stores the transaction in the database and local memory and keep track of the successful broadcast.
-func (b *Broadcaster) handleProcessedMsgs(ctx context.Context, data btypes.ProcessedMsgs, broadcasterAccount *BroadcasterAccount) error {
+func (b *Broadcaster) handleProcessedMsgs(ctx types.Context, data btypes.ProcessedMsgs, broadcasterAccount *BroadcasterAccount) error {
 	sequence := broadcasterAccount.Sequence()
 
-	txBytes, txHash, err := broadcasterAccount.BuildTxWithMessages(ctx, data.Msgs)
+	txBytes, txHash, err := broadcasterAccount.BuildTxWithMsgs(ctx, data.Msgs)
 	if err != nil {
 		return errors.Wrapf(err, "simulation failed")
 	}
@@ -90,9 +92,9 @@ func (b *Broadcaster) handleProcessedMsgs(ctx context.Context, data btypes.Proce
 		return fmt.Errorf("broadcast txs: %s", res.Log)
 	}
 
-	b.logger.Debug("broadcast tx", zap.String("tx_hash", txHash), zap.Uint64("sequence", sequence))
+	ctx.Logger().Debug("broadcast tx", zap.String("tx_hash", txHash), zap.Uint64("sequence", sequence))
 
-	err = b.deleteProcessedMsgs(data.Timestamp)
+	err = DeleteProcessedMsgs(b.db, data)
 	if err != nil {
 		return err
 	}
@@ -111,7 +113,7 @@ func (b *Broadcaster) handleProcessedMsgs(ctx context.Context, data btypes.Proce
 
 	if pendingTx.Save {
 		// save pending transaction to the database for handling after restart
-		err = b.savePendingTx(pendingTx)
+		err = SavePendingTx(b.db, pendingTx)
 		if err != nil {
 			return err
 		}

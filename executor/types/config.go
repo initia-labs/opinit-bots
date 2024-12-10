@@ -1,13 +1,13 @@
 package types
 
 import (
-	"errors"
 	"time"
 
 	btypes "github.com/initia-labs/opinit-bots/node/broadcaster/types"
 	nodetypes "github.com/initia-labs/opinit-bots/node/types"
 
 	servertypes "github.com/initia-labs/opinit-bots/server/types"
+	"github.com/pkg/errors"
 )
 
 type NodeConfig struct {
@@ -143,14 +143,14 @@ func DefaultConfig() *Config {
 		MaxSubmissionTime: 60 * 60, // 1 hour
 
 		DisableAutoSetL1Height:        false,
-		L1StartHeight:                 0,
-		L2StartHeight:                 0,
-		BatchStartHeight:              0,
+		L1StartHeight:                 1,
+		L2StartHeight:                 1,
+		BatchStartHeight:              1,
 		DisableDeleteFutureWithdrawal: false,
 	}
 }
 
-func (cfg Config) Validate() error {
+func (cfg *Config) Validate() error {
 	if cfg.Version == 0 {
 		return errors.New("version is required")
 	}
@@ -164,15 +164,15 @@ func (cfg Config) Validate() error {
 	}
 
 	if err := cfg.L1Node.Validate(); err != nil {
-		return err
+		return errors.Wrap(err, "l1 node validation error")
 	}
 
 	if err := cfg.L2Node.Validate(); err != nil {
-		return err
+		return errors.Wrap(err, "l2 node validation error")
 	}
 
 	if err := cfg.DANode.Validate(); err != nil {
-		return err
+		return errors.Wrap(err, "da node validation error")
 	}
 
 	if cfg.MaxChunks <= 0 {
@@ -187,21 +187,21 @@ func (cfg Config) Validate() error {
 		return errors.New("max submission time must be greater than 0")
 	}
 
-	if cfg.L1StartHeight < 0 {
-		return errors.New("l1 start height must be greater than or equal to 0")
+	if cfg.L1StartHeight <= 0 {
+		return errors.New("l1 start height must be greater than 0")
 	}
 
-	if cfg.L2StartHeight < 0 {
-		return errors.New("l2 start height must be greater than or equal to 0")
+	if cfg.L2StartHeight <= 0 {
+		return errors.New("l2 start height must be greater than 0")
 	}
 
-	if cfg.BatchStartHeight < 0 {
-		return errors.New("batch start height must be greater than or equal to 0")
+	if cfg.BatchStartHeight <= 0 {
+		return errors.New("batch start height must be greater than 0")
 	}
 	return nil
 }
 
-func (cfg Config) L1NodeConfig(homePath string) nodetypes.NodeConfig {
+func (cfg Config) L1NodeConfig() nodetypes.NodeConfig {
 	nc := nodetypes.NodeConfig{
 		RPC:          cfg.L1Node.RPCAddress,
 		ProcessType:  nodetypes.PROCESS_TYPE_DEFAULT,
@@ -215,14 +215,13 @@ func (cfg Config) L1NodeConfig(homePath string) nodetypes.NodeConfig {
 			GasAdjustment: cfg.L1Node.GasAdjustment,
 			TxTimeout:     time.Duration(cfg.L1Node.TxTimeout) * time.Second,
 			Bech32Prefix:  cfg.L1Node.Bech32Prefix,
-			HomePath:      homePath,
 		}
 	}
 
 	return nc
 }
 
-func (cfg Config) L2NodeConfig(homePath string) nodetypes.NodeConfig {
+func (cfg Config) L2NodeConfig() nodetypes.NodeConfig {
 	nc := nodetypes.NodeConfig{
 		RPC:          cfg.L2Node.RPCAddress,
 		ProcessType:  nodetypes.PROCESS_TYPE_DEFAULT,
@@ -236,14 +235,13 @@ func (cfg Config) L2NodeConfig(homePath string) nodetypes.NodeConfig {
 			GasAdjustment: cfg.L2Node.GasAdjustment,
 			TxTimeout:     time.Duration(cfg.L2Node.TxTimeout) * time.Second,
 			Bech32Prefix:  cfg.L2Node.Bech32Prefix,
-			HomePath:      homePath,
 		}
 	}
 
 	return nc
 }
 
-func (cfg Config) DANodeConfig(homePath string) nodetypes.NodeConfig {
+func (cfg Config) DANodeConfig() nodetypes.NodeConfig {
 	nc := nodetypes.NodeConfig{
 		RPC:          cfg.DANode.RPCAddress,
 		ProcessType:  nodetypes.PROCESS_TYPE_ONLY_BROADCAST,
@@ -257,7 +255,6 @@ func (cfg Config) DANodeConfig(homePath string) nodetypes.NodeConfig {
 			GasAdjustment: cfg.DANode.GasAdjustment,
 			TxTimeout:     time.Duration(cfg.DANode.TxTimeout) * time.Second,
 			Bech32Prefix:  cfg.DANode.Bech32Prefix,
-			HomePath:      homePath,
 		}
 	}
 	return nc

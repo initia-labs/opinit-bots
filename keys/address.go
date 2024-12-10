@@ -6,10 +6,12 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 )
 
+// EncodeBech32AccAddr encodes the given account address to bech32 format
 func EncodeBech32AccAddr(addr sdk.AccAddress, prefix string) (string, error) {
 	return sdk.Bech32ifyAddressBytes(prefix, addr)
 }
 
+// DecodeBech32AccAddr decodes the given bech32 account address
 func DecodeBech32AccAddr(addr string, prefix string) (sdk.AccAddress, error) {
 	return sdk.GetFromBech32(addr, prefix)
 }

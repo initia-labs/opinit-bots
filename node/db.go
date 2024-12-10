@@ -5,59 +5,36 @@ import (
 	btypes "github.com/initia-labs/opinit-bots/node/broadcaster/types"
 	nodetypes "github.com/initia-labs/opinit-bots/node/types"
 	"github.com/initia-labs/opinit-bots/types"
-	"go.uber.org/zap"
+	"github.com/pkg/errors"
 )
 
-func (n *Node) SetSyncInfo(height int64) {
-	n.lastProcessedBlockHeight = height
-	if n.broadcaster != nil {
-		n.broadcaster.SetSyncInfo(n.lastProcessedBlockHeight)
-	}
-}
-
-func (n *Node) loadSyncInfo(processedHeight int64) error {
-	data, err := n.db.Get(nodetypes.LastProcessedBlockHeightKey)
-	if err == dbtypes.ErrNotFound {
-		n.SetSyncInfo(processedHeight)
-		n.startHeightInitialized = true
-		n.logger.Info("initialize sync info", zap.Int64("start_height", processedHeight+1))
-		return nil
-	} else if err != nil {
-		return err
-	}
-
-	lastSyncedHeight, err := dbtypes.ToInt64(data)
+// GetSyncInfo gets the synced height
+func GetSyncInfo(db types.BasicDB) (int64, error) {
+	loadedHeightBytes, err := db.Get(nodetypes.SyncedHeightKey)
 	if err != nil {
-		return err
+		return 0, errors.Wrap(err, "failed to load sync info")
 	}
 
-	n.SetSyncInfo(lastSyncedHeight)
-	n.logger.Debug("load sync info", zap.Int64("last_processed_height", n.lastProcessedBlockHeight))
-
-	return nil
-}
-
-func (n Node) SaveSyncInfo(height int64) error {
-	return n.db.Set(nodetypes.LastProcessedBlockHeightKey, dbtypes.FromUint64(types.MustInt64ToUint64(height)))
-}
-
-func (n Node) SyncInfoToRawKV(height int64) types.RawKV {
-	return types.RawKV{
-		Key:   n.db.PrefixedKey(nodetypes.LastProcessedBlockHeightKey),
-		Value: dbtypes.FromUint64(types.MustInt64ToUint64(height)),
+	syncedHeight, err := nodetypes.UnmarshalHeight(loadedHeightBytes)
+	if err != nil {
+		return 0, errors.Wrap(err, "failed to deserialize height")
 	}
+	return syncedHeight, nil
 }
 
-func (n Node) DeleteSyncInfo() error {
-	return n.db.Delete(nodetypes.LastProcessedBlockHeightKey)
+// SetSyncInfo sets the synced height
+func SetSyncedHeight(db types.BasicDB, height int64) error {
+	return db.Set(nodetypes.SyncedHeightKey, nodetypes.MarshalHeight(height))
 }
 
-func DeleteSyncInfo(db types.DB) error {
-	return db.Delete(nodetypes.LastProcessedBlockHeightKey)
+// DeleteSyncInfo deletes the synced height
+func DeleteSyncedHeight(db types.BasicDB) error {
+	return db.Delete(nodetypes.SyncedHeightKey)
 }
 
+// DeleteProcessedMsgs deletes all processed messages
 func DeleteProcessedMsgs(db types.DB) error {
-	return db.PrefixedIterate(btypes.ProcessedMsgsKey, nil, func(key, _ []byte) (stop bool, err error) {
+	return db.Iterate(dbtypes.AppendSplitter(btypes.ProcessedMsgsPrefix), nil, func(key, _ []byte) (stop bool, err error) {
 		err = db.Delete(key)
 		if err != nil {
 			return stop, err
@@ -66,8 +43,9 @@ func DeleteProcessedMsgs(db types.DB) error {
 	})
 }
 
+// DeletePendingTxs deletes all pending txs
 func DeletePendingTxs(db types.DB) error {
-	return db.PrefixedIterate(btypes.PendingTxsKey, nil, func(key, _ []byte) (stop bool, err error) {
+	return db.Iterate(dbtypes.AppendSplitter(btypes.PendingTxsPrefix), nil, func(key, _ []byte) (stop bool, err error) {
 		err = db.Delete(key)
 		if err != nil {
 			return stop, err

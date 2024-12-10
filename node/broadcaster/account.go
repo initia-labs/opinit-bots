@@ -10,6 +10,7 @@ import (
 	btypes "github.com/initia-labs/opinit-bots/node/broadcaster/types"
 	"github.com/initia-labs/opinit-bots/node/rpcclient"
 	"github.com/initia-labs/opinit-bots/txutils"
+	"github.com/initia-labs/opinit-bots/types"
 
 	ctypes "github.com/cometbft/cometbft/rpc/core/types"
 
@@ -23,6 +24,7 @@ import (
 	authsigning "github.com/cosmos/cosmos-sdk/x/auth/signing"
 )
 
+// BroadcasterAccount is an account that can be used to sign and broadcast transactions.
 type BroadcasterAccount struct {
 	cfg       btypes.BroadcasterConfig
 	txf       tx.Factory
@@ -36,18 +38,20 @@ type BroadcasterAccount struct {
 	address       sdk.AccAddress
 	addressString string
 
-	BuildTxWithMessages      btypes.BuildTxWithMessagesFn
-	PendingTxToProcessedMsgs btypes.PendingTxToProcessedMsgsFn
+	// Custom tx building functions, if not provided, the default functions will be used.
+	BuildTxWithMsgs btypes.BuildTxWithMsgsFn
+	// Custom tx message extraction function, if not provided, the default function will be used.
+	MsgsFromTx btypes.MsgsFromTxFn
 }
 
-func NewBroadcasterAccount(cfg btypes.BroadcasterConfig, cdc codec.Codec, txConfig client.TxConfig, rpcClient *rpcclient.RPCClient, keyringConfig btypes.KeyringConfig) (*BroadcasterAccount, error) {
+func NewBroadcasterAccount(ctx types.Context, cfg btypes.BroadcasterConfig, cdc codec.Codec, txConfig client.TxConfig, rpcClient *rpcclient.RPCClient, keyringConfig btypes.KeyringConfig) (*BroadcasterAccount, error) {
 	err := keyringConfig.Validate()
 	if err != nil {
 		return nil, err
 	}
 
 	// setup keyring
-	keyBase, keyringRecord, err := cfg.GetKeyringRecord(cdc, &keyringConfig)
+	keyBase, keyringRecord, err := cfg.GetKeyringRecord(cdc, &keyringConfig, ctx.HomePath())
 	if err != nil {
 		return nil, err
 	}
@@ -74,16 +78,16 @@ func NewBroadcasterAccount(cfg btypes.BroadcasterConfig, cdc codec.Codec, txConf
 		address:       addr,
 		addressString: addrStr,
 
-		BuildTxWithMessages:      keyringConfig.BuildTxWithMessages,
-		PendingTxToProcessedMsgs: keyringConfig.PendingTxToProcessedMsgs,
+		BuildTxWithMsgs: keyringConfig.BuildTxWithMsgs,
+		MsgsFromTx:      keyringConfig.MsgsFromTx,
 	}
 
-	if b.BuildTxWithMessages == nil {
-		b.BuildTxWithMessages = b.DefaultBuildTxWithMessages
+	if b.BuildTxWithMsgs == nil {
+		b.BuildTxWithMsgs = b.DefaultBuildTxWithMsgs
 	}
 
-	if b.PendingTxToProcessedMsgs == nil {
-		b.PendingTxToProcessedMsgs = b.DefaultPendingTxToProcessedMsgs
+	if b.MsgsFromTx == nil {
+		b.MsgsFromTx = b.DefaultMsgsFromTx
 	}
 
 	b.txf = tx.Factory{}.
@@ -97,7 +101,7 @@ func NewBroadcasterAccount(cfg btypes.BroadcasterConfig, cdc codec.Codec, txConf
 
 	if keyringConfig.FeeGranter != nil {
 		// setup keyring
-		_, feeGranterKeyringRecord, err := cfg.GetKeyringRecord(cdc, keyringConfig.FeeGranter)
+		_, feeGranterKeyringRecord, err := cfg.GetKeyringRecord(cdc, keyringConfig.FeeGranter, ctx.HomePath())
 		if err != nil {
 			return nil, err
 		}
@@ -123,6 +127,7 @@ func (b BroadcasterAccount) Bech32Prefix() string {
 	return b.cfg.Bech32Prefix
 }
 
+// Load function loads the account sequence number and account number.
 func (b *BroadcasterAccount) Load(ctx context.Context) error {
 	account, err := b.GetAccount(b.getClientCtx(ctx), b.address)
 	if err != nil {
@@ -242,6 +247,7 @@ func (b BroadcasterAccount) adjustEstimatedGas(gasUsed uint64) (uint64, error) {
 	return uint64(gas), nil
 }
 
+// SimulateAndSignTx simulates the transaction, adjusts the gas, and signs the transaction.
 func (b BroadcasterAccount) SimulateAndSignTx(ctx context.Context, msgs ...sdk.Msg) (authsigning.Tx, error) {
 	_, adjusted, err := b.CalculateGas(ctx, msgs...)
 	if err != nil {
@@ -260,8 +266,8 @@ func (b BroadcasterAccount) SimulateAndSignTx(ctx context.Context, msgs ...sdk.M
 	return txb.GetTx(), nil
 }
 
-// buildTxWithMessages creates a transaction from the given messages.
-func (b *BroadcasterAccount) DefaultBuildTxWithMessages(
+// DefaultBuildTxWithMsgs creates a transaction with the provided messages and returns the encoded transaction.
+func (b *BroadcasterAccount) DefaultBuildTxWithMsgs(
 	ctx context.Context,
 	msgs []sdk.Msg,
 ) (
@@ -278,10 +284,11 @@ func (b *BroadcasterAccount) DefaultBuildTxWithMessages(
 	if err != nil {
 		return nil, "", err
 	}
-	return txBytes, btypes.TxHash(txBytes), nil
+	return txBytes, txutils.TxHash(txBytes), nil
 }
 
-func (b *BroadcasterAccount) DefaultPendingTxToProcessedMsgs(
+// DefaultMsgsFromTx extracts the messages from the transaction bytes.
+func (b *BroadcasterAccount) DefaultMsgsFromTx(
 	txBytes []byte,
 ) ([]sdk.Msg, error) {
 	tx, err := txutils.DecodeTx(b.txConfig, txBytes)
