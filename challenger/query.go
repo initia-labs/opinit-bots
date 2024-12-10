@@ -14,17 +14,17 @@ func (c *Challenger) QueryChallenges(from string, limit uint64, descOrder bool) 
 
 	count := uint64(0)
 	fetchFn := func(key, value []byte) (bool, error) {
+		if count >= limit {
+			next = base64.StdEncoding.EncodeToString(key)
+			return true, nil
+		}
 		challenge := challengertypes.Challenge{}
 		err = challenge.Unmarshal(value)
 		if err != nil {
 			return true, err
 		}
-		if count >= limit {
-			next = base64.StdEncoding.EncodeToString(challengertypes.PrefixedChallenge(challenge.Time, challenge.Id))
-			return true, nil
-		}
-		challenges = append(challenges, challenge)
 		count++
+		challenges = append(challenges, challenge)
 		return false, nil
 	}
 
