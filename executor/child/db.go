@@ -81,18 +81,9 @@ func SaveWithdrawal(db types.BasicDB, data executortypes.WithdrawalData) error {
 
 // DeleteFutureWithdrawals deletes all future withdrawals from the database starting from the given sequence
 func DeleteFutureWithdrawals(db types.DB, fromSequence uint64) error {
-	return db.Iterate(dbtypes.AppendSplitter(executortypes.WithdrawalSequencePrefix), nil, func(key, value []byte) (bool, error) {
-		sequence, err := executortypes.ParseWithdrawalSequenceKey(key)
-		if err != nil {
-			return true, err
-		}
-
-		if sequence < fromSequence {
-			return false, nil
-		}
-
+	return db.Iterate(dbtypes.AppendSplitter(executortypes.WithdrawalSequencePrefix), executortypes.PrefixedWithdrawalSequence(fromSequence), func(key, value []byte) (bool, error) {
 		data := executortypes.WithdrawalData{}
-		err = data.Unmarshal(value)
+		err := data.Unmarshal(value)
 		if err != nil {
 			return true, err
 		}
