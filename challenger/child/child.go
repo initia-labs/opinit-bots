@@ -71,7 +71,7 @@ func (ch *Child) Initialize(
 		bridgeInfo,
 		nil,
 		nil,
-		true,
+		false,
 	)
 	if err != nil {
 		return time.Time{}, err
