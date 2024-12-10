@@ -8,10 +8,16 @@ import (
 	"go.uber.org/zap"
 )
 
-// txChecker checks pending txs and handle events if the tx is included in the block
-// in the case that the tx hash is not indexed by the node even if the tx is processed,
-// event handler will not be called.
-// so, it is recommended to use the event handler only for the check event (e.g. logs)
+// txChecker continuously checks for pending transactions and handles events if the transaction is included in a block.
+// If the transaction hash is not indexed by the node, even if the transaction is processed, the event handler will not be called.
+// It is recommended to use the event handler only for logging or monitoring purposes.
+//
+// Parameters:
+// - ctx: The context for managing the lifecycle of the txChecker.
+// - enableEventHandler: A boolean flag to enable or disable event handling.
+//
+// Returns:
+// - error: An error if the txChecker encounters an issue.
 func (n *Node) txChecker(ctx types.Context, enableEventHandler bool) error {
 	if !n.HasBroadcaster() {
 		return nil
