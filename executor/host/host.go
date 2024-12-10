@@ -3,8 +3,6 @@ package host
 import (
 	"context"
 
-	"go.uber.org/zap"
-
 	sdk "github.com/cosmos/cosmos-sdk/types"
 
 	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
@@ -14,19 +12,24 @@ import (
 	nodetypes "github.com/initia-labs/opinit-bots/node/types"
 	"github.com/initia-labs/opinit-bots/types"
 
+	"github.com/cosmos/cosmos-sdk/codec"
+
 	hostprovider "github.com/initia-labs/opinit-bots/provider/host"
+
+	"github.com/pkg/errors"
 )
 
 type childNode interface {
-	HasKey() bool
-	BroadcastMsgs(btypes.ProcessedMsgs)
-	ProcessedMsgsToRawKV([]btypes.ProcessedMsgs, bool) ([]types.RawKV, error)
-	QueryNextL1Sequence(context.Context, int64) (uint64, error)
-	BaseAccountAddressString() (string, error)
-	OracleAccountAddressString() (string, error)
+	DB() types.DB
+	Codec() codec.Codec
+
+	HasBroadcaster() bool
+	BroadcastProcessedMsgs(...btypes.ProcessedMsgs)
 
 	GetMsgFinalizeTokenDeposit(string, string, sdk.Coin, uint64, int64, string, []byte) (sdk.Msg, string, error)
 	GetMsgUpdateOracle(int64, []byte) (sdk.Msg, string, error)
+
+	QueryNextL1Sequence(context.Context, int64) (uint64, error)
 }
 
 type batchNode interface {
@@ -43,50 +46,50 @@ type Host struct {
 
 	initialL1Sequence uint64
 
+	stage types.CommitDB
+
 	// status info
 	lastProposedOutputIndex         uint64
 	lastProposedOutputL2BlockNumber int64
 }
 
-func NewHostV1(
-	cfg nodetypes.NodeConfig,
-	db types.DB, logger *zap.Logger,
-) *Host {
+func NewHostV1(cfg nodetypes.NodeConfig, db types.DB) *Host {
 	return &Host{
-		BaseHost: hostprovider.NewBaseHostV1(cfg, db, logger),
+		BaseHost: hostprovider.NewBaseHostV1(cfg, db),
+		stage:    db.NewStage(),
 	}
 }
 
 func (h *Host) Initialize(
-	ctx context.Context,
-	processedHeight int64,
+	ctx types.Context,
+	syncedHeight int64,
 	child childNode,
 	batch batchNode,
 	bridgeInfo ophosttypes.QueryBridgeResponse,
 	keyringConfig *btypes.KeyringConfig,
 ) error {
-	err := h.BaseHost.Initialize(ctx, processedHeight, bridgeInfo, keyringConfig)
+	err := h.BaseHost.Initialize(ctx, syncedHeight, bridgeInfo, keyringConfig)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to initialize base host")
 	}
 	h.child = child
 	h.batch = batch
 	h.initialL1Sequence, err = h.child.QueryNextL1Sequence(ctx, 0)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to query next L1 sequence")
 	}
 	h.registerHandlers()
 	return nil
 }
 
 func (h *Host) InitializeDA(
-	ctx context.Context,
+	ctx types.Context,
 	bridgeInfo ophosttypes.QueryBridgeResponse,
 	keyringConfig *btypes.KeyringConfig,
 ) error {
 	err := h.BaseHost.Initialize(ctx, 0, bridgeInfo, keyringConfig)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to initialize base DA host")
 	}
 	h.registerDAHandlers()
 	return nil

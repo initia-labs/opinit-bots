@@ -8,9 +8,11 @@ import (
 	challengertypes "github.com/initia-labs/opinit-bots/challenger/types"
 	nodetypes "github.com/initia-labs/opinit-bots/node/types"
 	"go.uber.org/zap"
+
+	"github.com/initia-labs/opinit-bots/types"
 )
 
-func (ch *ChallengeEventHandler) CheckValue(events []challengertypes.ChallengeEvent) ([]challengertypes.Challenge, []challengertypes.ChallengeEvent, error) {
+func (ch *ChallengeEventHandler) CheckValue(ctx types.Context, events []challengertypes.ChallengeEvent) ([]challengertypes.Challenge, []challengertypes.ChallengeEvent, error) {
 	challenges := make([]challengertypes.Challenge, 0)
 	processedEvents := make([]challengertypes.ChallengeEvent, 0)
 
@@ -32,7 +34,7 @@ func (ch *ChallengeEventHandler) CheckValue(events []challengertypes.ChallengeEv
 				Time:      event.EventTime(),
 			})
 		} else {
-			ch.logger.Info("pending event matched", zap.String("event", pendingEvent.String()))
+			ctx.Logger().Info("pending event matched", zap.String("event", pendingEvent.String()))
 		}
 		processedEvents = append(processedEvents, pendingEvent)
 

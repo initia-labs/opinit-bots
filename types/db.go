@@ -6,25 +6,32 @@ type KV struct {
 	Value []byte
 }
 
-// RawKV is a key-value pair without prefixing the key.
-type RawKV struct {
-	Key   []byte
-	Value []byte
+type BasicDB interface {
+	Get([]byte) ([]byte, error)
+	Set([]byte, []byte) error
+	Delete([]byte) error
 }
 
 type DB interface {
-	Get([]byte) ([]byte, error)
-	Set([]byte, []byte) error
-	RawBatchSet(...RawKV) error
+	BasicDB
+
+	NewStage() CommitDB
+
 	BatchSet(...KV) error
-	Delete([]byte) error
-	Close() error
-	PrefixedIterate([]byte, []byte, func([]byte, []byte) (bool, error)) error
-	PrefixedReverseIterate([]byte, []byte, func([]byte, []byte) (bool, error)) error
+	Iterate([]byte, []byte, func([]byte, []byte) (bool, error)) error
+	ReverseIterate([]byte, []byte, func([]byte, []byte) (bool, error)) error
 	SeekPrevInclusiveKey([]byte, []byte) ([]byte, []byte, error)
 	WithPrefix([]byte) DB
 	PrefixedKey([]byte) []byte
 	UnprefixedKey([]byte) []byte
-	GetPath() string
 	GetPrefix() []byte
+}
+
+type CommitDB interface {
+	BasicDB
+
+	WithPrefixedKey(prefixedKey func(key []byte) []byte) CommitDB
+	Commit() error
+	Reset()
+	Len() int
 }

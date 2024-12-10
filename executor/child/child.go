@@ -4,25 +4,29 @@ import (
 	"context"
 	"time"
 
-	"go.uber.org/zap"
-
 	sdk "github.com/cosmos/cosmos-sdk/types"
 
 	opchildtypes "github.com/initia-labs/OPinit/x/opchild/types"
 	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
+
+	"github.com/cosmos/cosmos-sdk/codec"
 
 	btypes "github.com/initia-labs/opinit-bots/node/broadcaster/types"
 	nodetypes "github.com/initia-labs/opinit-bots/node/types"
 	"github.com/initia-labs/opinit-bots/types"
 
 	childprovider "github.com/initia-labs/opinit-bots/provider/child"
+
+	"github.com/pkg/errors"
 )
 
 type hostNode interface {
-	HasKey() bool
-	BaseAccountAddressString() (string, error)
-	BroadcastMsgs(btypes.ProcessedMsgs)
-	ProcessedMsgsToRawKV([]btypes.ProcessedMsgs, bool) ([]types.RawKV, error)
+	DB() types.DB
+	Codec() codec.Codec
+
+	HasBroadcaster() bool
+	BroadcastProcessedMsgs(...btypes.ProcessedMsgs)
+
 	QueryLastOutput(context.Context, uint64) (*ophosttypes.QueryOutputProposalResponse, error)
 	QueryOutput(context.Context, uint64, uint64, int64) (*ophosttypes.QueryOutputProposalResponse, error)
 
@@ -43,24 +47,22 @@ type Child struct {
 	lastFinalizedDepositL1Sequence    uint64
 	lastOutputTime                    time.Time
 
-	batchKVs        []types.RawKV
-	addressIndexMap map[string]uint64
+	stage types.CommitDB
 }
 
 func NewChildV1(
 	cfg nodetypes.NodeConfig,
-	db types.DB, logger *zap.Logger,
+	db types.DB,
 ) *Child {
 	return &Child{
-		BaseChild:       childprovider.NewBaseChildV1(cfg, db, logger),
-		batchKVs:        make([]types.RawKV, 0),
-		addressIndexMap: make(map[string]uint64),
+		BaseChild: childprovider.NewBaseChildV1(cfg, db),
+		stage:     db.NewStage(),
 	}
 }
 
 func (ch *Child) Initialize(
-	ctx context.Context,
-	processedHeight int64,
+	ctx types.Context,
+	syncedHeight int64,
 	startOutputIndex uint64,
 	host hostNode,
 	bridgeInfo ophosttypes.QueryBridgeResponse,
@@ -70,7 +72,7 @@ func (ch *Child) Initialize(
 ) error {
 	l2Sequence, err := ch.BaseChild.Initialize(
 		ctx,
-		processedHeight,
+		syncedHeight,
 		startOutputIndex,
 		bridgeInfo,
 		keyringConfig,
@@ -78,12 +80,12 @@ func (ch *Child) Initialize(
 		disableDeleteFutureWithdrawals,
 	)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to initialize base child")
 	}
 	if l2Sequence != 0 {
-		err = ch.DeleteFutureWithdrawals(l2Sequence)
+		err = DeleteFutureWithdrawals(ch.DB(), l2Sequence)
 		if err != nil {
-			return err
+			return errors.Wrap(err, "failed to delete future withdrawals")
 		}
 	}
 

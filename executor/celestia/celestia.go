@@ -1,11 +1,7 @@
 package celestia
 
 import (
-	"context"
 	"crypto/sha256"
-	"errors"
-
-	"go.uber.org/zap"
 
 	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/codec"
@@ -20,6 +16,8 @@ import (
 	nodetypes "github.com/initia-labs/opinit-bots/node/types"
 	"github.com/initia-labs/opinit-bots/types"
 	celestiatypes "github.com/initia-labs/opinit-bots/types/celestia"
+
+	"github.com/pkg/errors"
 )
 
 type batchNode interface {
@@ -38,31 +36,26 @@ type Celestia struct {
 	bridgeId  uint64
 	namespace sh.Namespace
 
-	cfg    nodetypes.NodeConfig
-	db     types.DB
-	logger *zap.Logger
+	cfg nodetypes.NodeConfig
+	db  types.DB
 }
 
-func NewDACelestia(
-	version uint8, cfg nodetypes.NodeConfig,
-	db types.DB, logger *zap.Logger,
-) *Celestia {
+func NewDACelestia(version uint8, cfg nodetypes.NodeConfig, db types.DB) *Celestia {
 	c := &Celestia{
 		version: version,
 
-		cfg:    cfg,
-		db:     db,
-		logger: logger,
+		cfg: cfg,
+		db:  db,
 	}
 
 	appCodec, txConfig, err := createCodec(cfg.Bech32Prefix)
 	if err != nil {
-		panic(err)
+		panic(errors.Wrap(err, "failed to create codec"))
 	}
 
-	node, err := node.NewNode(cfg, db, logger, appCodec, txConfig)
+	node, err := node.NewNode(cfg, db, appCodec, txConfig)
 	if err != nil {
-		panic(err)
+		panic(errors.Wrap(err, "failed to create node"))
 	}
 
 	c.node = node
@@ -79,17 +72,17 @@ func createCodec(bech32Prefix string) (codec.Codec, client.TxConfig, error) {
 	})
 }
 
-func (c *Celestia) Initialize(ctx context.Context, batch batchNode, bridgeId uint64, keyringConfig *btypes.KeyringConfig) error {
+func (c *Celestia) Initialize(ctx types.Context, batch batchNode, bridgeId uint64, keyringConfig *btypes.KeyringConfig) error {
 	err := c.node.Initialize(ctx, 0, c.keyringConfigs(keyringConfig))
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to initialize node")
 	}
 
 	c.batch = batch
 	c.bridgeId = bridgeId
 	c.namespace, err = sh.NewV0Namespace(c.NamespaceID())
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to create namespace")
 	}
 	return nil
 }
@@ -98,28 +91,38 @@ func (c *Celestia) RegisterDAHandlers() {
 	c.node.RegisterEventHandler("celestia.blob.v1.EventPayForBlobs", c.payForBlobsHandler)
 }
 
-func (c *Celestia) Start(ctx context.Context) {
-	c.logger.Info("celestia start")
+func (c *Celestia) Start(ctx types.Context) {
+	ctx.Logger().Info("celestia start")
 	c.node.Start(ctx)
 }
 
-func (c Celestia) BroadcastMsgs(msgs btypes.ProcessedMsgs) {
-	if len(msgs.Msgs) == 0 {
+func (c Celestia) BroadcastProcessedMsgs(batch ...btypes.ProcessedMsgs) {
+	if len(batch) == 0 {
 		return
 	}
+	broadcaster := c.node.MustGetBroadcaster()
 
-	c.node.MustGetBroadcaster().BroadcastMsgs(msgs)
+	for _, processedMsgs := range batch {
+		if len(processedMsgs.Msgs) == 0 {
+			continue
+		}
+		broadcaster.BroadcastProcessedMsgs(processedMsgs)
+	}
 }
 
-func (c Celestia) ProcessedMsgsToRawKV(msgs []btypes.ProcessedMsgs, delete bool) ([]types.RawKV, error) {
-	return c.node.MustGetBroadcaster().ProcessedMsgsToRawKV(msgs, delete)
+func (c Celestia) DB() types.DB {
+	return c.node.DB()
+}
+
+func (c Celestia) Codec() codec.Codec {
+	return c.node.Codec()
 }
 
 func (c *Celestia) SetBridgeId(bridgeId uint64) {
 	c.bridgeId = bridgeId
 }
 
-func (c Celestia) HasKey() bool {
+func (c Celestia) HasBroadcaster() bool {
 	return c.node.HasBroadcaster()
 }
 

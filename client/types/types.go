@@ -1,4 +1,4 @@
-package http
+package types
 
 // Result of block bulk
 type ResultBlockBulk struct {

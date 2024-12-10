@@ -1,4 +1,4 @@
-package challenger
+package db
 
 import (
 	"fmt"
@@ -11,35 +11,40 @@ import (
 	"github.com/pkg/errors"
 )
 
-func (c *Challenger) PendingChallengeToRawKVs(challenges []challengertypes.Challenge, delete bool) ([]types.RawKV, error) {
-	kvs := make([]types.RawKV, 0, len(challenges))
+func SavePendingChallenge(db types.BasicDB, challenge challengertypes.Challenge) error {
+	data, err := challenge.Marshal()
+	if err != nil {
+		return err
+	}
+	return db.Set(challengertypes.PrefixedPendingChallenge(challenge.Id), data)
+}
+
+func SavePendingChallenges(db types.BasicDB, challenges []challengertypes.Challenge) error {
 	for _, challenge := range challenges {
-		var value []byte
-		var err error
-
-		if !delete {
-			value, err = challenge.Marshal()
-			if err != nil {
-				return nil, err
-			}
+		err := SavePendingChallenge(db, challenge)
+		if err != nil {
+			return err
 		}
-		kvs = append(kvs, types.RawKV{
-			Key:   c.db.PrefixedKey(challengertypes.PrefixedPendingChallenge(challenge.Id)),
-			Value: value,
-		})
 	}
-	return kvs, nil
+	return nil
 }
 
-func (c *Challenger) deletePendingChallenge(challenge challengertypes.Challenge) types.RawKV {
-	return types.RawKV{
-		Key:   c.db.PrefixedKey(challengertypes.PrefixedPendingChallenge(challenge.Id)),
-		Value: nil,
-	}
+func DeletePendingChallenge(db types.BasicDB, challenge challengertypes.Challenge) error {
+	return db.Delete(challengertypes.PrefixedPendingChallenge(challenge.Id))
 }
 
-func (c *Challenger) loadPendingChallenges() (challenges []challengertypes.Challenge, err error) {
-	iterErr := c.db.PrefixedIterate(challengertypes.PendingChallengeKey, nil, func(_, value []byte) (stop bool, err error) {
+func DeletePendingChallenges(db types.BasicDB, challenges []challengertypes.Challenge) error {
+	for _, challenge := range challenges {
+		err := DeletePendingChallenge(db, challenge)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func LoadPendingChallenges(db types.DB) (challenges []challengertypes.Challenge, err error) {
+	iterErr := db.Iterate(challengertypes.PendingChallengeKey, nil, func(_, value []byte) (stop bool, err error) {
 		challenge := challengertypes.Challenge{}
 		err = challenge.Unmarshal(value)
 		if err != nil {
@@ -54,19 +59,16 @@ func (c *Challenger) loadPendingChallenges() (challenges []challengertypes.Chall
 	return
 }
 
-func (c *Challenger) saveChallenge(challenge challengertypes.Challenge) (types.RawKV, error) {
+func SaveChallenge(db types.BasicDB, challenge challengertypes.Challenge) error {
 	value, err := challenge.Marshal()
 	if err != nil {
-		return types.RawKV{}, err
+		return err
 	}
-	return types.RawKV{
-		Key:   c.db.PrefixedKey(challengertypes.PrefixedChallenge(challenge.Time, challenge.Id)),
-		Value: value,
-	}, nil
+	return db.Set(challengertypes.PrefixedChallenge(challenge.Time, challenge.Id), value)
 }
 
-func (c *Challenger) loadChallenges() (challenges []challengertypes.Challenge, err error) {
-	iterErr := c.db.PrefixedReverseIterate(challengertypes.ChallengeKey, nil, func(_, value []byte) (stop bool, err error) {
+func LoadChallenges(db types.DB) (challenges []challengertypes.Challenge, err error) {
+	iterErr := db.ReverseIterate(challengertypes.ChallengeKey, nil, func(_, value []byte) (stop bool, err error) {
 		challenge := challengertypes.Challenge{}
 		err = challenge.Unmarshal(value)
 		if err != nil {
@@ -85,9 +87,9 @@ func (c *Challenger) loadChallenges() (challenges []challengertypes.Challenge, e
 	return
 }
 
-func (c *Challenger) DeleteFutureChallenges(initialBlockTime time.Time) error {
+func DeleteFutureChallenges(db types.DB, initialBlockTime time.Time) error {
 	deletingKeys := make([][]byte, 0)
-	iterErr := c.db.PrefixedReverseIterate(challengertypes.ChallengeKey, nil, func(key []byte, _ []byte) (stop bool, err error) {
+	iterErr := db.ReverseIterate(challengertypes.ChallengeKey, nil, func(key []byte, _ []byte) (stop bool, err error) {
 		ts, _, err := challengertypes.ParseChallenge(key)
 		if err != nil {
 			return true, err
@@ -104,7 +106,7 @@ func (c *Challenger) DeleteFutureChallenges(initialBlockTime time.Time) error {
 	}
 
 	for _, key := range deletingKeys {
-		err := c.db.Delete(key)
+		err := db.Delete(key)
 		if err != nil {
 			return err
 		}
@@ -133,24 +135,24 @@ func ResetHeight(db types.DB, nodeName string) error {
 	}
 	nodeDB := db.WithPrefix([]byte(nodeName))
 
-	if err := DeletePendingEvents(nodeDB); err != nil {
+	if err := DeleteAllPendingEvents(nodeDB); err != nil {
 		return err
 	}
 
-	if err := DeletePendingChallenges(nodeDB); err != nil {
+	if err := DeleteAllPendingChallenges(nodeDB); err != nil {
 		return err
 	}
 
-	if err := node.DeleteSyncInfo(nodeDB); err != nil {
+	if err := node.DeleteSyncedHeight(nodeDB); err != nil {
 		return err
 	}
 	fmt.Printf("reset height to 0 for node %s\n", string(nodeDB.GetPrefix()))
 	return nil
 }
 
-func DeletePendingEvents(db types.DB) error {
+func DeleteAllPendingEvents(db types.DB) error {
 	deletingKeys := make([][]byte, 0)
-	iterErr := db.PrefixedIterate(challengertypes.PendingEventKey, nil, func(key []byte, _ []byte) (stop bool, err error) {
+	iterErr := db.Iterate(challengertypes.PendingEventKey, nil, func(key []byte, _ []byte) (stop bool, err error) {
 		deletingKeys = append(deletingKeys, key)
 		return false, nil
 	})
@@ -167,9 +169,9 @@ func DeletePendingEvents(db types.DB) error {
 	return nil
 }
 
-func DeletePendingChallenges(db types.DB) error {
+func DeleteAllPendingChallenges(db types.DB) error {
 	deletingKeys := make([][]byte, 0)
-	iterErr := db.PrefixedIterate(challengertypes.PendingChallengeKey, nil, func(key []byte, _ []byte) (stop bool, err error) {
+	iterErr := db.Iterate(challengertypes.PendingChallengeKey, nil, func(key []byte, _ []byte) (stop bool, err error) {
 		deletingKeys = append(deletingKeys, key)
 		return false, nil
 	})

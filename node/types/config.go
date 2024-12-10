@@ -39,14 +39,5 @@ func (nc NodeConfig) Validate() error {
 	if nc.Bech32Prefix == "" {
 		return fmt.Errorf("bech32 prefix is empty")
 	}
-
-	// Validated in broadcaster
-	//
-	// if nc.BroadcasterConfig != nil {
-	// 	if err := nc.BroadcasterConfig.Validate(); err != nil {
-	// 		return err
-	// 	}
-	// }
-
 	return nil
 }

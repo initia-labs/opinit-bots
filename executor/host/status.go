@@ -1,9 +1,8 @@
 package host
 
 import (
-	"errors"
-
 	nodetypes "github.com/initia-labs/opinit-bots/node/types"
+	"github.com/pkg/errors"
 )
 
 type Status struct {
@@ -15,7 +14,7 @@ type Status struct {
 func (h Host) GetStatus() (Status, error) {
 	nodeStatus, err := h.GetNodeStatus()
 	if err != nil {
-		return Status{}, err
+		return Status{}, errors.Wrap(err, "failed to get node status")
 	}
 
 	return Status{

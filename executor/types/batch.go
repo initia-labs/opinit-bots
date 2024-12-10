@@ -1,36 +1,73 @@
 package types
 
 import (
-	"context"
 	"crypto/sha256"
 	"encoding/binary"
+	"encoding/json"
 	"fmt"
 	"time"
 
 	btypes "github.com/initia-labs/opinit-bots/node/broadcaster/types"
 	nodetypes "github.com/initia-labs/opinit-bots/node/types"
 	"github.com/initia-labs/opinit-bots/types"
+	"github.com/pkg/errors"
+
+	"github.com/cosmos/cosmos-sdk/codec"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 )
 
 type DANode interface {
-	Start(context.Context)
-	HasKey() bool
+	DB() types.DB
+	Codec() codec.Codec
+
+	Start(types.Context)
+	HasBroadcaster() bool
+	BroadcastProcessedMsgs(...btypes.ProcessedMsgs)
+
 	CreateBatchMsg([]byte) (sdk.Msg, string, error)
-	BroadcastMsgs(btypes.ProcessedMsgs)
-	ProcessedMsgsToRawKV(processedMsgs []btypes.ProcessedMsgs, delete bool) ([]types.RawKV, error)
+
 	GetNodeStatus() (nodetypes.Status, error)
 }
+
+var LocalBatchInfoKey = []byte("local_batch_info")
 
 type LocalBatchInfo struct {
 	// start l2 block height which is included in the batch
 	Start int64 `json:"start"`
 	// last l2 block height which is included in the batch
 	End int64 `json:"end"`
-
+	// last submission time of the batch
 	LastSubmissionTime time.Time `json:"last_submission_time"`
-	BatchFileSize      int64     `json:"batch_size"`
+	// batch file size
+	BatchSize int64 `json:"batch_size"`
+}
+
+func (l LocalBatchInfo) Key() []byte {
+	return LocalBatchInfoKey
+}
+
+func (l LocalBatchInfo) Value() ([]byte, error) {
+	bz, err := l.Marshal()
+	if err != nil {
+		return nil, err
+	}
+	return bz, nil
+}
+
+func (l LocalBatchInfo) Marshal() ([]byte, error) {
+	bz, err := json.Marshal(l)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to marshal local batch info")
+	}
+	return bz, nil
+}
+
+func (l *LocalBatchInfo) Unmarshal(bz []byte) error {
+	if err := json.Unmarshal(bz, l); err != nil {
+		return errors.Wrap(err, "failed to unmarshal local batch info")
+	}
+	return nil
 }
 
 type BatchDataType uint8
