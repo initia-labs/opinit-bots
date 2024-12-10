@@ -42,7 +42,7 @@ func (c *Challenger) QueryChallenges(from string, limit uint64, descOrder bool) 
 			return challengertypes.QueryChallengesResponse{}, err
 		}
 	} else {
-		err := c.db.Iterate(dbtypes.AppendSplitter(challengertypes.ChallengeKey), startKey, fetchFn)
+		err = c.db.Iterate(dbtypes.AppendSplitter(challengertypes.ChallengeKey), startKey, fetchFn)
 		if err != nil {
 			return challengertypes.QueryChallengesResponse{}, err
 		}
