@@ -27,6 +27,9 @@ func (n *Node) handleBeginBlock(ctx types.Context, blockID []byte, protoBlock *p
 
 // handleBlockTxs handles the block transactions.
 func (n *Node) handleBlockTxs(ctx types.Context, block *rpccoretypes.ResultBlock, blockResult *rpccoretypes.ResultBlockResults, latestHeight int64) error {
+	if len(block.Block.Txs) != len(blockResult.TxsResults) {
+		return fmt.Errorf("mismatch in transactions and results count: %d vs %d", len(block.Block.Txs), len(blockResult.TxsResults))
+	}
 	for txIndex, tx := range block.Block.Txs {
 		if n.txHandler != nil {
 			err := n.txHandler(ctx, nodetypes.TxHandlerArgs{
