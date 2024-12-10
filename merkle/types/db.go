@@ -52,7 +52,8 @@ func (t LegacyTreeInfo) Migrate(version uint64) TreeInfo {
 }
 
 type TreeInfo struct {
-	// Version of the tree
+	// Version represents the chain height. We store the tree information for each height to 
+    // maintain a record of the state of the tree at that specific height.
 	Version uint64 `json:"version"`
 
 	// Index of the tree used as prefix for the keys
