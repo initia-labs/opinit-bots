@@ -29,7 +29,7 @@ func (c *Challenger) QueryChallenges(from string, limit uint64, descOrder bool) 
 	}
 
 	var startKey []byte
-	if next != "" {
+	if from != "" {
 		startKey, err = base64.StdEncoding.DecodeString(from)
 		if err != nil {
 			return challengertypes.QueryChallengesResponse{}, err
