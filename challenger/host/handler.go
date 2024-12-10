@@ -48,11 +48,11 @@ func (h *Host) endBlockHandler(_ types.Context, args nodetypes.EndBlockArgs) err
 		}
 	}
 	unprocessedEvents := h.eventHandler.GetUnprocessedPendingEvents(prevEvents)
-	pendingChallenges, precessedEvents := h.eventHandler.CheckTimeout(args.Block.Header.Time, unprocessedEvents)
-	precessedEvents = append(precessedEvents, prevEvents...)
+	pendingChallenges, processedEvents := h.eventHandler.CheckTimeout(args.Block.Header.Time, unprocessedEvents)
+	processedEvents = append(processedEvents, prevEvents...)
 
 	// delete processed events
-	err = eventhandler.DeletePendingEvents(h.stage, precessedEvents)
+	err = eventhandler.DeletePendingEvents(h.stage, processedEvents)
 	if err != nil {
 		return err
 	}
@@ -68,7 +68,7 @@ func (h *Host) endBlockHandler(_ types.Context, args nodetypes.EndBlockArgs) err
 	}
 
 	h.child.SetPendingEvents(h.eventQueue)
-	h.eventHandler.DeletePendingEvents(precessedEvents)
+	h.eventHandler.DeletePendingEvents(processedEvents)
 	h.eventHandler.SetPendingEvents(h.outputPendingEventQueue)
 	h.challenger.SendPendingChallenges(pendingChallenges)
 	return nil
