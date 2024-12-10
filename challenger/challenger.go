@@ -133,12 +133,12 @@ func (c *Challenger) Initialize(ctx types.Context) error {
 
 	c.pendingChallenges, err = challengerdb.LoadPendingChallenges(c.db)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to load pending challenges")
 	}
 
 	c.latestChallenges, err = challengerdb.LoadChallenges(c.db)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to load challenges")
 	}
 
 	return nil
