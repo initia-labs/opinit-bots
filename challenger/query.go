@@ -51,5 +51,6 @@ func (c *Challenger) QueryChallenges(from string, limit uint64, descOrder bool) 
 	if next != "" {
 		res.Next = &next
 	}
+	res.Challenges = challenges
 	return res, nil
 }
