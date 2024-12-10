@@ -179,12 +179,21 @@ func (b *Broadcaster) loadPendingTxs(ctx types.Context, stage types.BasicDB, las
 			}
 
 			res, err := b.rpcClient.QueryTx(ctx, txHash)
-			if err == nil && res != nil {
+			if err == nil && res != nil && res.TxResult.Code == 0 {
+				ctx.Logger().Debug("transaction successfully included",
+					zap.String("hash", pendingTxs[0].TxHash),
+					zap.Int64("height", res.Height))
 				err = DeletePendingTx(b.db, pendingTxs[0])
 				if err != nil {
 					return err
 				}
 				pendingTxs = pendingTxs[1:]
+			} else if err == nil && res != nil {
+				ctx.Logger().Warn("transaction failed",
+					zap.String("hash", pendingTxs[0].TxHash),
+					zap.Uint32("code", res.TxResult.Code),
+					zap.String("log", res.TxResult.Log))
+			}
 			}
 		}
 	}
