@@ -21,7 +21,7 @@ const (
 	flagPollingInterval = "polling-interval"
 )
 
-func startCmd(baseCtx *cmdContext) *cobra.Command {
+func startCmd(cmdCtx *cmdContext) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "start [bot-name]",
 		Args:  cobra.ExactArgs(1),
@@ -37,12 +37,12 @@ Currently supported bots:
 				return err
 			}
 
-			configPath, err := getConfigPath(cmd, baseCtx.homePath, args[0])
+			configPath, err := getConfigPath(cmd, cmdCtx.homePath, args[0])
 			if err != nil {
 				return err
 			}
 
-			db, err := db.NewDB(GetDBPath(baseCtx.homePath, botType))
+			db, err := db.NewDB(GetDBPath(cmdCtx.homePath, botType))
 			if err != nil {
 				return err
 			}
@@ -53,16 +53,16 @@ Currently supported bots:
 				return err
 			}
 
-			cmdCtx, botDone := context.WithCancel(cmd.Context())
+			ctx, botDone := context.WithCancel(cmd.Context())
 			gracefulShutdown(botDone)
 
-			errGrp, ctx := errgroup.WithContext(cmdCtx)
+			errGrp, ctx := errgroup.WithContext(ctx)
 			interval, err := cmd.Flags().GetDuration(flagPollingInterval)
 			if err != nil {
 				return err
 			}
 
-			baseCtx := types.NewContext(ctx, baseCtx.logger.Named(string(botType)), baseCtx.homePath).
+			baseCtx := types.NewContext(ctx, cmdCtx.logger.Named(string(botType)), cmdCtx.homePath).
 				WithErrGrp(errGrp).
 				WithPollingInterval(interval)
 			err = bot.Initialize(baseCtx)
@@ -73,7 +73,7 @@ Currently supported bots:
 		},
 	}
 
-	cmd = configFlag(baseCtx.v, cmd)
+	cmd = configFlag(cmdCtx.v, cmd)
 	cmd.Flags().Duration(flagPollingInterval, 100*time.Millisecond, "Polling interval in milliseconds")
 	return cmd
 }
