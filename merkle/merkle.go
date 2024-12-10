@@ -164,7 +164,7 @@ func (m *Merkle) fillLeaves() ([]merkletypes.Node, error) {
 
 	newNodes := make([]merkletypes.Node, 0)
 	lastLeaf := m.workingTree.LastSiblings[0]
-	for range numRestLeaves {
+	for i := uint64(0); i < numRestLeaves; i++ {
 		nodes, err := m.InsertLeaf(lastLeaf)
 		if err != nil {
 			return nil, err
