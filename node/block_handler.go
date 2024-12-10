@@ -31,7 +31,7 @@ func (n *Node) handleBlockTxs(ctx types.Context, block *rpccoretypes.ResultBlock
 		if n.txHandler != nil {
 			err := n.txHandler(ctx, nodetypes.TxHandlerArgs{
 				BlockHeight:  block.Block.Height,
-				BlockTime:    block.Block.Time,
+				BlockTime:    block.Block.Time.UTC(),
 				LatestHeight: latestHeight,
 				TxIndex:      int64(txIndex),
 				Tx:           tx,
@@ -42,7 +42,7 @@ func (n *Node) handleBlockTxs(ctx types.Context, block *rpccoretypes.ResultBlock
 			}
 		}
 
-		err := n.handleEvents(ctx, block.Block.Height, block.Block.Time, blockResult.TxsResults[txIndex].GetEvents(), latestHeight, tx, int64(txIndex))
+		err := n.handleEvents(ctx, block.Block.Height, block.Block.Time.UTC(), blockResult.TxsResults[txIndex].GetEvents(), latestHeight, tx, int64(txIndex))
 		if err != nil {
 			return errors.Wrap(err, fmt.Sprintf("failed to handle events: tx_index: %d", txIndex))
 		}

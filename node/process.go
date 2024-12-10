@@ -155,7 +155,7 @@ func (n *Node) handleNewBlock(ctx types.Context, block *rpccoretypes.ResultBlock
 		return errors.Wrap(err, "failed to handle block txs")
 	}
 
-	err = n.handleFinalizeBlock(ctx, block.Block.Height, block.Block.Time, blockResult, latestChainHeight)
+	err = n.handleFinalizeBlock(ctx, block.Block.Height, block.Block.Time.UTC(), blockResult, latestChainHeight)
 	if err != nil {
 		return errors.Wrap(err, "failed to handle finalize block")
 	}
