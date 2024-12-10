@@ -115,6 +115,8 @@ func GetProofs(db types.DB, leafIndex uint64) (proofs [][]byte, treeIndex uint64
 	height := uint8(0)
 	localNodeIndex := leafIndex - treeInfo.StartLeafIndex
 	for height < treeInfo.TreeHeight {
+        // In `FinalizeWorkingTree`, we ensure that the leaf count of the tree is always a power of two by filling the leaves as needed.
+        // This ensures that there is always a sibling for each leaf node.
 		siblingIndex := localNodeIndex ^ 1 // flip the last bit to find the sibling
 		sibling, err := GetNodeBytes(db, treeInfo.TreeIndex, height, siblingIndex)
 		if err != nil {
