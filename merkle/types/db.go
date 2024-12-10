@@ -1,3 +1,20 @@
+// DB Structure
+//
+// * WorkingTree (TreeInfo)
+//   - Key: `working_tree/${version}`
+//   - Description: Stores the tree information at the given chain height ('version').
+//
+// * FinalizedTree
+//   - Key: `finalized_tree/${start_leaf_index}`
+//   - Description: Stores the finalized tree starting from the given `start_leaf_index`, 
+//     which corresponds to the first L2 sequence number of the first withdrawal.
+//
+// * Node
+//   - Key: `node/${tree_index}${height}${local_node_index}`
+//   - Description: Stores node information at a specific position in the tree.
+//     - `tree_index`: Incremental index identifying the tree.
+//     - `height`: Vertical position of the node in the tree.
+//     - `local_node_index`: Index of the node within the tree, representing the order in which the node was added.
 package types
 
 import (
