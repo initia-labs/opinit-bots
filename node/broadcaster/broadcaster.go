@@ -194,7 +194,6 @@ func (b *Broadcaster) loadPendingTxs(ctx types.Context, stage types.BasicDB, las
 					zap.Uint32("code", res.TxResult.Code),
 					zap.String("log", res.TxResult.Log))
 			}
-			}
 		}
 	}
 
