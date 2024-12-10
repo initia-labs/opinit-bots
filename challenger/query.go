@@ -1,27 +1,55 @@
 package challenger
 
-import challengertypes "github.com/initia-labs/opinit-bots/challenger/types"
+import (
+	"encoding/base64"
 
-func (c *Challenger) QueryChallenges(page uint64) (challenges []challengertypes.Challenge, err error) {
-	i := uint64(0)
-	iterErr := c.db.Iterate(challengertypes.ChallengeKey, nil, func(_, value []byte) (stop bool, err error) {
-		i++
-		if i >= (page+1)*100 {
-			return true, nil
-		}
-		if i < page*100 {
-			return false, nil
-		}
+	dbtypes "github.com/initia-labs/opinit-bots/db/types"
+
+	challengertypes "github.com/initia-labs/opinit-bots/challenger/types"
+)
+
+func (c *Challenger) QueryChallenges(from string, limit uint64, descOrder bool) (res challengertypes.QueryChallengesResponse, err error) {
+	challenges := []challengertypes.Challenge{}
+	next := ""
+
+	count := uint64(0)
+	fetchFn := func(key, value []byte) (bool, error) {
 		challenge := challengertypes.Challenge{}
 		err = challenge.Unmarshal(value)
 		if err != nil {
 			return true, err
 		}
+		if count >= limit {
+			next = base64.StdEncoding.EncodeToString(challengertypes.PrefixedChallenge(challenge.Time, challenge.Id))
+			return true, nil
+		}
 		challenges = append(challenges, challenge)
+		count++
 		return false, nil
-	})
-	if iterErr != nil {
-		return nil, iterErr
 	}
-	return
+
+	var startKey []byte
+	if next != "" {
+		startKey, err = base64.StdEncoding.DecodeString(from)
+		if err != nil {
+			return challengertypes.QueryChallengesResponse{}, err
+		}
+	}
+
+	if descOrder {
+		err = c.db.ReverseIterate(dbtypes.AppendSplitter(challengertypes.ChallengeKey), startKey, fetchFn)
+		if err != nil {
+			return challengertypes.QueryChallengesResponse{}, err
+		}
+	} else {
+		err := c.db.Iterate(dbtypes.AppendSplitter(challengertypes.ChallengeKey), startKey, fetchFn)
+		if err != nil {
+			return challengertypes.QueryChallengesResponse{}, err
+		}
+	}
+
+	if next != "" {
+		res.Next = &next
+	}
+	return res, nil
 }

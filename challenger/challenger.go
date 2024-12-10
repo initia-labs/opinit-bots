@@ -1,7 +1,6 @@
 package challenger
 
 import (
-	"strconv"
 	"sync"
 	"time"
 
@@ -186,16 +185,25 @@ func (c *Challenger) RegisterQuerier() {
 
 		return ctx.JSON(status)
 	})
-	c.server.RegisterQuerier("/challenges/:page", func(ctx *fiber.Ctx) error {
-		pageStr := ctx.Params("page")
-		if pageStr == "" {
-			pageStr = "1"
+	c.server.RegisterQuerier("/challenges", func(ctx *fiber.Ctx) error {
+		next := ctx.Query("next", "")
+		limit := ctx.QueryInt("limit", 10)
+		if limit > 100 {
+			limit = 100
 		}
-		page, err := strconv.ParseUint(pageStr, 10, 64)
+
+		ulimit, err := types.SafeInt64ToUint64(int64(limit))
 		if err != nil {
-			return err
+			return errors.Wrap(err, "failed to convert limit")
 		}
-		res, err := c.QueryChallenges(page)
+
+		descOrder := true
+		orderStr := ctx.Query("order", "desc")
+		if orderStr == "asc" {
+			descOrder = false
+		}
+
+		res, err := c.QueryChallenges(next, ulimit, descOrder)
 		if err != nil {
 			return err
 		}
