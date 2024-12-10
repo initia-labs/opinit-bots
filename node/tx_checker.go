@@ -54,7 +54,7 @@ func (n *Node) txChecker(ctx types.Context, enableEventHandler bool) error {
 		} else if res != nil {
 			// tx found
 			height = res.Height
-			// it only handles the tx if node is only broadcasting txs, not processing blocks
+			// handle the transaction only if the node is broadcasting transactions and not processing blocks.
 			if enableEventHandler && len(n.eventHandlers) != 0 {
 				events := res.TxResult.GetEvents()
 				for eventIndex, event := range events {
