@@ -191,6 +191,8 @@ func (n Node) DB() types.DB {
 	return n.db
 }
 
+// GetHeight returns the processing height.
+// It returns the synced height + 1.
 func (n Node) GetHeight() int64 {
 	return n.syncedHeight + 1
 }
@@ -202,6 +204,8 @@ func (n *Node) UpdateSyncedHeight(height int64) {
 	}
 }
 
+// GetSyncedHeight returns the synced height.
+// It returns the last processed height.
 func (n Node) GetSyncedHeight() int64 {
 	return n.syncedHeight
 }
