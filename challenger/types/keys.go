@@ -38,13 +38,13 @@ func prefixedTimeEvent(eventTime time.Time) []byte {
 	return append(dbtypes.FromUint64Key(types.MustInt64ToUint64(eventTime.UnixNano())), dbtypes.Splitter)
 }
 
-func prefixedChallengeEventTime(eventTime time.Time) []byte {
+func PrefixedChallengeEventTime(eventTime time.Time) []byte {
 	return append(append(ChallengeKey, dbtypes.Splitter),
 		prefixedTimeEvent(eventTime)...)
 }
 
 func PrefixedChallenge(eventTime time.Time, id ChallengeId) []byte {
-	return append(prefixedChallengeEventTime(eventTime),
+	return append(PrefixedChallengeEventTime(eventTime),
 		prefixedEventTypeId(id.Type, id.Id)...)
 }
 
