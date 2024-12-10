@@ -131,6 +131,9 @@ func NewFinalizedTreeInfo(treeIndex uint64, treeHeight uint8, root []byte, start
 }
 
 func (f FinalizedTreeInfo) Key() []byte {
+    // Store the finalized tree information with the start leaf index as its prefix. 
+    // This makes it easier to retrieve proofs using the L2 sequence number of the withdrawal request.
+    // For more details, see the `GetProofs()` function.
 	return PrefixedFinalizedTreeKey(f.StartLeafIndex)
 }
 
