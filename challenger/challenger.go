@@ -97,13 +97,13 @@ func (c *Challenger) Initialize(ctx types.Context) error {
 		zap.Duration("submission_interval", bridgeInfo.BridgeConfig.SubmissionInterval),
 	)
 
-	hostProcessedHeight, childProcessedHeight, processedOutputIndex, err := c.getProcessedHeights(ctx, bridgeInfo.BridgeId)
+	l1StartHeight, l2StartHeight, startOutputIndex, err := c.getNodeStartHeights(ctx, bridgeInfo.BridgeId)
 	if err != nil {
 		return err
 	}
 
 	var initialBlockTime time.Time
-	hostInitialBlockTime, err := c.host.Initialize(ctx, hostProcessedHeight, c.child, *bridgeInfo, c)
+	hostInitialBlockTime, err := c.host.Initialize(ctx, l1StartHeight-1, c.child, *bridgeInfo, c)
 	if err != nil {
 		return err
 	}
@@ -111,7 +111,7 @@ func (c *Challenger) Initialize(ctx types.Context) error {
 		initialBlockTime = hostInitialBlockTime
 	}
 
-	childInitialBlockTime, err := c.child.Initialize(ctx, childProcessedHeight, processedOutputIndex+1, c.host, *bridgeInfo, c)
+	childInitialBlockTime, err := c.child.Initialize(ctx, l2StartHeight-1, startOutputIndex, c.host, *bridgeInfo, c)
 	if err != nil {
 		return err
 	}
@@ -186,7 +186,7 @@ func (c *Challenger) RegisterQuerier() {
 		return ctx.JSON(status)
 	})
 	c.server.RegisterQuerier("/challenges", func(ctx *fiber.Ctx) error {
-		next := ctx.Query("next", "")
+		offset := ctx.Query("offset", "")
 		limit := ctx.QueryInt("limit", 10)
 		if limit > 100 {
 			limit = 100
@@ -203,7 +203,7 @@ func (c *Challenger) RegisterQuerier() {
 			descOrder = false
 		}
 
-		res, err := c.QueryChallenges(next, ulimit, descOrder)
+		res, err := c.QueryChallenges(offset, ulimit, descOrder)
 		if err != nil {
 			return err
 		}
@@ -227,35 +227,39 @@ func (c *Challenger) RegisterQuerier() {
 	})
 }
 
-func (c *Challenger) getProcessedHeights(ctx types.Context, bridgeId uint64) (l1ProcessedHeight int64, l2ProcessedHeight int64, processedOutputIndex uint64, err error) {
+func (c *Challenger) getNodeStartHeights(ctx types.Context, bridgeId uint64) (l1StartHeight int64, l2StartHeight int64, startOutputIndex uint64, err error) {
 	if c.host.Node().GetSyncedHeight() != 0 && c.child.Node().GetSyncedHeight() != 0 {
 		return 0, 0, 0, nil
 	}
 
-	var outputL1BlockNumber int64
+	var outputL1Height, outputL2Height int64
+	var outputIndex uint64
+
 	// get the last submitted output height before the start height from the host
-	if c.cfg.L2StartHeight != 0 {
+	if c.cfg.L2StartHeight > 1 {
 		output, err := c.host.QueryLastFinalizedOutput(ctx, bridgeId)
 		if err != nil {
 			return 0, 0, 0, err
 		} else if output != nil {
-			outputL1BlockNumber = types.MustUint64ToInt64(output.OutputProposal.L1BlockNumber)
-			l2ProcessedHeight = types.MustUint64ToInt64(output.OutputProposal.L2BlockNumber)
-			processedOutputIndex = output.OutputIndex
+			outputL1Height = types.MustUint64ToInt64(output.OutputProposal.L1BlockNumber)
+			outputL2Height = types.MustUint64ToInt64(output.OutputProposal.L2BlockNumber)
+			outputIndex = output.OutputIndex
 		}
 	}
+	l2StartHeight = outputL2Height + 1
+	startOutputIndex = outputIndex + 1
 
 	if c.cfg.DisableAutoSetL1Height {
-		l1ProcessedHeight = c.cfg.L1StartHeight
+		l1StartHeight = c.cfg.L1StartHeight
 	} else {
 		// get the bridge start height from the host
-		l1ProcessedHeight, err = c.host.QueryCreateBridgeHeight(ctx, bridgeId)
+		l1StartHeight, err = c.host.QueryCreateBridgeHeight(ctx, bridgeId)
 		if err != nil {
 			return 0, 0, 0, err
 		}
 
-		if l2ProcessedHeight > 0 {
-			l1Sequence, err := c.child.QueryNextL1Sequence(ctx, l2ProcessedHeight-1)
+		if l2StartHeight > 1 {
+			l1Sequence, err := c.child.QueryNextL1Sequence(ctx, l2StartHeight-1)
 			if err != nil {
 				return 0, 0, 0, err
 			}
@@ -271,19 +275,16 @@ func (c *Challenger) getProcessedHeights(ctx types.Context, bridgeId uint64) (l1
 				}
 			}
 
-			if depositTxHeight > l1ProcessedHeight {
-				l1ProcessedHeight = depositTxHeight
+			if depositTxHeight > l1StartHeight {
+				l1StartHeight = depositTxHeight
 			}
-			if outputL1BlockNumber != 0 && outputL1BlockNumber < l1ProcessedHeight {
-				l1ProcessedHeight = outputL1BlockNumber
+			if outputL1Height != 0 && outputL1Height < l1StartHeight {
+				l1StartHeight = outputL1Height + 1
 			}
 		}
 	}
-	if l1ProcessedHeight > 0 {
-		l1ProcessedHeight--
-	}
 
-	return l1ProcessedHeight, l2ProcessedHeight, processedOutputIndex, err
+	return
 }
 
 func (c Challenger) DB() types.DB {
