@@ -186,7 +186,7 @@ func (c *Challenger) RegisterQuerier() {
 		return ctx.JSON(status)
 	})
 	c.server.RegisterQuerier("/challenges", func(ctx *fiber.Ctx) error {
-		next := ctx.Query("next", "")
+		offset := ctx.Query("offset", "")
 		limit := ctx.QueryInt("limit", 10)
 		if limit > 100 {
 			limit = 100
@@ -203,7 +203,7 @@ func (c *Challenger) RegisterQuerier() {
 			descOrder = false
 		}
 
-		res, err := c.QueryChallenges(next, ulimit, descOrder)
+		res, err := c.QueryChallenges(offset, ulimit, descOrder)
 		if err != nil {
 			return err
 		}

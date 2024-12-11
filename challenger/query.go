@@ -8,7 +8,7 @@ import (
 	challengertypes "github.com/initia-labs/opinit-bots/challenger/types"
 )
 
-func (c *Challenger) QueryChallenges(from string, limit uint64, descOrder bool) (res challengertypes.QueryChallengesResponse, err error) {
+func (c *Challenger) QueryChallenges(offset string, limit uint64, descOrder bool) (res challengertypes.QueryChallengesResponse, err error) {
 	challenges := []challengertypes.Challenge{}
 	next := ""
 
@@ -29,8 +29,8 @@ func (c *Challenger) QueryChallenges(from string, limit uint64, descOrder bool) 
 	}
 
 	var startKey []byte
-	if from != "" {
-		startKey, err = base64.StdEncoding.DecodeString(from)
+	if offset != "" {
+		startKey, err = base64.StdEncoding.DecodeString(offset)
 		if err != nil {
 			return challengertypes.QueryChallengesResponse{}, err
 		}

@@ -189,7 +189,7 @@ curl localhost:3001/challenges
 
 default options
 - `limit`: 10
-- `next`: ""
+- `offset`: ""
 - `order`: desc
 
 ```go
@@ -199,7 +199,7 @@ type QueryChallengesResponse struct {
 }
 ```
 
-If `next` exists, you can continue querying by inserting it as the `next`.
+If `next` exists, you can continue querying by inserting it as the `offset`.
 
 ```json
 [
