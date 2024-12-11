@@ -78,15 +78,15 @@ To configure the Executor, fill in the values in the `~/.opinit/executor.json` f
   // It can be useful when you don't want to use TxSearch.
   "disable_auto_set_l1_height": false,
   // L1StartHeight is the height to start the l1 node.
-  "l1_start_height": 0,
-  // L2StartHeight is the height to start the l2 node. If it is 0, it will start from the latest height.
+  "l1_start_height": 1,
+  // L2StartHeight is the height to start the l2 node. 
   // If the latest height stored in the db is not 0, this config is ignored.
   // L2 starts from the last submitted output l2 block number + 1 before L2StartHeight.
   // L1 starts from the block number of the output tx + 1
-  "l2_start_height": 0,
-  // StartBatchHeight is the height to start the batch. If it is 0, it will start from the latest height.
+  "l2_start_height": 1,
+  // StartBatchHeight is the height to start the batch. 
   // If the latest height stored in the db is not 0, this config is ignored.
-  "batch_start_height": 0,
+  "batch_start_height": 1,
   // DisableDeleteFutureWithdrawal is the flag to disable the deletion of future withdrawal.
   // when the bot is rolled back, it will delete the future withdrawals from DB.
   // If it is true, it will not delete the future withdrawals.
@@ -229,21 +229,22 @@ When a tree is finalized, `Child` stores the leaf nodes and internal nodes of th
 
 ```go
 type QueryWithdrawalResponse struct {
- // fields required to withdraw funds
- BridgeId         uint64   `json:"bridge_id"`
- OutputIndex      uint64   `json:"output_index"`
- WithdrawalProofs [][]byte `json:"withdrawal_proofs"`
- Sender           string   `json:"sender"`
- Sequence         uint64   `json:"sequence"`
- Amount           string   `json:"amount"`
- Version          []byte   `json:"version"`
- StorageRoot      []byte   `json:"storage_root"`
- LatestBlockHash  []byte   `json:"latest_block_hash"`
+// fields required to withdraw funds
+	Sequence         uint64     `json:"sequence"`
+	To               string     `json:"to"`
+	From             string     `json:"from"`
+	Amount           types.Coin `json:"amount"`
+	OutputIndex      uint64     `json:"output_index"`
+	BridgeId         uint64     `json:"bridge_id"`
+	WithdrawalProofs [][]byte   `json:"withdrawal_proofs"`
+	Version          []byte     `json:"version"`
+	StorageRoot      []byte     `json:"storage_root"`
+	LastBlockHash    []byte     `json:"last_block_hash"`
 
- // extra info
- BlockNumber    int64 `json:"block_number"`
- Receiver       string `json:"receiver"`
- WithdrawalHash []byte `json:"withdrawal_hash"`
+	// extra info
+	TxTime   int64  `json:"tx_time"`
+	TxHeight int64  `json:"tx_height"`
+	TxHash   string `json:"tx_hash"`
 }
 ```
 
@@ -414,7 +415,7 @@ curl localhost:3000/status
 ### Withdrawals
 
 ```bash
-curl localhost:3000/withdrawal/{sequence} | jq . > ./withdrawal-info.json
+curl localhost:3000/withdrawal/{sequence} | jq 'del(.tx_time, .tx_height, .tx_hash)' > ./withdrawal-info.json
 initiad tx ophost finalize-token-withdrawal ./withdrawal-info.json --gas= --gas-prices= --chain-id= --from=
 ```
 
@@ -430,6 +431,11 @@ type QueryWithdrawalResponse struct {
   Version          []byte     `json:"version"`
   StorageRoot      []byte     `json:"storage_root"`
   LastBlockHash    []byte     `json:"last_block_hash"`
+
+  // extra info
+  TxTime   int64  `json:"tx_time"`
+  TxHeight int64  `json:"tx_height"`
+  TxHash   string `json:"tx_hash"`
 }
 ```
 
@@ -446,6 +452,7 @@ default options
 type QueryWithdrawalsResponse struct {
   Withdrawals []QueryWithdrawalResponse `json:"withdrawals"`
   Next        uint64                    `json:"next"`
-  Total       uint64                    `json:"total"`
 }
 ```
+
+If `next` exists, you can continue querying by inserting it as the `offset`.

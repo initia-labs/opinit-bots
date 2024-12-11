@@ -75,8 +75,8 @@ func DefaultConfig() *Config {
 			RPCAddress:   "tcp://localhost:27657",
 		},
 		DisableAutoSetL1Height: false,
-		L1StartHeight:          0,
-		L2StartHeight:          0,
+		L1StartHeight:          1,
+		L2StartHeight:          1,
 	}
 }
 
@@ -101,12 +101,12 @@ func (cfg Config) Validate() error {
 		return err
 	}
 
-	if cfg.L1StartHeight < 0 {
-		return errors.New("l1 start height must be greater than or equal to 0")
+	if cfg.L1StartHeight <= 0 {
+		return errors.New("l1 start height must be greater than 0")
 	}
 
-	if cfg.L2StartHeight < 0 {
-		return errors.New("l2 start height must be greater than or equal to 0")
+	if cfg.L2StartHeight <= 0 {
+		return errors.New("l2 start height must be greater than 0")
 	}
 	return nil
 }

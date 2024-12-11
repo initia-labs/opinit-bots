@@ -19,7 +19,7 @@ To ensure compatibility with the node version, check the following versions:
 
 | L1 Node | MiniMove | MiniWasm | MiniEVM |
 | ------- | -------- | -------- | ------- |
-| v0.6.1+ | v0.6.4+  | v0.6.4+  | v0.6.6+ |
+| v0.6.4+ | v0.6.5+  | v0.6.5+  | v0.6.7+ |
 
 ### Build and Configure
 
@@ -85,7 +85,7 @@ opinitd reset-heights [bot-name]
 
 ### Reset Node Height
 
-To reset bot's specific node height info to 0 , use the following command:
+To reset bot's specific node height info to 0, use the following command:
 
 ```bash
 opinitd reset-height [bot-name] [node-type]

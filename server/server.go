@@ -14,10 +14,9 @@ type Server struct {
 func NewServer(cfg types.ServerConfig) *Server {
 	app := fiber.New()
 	app.Use(cors.New(cors.Config{
-		AllowOrigins:     cfg.AllowOrigins,
-		AllowHeaders:     cfg.AllowHeaders,
-		AllowMethods:     cfg.AllowMethods,
-		AllowCredentials: true,
+		AllowOrigins: cfg.AllowOrigins,
+		AllowHeaders: cfg.AllowHeaders,
+		AllowMethods: cfg.AllowMethods,
 	}))
 
 	return &Server{

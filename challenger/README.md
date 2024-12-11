@@ -41,12 +41,12 @@ To configure the Challenger, fill in the values in the `~/.opinit/challenger.jso
   // It can be useful when you don't want to use TxSearch.
   "disable_auto_set_l1_height": false,
   // L1StartHeight is the height to start the l1 node.
-  "l1_start_height": 0,
-  // L2StartHeight is the height to start the l2 node. If it is 0, it will start from the latest height.
+  "l1_start_height": 1,
+  // L2StartHeight is the height to start the l2 node. 
   // If the latest height stored in the db is not 0, this config is ignored.
   // L2 starts from the last submitted output l2 block number + 1 before L2StartHeight.
   // L1 starts from the block number of the output tx + 1
-  "l2_start_height": 0,
+  "l2_start_height": 1,
 }
 ```
 
@@ -184,8 +184,22 @@ curl localhost:3001/status
 ### Challenges
 
 ```bash
-curl localhost:3001/challenges/{page}
+curl localhost:3001/challenges
 ```
+
+default options
+- `limit`: 10
+- `next`: ""
+- `order`: desc
+
+```go
+type QueryChallengesResponse struct {
+  Challenges []Challenge `json:"challenges"`
+  Next       *string     `json:"next,omitempty"`
+}
+```
+
+If `next` exists, you can continue querying by inserting it as the `next`.
 
 ```json
 [
