@@ -1,0 +1,473 @@
+package e2e
+
+import (
+	"bufio"
+	"bytes"
+	"context"
+	"encoding/json"
+	"fmt"
+	"io"
+	"path/filepath"
+	"runtime"
+	"time"
+
+	dockertypes "github.com/docker/docker/api/types"
+	volumetypes "github.com/docker/docker/api/types/volume"
+	"github.com/docker/docker/client"
+	"github.com/docker/docker/pkg/archive"
+	"github.com/docker/docker/pkg/stdcopy"
+
+	"github.com/strangelove-ventures/interchaintest/v8/dockerutil"
+	"github.com/strangelove-ventures/interchaintest/v8/ibc"
+	"github.com/strangelove-ventures/interchaintest/v8/testutil"
+	"go.uber.org/zap"
+)
+
+const (
+	defaultOPBotHomeDirectory = "/home/.opinit"
+	OPBotLocalImage           = "opinit-bot-local-test"
+)
+
+type dockerLogLine struct {
+	Stream      string            `json:"stream"`
+	Aux         any               `json:"aux"`
+	Error       string            `json:"error"`
+	ErrorDetail dockerErrorDetail `json:"errorDetail"`
+}
+
+type dockerErrorDetail struct {
+	Message string `json:"message"`
+}
+
+func BuildOPBotImage(ctx context.Context) error {
+	_, b, _, _ := runtime.Caller(0)
+	basepath := filepath.Join(filepath.Dir(b), "..")
+
+	tar, err := archive.TarWithOptions(basepath, &archive.TarOptions{})
+	if err != nil {
+		return fmt.Errorf("error archiving opinit Bot for docker image build: %w", err)
+	}
+
+	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	if err != nil {
+		return fmt.Errorf("error building docker client: %w", err)
+	}
+
+	res, err := cli.ImageBuild(ctx, tar, dockertypes.ImageBuildOptions{
+		Dockerfile: "Dockerfile",
+		Tags:       []string{OPBotLocalImage},
+	})
+	if err != nil {
+		return fmt.Errorf("error building docker image: %w", err)
+	}
+
+	defer res.Body.Close()
+	return handleDockerBuildOutput(res.Body)
+}
+
+func handleDockerBuildOutput(body io.Reader) error {
+	var logLine dockerLogLine
+
+	scanner := bufio.NewScanner(body)
+	for scanner.Scan() {
+		logLine.Stream = ""
+		logLine.Aux = nil
+		logLine.Error = ""
+		logLine.ErrorDetail = dockerErrorDetail{}
+
+		line := scanner.Text()
+
+		_ = json.Unmarshal([]byte(line), &logLine)
+	}
+	if logLine.Error != "" {
+		return fmt.Errorf("docker image build error: %s", logLine.Error)
+	}
+	return nil
+}
+
+type DockerOPBot struct {
+	log *zap.Logger
+
+	botName string
+
+	c OPBotCommander
+
+	networkID  string
+	client     *client.Client
+	volumeName string
+
+	testName string
+
+	customImage *ibc.DockerImage
+	pullImage   bool
+
+	containerLifecycle *dockerutil.ContainerLifecycle
+
+	wallets map[string]map[string]ibc.Wallet // chainID -> keyname -> wallet
+
+	homeDir string
+
+	extraStartupFlags []string
+}
+
+func NewDockerOPBot(ctx context.Context, log *zap.Logger, botName string, testName string, cli *client.Client, networkID string, c OPBotCommander, buildLocalImage bool) (*DockerOPBot, error) {
+	var customImage *ibc.DockerImage
+	var err error
+
+	if buildLocalImage {
+		err := BuildOPBotImage(ctx)
+		customImage = &ibc.DockerImage{
+			Repository: OPBotLocalImage,
+			Version:    "",
+			UIDGID:     c.DockerUser(),
+		}
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	opbot := DockerOPBot{
+		log: log,
+
+		botName: botName,
+
+		c: c,
+
+		networkID: networkID,
+		client:    cli,
+
+		pullImage: false,
+
+		testName: testName,
+
+		wallets:     map[string]map[string]ibc.Wallet{},
+		customImage: customImage,
+	}
+
+	opbot.homeDir = defaultOPBotHomeDirectory
+
+	containerImage := opbot.ContainerImage()
+	if err := opbot.pullContainerImageIfNecessary(containerImage); err != nil {
+		return nil, fmt.Errorf("pulling container image %s: %w", containerImage.Ref(), err)
+	}
+
+	v, err := cli.VolumeCreate(ctx, volumetypes.CreateOptions{
+		Labels: map[string]string{dockerutil.CleanupLabel: testName},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("creating volume: %w", err)
+	}
+	opbot.volumeName = v.Name
+
+	if err := dockerutil.SetVolumeOwner(ctx, dockerutil.VolumeOwnerOptions{
+		Log: opbot.log,
+
+		Client: opbot.client,
+
+		VolumeName: opbot.volumeName,
+		ImageRef:   containerImage.Ref(),
+		TestName:   testName,
+		UidGid:     containerImage.UIDGID,
+	}); err != nil {
+		return nil, fmt.Errorf("set volume owner: %w", err)
+	}
+
+	if init := opbot.c.Init(botName, opbot.HomeDir()); len(init) > 0 {
+		// Initialization should complete immediately,
+		// but add a 1-minute timeout in case Docker hangs on a developer workstation.
+		ctx, cancel := context.WithTimeout(ctx, time.Minute)
+		defer cancel()
+
+		// Using a nop reporter here because it keeps the API simpler,
+		// and the init command is typically not of high interest.
+		res := opbot.Exec(ctx, init, nil)
+		if res.Err != nil {
+			return nil, res.Err
+		}
+	}
+
+	return &opbot, nil
+}
+
+func (op *DockerOPBot) WriteFileToHomeDir(ctx context.Context, relativePath string, contents []byte) error {
+	fw := dockerutil.NewFileWriter(op.log, op.client, op.testName)
+	if err := fw.WriteFile(ctx, op.volumeName, relativePath, contents); err != nil {
+		return fmt.Errorf("failed to write file: %w", err)
+	}
+	return nil
+}
+
+func (op *DockerOPBot) ReadFileFromHomeDir(ctx context.Context, relativePath string) ([]byte, error) {
+	fr := dockerutil.NewFileRetriever(op.log, op.client, op.testName)
+	bytes, err := fr.SingleFileContent(ctx, op.volumeName, relativePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to retrieve %s: %w", relativePath, err)
+	}
+	return bytes, nil
+}
+
+func (op *DockerOPBot) ModifyTomlConfigFile(ctx context.Context, relativePath string, modification testutil.Toml) error {
+	return testutil.ModifyTomlConfigFile(ctx, op.log, op.client, op.testName, op.volumeName, relativePath, modification)
+}
+
+// AddWallet adds a stores a wallet for the given chain ID.
+func (op *DockerOPBot) AddWallet(chainID string, wallet ibc.Wallet) {
+	if _, ok := op.wallets[chainID]; !ok {
+		op.wallets[chainID] = map[string]ibc.Wallet{
+			wallet.KeyName(): wallet,
+		}
+	}
+}
+
+func (op *DockerOPBot) AddKey(ctx context.Context, chainID, keyName, bech32Prefix string) (ibc.Wallet, error) {
+	cmd := op.c.AddKey(chainID, keyName, bech32Prefix, op.HomeDir())
+
+	// Adding a key should be near-instantaneous, so add a 1-minute timeout
+	// to detect if Docker has hung.
+	ctx, cancel := context.WithTimeout(ctx, time.Minute)
+	defer cancel()
+
+	res := op.Exec(ctx, cmd, nil)
+	if res.Err != nil {
+		return nil, res.Err
+	}
+
+	wallet, err := op.c.ParseAddKeyOutput(string(res.Stdout), string(res.Stderr))
+	if err != nil {
+		return nil, err
+	}
+	op.AddWallet(chainID, wallet)
+	return wallet, nil
+}
+
+func (op *DockerOPBot) GetExtraStartupFlags() []string {
+	return op.extraStartupFlags
+}
+
+func (op *DockerOPBot) GetWallet(chainID string, keyName string) (ibc.Wallet, bool) {
+	chainWallets, ok := op.wallets[chainID]
+	if !ok {
+		return nil, false
+	}
+
+	wallet, ok := chainWallets[keyName]
+	return wallet, ok
+}
+
+func (op *DockerOPBot) GetWallets(chainID string) (map[string]ibc.Wallet, bool) {
+	wallets, ok := op.wallets[chainID]
+	return wallets, ok
+}
+
+func (op *DockerOPBot) Exec(ctx context.Context, cmd []string, env []string) dockerutil.ContainerExecResult {
+	job := dockerutil.NewImage(op.log, op.client, op.networkID, op.testName, op.ContainerImage().Repository, op.ContainerImage().Version)
+	opts := dockerutil.ContainerOptions{
+		Env:   env,
+		Binds: op.Bind(),
+	}
+
+	// startedAt := time.Now()
+	res := job.Run(ctx, cmd, opts)
+
+	defer func() {
+		// rep.TrackRelayerExec(
+		// 	op.Name(),
+		// 	cmd,
+		// 	string(res.Stdout), string(res.Stderr),
+		// 	res.ExitCode,
+		// 	startedAt, time.Now(),
+		// 	res.Err,
+		// )
+	}()
+
+	return res
+}
+
+func (op *DockerOPBot) RestoreKey(ctx context.Context, chainID, keyName, bech32Prefix, mnemonic string) error {
+	cmd := op.c.RestoreKey(chainID, keyName, bech32Prefix, mnemonic, op.HomeDir())
+
+	// Restoring a key should be near-instantaneous, so add a 1-minute timeout
+	// to detect if Docker has hung.
+	ctx, cancel := context.WithTimeout(ctx, time.Minute)
+	defer cancel()
+
+	res := op.Exec(ctx, cmd, nil)
+	if res.Err != nil {
+		return res.Err
+	}
+	addrBytes := op.c.ParseRestoreKeyOutput(string(res.Stdout), string(res.Stderr))
+
+	op.AddWallet(chainID, op.c.CreateWallet(keyName, addrBytes, mnemonic))
+	return nil
+}
+
+func (op *DockerOPBot) Start(ctx context.Context) error {
+	if op.containerLifecycle != nil {
+		return fmt.Errorf("tried to start OPBot again without stopping first")
+	}
+
+	containerImage := op.ContainerImage()
+	containerName := fmt.Sprintf("%s-%s", op.c.Name(), dockerutil.RandLowerCaseLetterString(5))
+
+	cmd := op.c.Start(op.botName, op.HomeDir())
+
+	op.containerLifecycle = dockerutil.NewContainerLifecycle(op.log, op.client, containerName)
+
+	if err := op.containerLifecycle.CreateContainer(
+		ctx, op.testName, op.networkID, containerImage, nil,
+		op.Bind(), nil, op.botName, cmd, nil, []string{},
+	); err != nil {
+		return err
+	}
+
+	return op.containerLifecycle.StartContainer(ctx)
+}
+
+func (op *DockerOPBot) Stop(ctx context.Context) error {
+	if op.containerLifecycle == nil {
+		return nil
+	}
+	if err := op.containerLifecycle.StopContainer(ctx); err != nil {
+		return err
+	}
+
+	stdoutBuf := new(bytes.Buffer)
+	stderrBuf := new(bytes.Buffer)
+	containerID := op.containerLifecycle.ContainerID()
+	rc, err := op.client.ContainerLogs(ctx, containerID, dockertypes.ContainerLogsOptions{
+		ShowStdout: true,
+		ShowStderr: true,
+		Tail:       "50",
+	})
+	if err != nil {
+		return fmt.Errorf("Stop OPBot: retrieving ContainerLogs: %w", err)
+	}
+	defer func() { _ = rc.Close() }()
+
+	// Logs are multiplexed into one stream; see docs for ContainerLogs.
+	_, err = stdcopy.StdCopy(stdoutBuf, stderrBuf, rc)
+	if err != nil {
+		return fmt.Errorf("Stop OPBot: demuxing logs: %w", err)
+	}
+	_ = rc.Close()
+
+	stdout := stdoutBuf.String()
+	stderr := stderrBuf.String()
+
+	c, err := op.client.ContainerInspect(ctx, containerID)
+	if err != nil {
+		return fmt.Errorf("Stop OPBot: inspecting container: %w", err)
+	}
+
+	// startedAt, err := time.Parse(time.RFC3339Nano, c.State.StartedAt)
+	// if err != nil {
+	// 	op.log.Info("Failed to parse container StartedAt", zap.Error(err))
+	// 	startedAt = time.Unix(0, 0)
+	// }
+
+	// finishedAt, err := time.Parse(time.RFC3339Nano, c.State.FinishedAt)
+	// if err != nil {
+	// 	op.log.Info("Failed to parse container FinishedAt", zap.Error(err))
+	// 	finishedAt = time.Now().UTC()
+	// }
+
+	// rep.TrackRelayerExec(
+	// 	c.Name,
+	// 	c.Args,
+	// 	stdout, stderr,
+	// 	c.State.ExitCode,
+	// 	startedAt,
+	// 	finishedAt,
+	// 	nil,
+	// )
+
+	op.log.Debug(
+		fmt.Sprintf("Stopped docker container\nstdout:\n%s\nstderr:\n%s", stdout, stderr),
+		zap.String("container_id", containerID),
+		zap.String("container", c.Name),
+	)
+
+	if err := op.containerLifecycle.RemoveContainer(ctx); err != nil {
+		return err
+	}
+
+	op.containerLifecycle = nil
+
+	return nil
+}
+
+func (op *DockerOPBot) Pause(ctx context.Context) error {
+	if op.containerLifecycle == nil {
+		return fmt.Errorf("container not running")
+	}
+	return op.client.ContainerPause(ctx, op.containerLifecycle.ContainerID())
+}
+
+func (op *DockerOPBot) Resume(ctx context.Context) error {
+	if op.containerLifecycle == nil {
+		return fmt.Errorf("container not running")
+	}
+	return op.client.ContainerUnpause(ctx, op.containerLifecycle.ContainerID())
+}
+
+func (op *DockerOPBot) ContainerImage() ibc.DockerImage {
+	if op.customImage != nil {
+		return *op.customImage
+	}
+	return ibc.DockerImage{
+		Repository: op.c.DefaultContainerImage(),
+		Version:    op.c.DefaultContainerVersion(),
+		UIDGID:     op.c.DockerUser(),
+	}
+}
+
+func (op *DockerOPBot) pullContainerImageIfNecessary(containerImage ibc.DockerImage) error {
+	if !op.pullImage {
+		return nil
+	}
+
+	rc, err := op.client.ImagePull(context.TODO(), containerImage.Ref(), dockertypes.ImagePullOptions{})
+	if err != nil {
+		return err
+	}
+
+	_, _ = io.Copy(io.Discard, rc)
+	_ = rc.Close()
+	return nil
+}
+
+func (op *DockerOPBot) Name() string {
+	return op.c.Name() + "-" + op.botName + "-" + dockerutil.SanitizeContainerName(op.testName)
+}
+
+func (op *DockerOPBot) Bind() []string {
+	return []string{op.volumeName + ":" + op.HomeDir()}
+}
+
+func (op *DockerOPBot) HomeDir() string {
+	return op.homeDir
+}
+
+func (op *DockerOPBot) UseDockerNetwork() bool {
+	return true
+}
+
+type OPBotCommander interface {
+	Name() string
+
+	DefaultContainerImage() string
+	DefaultContainerVersion() string
+
+	DockerUser() string
+
+	ParseAddKeyOutput(stdout, stderr string) (ibc.Wallet, error)
+
+	ParseRestoreKeyOutput(stdout, stderr string) string
+
+	Init(botName, homeDir string) []string
+
+	AddKey(chainID, keyName, bech32Prefix, homeDir string) []string
+	RestoreKey(chainID, keyName, bech32Prefix, mnemonic, homeDir string) []string
+	Start(botName string, homeDir string) []string
+	CreateWallet(keyName, address, mnemonic string) ibc.Wallet
+}

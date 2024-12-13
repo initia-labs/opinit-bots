@@ -89,7 +89,7 @@ format:
 ###                           Tests 
 ###############################################################################
 
-test: test-unit
+test: test-unit test-e2e
 
 test-all: test-unit test-race test-cover
 
