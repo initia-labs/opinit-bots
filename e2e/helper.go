@@ -8,9 +8,13 @@ import (
 	"path"
 	"strings"
 	"testing"
+	"time"
 
 	"cosmossdk.io/math"
+	"cosmossdk.io/x/feegrant"
 	"github.com/icza/dyno"
+	oracleconfig "github.com/skip-mev/connect/v2/oracle/config"
+	"github.com/skip-mev/connect/v2/providers/apis/marketmap"
 	"github.com/strangelove-ventures/interchaintest/v8"
 	"github.com/strangelove-ventures/interchaintest/v8/chain/cosmos"
 	"github.com/strangelove-ventures/interchaintest/v8/dockerutil"
@@ -24,6 +28,7 @@ import (
 	"moul.io/zapfilter"
 
 	cosmostestutil "github.com/cosmos/cosmos-sdk/types/module/testutil"
+	"github.com/cosmos/cosmos-sdk/x/authz"
 
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
 
@@ -103,6 +108,8 @@ func InitiaEncoding() *cosmostestutil.TestEncodingConfig {
 
 func MinitiaEncoding() *cosmostestutil.TestEncodingConfig {
 	cfg := cosmos.DefaultEncoding()
+	authz.RegisterInterfaces(cfg.InterfaceRegistry)
+	feegrant.RegisterInterfaces(cfg.InterfaceRegistry)
 	opchildtypes.RegisterInterfaces(cfg.InterfaceRegistry)
 	return &cfg
 }
@@ -145,11 +152,6 @@ func SetupTest(
 	// OPinit bot setup
 
 	op := NewOPBot(logger, botName, t.Name(), client, network)
-	t.Cleanup(func() {
-		if err := op.Stop(ctx); err != nil {
-			t.Logf("an error occurred while stopping the OP bot: %s", err)
-		}
-	})
 
 	bridgeExecutor, err := op.AddKey(ctx, l2ChainConfig.ChainID, BridgeExecutorKeyName, l2ChainConfig.Bech32Prefix)
 	require.NoError(t, err)
@@ -176,6 +178,24 @@ func SetupTest(
 				Images: []ibc.DockerImage{
 					l1ChainConfig.Image,
 				},
+				SidecarConfigs: []ibc.SidecarConfig{
+					{
+						ProcessName: "connect",
+						HomeDir:     "/oracle",
+						Image: ibc.DockerImage{
+							Repository: "ghcr.io/skip-mev/connect-sidecar",
+							Version:    "v2.0.1",
+							UIDGID:     "1000:1000",
+						},
+						Ports: []string{
+							"8080",
+						},
+						StartCmd: []string{
+							"connect",
+							"--oracle-config", "/oracle/oracle.json",
+						},
+					},
+				},
 				Bin:            l1ChainConfig.Bin,
 				Bech32Prefix:   l1ChainConfig.Bech32Prefix,
 				Denom:          l1ChainConfig.Denom,
@@ -185,6 +205,48 @@ func SetupTest(
 				TrustingPeriod: l1ChainConfig.TrustingPeriod,
 				EncodingConfig: InitiaEncoding(),
 				NoHostMount:    false,
+				PreGenesis: func(ch ibc.Chain) error {
+					l1Chain := ch.(*cosmos.CosmosChain)
+
+					cfg := marketmap.DefaultAPIConfig
+					cfg.Endpoints = []oracleconfig.Endpoint{
+						{
+							URL: fmt.Sprintf("%s:9090", l1Chain.Validators[0].HostName()),
+						},
+					}
+
+					// Create the oracle config
+					oracleConfig := oracleconfig.OracleConfig{
+						UpdateInterval: 500 * time.Millisecond,
+						MaxPriceAge:    1 * time.Minute,
+						Host:           "0.0.0.0",
+						Port:           "8080",
+						Providers: map[string]oracleconfig.ProviderConfig{
+							marketmap.Name: {
+								Name: marketmap.Name,
+								API:  cfg,
+								Type: "market_map_provider",
+							},
+						},
+					}
+
+					oracleConfigBz, err := json.Marshal(oracleConfig)
+					require.NoError(t, err)
+
+					err = l1Chain.Sidecars[0].WriteFile(ctx, oracleConfigBz, "oracle.json")
+					require.NoError(t, err)
+
+					ctx := context.Background()
+					c := make(testutil.Toml)
+					oracle := make(testutil.Toml)
+					oracle["enabled"] = "true"
+					oracle["oracle_address"] = fmt.Sprintf("%s:8080", l1Chain.Sidecars[0].HostName())
+					c["oracle"] = oracle
+
+					err = testutil.ModifyTomlConfigFile(ctx, logger, client, t.Name(), l1Chain.Validators[0].VolumeName, "config/app.toml", c)
+					require.NoError(t, err)
+					return nil
+				},
 			},
 			NumValidators: &l1ChainConfig.NumValidators,
 			NumFullNodes:  &l1ChainConfig.NumFullNodes,
@@ -316,6 +378,21 @@ func SetupTest(
 			Path:    ibcPath,
 		})
 
+	icBuildOptions := interchaintest.InterchainBuildOptions{
+		TestName:          t.Name(),
+		Client:            client,
+		NetworkID:         network,
+		BlockDatabaseFile: interchaintest.DefaultBlockDatabaseFilepath(),
+
+		SkipPathCreation: false,
+	}
+	require.NoError(t, ic.Build(ctx, eRep, icBuildOptions))
+
+	err = initia.StartAllSidecars(ctx)
+	require.NoError(t, err)
+
+	err = relayer.StartRelayer(ctx, eRep)
+	require.NoError(t, err)
 	t.Cleanup(func() {
 		_ = ic.Close()
 
@@ -325,15 +402,6 @@ func SetupTest(
 			}
 		}
 	})
-
-	require.NoError(t, ic.Build(ctx, eRep, interchaintest.InterchainBuildOptions{
-		TestName:          t.Name(),
-		Client:            client,
-		NetworkID:         network,
-		BlockDatabaseFile: interchaintest.DefaultBlockDatabaseFilepath(),
-
-		SkipPathCreation: false,
-	}))
 
 	err = initia.SendFunds(ctx, interchaintest.FaucetAccountKeyName, ibc.WalletAmount{
 		Address: outputSubmitter.FormattedAddress(),
@@ -358,6 +426,7 @@ func SetupTest(
 
 	logger.Info("chains and relayer setup complete",
 		zap.String("bridge executor", bridgeExecutor.FormattedAddress()),
+		zap.String("oracle bridge executor", oracleBridgeExecutor.FormattedAddress()),
 		zap.String("l2 validator", l2Validator.FormattedAddress()),
 		zap.String("output submitter", outputSubmitter.FormattedAddress()),
 		zap.String("batch submitter", batchSubmitter.FormattedAddress()),
@@ -382,11 +451,19 @@ func SetupTest(
 
 	// create bridge
 	helper.CreateBridge(t, ctx)
-
 	helper.SetOPConfig(t, ctx)
+
+	// register validators on l2 chain
+	err = relayer.UpdateClients(ctx, eRep, ibcPath)
+	require.NoError(t, err)
 
 	err = op.Start(ctx)
 	require.NoError(t, err)
+	t.Cleanup(func() {
+		if err := op.Stop(ctx); err != nil {
+			t.Logf("an error occurred while stopping the OP bot: %s", err)
+		}
+	})
 
 	err = op.WaitForSync(ctx)
 	require.NoError(t, err)
@@ -428,6 +505,14 @@ func (op OPTestHelper) SetOPConfig(t *testing.T, ctx context.Context) {
 
 	err = op.OP.WriteFileToHomeDir(ctx, configName, configBz)
 	require.NoError(t, err)
+
+	if op.bridgeConfig.OracleEnabled && op.OP.botName == BotExecutor {
+		// grant oracle permissions
+		err := op.OP.GrantOraclePermissions(ctx, op.Minitia.OracleBridgeExecutor.FormattedAddress())
+		require.NoError(t, err)
+		err = testutil.WaitForBlocks(ctx, 2, op.Minitia.GetFullNode())
+		require.NoError(t, err)
+	}
 }
 
 func (op OPTestHelper) ExecutorConfig() *executortypes.Config {
@@ -447,7 +532,7 @@ func (op OPTestHelper) ExecutorConfig() *executortypes.Config {
 			RPCAddress:    fmt.Sprintf("http://%s:26657", op.Initia.GetFullNode().Name()),
 			GasPrice:      op.Initia.Config().GasPrices,
 			GasAdjustment: op.Initia.Config().GasAdjustment,
-			TxTimeout:     60,
+			TxTimeout:     10,
 		},
 
 		L2Node: executortypes.NodeConfig{
@@ -456,7 +541,7 @@ func (op OPTestHelper) ExecutorConfig() *executortypes.Config {
 			RPCAddress:    fmt.Sprintf("http://%s:26657", op.Minitia.GetFullNode().Name()),
 			GasPrice:      "",
 			GasAdjustment: op.Minitia.Config().GasAdjustment,
-			TxTimeout:     60,
+			TxTimeout:     10,
 		},
 
 		DANode: executortypes.NodeConfig{
@@ -465,7 +550,7 @@ func (op OPTestHelper) ExecutorConfig() *executortypes.Config {
 			RPCAddress:    fmt.Sprintf("http://%s:26657", op.DA.GetFullNode().Name()),
 			GasPrice:      op.DA.Config().GasPrices,
 			GasAdjustment: op.DA.Config().GasAdjustment,
-			TxTimeout:     60,
+			TxTimeout:     10,
 		},
 
 		BridgeExecutor:         op.Minitia.BridgeExecutor.KeyName(),

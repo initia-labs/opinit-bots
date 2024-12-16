@@ -52,7 +52,7 @@ func TestDeposit(t *testing.T) {
 		SubmissionInterval:    "5s",
 		FinalizationPeriod:    "10s",
 		SubmissionStartHeight: "1",
-		OracleEnabled:         false,
+		OracleEnabled:         true,
 		Metadata:              "",
 	}
 
@@ -77,4 +77,9 @@ func TestDeposit(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Equal(t, amount.Amount, l2UserBalance)
+
+	prices, err := op.Minitia.QueryPrices(ctx, []string{"BTC/USD"})
+	require.NoError(t, err)
+
+	require.NotEqual(t, uint64(0), prices.Prices[0].Price.BlockHeight)
 }

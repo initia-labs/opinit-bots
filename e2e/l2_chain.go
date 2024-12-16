@@ -6,6 +6,8 @@ import (
 
 	"github.com/strangelove-ventures/interchaintest/v8/chain/cosmos"
 	"github.com/strangelove-ventures/interchaintest/v8/ibc"
+
+	oracletypes "github.com/skip-mev/connect/v2/x/oracle/types"
 )
 
 type L2ChainNode struct {
@@ -42,10 +44,20 @@ func (l2 *L2Chain) GetFullNode() *L2ChainNode {
 	return NewL2ChainNode(l2.CosmosChain.GetFullNode())
 }
 
+// Tx
+
 func (l2 *L2Chain) SetBridgeInfo(ctx context.Context, bridgeId uint64, bridgeAddr string, l1ChainId string, l1ClientId string, configPath string) (string, error) {
 	cmds := []string{
 		"opchild", "set-bridge-info", fmt.Sprintf("%d", bridgeId), bridgeAddr, l1ChainId, l1ClientId, configPath,
 		"--gas-prices", "0umin",
 	}
 	return l2.GetFullNode().ExecTx(ctx, l2.BridgeExecutor.KeyName(), cmds...)
+}
+
+// Query
+
+func (l2 *L2Chain) QueryPrices(ctx context.Context, currencyPairIds []string) (*oracletypes.GetPricesResponse, error) {
+	return oracletypes.NewQueryClient(l2.GetFullNode().GrpcConn).GetPrices(ctx, &oracletypes.GetPricesRequest{
+		CurrencyPairIds: currencyPairIds,
+	})
 }

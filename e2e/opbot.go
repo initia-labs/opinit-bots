@@ -54,17 +54,16 @@ func (op *OPBot) WaitForSync(ctx context.Context) error {
 		}
 
 		syncing, err := op.QuerySyncing()
-		if err != nil {
+		if err != nil || syncing {
+			op.log.Error("query syncing result", zap.Bool("syncing", syncing), zap.Error(err))
 			continue
 		}
-		if !syncing {
-			break
-		}
+		break
 	}
 	return nil
 }
 
-func query(address string, params map[string]string) ([]byte, error) {
+func (op *OPBot) query(address string, params map[string]string) (data []byte, err error) {
 	u, err := url.Parse(address)
 	if err != nil {
 		return nil, err
@@ -75,33 +74,32 @@ func query(address string, params map[string]string) ([]byte, error) {
 	}
 	u.RawQuery = q.Encode()
 
+	defer func() {
+		op.log.Info("opbot query", zap.String("url", u.String()), zap.String("data", string(data)), zap.Error(err))
+	}()
+
 	resp, err := http.Get(u.String())
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
-	data, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-	return data, nil
+	return io.ReadAll(resp.Body)
 }
 
 func (op *OPBot) QuerySyncing() (bool, error) {
 	address := op.DockerOPBot.queryServerUrl + "/syncing"
 
-	data, err := query(address, nil)
+	data, err := op.query(address, nil)
 	if err != nil {
 		return false, err
 	}
-
 	return strconv.ParseBool(string(data))
 }
 
 func (op *OPBot) QueryExecutorStatus() (executor.Status, error) {
 	address := op.DockerOPBot.queryServerUrl + "/status"
 
-	data, err := query(address, nil)
+	data, err := op.query(address, nil)
 	if err != nil {
 		return executor.Status{}, err
 	}
@@ -153,6 +151,13 @@ func (c commander) Start(botName string, homeDir string) []string {
 	return []string{
 		"opinitd", "start", botName,
 		"--log-level", "debug",
+		"--home", homeDir,
+	}
+}
+
+func (c commander) GrantOraclePermissions(address string, homeDir string) []string {
+	return []string{
+		"opinitd", "tx", "grant-oracle", address,
 		"--home", homeDir,
 	}
 }

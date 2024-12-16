@@ -1,20 +1,16 @@
 package e2e
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"io"
-	"path/filepath"
-	"runtime"
 	"time"
 
 	dockertypes "github.com/docker/docker/api/types"
 	volumetypes "github.com/docker/docker/api/types/volume"
 	"github.com/docker/docker/client"
-	"github.com/docker/docker/pkg/archive"
 	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/docker/go-connections/nat"
 
@@ -28,63 +24,6 @@ const (
 	defaultOPBotHomeDirectory = "/home/.opinit"
 	OPBotLocalImage           = "opinit-bot-local-test"
 )
-
-type dockerLogLine struct {
-	Stream      string            `json:"stream"`
-	Aux         any               `json:"aux"`
-	Error       string            `json:"error"`
-	ErrorDetail dockerErrorDetail `json:"errorDetail"`
-}
-
-type dockerErrorDetail struct {
-	Message string `json:"message"`
-}
-
-func BuildOPBotImage(ctx context.Context) error {
-	_, b, _, _ := runtime.Caller(0)
-	basepath := filepath.Join(filepath.Dir(b), "..")
-
-	tar, err := archive.TarWithOptions(basepath, &archive.TarOptions{})
-	if err != nil {
-		return fmt.Errorf("error archiving opinit Bot for docker image build: %w", err)
-	}
-
-	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
-	if err != nil {
-		return fmt.Errorf("error building docker client: %w", err)
-	}
-
-	res, err := cli.ImageBuild(ctx, tar, dockertypes.ImageBuildOptions{
-		Dockerfile: "Dockerfile",
-		Tags:       []string{OPBotLocalImage},
-	})
-	if err != nil {
-		return fmt.Errorf("error building docker image: %w", err)
-	}
-
-	defer res.Body.Close()
-	return handleDockerBuildOutput(res.Body)
-}
-
-func handleDockerBuildOutput(body io.Reader) error {
-	var logLine dockerLogLine
-
-	scanner := bufio.NewScanner(body)
-	for scanner.Scan() {
-		logLine.Stream = ""
-		logLine.Aux = nil
-		logLine.Error = ""
-		logLine.ErrorDetail = dockerErrorDetail{}
-
-		line := scanner.Text()
-
-		_ = json.Unmarshal([]byte(line), &logLine)
-	}
-	if logLine.Error != "" {
-		return fmt.Errorf("docker image build error: %s", logLine.Error)
-	}
-	return nil
-}
 
 const (
 	queryServerPort = "3000/tcp"
@@ -122,21 +61,6 @@ type DockerOPBot struct {
 }
 
 func NewDockerOPBot(ctx context.Context, log *zap.Logger, botName string, testName string, cli *client.Client, networkID string, c OPBotCommander, buildLocalImage bool) (*DockerOPBot, error) {
-	var customImage *ibc.DockerImage
-	var err error
-
-	if buildLocalImage {
-		err := BuildOPBotImage(ctx)
-		customImage = &ibc.DockerImage{
-			Repository: OPBotLocalImage,
-			Version:    "",
-			UIDGID:     c.DockerUser(),
-		}
-		if err != nil {
-			return nil, err
-		}
-	}
-
 	opbot := DockerOPBot{
 		log: log,
 
@@ -151,11 +75,17 @@ func NewDockerOPBot(ctx context.Context, log *zap.Logger, botName string, testNa
 
 		testName: testName,
 
-		wallets:     map[string]map[string]ibc.Wallet{},
-		customImage: customImage,
+		wallets: map[string]map[string]ibc.Wallet{},
+		homeDir: defaultOPBotHomeDirectory,
 	}
 
-	opbot.homeDir = defaultOPBotHomeDirectory
+	if buildLocalImage {
+		opbot.customImage = &ibc.DockerImage{
+			Repository: OPBotLocalImage,
+			Version:    "",
+			UIDGID:     c.DockerUser(),
+		}
+	}
 
 	containerImage := opbot.ContainerImage()
 	if err := opbot.pullContainerImageIfNecessary(containerImage); err != nil {
@@ -270,6 +200,35 @@ func (op *DockerOPBot) GetWallets(chainID string) (map[string]ibc.Wallet, bool) 
 	return wallets, ok
 }
 
+type CosmosTx struct {
+	Code int    `json:"code"`
+	Data string `json:"data"`
+	Hash string `json:"hash"`
+	Log  string `json:"log"`
+}
+
+func (op *DockerOPBot) GrantOraclePermissions(ctx context.Context, oracleBridgeExecutorAddress string) error {
+	cmd := op.c.GrantOraclePermissions(oracleBridgeExecutorAddress, op.HomeDir())
+
+	ctx, cancel := context.WithTimeout(ctx, time.Minute)
+	defer cancel()
+
+	res := op.Exec(ctx, cmd, nil)
+	if res.Err != nil {
+		return res.Err
+	}
+
+	output := CosmosTx{}
+	err := json.Unmarshal(res.Stdout, &output)
+	if err != nil {
+		return err
+	}
+	if output.Code != 0 {
+		return fmt.Errorf("transaction failed with code %d: %s", output.Code, output.Log)
+	}
+	return nil
+}
+
 func (op *DockerOPBot) Exec(ctx context.Context, cmd []string, env []string) dockerutil.ContainerExecResult {
 	job := dockerutil.NewImage(op.log, op.DockerClient, op.networkID, op.testName, op.ContainerImage().Repository, op.ContainerImage().Version)
 	opts := dockerutil.ContainerOptions{
@@ -319,6 +278,7 @@ func (op *DockerOPBot) Start(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+
 	hostPorts, err := op.containerLifecycle.GetHostPorts(ctx, queryServerPort)
 	if err != nil {
 		return err
@@ -341,7 +301,7 @@ func (op *DockerOPBot) Stop(ctx context.Context) error {
 	rc, err := op.DockerClient.ContainerLogs(ctx, containerID, dockertypes.ContainerLogsOptions{
 		ShowStdout: true,
 		ShowStderr: true,
-		Tail:       "50",
+		Tail:       "100",
 	})
 	if err != nil {
 		return fmt.Errorf("Stop OPBot: retrieving ContainerLogs: %w", err)
@@ -451,4 +411,5 @@ type OPBotCommander interface {
 	RestoreKey(chainID, keyName, bech32Prefix, mnemonic, homeDir string) []string
 	Start(botName string, homeDir string) []string
 	CreateWallet(keyName, address, mnemonic string) ibc.Wallet
+	GrantOraclePermissions(address string, homeDir string) []string
 }
