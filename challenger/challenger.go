@@ -186,6 +186,15 @@ func (c *Challenger) RegisterQuerier() {
 
 		return ctx.JSON(status)
 	})
+
+	c.server.RegisterQuerier("/syncing", func(ctx *fiber.Ctx) error {
+		status, err := c.GetStatus()
+		if err != nil {
+			return err
+		}
+		return ctx.JSON(*status.Host.Node.Syncing && *status.Child.Node.Syncing)
+	})
+
 	c.server.RegisterQuerier("/challenges/:page", func(ctx *fiber.Ctx) error {
 		pageStr := ctx.Params("page")
 		if pageStr == "" {
