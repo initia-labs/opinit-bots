@@ -16,6 +16,7 @@ import (
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/archive"
 	"github.com/docker/docker/pkg/stdcopy"
+	"github.com/docker/go-connections/nat"
 
 	"github.com/strangelove-ventures/interchaintest/v8/dockerutil"
 	"github.com/strangelove-ventures/interchaintest/v8/ibc"
@@ -85,6 +86,14 @@ func handleDockerBuildOutput(body io.Reader) error {
 	return nil
 }
 
+const (
+	queryServerPort = "3000/tcp"
+)
+
+var ports = nat.PortMap{
+	nat.Port(queryServerPort): {},
+}
+
 type DockerOPBot struct {
 	log *zap.Logger
 
@@ -92,9 +101,9 @@ type DockerOPBot struct {
 
 	c OPBotCommander
 
-	networkID  string
-	client     *client.Client
-	volumeName string
+	networkID    string
+	DockerClient *client.Client
+	volumeName   string
 
 	testName string
 
@@ -108,6 +117,8 @@ type DockerOPBot struct {
 	homeDir string
 
 	extraStartupFlags []string
+
+	queryServerUrl string
 }
 
 func NewDockerOPBot(ctx context.Context, log *zap.Logger, botName string, testName string, cli *client.Client, networkID string, c OPBotCommander, buildLocalImage bool) (*DockerOPBot, error) {
@@ -133,8 +144,8 @@ func NewDockerOPBot(ctx context.Context, log *zap.Logger, botName string, testNa
 
 		c: c,
 
-		networkID: networkID,
-		client:    cli,
+		networkID:    networkID,
+		DockerClient: cli,
 
 		pullImage: false,
 
@@ -162,7 +173,7 @@ func NewDockerOPBot(ctx context.Context, log *zap.Logger, botName string, testNa
 	if err := dockerutil.SetVolumeOwner(ctx, dockerutil.VolumeOwnerOptions{
 		Log: opbot.log,
 
-		Client: opbot.client,
+		Client: opbot.DockerClient,
 
 		VolumeName: opbot.volumeName,
 		ImageRef:   containerImage.Ref(),
@@ -190,7 +201,7 @@ func NewDockerOPBot(ctx context.Context, log *zap.Logger, botName string, testNa
 }
 
 func (op *DockerOPBot) WriteFileToHomeDir(ctx context.Context, relativePath string, contents []byte) error {
-	fw := dockerutil.NewFileWriter(op.log, op.client, op.testName)
+	fw := dockerutil.NewFileWriter(op.log, op.DockerClient, op.testName)
 	if err := fw.WriteFile(ctx, op.volumeName, relativePath, contents); err != nil {
 		return fmt.Errorf("failed to write file: %w", err)
 	}
@@ -198,7 +209,7 @@ func (op *DockerOPBot) WriteFileToHomeDir(ctx context.Context, relativePath stri
 }
 
 func (op *DockerOPBot) ReadFileFromHomeDir(ctx context.Context, relativePath string) ([]byte, error) {
-	fr := dockerutil.NewFileRetriever(op.log, op.client, op.testName)
+	fr := dockerutil.NewFileRetriever(op.log, op.DockerClient, op.testName)
 	bytes, err := fr.SingleFileContent(ctx, op.volumeName, relativePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve %s: %w", relativePath, err)
@@ -207,7 +218,7 @@ func (op *DockerOPBot) ReadFileFromHomeDir(ctx context.Context, relativePath str
 }
 
 func (op *DockerOPBot) ModifyTomlConfigFile(ctx context.Context, relativePath string, modification testutil.Toml) error {
-	return testutil.ModifyTomlConfigFile(ctx, op.log, op.client, op.testName, op.volumeName, relativePath, modification)
+	return testutil.ModifyTomlConfigFile(ctx, op.log, op.DockerClient, op.testName, op.volumeName, relativePath, modification)
 }
 
 // AddWallet adds a stores a wallet for the given chain ID.
@@ -260,27 +271,12 @@ func (op *DockerOPBot) GetWallets(chainID string) (map[string]ibc.Wallet, bool) 
 }
 
 func (op *DockerOPBot) Exec(ctx context.Context, cmd []string, env []string) dockerutil.ContainerExecResult {
-	job := dockerutil.NewImage(op.log, op.client, op.networkID, op.testName, op.ContainerImage().Repository, op.ContainerImage().Version)
+	job := dockerutil.NewImage(op.log, op.DockerClient, op.networkID, op.testName, op.ContainerImage().Repository, op.ContainerImage().Version)
 	opts := dockerutil.ContainerOptions{
 		Env:   env,
 		Binds: op.Bind(),
 	}
-
-	// startedAt := time.Now()
-	res := job.Run(ctx, cmd, opts)
-
-	defer func() {
-		// rep.TrackRelayerExec(
-		// 	op.Name(),
-		// 	cmd,
-		// 	string(res.Stdout), string(res.Stderr),
-		// 	res.ExitCode,
-		// 	startedAt, time.Now(),
-		// 	res.Err,
-		// )
-	}()
-
-	return res
+	return job.Run(ctx, cmd, opts)
 }
 
 func (op *DockerOPBot) RestoreKey(ctx context.Context, chainID, keyName, bech32Prefix, mnemonic string) error {
@@ -307,20 +303,28 @@ func (op *DockerOPBot) Start(ctx context.Context) error {
 	}
 
 	containerImage := op.ContainerImage()
-	containerName := fmt.Sprintf("%s-%s", op.c.Name(), dockerutil.RandLowerCaseLetterString(5))
 
 	cmd := op.c.Start(op.botName, op.HomeDir())
 
-	op.containerLifecycle = dockerutil.NewContainerLifecycle(op.log, op.client, containerName)
+	op.containerLifecycle = dockerutil.NewContainerLifecycle(op.log, op.DockerClient, op.Name())
 
 	if err := op.containerLifecycle.CreateContainer(
-		ctx, op.testName, op.networkID, containerImage, nil,
-		op.Bind(), nil, op.botName, cmd, nil, []string{},
+		ctx, op.testName, op.networkID, containerImage, ports,
+		op.Bind(), nil, op.Name(), cmd, nil, []string{},
 	); err != nil {
 		return err
 	}
 
-	return op.containerLifecycle.StartContainer(ctx)
+	err := op.containerLifecycle.StartContainer(ctx)
+	if err != nil {
+		return err
+	}
+	hostPorts, err := op.containerLifecycle.GetHostPorts(ctx, queryServerPort)
+	if err != nil {
+		return err
+	}
+	op.queryServerUrl = fmt.Sprintf("http://%s", hostPorts[0])
+	return nil
 }
 
 func (op *DockerOPBot) Stop(ctx context.Context) error {
@@ -334,7 +338,7 @@ func (op *DockerOPBot) Stop(ctx context.Context) error {
 	stdoutBuf := new(bytes.Buffer)
 	stderrBuf := new(bytes.Buffer)
 	containerID := op.containerLifecycle.ContainerID()
-	rc, err := op.client.ContainerLogs(ctx, containerID, dockertypes.ContainerLogsOptions{
+	rc, err := op.DockerClient.ContainerLogs(ctx, containerID, dockertypes.ContainerLogsOptions{
 		ShowStdout: true,
 		ShowStderr: true,
 		Tail:       "50",
@@ -354,32 +358,10 @@ func (op *DockerOPBot) Stop(ctx context.Context) error {
 	stdout := stdoutBuf.String()
 	stderr := stderrBuf.String()
 
-	c, err := op.client.ContainerInspect(ctx, containerID)
+	c, err := op.DockerClient.ContainerInspect(ctx, containerID)
 	if err != nil {
 		return fmt.Errorf("Stop OPBot: inspecting container: %w", err)
 	}
-
-	// startedAt, err := time.Parse(time.RFC3339Nano, c.State.StartedAt)
-	// if err != nil {
-	// 	op.log.Info("Failed to parse container StartedAt", zap.Error(err))
-	// 	startedAt = time.Unix(0, 0)
-	// }
-
-	// finishedAt, err := time.Parse(time.RFC3339Nano, c.State.FinishedAt)
-	// if err != nil {
-	// 	op.log.Info("Failed to parse container FinishedAt", zap.Error(err))
-	// 	finishedAt = time.Now().UTC()
-	// }
-
-	// rep.TrackRelayerExec(
-	// 	c.Name,
-	// 	c.Args,
-	// 	stdout, stderr,
-	// 	c.State.ExitCode,
-	// 	startedAt,
-	// 	finishedAt,
-	// 	nil,
-	// )
 
 	op.log.Debug(
 		fmt.Sprintf("Stopped docker container\nstdout:\n%s\nstderr:\n%s", stdout, stderr),
@@ -392,7 +374,6 @@ func (op *DockerOPBot) Stop(ctx context.Context) error {
 	}
 
 	op.containerLifecycle = nil
-
 	return nil
 }
 
@@ -400,14 +381,14 @@ func (op *DockerOPBot) Pause(ctx context.Context) error {
 	if op.containerLifecycle == nil {
 		return fmt.Errorf("container not running")
 	}
-	return op.client.ContainerPause(ctx, op.containerLifecycle.ContainerID())
+	return op.DockerClient.ContainerPause(ctx, op.containerLifecycle.ContainerID())
 }
 
 func (op *DockerOPBot) Resume(ctx context.Context) error {
 	if op.containerLifecycle == nil {
 		return fmt.Errorf("container not running")
 	}
-	return op.client.ContainerUnpause(ctx, op.containerLifecycle.ContainerID())
+	return op.DockerClient.ContainerUnpause(ctx, op.containerLifecycle.ContainerID())
 }
 
 func (op *DockerOPBot) ContainerImage() ibc.DockerImage {
@@ -426,7 +407,7 @@ func (op *DockerOPBot) pullContainerImageIfNecessary(containerImage ibc.DockerIm
 		return nil
 	}
 
-	rc, err := op.client.ImagePull(context.TODO(), containerImage.Ref(), dockertypes.ImagePullOptions{})
+	rc, err := op.DockerClient.ImagePull(context.TODO(), containerImage.Ref(), dockertypes.ImagePullOptions{})
 	if err != nil {
 		return err
 	}

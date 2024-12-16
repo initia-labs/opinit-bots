@@ -20,15 +20,17 @@ func NewL2ChainNode(chainNode *cosmos.ChainNode) *L2ChainNode {
 
 type L2Chain struct {
 	*cosmos.CosmosChain
-	BridgeExecutor ibc.Wallet
-	Validator      ibc.Wallet
+	BridgeExecutor       ibc.Wallet
+	OracleBridgeExecutor ibc.Wallet
+	Validator            ibc.Wallet
 }
 
-func NewL2Chain(cosmosChain *cosmos.CosmosChain, bridgeExecutor ibc.Wallet, validator ibc.Wallet) *L2Chain {
+func NewL2Chain(cosmosChain *cosmos.CosmosChain, bridgeExecutor ibc.Wallet, oracleBridgeExecutor ibc.Wallet, validator ibc.Wallet) *L2Chain {
 	return &L2Chain{
-		CosmosChain:    cosmosChain,
-		BridgeExecutor: bridgeExecutor,
-		Validator:      validator,
+		CosmosChain:          cosmosChain,
+		BridgeExecutor:       bridgeExecutor,
+		OracleBridgeExecutor: oracleBridgeExecutor,
+		Validator:            validator,
 	}
 }
 

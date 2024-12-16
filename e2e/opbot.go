@@ -4,11 +4,17 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
+	"net/http"
+	"net/url"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/docker/docker/client"
 	"go.uber.org/zap"
 
+	"github.com/initia-labs/opinit-bots/executor"
 	"github.com/strangelove-ventures/interchaintest/v8/ibc"
 )
 
@@ -34,6 +40,78 @@ func NewOPBot(log *zap.Logger, botName string, testName string, cli *client.Clie
 		DockerOPBot: op,
 	}
 	return r
+}
+
+func (op *OPBot) WaitForSync(ctx context.Context) error {
+	timer := time.NewTicker(5 * time.Second)
+	defer timer.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		case <-timer.C:
+
+		}
+
+		syncing, err := op.QuerySyncing()
+		if err != nil {
+			continue
+		}
+		if !syncing {
+			break
+		}
+	}
+	return nil
+}
+
+func query(address string, params map[string]string) ([]byte, error) {
+	u, err := url.Parse(address)
+	if err != nil {
+		return nil, err
+	}
+	q := u.Query()
+	for k, v := range params {
+		q.Set(k, v)
+	}
+	u.RawQuery = q.Encode()
+
+	resp, err := http.Get(u.String())
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	return data, nil
+}
+
+func (op *OPBot) QuerySyncing() (bool, error) {
+	address := op.DockerOPBot.queryServerUrl + "/syncing"
+
+	data, err := query(address, nil)
+	if err != nil {
+		return false, err
+	}
+
+	return strconv.ParseBool(string(data))
+}
+
+func (op *OPBot) QueryExecutorStatus() (executor.Status, error) {
+	address := op.DockerOPBot.queryServerUrl + "/status"
+
+	data, err := query(address, nil)
+	if err != nil {
+		return executor.Status{}, err
+	}
+
+	var status executor.Status
+	err = json.Unmarshal(data, &status)
+	if err != nil {
+		return executor.Status{}, err
+	}
+	return status, nil
 }
 
 const (

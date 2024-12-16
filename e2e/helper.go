@@ -30,14 +30,22 @@ import (
 	opchildtypes "github.com/initia-labs/OPinit/x/opchild/types"
 	ophostcli "github.com/initia-labs/OPinit/x/ophost/client/cli"
 	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
+
+	bottypes "github.com/initia-labs/opinit-bots/bot/types"
+	executortypes "github.com/initia-labs/opinit-bots/executor/types"
+	servertypes "github.com/initia-labs/opinit-bots/server/types"
 )
 
 const (
-	BridgeExecutorKeyName  = "executor"
-	L2ValidatorKeyName     = "validator"
-	OutputSubmitterKeyName = "output"
-	BatchSubmitterKeyName  = "batch"
-	ChallengerKeyName      = "challenger"
+	BotExecutor   = "executor"
+	BotChallenger = "challenger"
+
+	BridgeExecutorKeyName       = "executor"
+	OracleBridgeExecutorKeyName = "oracle"
+	L2ValidatorKeyName          = "validator"
+	OutputSubmitterKeyName      = "output"
+	BatchSubmitterKeyName       = "batch"
+	ChallengerKeyName           = "challenger"
 
 	ibcPath = "initia-minitia"
 
@@ -101,6 +109,7 @@ func MinitiaEncoding() *cosmostestutil.TestEncodingConfig {
 
 func SetupTest(
 	t *testing.T,
+	ctx context.Context,
 	botName string,
 	l1ChainConfig *ChainConfig,
 	l2ChainConfig *ChainConfig,
@@ -112,7 +121,6 @@ func SetupTest(
 	require.NotNil(t, daChainConfig)
 	require.NotNil(t, bridgeConfig)
 
-	ctx := context.Background()
 	client, network := interchaintest.DockerSetup(t)
 	rep := testreporter.NewReporter(os.Stdout)
 	eRep := rep.RelayerExecReporter(t)
@@ -134,7 +142,7 @@ func SetupTest(
 	})
 	logger = zaptest.NewLogger(t, zaptest.WrapOptions(zap.WrapCore(func(core zapcore.Core) zapcore.Core { return filteringCore })))
 
-	/// OPinit bot setup
+	// OPinit bot setup
 
 	op := NewOPBot(logger, botName, t.Name(), client, network)
 	t.Cleanup(func() {
@@ -144,6 +152,8 @@ func SetupTest(
 	})
 
 	bridgeExecutor, err := op.AddKey(ctx, l2ChainConfig.ChainID, BridgeExecutorKeyName, l2ChainConfig.Bech32Prefix)
+	require.NoError(t, err)
+	oracleBridgeExecutor, err := op.AddKey(ctx, l2ChainConfig.ChainID, OracleBridgeExecutorKeyName, l2ChainConfig.Bech32Prefix)
 	require.NoError(t, err)
 	l2Validator, err := op.AddKey(ctx, l2ChainConfig.ChainID, L2ValidatorKeyName, l2ChainConfig.Bech32Prefix)
 	require.NoError(t, err)
@@ -325,6 +335,27 @@ func SetupTest(
 		SkipPathCreation: false,
 	}))
 
+	err = initia.SendFunds(ctx, interchaintest.FaucetAccountKeyName, ibc.WalletAmount{
+		Address: outputSubmitter.FormattedAddress(),
+		Denom:   initia.Config().Denom,
+		Amount:  math.NewInt(100_000_000_000),
+	})
+	require.NoError(t, err)
+
+	err = initia.SendFunds(ctx, interchaintest.FaucetAccountKeyName, ibc.WalletAmount{
+		Address: batchSubmitter.FormattedAddress(),
+		Denom:   initia.Config().Denom,
+		Amount:  math.NewInt(100_000_000_000),
+	})
+	require.NoError(t, err)
+
+	err = initia.SendFunds(ctx, interchaintest.FaucetAccountKeyName, ibc.WalletAmount{
+		Address: challenger.FormattedAddress(),
+		Denom:   initia.Config().Denom,
+		Amount:  math.NewInt(100_000_000_000),
+	})
+	require.NoError(t, err)
+
 	logger.Info("chains and relayer setup complete",
 		zap.String("bridge executor", bridgeExecutor.FormattedAddress()),
 		zap.String("l2 validator", l2Validator.FormattedAddress()),
@@ -337,7 +368,7 @@ func SetupTest(
 		logger,
 
 		NewL1Chain(initia, outputSubmitter, batchSubmitter, challenger),
-		NewL2Chain(minitia, bridgeExecutor, l2Validator),
+		NewL2Chain(minitia, bridgeExecutor, oracleBridgeExecutor, l2Validator),
 		da,
 		daChainConfig.ChainType,
 
@@ -351,6 +382,14 @@ func SetupTest(
 
 	// create bridge
 	helper.CreateBridge(t, ctx)
+
+	helper.SetOPConfig(t, ctx)
+
+	err = op.Start(ctx)
+	require.NoError(t, err)
+
+	err = op.WaitForSync(ctx)
+	require.NoError(t, err)
 
 	return helper
 }
@@ -368,6 +407,81 @@ func (op OPTestHelper) BridgeConfig() ophostcli.BridgeCliConfig {
 		SubmissionStartHeight: op.bridgeConfig.SubmissionStartHeight,
 		OracleEnabled:         op.bridgeConfig.OracleEnabled,
 		Metadata:              op.bridgeConfig.Metadata,
+	}
+}
+
+func (op OPTestHelper) SetOPConfig(t *testing.T, ctx context.Context) {
+	var cfg bottypes.Config
+	switch op.OP.botName {
+	case BotExecutor:
+		cfg = op.ExecutorConfig()
+	case BotChallenger:
+		t.Fatal("challenger bot not supported")
+	default:
+		t.Fatalf("unknown bot name: %s", op.OP.botName)
+	}
+
+	configBz, err := json.Marshal(cfg)
+	require.NoError(t, err)
+
+	configName := fmt.Sprintf("%s.json", op.OP.botName)
+
+	err = op.OP.WriteFileToHomeDir(ctx, configName, configBz)
+	require.NoError(t, err)
+}
+
+func (op OPTestHelper) ExecutorConfig() *executortypes.Config {
+	return &executortypes.Config{
+		Version: 1,
+
+		Server: servertypes.ServerConfig{
+			Address:      "0.0.0.0:3000",
+			AllowOrigins: "*",
+			AllowHeaders: "Origin, Content-Type, Accept",
+			AllowMethods: "GET",
+		},
+
+		L1Node: executortypes.NodeConfig{
+			ChainID:       op.Initia.Config().ChainID,
+			Bech32Prefix:  op.Initia.Config().Bech32Prefix,
+			RPCAddress:    fmt.Sprintf("http://%s:26657", op.Initia.GetFullNode().Name()),
+			GasPrice:      op.Initia.Config().GasPrices,
+			GasAdjustment: op.Initia.Config().GasAdjustment,
+			TxTimeout:     60,
+		},
+
+		L2Node: executortypes.NodeConfig{
+			ChainID:       op.Minitia.Config().ChainID,
+			Bech32Prefix:  op.Minitia.Config().Bech32Prefix,
+			RPCAddress:    fmt.Sprintf("http://%s:26657", op.Minitia.GetFullNode().Name()),
+			GasPrice:      "",
+			GasAdjustment: op.Minitia.Config().GasAdjustment,
+			TxTimeout:     60,
+		},
+
+		DANode: executortypes.NodeConfig{
+			ChainID:       op.DA.Config().ChainID,
+			Bech32Prefix:  op.DA.Config().Bech32Prefix,
+			RPCAddress:    fmt.Sprintf("http://%s:26657", op.DA.GetFullNode().Name()),
+			GasPrice:      op.DA.Config().GasPrices,
+			GasAdjustment: op.DA.Config().GasAdjustment,
+			TxTimeout:     60,
+		},
+
+		BridgeExecutor:         op.Minitia.BridgeExecutor.KeyName(),
+		OracleBridgeExecutor:   op.Minitia.OracleBridgeExecutor.KeyName(),
+		DisableOutputSubmitter: false,
+		DisableBatchSubmitter:  false,
+
+		MaxChunks:         5000,
+		MaxChunkSize:      300000, // 300KB
+		MaxSubmissionTime: 10,     // 10 seconds
+
+		DisableAutoSetL1Height:        false,
+		L1StartHeight:                 1,
+		L2StartHeight:                 1,
+		BatchStartHeight:              1,
+		DisableDeleteFutureWithdrawal: false,
 	}
 }
 
