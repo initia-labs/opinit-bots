@@ -122,6 +122,12 @@ func (m *Merkle) PrepareWorkingTree(lastWorkingTree merkletypes.TreeInfo) error 
 }
 
 // Height returns the height of the working tree.
+//
+// Example:
+// - For 7 leaves, the height is 3.
+// - For 8 leaves, the height is 3.
+// - For 9 leaves, the height is 4.
+// - For 16 leaves, the height is 4.
 func (m *Merkle) Height() (uint8, error) {
 	if m.workingTree == nil {
 		return 0, errors.New("working tree is not initialized")
@@ -158,7 +164,7 @@ func (m *Merkle) fillLeaves() ([]merkletypes.Node, error) {
 
 	newNodes := make([]merkletypes.Node, 0)
 	lastLeaf := m.workingTree.LastSiblings[0]
-	for range numRestLeaves {
+	for i := uint64(0); i < numRestLeaves; i++ {
 		nodes, err := m.InsertLeaf(lastLeaf)
 		if err != nil {
 			return nil, err

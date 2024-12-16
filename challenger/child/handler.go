@@ -80,9 +80,7 @@ func (ch *Child) endBlockHandler(ctx types.Context, args nodetypes.EndBlockArgs)
 		return err
 	}
 
-	err = ch.stage.ExecuteFnWithDB(ch.challenger.DB(), func() error {
-		return challengerdb.SavePendingChallenges(ch.stage, pendingChallenges)
-	})
+	err = challengerdb.SavePendingChallenges(ch.stage.WithPrefixedKey(ch.challenger.DB().PrefixedKey), pendingChallenges)
 	if err != nil {
 		return errors.Wrap(err, "failed to save pending events on child db")
 	}

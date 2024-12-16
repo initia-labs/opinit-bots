@@ -38,13 +38,13 @@ func prefixedTimeEvent(eventTime time.Time) []byte {
 	return append(dbtypes.FromUint64Key(types.MustInt64ToUint64(eventTime.UnixNano())), dbtypes.Splitter)
 }
 
-func prefixedChallengeEventTime(eventTime time.Time) []byte {
+func PrefixedChallengeEventTime(eventTime time.Time) []byte {
 	return append(append(ChallengeKey, dbtypes.Splitter),
 		prefixedTimeEvent(eventTime)...)
 }
 
 func PrefixedChallenge(eventTime time.Time, id ChallengeId) []byte {
-	return append(prefixedChallengeEventTime(eventTime),
+	return append(PrefixedChallengeEventTime(eventTime),
 		prefixedEventTypeId(id.Type, id.Id)...)
 }
 
@@ -71,5 +71,5 @@ func ParseChallenge(key []byte) (time.Time, ChallengeId, error) {
 	typeBz := key[cursor : cursor+1]
 	cursor += 1 + 1 // u8 + splitter
 	idBz := key[cursor:]
-	return time.Unix(0, types.MustUint64ToInt64(dbtypes.ToUint64Key(timeBz))), ChallengeId{Type: EventType(typeBz[0]), Id: dbtypes.ToUint64Key(idBz)}, nil
+	return time.Unix(0, types.MustUint64ToInt64(dbtypes.ToUint64Key(timeBz))).UTC(), ChallengeId{Type: EventType(typeBz[0]), Id: dbtypes.ToUint64Key(idBz)}, nil
 }

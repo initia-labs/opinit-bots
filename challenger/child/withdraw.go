@@ -79,7 +79,7 @@ func (ch *Child) prepareTree(blockHeight int64) error {
 
 	err = ch.Merkle().PrepareWorkingTree(workingTree)
 	if err != nil {
-		return errors.Wrap(err, "failed to load working tree")
+		return errors.Wrap(err, "failed to prepare working tree")
 	}
 	return nil
 }

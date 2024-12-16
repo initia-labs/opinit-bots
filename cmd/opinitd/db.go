@@ -92,6 +92,13 @@ v0.1.9-2: Fill block hash of finalized tree
 					return err
 				}
 				return executor.Migration0110(db)
+			case "v0.1.11":
+				// Run migration for v0.1.11
+				db, err := db.NewDB(GetDBPath(ctx.homePath, bottypes.BotTypeExecutor))
+				if err != nil {
+					return err
+				}
+				return executor.Migration0111(db)
 			default:
 				return fmt.Errorf("unknown migration version: %s", version)
 			}

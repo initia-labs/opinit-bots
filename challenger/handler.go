@@ -17,6 +17,7 @@ func (c *Challenger) challengeHandler(ctx types.Context) error {
 			return nil
 		case challenge := <-c.challengeCh:
 			c.stage.Reset()
+			// Remove the pending challenge that was stored by the client or host
 			err := challengerdb.DeletePendingChallenge(c.stage, challenge)
 			if err != nil {
 				return err

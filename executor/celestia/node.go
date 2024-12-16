@@ -40,7 +40,7 @@ func (c *Celestia) BuildTxWithMessages(
 	}
 	tx, err := broadcasterAccount.SimulateAndSignTx(ctx, pfbMsgs...)
 	if err != nil {
-		return nil, "", errors.Wrap(err, "failed to build unsigned tx")
+		return nil, "", errors.Wrap(err, "failed to simulate and sign tx")
 	}
 	txConfig := c.node.GetTxConfig()
 	txBytes, err = txutils.EncodeTx(txConfig, tx)

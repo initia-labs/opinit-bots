@@ -364,7 +364,7 @@ func TestNewStage(t *testing.T) {
 	tstage := db.NewStage()
 	require.NotNil(t, tstage)
 
-	stage, ok := tstage.(*Stage)
+	stage, ok := tstage.(Stage)
 	require.True(t, ok)
 	require.Equal(t, stage.batch.Len(), 0)
 	require.Equal(t, len(stage.kvmap), 0)

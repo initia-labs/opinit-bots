@@ -1,3 +1,20 @@
+// DB Structure
+//
+// * WorkingTree (TreeInfo)
+//   - Key: `working_tree/${version}`
+//   - Description: Stores the tree information at the given chain height ('version').
+//
+// * FinalizedTree
+//   - Key: `finalized_tree/${start_leaf_index}`
+//   - Description: Stores the finalized tree starting from the given `start_leaf_index`,
+//     which corresponds to the first L2 sequence number of the first withdrawal.
+//
+// * Node
+//   - Key: `node/${tree_index}${height}${local_node_index}`
+//   - Description: Stores node information at a specific position in the tree.
+//   - `tree_index`: Incremental index identifying the tree.
+//   - `height`: Vertical position of the node in the tree.
+//   - `local_node_index`: Index of the node within the tree, representing the order in which the node was added.
 package types
 
 import (
@@ -35,7 +52,8 @@ func (t LegacyTreeInfo) Migrate(version uint64) TreeInfo {
 }
 
 type TreeInfo struct {
-	// Version of the tree
+	// Version represents the chain height. We store the tree information for each height to
+	// maintain a record of the state of the tree at that specific height.
 	Version uint64 `json:"version"`
 
 	// Index of the tree used as prefix for the keys
@@ -114,6 +132,9 @@ func NewFinalizedTreeInfo(treeIndex uint64, treeHeight uint8, root []byte, start
 }
 
 func (f FinalizedTreeInfo) Key() []byte {
+	// Store the finalized tree information with the start leaf index as its prefix.
+	// This makes it easier to retrieve proofs using the L2 sequence number of the withdrawal request.
+	// For more details, see the `GetProofs()` function.
 	return PrefixedFinalizedTreeKey(f.StartLeafIndex)
 }
 

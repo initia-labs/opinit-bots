@@ -81,6 +81,14 @@ func NewNode(cfg nodetypes.NodeConfig, db types.DB, cdc codec.Codec, txConfig cl
 			return nil, errors.Wrap(err, "failed to create broadcaster")
 		}
 	}
+
+	syncedHeight, err := GetSyncInfo(n.db)
+	if errors.Is(err, dbtypes.ErrNotFound) {
+		syncedHeight = 0
+	} else if err != nil {
+		return nil, errors.Wrap(err, "failed to load sync info")
+	}
+	n.UpdateSyncedHeight(syncedHeight)
 	return n, nil
 }
 
@@ -103,17 +111,14 @@ func (n *Node) Initialize(ctx types.Context, processedHeight int64, keyringConfi
 		}
 	}
 
-	syncedHeight, err := GetSyncInfo(n.db)
 	// if not found, initialize the height
-	if errors.Is(err, dbtypes.ErrNotFound) {
-		syncedHeight = processedHeight
+	if n.GetSyncedHeight() == 0 {
+		n.UpdateSyncedHeight(processedHeight)
 		n.startHeightInitialized = true
 		ctx.Logger().Info("initialize height")
 	} else if err != nil {
 		return errors.Wrap(err, "failed to load sync info")
 	}
-
-	n.UpdateSyncedHeight(syncedHeight)
 	ctx.Logger().Debug("load sync info", zap.Int64("synced_height", n.syncedHeight))
 	return nil
 }
@@ -188,6 +193,8 @@ func (n Node) DB() types.DB {
 	return n.db
 }
 
+// GetHeight returns the processing height.
+// It returns the synced height + 1.
 func (n Node) GetHeight() int64 {
 	return n.syncedHeight + 1
 }
@@ -199,6 +206,8 @@ func (n *Node) UpdateSyncedHeight(height int64) {
 	}
 }
 
+// GetSyncedHeight returns the synced height.
+// It returns the last processed height.
 func (n Node) GetSyncedHeight() int64 {
 	return n.syncedHeight
 }

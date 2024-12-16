@@ -24,9 +24,7 @@ func (h *Host) endBlockHandler(_ types.Context, args nodetypes.EndBlockArgs) err
 	}
 
 	// save all pending events to child db
-	err = h.stage.ExecuteFnWithDB(h.child.DB(), func() error {
-		return eventhandler.SavePendingEvents(h.stage, h.eventQueue)
-	})
+	err = eventhandler.SavePendingEvents(h.stage.WithPrefixedKey(h.child.DB().PrefixedKey), h.eventQueue)
 	if err != nil {
 		return errors.Wrap(err, "failed to save pending events on child db")
 	}
@@ -50,18 +48,16 @@ func (h *Host) endBlockHandler(_ types.Context, args nodetypes.EndBlockArgs) err
 		}
 	}
 	unprocessedEvents := h.eventHandler.GetUnprocessedPendingEvents(prevEvents)
-	pendingChallenges, precessedEvents := h.eventHandler.CheckTimeout(args.Block.Header.Time, unprocessedEvents)
-	precessedEvents = append(precessedEvents, prevEvents...)
+	pendingChallenges, processedEvents := h.eventHandler.CheckTimeout(args.Block.Header.Time, unprocessedEvents)
+	processedEvents = append(processedEvents, prevEvents...)
 
 	// delete processed events
-	err = eventhandler.DeletePendingEvents(h.stage, precessedEvents)
+	err = eventhandler.DeletePendingEvents(h.stage, processedEvents)
 	if err != nil {
 		return err
 	}
 
-	err = h.stage.ExecuteFnWithDB(h.challenger.DB(), func() error {
-		return challengerdb.SavePendingChallenges(h.stage, pendingChallenges)
-	})
+	err = challengerdb.SavePendingChallenges(h.stage.WithPrefixedKey(h.challenger.DB().PrefixedKey), pendingChallenges)
 	if err != nil {
 		return errors.Wrap(err, "failed to save pending events on child db")
 	}
@@ -72,7 +68,7 @@ func (h *Host) endBlockHandler(_ types.Context, args nodetypes.EndBlockArgs) err
 	}
 
 	h.child.SetPendingEvents(h.eventQueue)
-	h.eventHandler.DeletePendingEvents(precessedEvents)
+	h.eventHandler.DeletePendingEvents(processedEvents)
 	h.eventHandler.SetPendingEvents(h.outputPendingEventQueue)
 	h.challenger.SendPendingChallenges(pendingChallenges)
 	return nil

@@ -127,13 +127,9 @@ func (bs *BatchSubmitter) Initialize(ctx types.Context, syncedHeight int64, host
 			return errors.Wrap(err, "failed to save local batch info")
 		}
 		// reset batch file
-		err := bs.batchFile.Truncate(0)
+		err = bs.emptyBatchFile()
 		if err != nil {
-			return errors.Wrap(err, "failed to truncate batch file")
-		}
-		_, err = bs.batchFile.Seek(0, 0)
-		if err != nil {
-			return errors.Wrap(err, "failed to seek batch file")
+			return errors.Wrap(err, "failed to empty batch file")
 		}
 	}
 	// linux command gzip use level 6 as default

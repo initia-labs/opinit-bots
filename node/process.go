@@ -35,8 +35,6 @@ func (n *Node) blockProcessLooper(ctx types.Context, processType nodetypes.Block
 
 		latestHeight := status.SyncInfo.LatestBlockHeight
 		if n.syncedHeight >= latestHeight {
-			ctx.Logger().Warn("already synced", zap.Int64("synced_height", n.syncedHeight), zap.Int64("latest_height", latestHeight))
-			n.syncing = false
 			continue
 		}
 
@@ -48,7 +46,6 @@ func (n *Node) blockProcessLooper(ctx types.Context, processType nodetypes.Block
 		} else {
 			consecutiveErrors = 0
 		}
-		n.syncing = false
 	}
 }
 
@@ -157,7 +154,7 @@ func (n *Node) handleNewBlock(ctx types.Context, block *rpccoretypes.ResultBlock
 		return errors.Wrap(err, "failed to handle block txs")
 	}
 
-	err = n.handleFinalizeBlock(ctx, block.Block.Height, block.Block.Time, blockResult, latestChainHeight)
+	err = n.handleFinalizeBlock(ctx, block.Block.Height, block.Block.Time.UTC(), blockResult, latestChainHeight)
 	if err != nil {
 		return errors.Wrap(err, "failed to handle finalize block")
 	}

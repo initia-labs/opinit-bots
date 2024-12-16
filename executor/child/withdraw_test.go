@@ -88,7 +88,7 @@ func TestInitiateWithdrawalHandler(t *testing.T) {
 			},
 			eventHandlerArgs: nodetypes.EventHandlerArgs{
 				BlockHeight:     11,
-				BlockTime:       time.Unix(0, 10000),
+				BlockTime:       time.Unix(0, 10000).UTC(),
 				Tx:              []byte("txbytes"), // EA58654919E6F3E08370DE723D8DA223F1DFE78DD28D0A23E6F18BFA0815BB99
 				EventAttributes: InitiateWithdrawalEvents("from", "to", "denom", "uinit", sdk.NewInt64Coin("uinit", 10000), 1),
 			},
@@ -137,7 +137,7 @@ func TestInitiateWithdrawalHandler(t *testing.T) {
 			},
 			eventHandlerArgs: nodetypes.EventHandlerArgs{
 				BlockHeight:     11,
-				BlockTime:       time.Unix(0, 10000),
+				BlockTime:       time.Unix(0, 10000).UTC(),
 				Tx:              []byte("txbytes"),
 				EventAttributes: InitiateWithdrawalEvents("from", "to", "denom", "uinit", sdk.NewInt64Coin("uinit", 10000), 101),
 			},
@@ -188,7 +188,7 @@ func TestInitiateWithdrawalHandler(t *testing.T) {
 			},
 			eventHandlerArgs: nodetypes.EventHandlerArgs{
 				BlockHeight:     10,
-				BlockTime:       time.Unix(0, 10000),
+				BlockTime:       time.Unix(0, 10000).UTC(),
 				Tx:              []byte("txbytes"),
 				EventAttributes: InitiateWithdrawalEvents("from", "to", "denom", "uinit", sdk.NewInt64Coin("uinit", 10000), 101),
 			},
@@ -258,7 +258,7 @@ func TestInitiateWithdrawalHandler(t *testing.T) {
 			err = mk.PrepareWorkingTree(tc.lastWorkingTree)
 			require.NoError(t, err)
 
-			stage := childdb.NewStage().(*db.Stage)
+			stage := childdb.NewStage().(db.Stage)
 			ch := Child{
 				BaseChild: childprovider.NewTestBaseChild(0, childNode, mk, bridgeInfo, nil, nodetypes.NodeConfig{}),
 				stage:     stage,
@@ -529,7 +529,7 @@ func TestPrepareOutput(t *testing.T) {
 			},
 			hostOutputs: map[uint64]ophosttypes.Output{
 				1: {
-					L1BlockTime:   time.Unix(0, 10000),
+					L1BlockTime:   time.Unix(0, 10000).UTC(),
 					L2BlockNumber: 10,
 				},
 			},
@@ -542,7 +542,7 @@ func TestPrepareOutput(t *testing.T) {
 				Done:           false,
 			},
 			expected: func() (lastOutputTime time.Time, nextOutputTime time.Time, finalizingBlockHeight int64) {
-				return time.Unix(0, 10000), time.Unix(0, 10200), 0
+				return time.Unix(0, 10000).UTC(), time.Unix(0, 10200).UTC(), 0
 			},
 			err: false,
 		},
@@ -613,7 +613,7 @@ func TestHandleTree(t *testing.T) {
 			blockHeight:  5,
 			latestHeight: 5,
 			blockHeader: cmtproto.Header{
-				Time: time.Unix(0, 10100),
+				Time: time.Unix(0, 10100).UTC(),
 			},
 			lastWorkingTree: merkletypes.TreeInfo{
 				Version:        4,
@@ -624,12 +624,12 @@ func TestHandleTree(t *testing.T) {
 				Done:           false,
 			},
 			lastOutputTime:        time.Time{},
-			nextOutputTime:        time.Unix(0, 10000),
+			nextOutputTime:        time.Unix(0, 10000).UTC(),
 			finalizingBlockHeight: 0,
 
 			expected: func() (storageRoot []byte, lastOutputTime time.Time, nextOutputTime time.Time, finalizingBlockHeight int64) {
 				return []byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
-					time.Unix(0, 10100), time.Unix(0, 10300), 0
+					time.Unix(0, 10100).UTC(), time.Unix(0, 10300).UTC(), 0
 			},
 			expectedStage: []types.KV{
 				{
@@ -645,7 +645,7 @@ func TestHandleTree(t *testing.T) {
 			blockHeight:  5,
 			latestHeight: 5,
 			blockHeader: cmtproto.Header{
-				Time: time.Unix(0, 10100),
+				Time: time.Unix(0, 10100).UTC(),
 			},
 			lastWorkingTree: merkletypes.TreeInfo{
 				Version:        4,
@@ -659,12 +659,12 @@ func TestHandleTree(t *testing.T) {
 				Done: false,
 			},
 			lastOutputTime:        time.Time{},
-			nextOutputTime:        time.Unix(0, 10000),
+			nextOutputTime:        time.Unix(0, 10000).UTC(),
 			finalizingBlockHeight: 0,
 
 			expected: func() (storageRoot []byte, lastOutputTime time.Time, nextOutputTime time.Time, finalizingBlockHeight int64) {
 				return []byte{0x50, 0x26, 0x55, 0x2e, 0x7b, 0x21, 0xca, 0xb5, 0x27, 0xe4, 0x16, 0x9e, 0x66, 0x46, 0x02, 0xb8, 0x5d, 0x03, 0x67, 0x0b, 0xb5, 0x57, 0xe3, 0x29, 0x18, 0xd9, 0x33, 0xe3, 0xd5, 0x92, 0x5c, 0x7e},
-					time.Unix(0, 10100), time.Unix(0, 10300), 0
+					time.Unix(0, 10100).UTC(), time.Unix(0, 10300).UTC(), 0
 			},
 			expectedStage: []types.KV{
 				{
@@ -684,7 +684,7 @@ func TestHandleTree(t *testing.T) {
 			blockHeight:  5,
 			latestHeight: 5,
 			blockHeader: cmtproto.Header{
-				Time: time.Unix(0, 10100),
+				Time: time.Unix(0, 10100).UTC(),
 			},
 			lastWorkingTree: merkletypes.TreeInfo{
 				Version:        4,
@@ -698,12 +698,12 @@ func TestHandleTree(t *testing.T) {
 				Done: false,
 			},
 			lastOutputTime:        time.Time{},
-			nextOutputTime:        time.Unix(0, 10000),
+			nextOutputTime:        time.Unix(0, 10000).UTC(),
 			finalizingBlockHeight: 0,
 
 			expected: func() (storageRoot []byte, lastOutputTime time.Time, nextOutputTime time.Time, finalizingBlockHeight int64) {
 				return []byte{0xff, 0xd4, 0x7a, 0x71, 0xf6, 0x3a, 0x8a, 0x50, 0x09, 0x56, 0xef, 0x34, 0xb1, 0xfa, 0xbb, 0xd4, 0x2f, 0x07, 0xc8, 0x5e, 0x77, 0xf7, 0xad, 0x21, 0x27, 0x01, 0xe0, 0x64, 0xda, 0xbd, 0xf6, 0xa3},
-					time.Unix(0, 10100), time.Unix(0, 10300), 0
+					time.Unix(0, 10100).UTC(), time.Unix(0, 10300).UTC(), 0
 			},
 			expectedStage: []types.KV{
 				{
@@ -735,7 +735,7 @@ func TestHandleTree(t *testing.T) {
 			blockHeight:  10,
 			latestHeight: 10,
 			blockHeader: cmtproto.Header{
-				Time: time.Unix(0, 10100),
+				Time: time.Unix(0, 10100).UTC(),
 			},
 			lastWorkingTree: merkletypes.TreeInfo{
 				Version:        9,
@@ -757,7 +757,7 @@ func TestHandleTree(t *testing.T) {
 			blockHeight:  5,
 			latestHeight: 5,
 			blockHeader: cmtproto.Header{
-				Time: time.Unix(0, 9900),
+				Time: time.Unix(0, 9900).UTC(),
 			},
 			lastWorkingTree: merkletypes.TreeInfo{
 				Version:        4,
@@ -771,7 +771,7 @@ func TestHandleTree(t *testing.T) {
 				Done: false,
 			},
 			lastOutputTime:        time.Time{},
-			nextOutputTime:        time.Unix(0, 10000),
+			nextOutputTime:        time.Unix(0, 10000).UTC(),
 			finalizingBlockHeight: 0,
 
 			expected: nil,
@@ -789,7 +789,7 @@ func TestHandleTree(t *testing.T) {
 			blockHeight:  5,
 			latestHeight: 6,
 			blockHeader: cmtproto.Header{
-				Time: time.Unix(0, 9900),
+				Time: time.Unix(0, 9900).UTC(),
 			},
 			lastWorkingTree: merkletypes.TreeInfo{
 				Version:        4,
@@ -803,7 +803,7 @@ func TestHandleTree(t *testing.T) {
 				Done: false,
 			},
 			lastOutputTime:        time.Time{},
-			nextOutputTime:        time.Unix(0, 10000),
+			nextOutputTime:        time.Unix(0, 10000).UTC(),
 			finalizingBlockHeight: 0,
 
 			expected: nil,
@@ -831,7 +831,7 @@ func TestHandleTree(t *testing.T) {
 			err = mk.PrepareWorkingTree(tc.lastWorkingTree)
 			require.NoError(t, err)
 
-			stage := childdb.NewStage().(*db.Stage)
+			stage := childdb.NewStage().(db.Stage)
 			ch := Child{
 				BaseChild: childprovider.NewTestBaseChild(0, childNode, mk, bridgeInfo, nil, nodetypes.NodeConfig{}),
 				stage:     stage,

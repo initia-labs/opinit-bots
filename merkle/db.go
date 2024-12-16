@@ -13,17 +13,10 @@ import (
 
 // DeleteFutureFinalizedTrees deletes all finalized trees with sequence number greater than or equal to fromSequence.
 func DeleteFutureFinalizedTrees(db types.DB, fromSequence uint64) error {
-	return db.Iterate(dbtypes.AppendSplitter(merkletypes.FinalizedTreePrefix), nil, func(key, _ []byte) (bool, error) {
-		sequence, err := merkletypes.ParseFinalizedTreeKey(key)
+	return db.Iterate(dbtypes.AppendSplitter(merkletypes.FinalizedTreePrefix), merkletypes.PrefixedFinalizedTreeKey(fromSequence), func(key, _ []byte) (bool, error) {
+		err := db.Delete(key)
 		if err != nil {
 			return true, err
-		}
-
-		if sequence >= fromSequence {
-			err := db.Delete(key)
-			if err != nil {
-				return true, err
-			}
 		}
 		return false, nil
 	})
@@ -31,17 +24,10 @@ func DeleteFutureFinalizedTrees(db types.DB, fromSequence uint64) error {
 
 // DeleteFutureWorkingTrees deletes all working trees with version greater than or equal to fromVersion.
 func DeleteFutureWorkingTrees(db types.DB, fromVersion uint64) error {
-	return db.Iterate(dbtypes.AppendSplitter(merkletypes.WorkingTreePrefix), nil, func(key, _ []byte) (bool, error) {
-		version, err := merkletypes.ParseWorkingTreeKey(key)
+	return db.Iterate(dbtypes.AppendSplitter(merkletypes.WorkingTreePrefix), merkletypes.PrefixedWorkingTreeKey(fromVersion), func(key, _ []byte) (bool, error) {
+		err := db.Delete(key)
 		if err != nil {
 			return true, err
-		}
-
-		if version >= fromVersion {
-			err := db.Delete(key)
-			if err != nil {
-				return true, err
-			}
 		}
 		return false, nil
 	})
@@ -82,7 +68,7 @@ func GetFinalizedTree(db types.BasicDB, startLeafIndex uint64) (merkletypes.Fina
 
 // SaveFinalizedTree saves the finalized tree to the db.
 func SaveFinalizedTree(db types.BasicDB, finalizedTree merkletypes.FinalizedTreeInfo) error {
-	value, err := json.Marshal(finalizedTree)
+	value, err := finalizedTree.Value()
 	if err != nil {
 		return err
 	}
@@ -129,6 +115,8 @@ func GetProofs(db types.DB, leafIndex uint64) (proofs [][]byte, treeIndex uint64
 	height := uint8(0)
 	localNodeIndex := leafIndex - treeInfo.StartLeafIndex
 	for height < treeInfo.TreeHeight {
+		// In `FinalizeWorkingTree`, we ensure that the leaf count of the tree is always a power of two by filling the leaves as needed.
+		// This ensures that there is always a sibling for each leaf node.
 		siblingIndex := localNodeIndex ^ 1 // flip the last bit to find the sibling
 		sibling, err := GetNodeBytes(db, treeInfo.TreeIndex, height, siblingIndex)
 		if err != nil {

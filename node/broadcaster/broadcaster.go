@@ -1,6 +1,7 @@
 package broadcaster
 
 import (
+	"encoding/hex"
 	"fmt"
 	"slices"
 	"sync"
@@ -146,16 +147,53 @@ func (b *Broadcaster) loadPendingTxs(ctx types.Context, stage types.BasicDB, las
 		return nil
 	}
 
-	pendingTxTime := time.Unix(0, pendingTxs[0].Timestamp)
+	pendingTxTime := time.Unix(0, pendingTxs[0].Timestamp).UTC()
+
 	// if we have pending txs, wait until timeout
 	if timeoutTime := pendingTxTime.Add(b.cfg.TxTimeout); lastBlockTime.Before(timeoutTime) {
 		waitingTime := timeoutTime.Sub(lastBlockTime)
 		timer := time.NewTimer(waitingTime)
+		defer timer.Stop()
+
 		ctx.Logger().Info("waiting for pending txs to be processed", zap.Duration("waiting_time", waitingTime))
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-timer.C:
+
+		pollingTimer := time.NewTicker(ctx.PollingInterval())
+		defer pollingTimer.Stop()
+
+		for {
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-timer.C:
+				break
+			case <-pollingTimer.C:
+			}
+
+			if len(pendingTxs) == 0 {
+				return nil
+			}
+
+			txHash, err := hex.DecodeString(pendingTxs[0].TxHash)
+			if err != nil {
+				return err
+			}
+
+			res, err := b.rpcClient.QueryTx(ctx, txHash)
+			if err == nil && res != nil && res.TxResult.Code == 0 {
+				ctx.Logger().Debug("transaction successfully included",
+					zap.String("hash", pendingTxs[0].TxHash),
+					zap.Int64("height", res.Height))
+				err = DeletePendingTx(b.db, pendingTxs[0])
+				if err != nil {
+					return err
+				}
+				pendingTxs = pendingTxs[1:]
+			} else if err == nil && res != nil {
+				ctx.Logger().Warn("transaction failed",
+					zap.String("hash", pendingTxs[0].TxHash),
+					zap.Uint32("code", res.TxResult.Code),
+					zap.String("log", res.TxResult.Log))
+			}
 		}
 	}
 

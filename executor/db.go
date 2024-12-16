@@ -313,7 +313,31 @@ func Migration0111(db types.DB) error {
 		}
 	}
 
+	// change WithdrawalPrefix to WithdrawalSequencePrefix or WithdrawalAddressPrefix
 	childDB := db.WithPrefix([]byte(types.ChildName))
+	err := childDB.Iterate(executortypes.WithdrawalPrefix, nil, func(key, value []byte) (bool, error) {
+		if len(key) == len(executortypes.WithdrawalPrefix)+1+8 {
+			err := childDB.Set(append(executortypes.WithdrawalSequencePrefix, key[len(executortypes.WithdrawalPrefix):]...), value)
+			if err != nil {
+				return true, err
+			}
+		} else {
+			err := childDB.Set(append(executortypes.WithdrawalAddressPrefix, key[len(executortypes.WithdrawalPrefix):]...), value)
+			if err != nil {
+				return true, err
+			}
+		}
+
+		err := childDB.Delete(key)
+		if err != nil {
+			return true, err
+		}
+		return false, nil
+	})
+	if err != nil {
+		return err
+	}
+
 	return childDB.Iterate(merkletypes.WorkingTreePrefix, nil, func(key, value []byte) (bool, error) {
 		version, err := merkletypes.ParseWorkingTreeKey(key)
 		if err != nil {

@@ -186,8 +186,5 @@ func (db LevelDB) GetPrefix() []byte {
 }
 
 func (db *LevelDB) NewStage() types.CommitDB {
-	return &Stage{
-		kvmap:  make(map[string][]byte),
-		parent: db,
-	}
+	return newStage(db)
 }

@@ -118,8 +118,8 @@ func (c Celestia) Codec() codec.Codec {
 	return c.node.Codec()
 }
 
-func (c *Celestia) SetBridgeId(brigeId uint64) {
-	c.bridgeId = brigeId
+func (c *Celestia) SetBridgeId(bridgeId uint64) {
+	c.bridgeId = bridgeId
 }
 
 func (c Celestia) HasBroadcaster() bool {

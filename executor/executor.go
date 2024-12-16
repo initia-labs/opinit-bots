@@ -188,56 +188,62 @@ func (ex *Executor) getNodeStartHeights(ctx types.Context, bridgeId uint64) (l1S
 	var outputL1Height, outputL2Height int64
 	var outputIndex uint64
 
-	// get the last submitted output height before the start height from the host
-	output, err := ex.host.QueryOutputByL2BlockNumber(ctx, bridgeId, ex.cfg.L2StartHeight)
-	if err != nil {
-		return 0, 0, 0, 0, errors.Wrap(err, "failed to query output by l2 block number")
-	} else if output != nil {
-		outputL1Height = types.MustUint64ToInt64(output.OutputProposal.L1BlockNumber)
-		outputL2Height = types.MustUint64ToInt64(output.OutputProposal.L2BlockNumber)
-		outputIndex = output.OutputIndex
+	if ex.host.Node().GetSyncedHeight() == 0 || ex.child.Node().GetSyncedHeight() == 0 {
+		// get the last submitted output height before the start height from the host
+		output, err := ex.host.QueryOutputByL2BlockNumber(ctx, bridgeId, ex.cfg.L2StartHeight)
+		if err != nil {
+			return 0, 0, 0, 0, errors.Wrap(err, "failed to query output by l2 block number")
+		} else if output != nil {
+			outputL1Height = types.MustUint64ToInt64(output.OutputProposal.L1BlockNumber)
+			outputL2Height = types.MustUint64ToInt64(output.OutputProposal.L2BlockNumber)
+			outputIndex = output.OutputIndex
+		}
+		l2StartHeight = outputL2Height + 1
+		startOutputIndex = outputIndex + 1
 	}
 
-	// use l1 start height from the config if auto set is disabled
-	if ex.cfg.DisableAutoSetL1Height {
-		l1StartHeight = ex.cfg.L1StartHeight
-	} else {
-		// get the bridge start height from the host
-		l1StartHeight, err = ex.host.QueryCreateBridgeHeight(ctx, bridgeId)
-		if err != nil {
-			return 0, 0, 0, 0, errors.Wrap(err, "failed to query create bridge height")
-		}
+	if ex.host.Node().GetSyncedHeight() == 0 {
+		// use l1 start height from the config if auto set is disabled
+		if ex.cfg.DisableAutoSetL1Height {
+			l1StartHeight = ex.cfg.L1StartHeight
+		} else {
+			// get the bridge start height from the host
+			l1StartHeight, err = ex.host.QueryCreateBridgeHeight(ctx, bridgeId)
+			if err != nil {
+				return 0, 0, 0, 0, errors.Wrap(err, "failed to query create bridge height")
+			}
 
-		childNextL1Sequence, err := ex.child.QueryNextL1Sequence(ctx, 0)
-		if err != nil {
-			return 0, 0, 0, 0, errors.Wrap(err, "failed to query next l1 sequence")
-		}
+			childNextL1Sequence, err := ex.child.QueryNextL1Sequence(ctx, 0)
+			if err != nil {
+				return 0, 0, 0, 0, errors.Wrap(err, "failed to query next l1 sequence")
+			}
 
-		// query last NextL1Sequence tx height
-		depositTxHeight, err := ex.host.QueryDepositTxHeight(ctx, bridgeId, childNextL1Sequence)
-		if err != nil {
-			return 0, 0, 0, 0, errors.Wrap(err, "failed to query deposit tx height")
-		} else if depositTxHeight == 0 && childNextL1Sequence > 1 {
-			// if the deposit tx with next_l1_sequence is not found
-			// query deposit tx with next_l1_sequence-1 tx
-			depositTxHeight, err = ex.host.QueryDepositTxHeight(ctx, bridgeId, childNextL1Sequence-1)
+			// query last NextL1Sequence tx height
+			depositTxHeight, err := ex.host.QueryDepositTxHeight(ctx, bridgeId, childNextL1Sequence)
 			if err != nil {
 				return 0, 0, 0, 0, errors.Wrap(err, "failed to query deposit tx height")
+			} else if depositTxHeight == 0 && childNextL1Sequence > 1 {
+				// if the deposit tx with next_l1_sequence is not found
+				// query deposit tx with next_l1_sequence-1 tx
+				depositTxHeight, err = ex.host.QueryDepositTxHeight(ctx, bridgeId, childNextL1Sequence-1)
+				if err != nil {
+					return 0, 0, 0, 0, errors.Wrap(err, "failed to query deposit tx height")
+				}
 			}
-		}
 
-		if l1StartHeight < depositTxHeight {
-			l1StartHeight = depositTxHeight
-		}
+			if l1StartHeight < depositTxHeight {
+				l1StartHeight = depositTxHeight
+			}
 
-		if outputL1Height != 0 && outputL1Height+1 < l1StartHeight {
-			l1StartHeight = outputL1Height + 1
+			if outputL1Height != 0 && outputL1Height+1 < l1StartHeight {
+				l1StartHeight = outputL1Height + 1
+			}
 		}
 	}
 
-	l2StartHeight = outputL2Height + 1
-	startOutputIndex = outputIndex + 1
-	batchStartHeight = ex.cfg.BatchStartHeight
+	if ex.batchSubmitter.Node().GetSyncedHeight() == 0 {
+		batchStartHeight = ex.cfg.BatchStartHeight
+	}
 	return
 }
 
