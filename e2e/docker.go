@@ -1,18 +1,23 @@
 package e2e
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"io"
+	"path/filepath"
+	"runtime"
 	"time"
 
 	dockertypes "github.com/docker/docker/api/types"
 	volumetypes "github.com/docker/docker/api/types/volume"
 	"github.com/docker/docker/client"
+	"github.com/docker/docker/pkg/archive"
 	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/docker/go-connections/nat"
+	"github.com/google/uuid"
 
 	"github.com/strangelove-ventures/interchaintest/v8/dockerutil"
 	"github.com/strangelove-ventures/interchaintest/v8/ibc"
@@ -60,6 +65,90 @@ type DockerOPBot struct {
 	queryServerUrl string
 }
 
+const OPBotImagePrefix = "opbot-e2etest-"
+
+type dockerLogLine struct {
+	Stream      string            `json:"stream"`
+	Aux         any               `json:"aux"`
+	Error       string            `json:"error"`
+	ErrorDetail dockerErrorDetail `json:"errorDetail"`
+}
+
+type dockerErrorDetail struct {
+	Message string `json:"message"`
+}
+
+func uniqueOPBotImageName() (string, error) {
+	uuid, err := uuid.NewRandom()
+	if err != nil {
+		return "", fmt.Errorf("failed to generate uuid %v", err)
+	}
+	return OPBotImagePrefix + uuid.String()[:6], nil
+}
+func BuildOPBotImage() (string, error) {
+	_, b, _, _ := runtime.Caller(0)
+	basepath := filepath.Join(filepath.Dir(b), "..")
+
+	tar, err := archive.TarWithOptions(basepath, &archive.TarOptions{})
+	if err != nil {
+		return "", err
+	}
+
+	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	if err != nil {
+		return "", err
+	}
+
+	image, err := uniqueOPBotImageName()
+	if err != nil {
+		return "", err
+	}
+
+	res, err := cli.ImageBuild(context.Background(), tar, dockertypes.ImageBuildOptions{
+		Dockerfile: "Dockerfile",
+		Tags:       []string{image},
+	})
+	if err != nil {
+		return "", err
+	}
+
+	defer res.Body.Close()
+	handleDockerBuildOutput(res.Body)
+	return image, nil
+}
+
+func DestroyOPBotImage(image string) error {
+	fmt.Println("DESTROYDESTROYDESTROYDESTROYDESTROYDESTROYDESTROYDESTROYDESTROYDESTROYDESTROYDESTROYDESTROYDESTROY")
+	// Create a Docker client
+	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	if err != nil {
+		return err
+	}
+
+	// Remove the Docker image using the provided tag (uniquestr)
+	_, err = cli.ImageRemove(context.Background(), image, dockertypes.ImageRemoveOptions{
+		Force:         true, // Force remove the image
+		PruneChildren: true, // Remove all child images
+	})
+	return err
+}
+
+func handleDockerBuildOutput(body io.Reader) {
+	var logLine dockerLogLine
+
+	scanner := bufio.NewScanner(body)
+	for scanner.Scan() {
+		logLine.Stream = ""
+		logLine.Aux = nil
+		logLine.Error = ""
+		logLine.ErrorDetail = dockerErrorDetail{}
+
+		line := scanner.Text()
+
+		_ = json.Unmarshal([]byte(line), &logLine)
+	}
+}
+
 func NewDockerOPBot(ctx context.Context, log *zap.Logger, botName string, testName string, cli *client.Client, networkID string, c OPBotCommander, buildLocalImage bool) (*DockerOPBot, error) {
 	opbot := DockerOPBot{
 		log: log,
@@ -80,8 +169,13 @@ func NewDockerOPBot(ctx context.Context, log *zap.Logger, botName string, testNa
 	}
 
 	if buildLocalImage {
+		image, err := BuildOPBotImage()
+		if err != nil {
+			return nil, err
+		}
+
 		opbot.customImage = &ibc.DockerImage{
-			Repository: OPBotLocalImage,
+			Repository: image,
 			Version:    "",
 			UIDGID:     c.DockerUser(),
 		}

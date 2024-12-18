@@ -471,8 +471,14 @@ func SetupTest(
 		if err := op.Stop(ctx); err != nil {
 			t.Logf("an error occurred while stopping the OP bot: %s", err)
 		}
-	})
 
+		if op.customImage != nil {
+			err = DestroyOPBotImage(op.customImage.Repository)
+			if err != nil {
+				t.Logf("an error occurred while stopping the OP bot: %s", err)
+			}
+		}
+	})
 	err = op.WaitForSync(ctx)
 	require.NoError(t, err)
 
