@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -15,6 +16,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/initia-labs/opinit-bots/executor"
+	executortypes "github.com/initia-labs/opinit-bots/executor/types"
 	"github.com/strangelove-ventures/interchaintest/v8/ibc"
 )
 
@@ -110,6 +112,49 @@ func (op *OPBot) QueryExecutorStatus() (executor.Status, error) {
 		return executor.Status{}, err
 	}
 	return status, nil
+}
+
+func (op *OPBot) QueryWithdrawal(sequence uint64) (executortypes.QueryWithdrawalResponse, error) {
+	address := fmt.Sprintf("%s/withdrawal/%d", op.DockerOPBot.queryServerUrl, sequence)
+	res, err := op.query(address, nil)
+	if err != nil {
+		return executortypes.QueryWithdrawalResponse{}, err
+	} else if strings.Contains(string(res), "not found") {
+		return executortypes.QueryWithdrawalResponse{}, errors.New("withdrawal not found")
+	}
+
+	var response executortypes.QueryWithdrawalResponse
+	err = json.Unmarshal(res, &response)
+	if err != nil {
+		return executortypes.QueryWithdrawalResponse{}, err
+	}
+	return response, nil
+}
+
+func (op *OPBot) QueryWithdrawals(address string, offset uint64, limit uint64, descOrder bool) (executortypes.QueryWithdrawalsResponse, error) {
+	order := "desc"
+	if !descOrder {
+		order = "asc"
+	}
+
+	params := map[string]string{
+		"address": address,
+		"offset":  strconv.FormatUint(offset, 10),
+		"limit":   strconv.FormatUint(limit, 10),
+		"order":   order,
+	}
+	url := op.DockerOPBot.queryServerUrl + "/withdrawals"
+	res, err := op.query(url, params)
+	if err != nil {
+		return executortypes.QueryWithdrawalsResponse{}, err
+	}
+
+	var response executortypes.QueryWithdrawalsResponse
+	err = json.Unmarshal(res, &response)
+	if err != nil {
+		return executortypes.QueryWithdrawalsResponse{}, err
+	}
+	return response, nil
 }
 
 const (

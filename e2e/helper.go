@@ -12,6 +12,7 @@ import (
 
 	"cosmossdk.io/math"
 	"cosmossdk.io/x/feegrant"
+	"github.com/avast/retry-go/v4"
 	"github.com/icza/dyno"
 	oracleconfig "github.com/skip-mev/connect/v2/oracle/config"
 	"github.com/skip-mev/connect/v2/providers/apis/marketmap"
@@ -39,6 +40,13 @@ import (
 	bottypes "github.com/initia-labs/opinit-bots/bot/types"
 	executortypes "github.com/initia-labs/opinit-bots/executor/types"
 	servertypes "github.com/initia-labs/opinit-bots/server/types"
+)
+
+var (
+	RtyAttNum = uint(5)
+	RtyAtt    = retry.Attempts(RtyAttNum)
+	RtyDel    = retry.Delay(time.Millisecond * 100)
+	RtyErr    = retry.LastErrorOnly(true)
 )
 
 const (
@@ -436,8 +444,8 @@ func SetupTest(
 	helper := OPTestHelper{
 		logger,
 
-		NewL1Chain(initia, outputSubmitter, batchSubmitter, challenger),
-		NewL2Chain(minitia, bridgeExecutor, oracleBridgeExecutor, l2Validator),
+		NewL1Chain(logger, initia, outputSubmitter, batchSubmitter, challenger),
+		NewL2Chain(logger, minitia, bridgeExecutor, oracleBridgeExecutor, l2Validator),
 		da,
 		daChainConfig.ChainType,
 
@@ -581,17 +589,8 @@ func (op *OPTestHelper) CreateBridge(t *testing.T, ctx context.Context) {
 	err = fw.WriteFile(ctx, op.Initia.GetFullNode().VolumeName, bridgeConfigPath, configBz)
 	require.NoError(t, err)
 
-	user0, err := op.Initia.BuildWallet(ctx, "user0", "")
-	require.NoError(t, err)
-
-	err = op.Initia.SendFunds(ctx, interchaintest.FaucetAccountKeyName, ibc.WalletAmount{
-		Address: user0.FormattedAddress(),
-		Amount:  math.NewInt(100_000),
-		Denom:   op.Initia.Config().Denom,
-	})
-	require.NoError(t, err)
-
-	_, err = op.Initia.CreateBridge(ctx, user0.KeyName(), path.Join(op.Initia.HomeDir(), bridgeConfigPath))
+	user := interchaintest.GetAndFundTestUsers(t, ctx, "user", math.NewInt(100_000), op.Initia)[0]
+	_, err = op.Initia.CreateBridge(ctx, user.KeyName(), path.Join(op.Initia.HomeDir(), bridgeConfigPath))
 	require.NoError(t, err)
 
 	res, err := op.Initia.QueryBridge(ctx, 1)
