@@ -8,11 +8,12 @@ import (
 	"time"
 
 	"github.com/avast/retry-go/v4"
-	sdk "github.com/cosmos/cosmos-sdk/types"
 	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
 	"github.com/strangelove-ventures/interchaintest/v8/chain/cosmos"
 	"github.com/strangelove-ventures/interchaintest/v8/ibc"
 	"go.uber.org/zap"
+
+	sdk "github.com/cosmos/cosmos-sdk/types"
 
 	txv1beta1 "cosmossdk.io/api/cosmos/tx/v1beta1"
 	"google.golang.org/protobuf/proto"
