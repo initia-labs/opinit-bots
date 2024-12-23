@@ -85,6 +85,7 @@ func uniqueOPBotImageName() (string, error) {
 	}
 	return OPBotImagePrefix + uuid.String()[:6], nil
 }
+
 func BuildOPBotImage() (string, error) {
 	_, b, _, _ := runtime.Caller(0)
 	basepath := filepath.Join(filepath.Dir(b), "..")
@@ -118,7 +119,6 @@ func BuildOPBotImage() (string, error) {
 }
 
 func DestroyOPBotImage(image string) error {
-	fmt.Println("DESTROYDESTROYDESTROYDESTROYDESTROYDESTROYDESTROYDESTROYDESTROYDESTROYDESTROYDESTROYDESTROYDESTROY")
 	// Create a Docker client
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 	if err != nil {

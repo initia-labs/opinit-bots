@@ -13,6 +13,11 @@ import (
 	"github.com/strangelove-ventures/interchaintest/v8/chain/cosmos"
 	"github.com/strangelove-ventures/interchaintest/v8/ibc"
 	"go.uber.org/zap"
+
+	txv1beta1 "cosmossdk.io/api/cosmos/tx/v1beta1"
+	"google.golang.org/protobuf/proto"
+
+	ophostv1 "github.com/initia-labs/OPinit/api/opinit/ophost/v1"
 )
 
 type L1ChainNode struct {
@@ -141,4 +146,44 @@ func (l1 *L1Chain) QueryOutputProposal(ctx context.Context, bridgeId uint64, out
 
 func (l1 *L1Chain) QueryLastFinalizedOutput(ctx context.Context, bridgeId uint64) (*ophosttypes.QueryLastFinalizedOutputResponse, error) {
 	return ophosttypes.NewQueryClient(l1.GetFullNode().GrpcConn).LastFinalizedOutput(ctx, &ophosttypes.QueryLastFinalizedOutputRequest{BridgeId: bridgeId})
+}
+
+func (l1 *L1Chain) QueryRecordBatch(ctx context.Context) ([][]byte, error) {
+	data := [][]byte{}
+	page := 1
+	perPage := 100
+
+	for {
+		txsResult, err := l1.GetFullNode().Client.TxSearch(ctx, "message.action='/opinit.ophost.v1.MsgRecordBatch'", false, &page, &perPage, "asc")
+		if err != nil {
+			return nil, err
+		}
+
+		for _, tx := range txsResult.Txs {
+			var raw txv1beta1.TxRaw
+			if err := proto.Unmarshal(tx.Tx, &raw); err != nil {
+				return nil, err
+			}
+
+			var body txv1beta1.TxBody
+			if err := proto.Unmarshal(raw.BodyBytes, &body); err != nil {
+				return nil, err
+			}
+
+			if len(body.Messages) == 0 {
+				continue
+			}
+
+			recordBatch := new(ophostv1.MsgRecordBatch)
+			if err := body.Messages[0].UnmarshalTo(recordBatch); err != nil {
+				return nil, err
+			}
+			data = append(data, recordBatch.BatchBytes)
+		}
+
+		if txsResult.TotalCount <= page*100 {
+			break
+		}
+	}
+	return data, nil
 }

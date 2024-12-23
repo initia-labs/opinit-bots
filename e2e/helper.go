@@ -111,6 +111,7 @@ type OPTestHelper struct {
 func InitiaEncoding() *cosmostestutil.TestEncodingConfig {
 	cfg := cosmos.DefaultEncoding()
 	ophosttypes.RegisterInterfaces(cfg.InterfaceRegistry)
+	ophosttypes.RegisterLegacyAminoCodec(cfg.Amino)
 	return &cfg
 }
 
