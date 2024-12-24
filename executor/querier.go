@@ -71,9 +71,9 @@ func (ex *Executor) RegisterQuerier() {
 		if err != nil {
 			return err
 		}
-		hostSync := status.Host != nil && status.Host.Node != nil && status.Host.Node.Syncing != nil && *status.Host.Node.Syncing
-		childSync := status.Child != nil && status.Child.Node != nil && status.Child.Node.Syncing != nil && *status.Child.Node.Syncing
-		batchSync := status.BatchSubmitter != nil && status.BatchSubmitter.Node != nil && status.BatchSubmitter.Node.Syncing != nil && *status.BatchSubmitter.Node.Syncing
+		hostSync := status.Host.Node.Syncing != nil && *status.Host.Node.Syncing
+		childSync := status.Child.Node.Syncing != nil && *status.Child.Node.Syncing
+		batchSync := status.BatchSubmitter.Node.Syncing != nil && *status.BatchSubmitter.Node.Syncing
 		return c.JSON(hostSync && childSync && batchSync)
 	})
 }
