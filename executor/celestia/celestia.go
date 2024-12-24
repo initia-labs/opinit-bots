@@ -73,6 +73,9 @@ func createCodec(bech32Prefix string) (codec.Codec, client.TxConfig, error) {
 }
 
 func (c *Celestia) Initialize(ctx types.Context, batch batchNode, bridgeId uint64, keyringConfig *btypes.KeyringConfig) error {
+	keyringConfig.BuildTxWithMsgs = c.BuildTxWithMsgs
+	keyringConfig.MsgsFromTx = c.MsgsFromTx
+
 	err := c.node.Initialize(ctx, 0, c.keyringConfigs(keyringConfig))
 	if err != nil {
 		return errors.Wrap(err, "failed to initialize node")

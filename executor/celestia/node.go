@@ -13,7 +13,7 @@ import (
 )
 
 // buildTxWithMessages creates a transaction from the given messages.
-func (c *Celestia) BuildTxWithMessages(
+func (c *Celestia) BuildTxWithMsgs(
 	ctx context.Context,
 	msgs []sdk.Msg,
 ) (
@@ -61,7 +61,7 @@ func (c *Celestia) BuildTxWithMessages(
 	return blobTxBytes, txutils.TxHash(txBytes), nil
 }
 
-func (c *Celestia) PendingTxToProcessedMsgs(
+func (c *Celestia) MsgsFromTx(
 	txBytes []byte,
 ) ([]sdk.Msg, error) {
 	txConfig := c.node.GetTxConfig()

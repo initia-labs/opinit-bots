@@ -56,7 +56,8 @@ func (n *Node) txChecker(ctx types.Context, enableEventHandler bool) error {
 			// tx not found
 			continue
 		} else if err != nil {
-			return errors.Wrap(err, "failed to check pending tx")
+			ctx.Logger().Error("failed to check pending tx", zap.String("tx_hash", pendingTx.TxHash), zap.String("error", err.Error()))
+			continue
 		} else if res != nil {
 			// tx found
 			height = res.Height

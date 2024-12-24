@@ -35,6 +35,7 @@ func (n *Node) blockProcessLooper(ctx types.Context, processType nodetypes.Block
 
 		latestHeight := status.SyncInfo.LatestBlockHeight
 		if n.syncedHeight >= latestHeight {
+			n.syncing = false
 			continue
 		}
 
@@ -46,6 +47,7 @@ func (n *Node) blockProcessLooper(ctx types.Context, processType nodetypes.Block
 		} else {
 			consecutiveErrors = 0
 		}
+		n.syncing = false
 	}
 }
 
