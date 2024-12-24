@@ -54,11 +54,6 @@ func TestBatchReconstructionTest(t *testing.T) {
 		NumFullNodes:   0,
 	}
 
-	daChainConfig := &DAChainConfig{
-		ChainConfig: *l1ChainConfig,
-		ChainType:   ophosttypes.BatchInfo_CHAIN_TYPE_INITIA,
-	}
-
 	bridgeConfig := &BridgeConfig{
 		SubmissionInterval:    "5s",
 		FinalizationPeriod:    "10s",
@@ -67,76 +62,112 @@ func TestBatchReconstructionTest(t *testing.T) {
 		Metadata:              "",
 	}
 
-	ctx := context.Background()
+	cases := []struct {
+		name          string
+		daChainConfig DAChainConfig
+	}{
+		{
+			name: "celestia",
+			daChainConfig: DAChainConfig{
+				ChainConfig: ChainConfig{
+					ChainID:        "celestia",
+					Image:          ibc.DockerImage{Repository: "ghcr.io/celestiaorg/celestia-app", Version: "v3.2.0", UIDGID: "10001:10001"},
+					Bin:            "celestia-appd",
+					Bech32Prefix:   "celestia",
+					Denom:          "utia",
+					Gas:            "auto",
+					GasPrices:      "0.25utia",
+					GasAdjustment:  1.5,
+					TrustingPeriod: "168h",
+					NumValidators:  1,
+					NumFullNodes:   0,
+				},
+				ChainType: ophosttypes.BatchInfo_CHAIN_TYPE_CELESTIA,
+			},
+		},
+		{
+			name: "initia",
+			daChainConfig: DAChainConfig{
+				ChainConfig: *l1ChainConfig,
+				ChainType:   ophosttypes.BatchInfo_CHAIN_TYPE_INITIA,
+			},
+		},
+	}
 
-	op := SetupTest(t, ctx, BotExecutor, l1ChainConfig, l2ChainConfig, daChainConfig, bridgeConfig)
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
 
-	err := testutil.WaitForBlocks(ctx, 20, op.Initia, op.Minitia)
-	require.NoError(t, err)
+			op := SetupTest(t, ctx, BotExecutor, l1ChainConfig, l2ChainConfig, &tc.daChainConfig, bridgeConfig)
 
-	batches, err := op.Initia.QueryRecordBatch(ctx)
-	require.NoError(t, err)
-
-	var header executortypes.BatchDataHeader
-	var chunks []executortypes.BatchDataChunk
-	var blockBytes []byte
-
-	for _, batch := range batches {
-		if batch[0] == byte(executortypes.BatchDataTypeHeader) {
-			header, err = executortypes.UnmarshalBatchDataHeader(batch)
+			err := testutil.WaitForBlocks(ctx, 20, op.Initia, op.Minitia)
 			require.NoError(t, err)
-		} else {
-			chunk, err := executortypes.UnmarshalBatchDataChunk(batch)
+
+			batches, err := op.DA.QueryBatchData(ctx)
 			require.NoError(t, err)
-			chunks = append(chunks, chunk)
 
-			require.Equal(t, header.Start, chunk.Start)
-			require.Equal(t, header.End, chunk.End)
-			require.Equal(t, len(header.Checksums), int(chunk.Length))
-		}
+			var header executortypes.BatchDataHeader
+			var chunks []executortypes.BatchDataChunk
+			var blockBytes []byte
 
-		if len(header.Checksums) == len(chunks) {
-			for i, chunk := range chunks {
-				require.Equal(t, i, int(chunk.Index))
+			for _, batch := range batches {
+				if batch[0] == byte(executortypes.BatchDataTypeHeader) {
+					header, err = executortypes.UnmarshalBatchDataHeader(batch)
+					require.NoError(t, err)
+				} else {
+					chunk, err := executortypes.UnmarshalBatchDataChunk(batch)
+					require.NoError(t, err)
+					chunks = append(chunks, chunk)
 
-				checksum := executortypes.GetChecksumFromChunk(chunk.ChunkData)
-				require.Equal(t, header.Checksums[i], checksum[:])
+					require.Equal(t, header.Start, chunk.Start)
+					require.Equal(t, header.End, chunk.End)
+					require.Equal(t, len(header.Checksums), int(chunk.Length))
+				}
 
-				blockBytes = append(blockBytes, chunk.ChunkData...)
+				if len(header.Checksums) == len(chunks) {
+					for i, chunk := range chunks {
+						require.Equal(t, i, int(chunk.Index))
+
+						checksum := executortypes.GetChecksumFromChunk(chunk.ChunkData)
+						require.Equal(t, header.Checksums[i], checksum[:])
+
+						blockBytes = append(blockBytes, chunk.ChunkData...)
+					}
+
+					blocks, err := decompressBatch(blockBytes)
+					require.NoError(t, err)
+
+					for _, blockBz := range blocks[:len(blocks)-1] {
+						block, err := unmarshalBlock(blockBz)
+						require.NoError(t, err)
+						require.NotNil(t, block)
+
+						err = fillOracleData(ctx, block, op.Initia)
+						require.NoError(t, err)
+
+						pbb, err := block.ToProto()
+						require.NoError(t, err)
+
+						blockBytes, err := pbb.Marshal()
+						require.NoError(t, err)
+
+						l2Block, err := op.Minitia.GetFullNode().Client.Block(ctx, &block.Height)
+						require.NoError(t, err)
+
+						expectedBlock, err := l2Block.Block.ToProto()
+						require.NoError(t, err)
+
+						expectedBlockBytes, err := expectedBlock.Marshal()
+						require.NoError(t, err)
+
+						require.Equal(t, expectedBlockBytes, blockBytes)
+					}
+
+					chunks = make([]executortypes.BatchDataChunk, 0)
+					blockBytes = make([]byte, 0)
+				}
 			}
-
-			blocks, err := decompressBatch(blockBytes)
-			require.NoError(t, err)
-
-			for _, blockBz := range blocks[:len(blocks)-1] {
-				block, err := unmarshalBlock(blockBz)
-				require.NoError(t, err)
-				require.NotNil(t, block)
-
-				err = fillOracleData(ctx, block, op.Initia)
-				require.NoError(t, err)
-
-				pbb, err := block.ToProto()
-				require.NoError(t, err)
-
-				blockBytes, err := pbb.Marshal()
-				require.NoError(t, err)
-
-				l2Block, err := op.Minitia.GetFullNode().Client.Block(ctx, &block.Height)
-				require.NoError(t, err)
-
-				expectedBlock, err := l2Block.Block.ToProto()
-				require.NoError(t, err)
-
-				expectedBlockBytes, err := expectedBlock.Marshal()
-				require.NoError(t, err)
-
-				require.Equal(t, expectedBlockBytes, blockBytes)
-			}
-
-			chunks = make([]executortypes.BatchDataChunk, 0)
-			blockBytes = make([]byte, 0)
-		}
+		})
 	}
 }
 

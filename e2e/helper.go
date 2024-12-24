@@ -95,10 +95,9 @@ type BridgeConfig struct {
 type OPTestHelper struct {
 	Logger *zap.Logger
 
-	Initia      *L1Chain
-	Minitia     *L2Chain
-	DA          *cosmos.CosmosChain
-	DAChainType ophosttypes.BatchInfo_ChainType
+	Initia  *L1Chain
+	Minitia *L2Chain
+	DA      *DAChain
 
 	OP      *OPBot
 	Relayer ibc.Relayer
@@ -348,14 +347,28 @@ func SetupTest(
 				Images: []ibc.DockerImage{
 					daChainConfig.Image,
 				},
-				Bin:            daChainConfig.Bin,
-				Bech32Prefix:   daChainConfig.Bech32Prefix,
-				Denom:          daChainConfig.Denom,
-				Gas:            daChainConfig.Gas,
-				GasPrices:      daChainConfig.GasPrices,
-				GasAdjustment:  daChainConfig.GasAdjustment,
-				TrustingPeriod: daChainConfig.TrustingPeriod,
-				NoHostMount:    false,
+				Bin:                 daChainConfig.Bin,
+				Bech32Prefix:        daChainConfig.Bech32Prefix,
+				Denom:               daChainConfig.Denom,
+				Gas:                 daChainConfig.Gas,
+				GasPrices:           daChainConfig.GasPrices,
+				GasAdjustment:       daChainConfig.GasAdjustment,
+				TrustingPeriod:      daChainConfig.TrustingPeriod,
+				NoHostMount:         false,
+				AdditionalStartArgs: []string{"--force-no-bbr"},
+				PreGenesis: func(ch ibc.Chain) error {
+					daChain := ch.(*cosmos.CosmosChain)
+
+					ctx := context.Background()
+					c := make(testutil.Toml)
+					txIndex := make(testutil.Toml)
+					txIndex["indexer"] = "kv"
+					c["tx_index"] = txIndex
+
+					err = testutil.ModifyTomlConfigFile(ctx, logger, client, t.Name(), daChain.Validators[0].VolumeName, "config/config.toml", c)
+					require.NoError(t, err)
+					return nil
+				},
 			},
 			NumValidators: &daChainConfig.NumValidators,
 			NumFullNodes:  &daChainConfig.NumFullNodes,
@@ -367,10 +380,6 @@ func SetupTest(
 	require.NoError(t, err)
 
 	initia, minitia := chains[0].(*cosmos.CosmosChain), chains[1].(*cosmos.CosmosChain)
-	da := initia
-	if len(chains) == 3 {
-		da = chains[2].(*cosmos.CosmosChain)
-	}
 
 	// relayer setup
 
@@ -386,6 +395,12 @@ func SetupTest(
 			Relayer: relayer,
 			Path:    ibcPath,
 		})
+
+	da := initia
+	if len(chains) == 3 {
+		da = chains[2].(*cosmos.CosmosChain)
+		ic.AddChain(da)
+	}
 
 	icBuildOptions := interchaintest.InterchainBuildOptions{
 		TestName:          t.Name(),
@@ -419,9 +434,9 @@ func SetupTest(
 	})
 	require.NoError(t, err)
 
-	err = initia.SendFunds(ctx, interchaintest.FaucetAccountKeyName, ibc.WalletAmount{
+	err = da.SendFunds(ctx, interchaintest.FaucetAccountKeyName, ibc.WalletAmount{
 		Address: batchSubmitter.FormattedAddress(),
-		Denom:   initia.Config().Denom,
+		Denom:   da.Config().Denom,
 		Amount:  math.NewInt(100_000_000_000),
 	})
 	require.NoError(t, err)
@@ -445,10 +460,9 @@ func SetupTest(
 	helper := OPTestHelper{
 		logger,
 
-		NewL1Chain(logger, initia, outputSubmitter, batchSubmitter, challenger),
+		NewL1Chain(logger, initia, outputSubmitter, challenger),
 		NewL2Chain(logger, minitia, bridgeExecutor, oracleBridgeExecutor, l2Validator),
-		da,
-		daChainConfig.ChainType,
+		NewDAChain(logger, da, daChainConfig.ChainType, batchSubmitter),
 
 		op,
 		relayer,
@@ -491,8 +505,8 @@ func (op OPTestHelper) BridgeConfig() ophostcli.BridgeCliConfig {
 		Challenger: op.Initia.Challenger.FormattedAddress(),
 		Proposer:   op.Initia.OutputSubmitter.FormattedAddress(),
 		BatchInfo: ophosttypes.BatchInfo{
-			Submitter: op.Initia.BatchSubmitter.FormattedAddress(),
-			ChainType: op.DAChainType,
+			Submitter: op.DA.BatchSubmitter.FormattedAddress(),
+			ChainType: op.DA.ChainType,
 		},
 		SubmissionInterval:    op.bridgeConfig.SubmissionInterval,
 		FinalizationPeriod:    op.bridgeConfig.FinalizationPeriod,
