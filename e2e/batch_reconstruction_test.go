@@ -280,6 +280,9 @@ func fillOracleData(ctx context.Context, block *cmtypes.Block, chain *L1Chain) e
 				if err != nil {
 					return err
 				}
+				if authzMsg.Msgs[0].TypeUrl != "/opinit.opchild.v1.MsgUpdateOracle" {
+					continue
+				}
 				msg := new(opchildv1.MsgUpdateOracle)
 
 				err = authzMsg.Msgs[0].UnmarshalTo(msg)
