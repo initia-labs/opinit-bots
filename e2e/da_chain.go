@@ -106,6 +106,7 @@ func (da *DAChain) QueryInitiaBatchData(ctx context.Context) ([][]byte, error) {
 		if txsResult.TotalCount <= page*100 {
 			break
 		}
+		page++
 	}
 	return data, nil
 }
@@ -147,6 +148,7 @@ func (da *DAChain) QueryCelestiaBatchData(ctx context.Context) ([][]byte, error)
 		if txsResult.TotalCount <= page*100 {
 			break
 		}
+		page++
 	}
 	return data, nil
 }
