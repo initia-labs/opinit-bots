@@ -5,11 +5,33 @@ import (
 	"slices"
 	"time"
 
+	"github.com/initia-labs/opinit-bots/challenger/eventhandler"
 	challengertypes "github.com/initia-labs/opinit-bots/challenger/types"
 	"github.com/initia-labs/opinit-bots/node"
 	"github.com/initia-labs/opinit-bots/types"
 	"github.com/pkg/errors"
 )
+
+func GetPendingChallenge(db types.BasicDB, id challengertypes.ChallengeId) (challengertypes.Challenge, error) {
+	data, err := db.Get(challengertypes.PrefixedPendingChallenge(id))
+	if err != nil {
+		return challengertypes.Challenge{}, err
+	}
+	challenge := challengertypes.Challenge{}
+	err = challenge.Unmarshal(data)
+	return challenge, err
+}
+
+func GetPendingChallenges(db types.DB, ids []challengertypes.ChallengeId) (challenges []challengertypes.Challenge, err error) {
+	for _, id := range ids {
+		challenge, err := GetPendingChallenge(db, id)
+		if err != nil {
+			return nil, err
+		}
+		challenges = append(challenges, challenge)
+	}
+	return
+}
 
 func SavePendingChallenge(db types.BasicDB, challenge challengertypes.Challenge) error {
 	data, err := challenge.Marshal()
@@ -36,6 +58,25 @@ func DeletePendingChallenge(db types.BasicDB, challenge challengertypes.Challeng
 func DeletePendingChallenges(db types.BasicDB, challenges []challengertypes.Challenge) error {
 	for _, challenge := range challenges {
 		err := DeletePendingChallenge(db, challenge)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func DeleteAllPendingChallenges(db types.DB) error {
+	deletingKeys := make([][]byte, 0)
+	iterErr := db.Iterate(challengertypes.PendingChallengeKey, nil, func(key []byte, _ []byte) (stop bool, err error) {
+		deletingKeys = append(deletingKeys, key)
+		return false, nil
+	})
+	if iterErr != nil {
+		return iterErr
+	}
+
+	for _, key := range deletingKeys {
+		err := db.Delete(key)
 		if err != nil {
 			return err
 		}
@@ -127,7 +168,7 @@ func ResetHeight(db types.DB, nodeName string) error {
 	}
 	nodeDB := db.WithPrefix([]byte(nodeName))
 
-	if err := DeleteAllPendingEvents(nodeDB); err != nil {
+	if err := eventhandler.DeleteAllPendingEvents(nodeDB); err != nil {
 		return err
 	}
 
@@ -139,43 +180,5 @@ func ResetHeight(db types.DB, nodeName string) error {
 		return err
 	}
 	fmt.Printf("reset height to 0 for node %s\n", string(nodeDB.GetPrefix()))
-	return nil
-}
-
-func DeleteAllPendingEvents(db types.DB) error {
-	deletingKeys := make([][]byte, 0)
-	iterErr := db.Iterate(challengertypes.PendingEventKey, nil, func(key []byte, _ []byte) (stop bool, err error) {
-		deletingKeys = append(deletingKeys, key)
-		return false, nil
-	})
-	if iterErr != nil {
-		return iterErr
-	}
-
-	for _, key := range deletingKeys {
-		err := db.Delete(key)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func DeleteAllPendingChallenges(db types.DB) error {
-	deletingKeys := make([][]byte, 0)
-	iterErr := db.Iterate(challengertypes.PendingChallengeKey, nil, func(key []byte, _ []byte) (stop bool, err error) {
-		deletingKeys = append(deletingKeys, key)
-		return false, nil
-	})
-	if iterErr != nil {
-		return iterErr
-	}
-
-	for _, key := range deletingKeys {
-		err := db.Delete(key)
-		if err != nil {
-			return err
-		}
-	}
 	return nil
 }
