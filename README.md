@@ -17,9 +17,9 @@ Before running OPinit bots, make sure you have the following prerequisites insta
 
 To ensure compatibility with the node version, check the following versions:
 
-| L1 Node | MiniMove | MiniWasm | MiniEVM |
-| ------- | -------- | -------- | ------- |
-| v0.6.4+ | v0.6.5+  | v0.6.5+  | v0.6.7+ |
+| L1 Node | MiniMove | MiniWasm | MiniEVM | Celestia-appd |
+| ------- | -------- | -------- | ------- | ------------- |
+| v0.6.4+ | v0.6.5+  | v0.6.5+  | v0.6.7+ | v3.2.0+       |
 
 ### Build and Configure
 

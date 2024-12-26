@@ -5,6 +5,7 @@ import (
 )
 
 type Status struct {
-	LastBlockHeight int64                     `json:"last_block_height,omitempty"`
+	Syncing         *bool                     `json:"syncing,omitempty"`
+	LastBlockHeight *int64                    `json:"last_block_height,omitempty"`
 	Broadcaster     *btypes.BroadcasterStatus `json:"broadcaster,omitempty"`
 }
