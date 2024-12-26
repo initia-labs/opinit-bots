@@ -103,7 +103,7 @@ test-cover:
 	@go test -mod=readonly -timeout 30m -race -coverprofile=coverage.txt -covermode=atomic -tags='ledger test_ledger_mock' ./...
 
 test-e2e:
-	cd e2e && go test -v .
+	cd e2e && go test -v . -timeout 30m
 
 benchmark:
 	@go test -timeout 20m -mod=readonly -bench=. ./... 

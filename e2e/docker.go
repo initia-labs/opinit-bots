@@ -86,6 +86,7 @@ func uniqueOPBotImageName() (string, error) {
 	return OPBotImagePrefix + uuid.String()[:6], nil
 }
 
+// BuildOPBotImage builds the OPBot Docker image
 func BuildOPBotImage() (string, error) {
 	_, b, _, _ := runtime.Caller(0)
 	basepath := filepath.Join(filepath.Dir(b), "..")
@@ -118,6 +119,7 @@ func BuildOPBotImage() (string, error) {
 	return image, nil
 }
 
+// DestroyOPBotImage removes the Docker image with the provided tag
 func DestroyOPBotImage(image string) error {
 	// Create a Docker client
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
@@ -133,6 +135,7 @@ func DestroyOPBotImage(image string) error {
 	return err
 }
 
+// ignore the build output
 func handleDockerBuildOutput(body io.Reader) {
 	var logLine dockerLogLine
 
@@ -224,6 +227,7 @@ func NewDockerOPBot(ctx context.Context, log *zap.Logger, botName string, testNa
 	return &opbot, nil
 }
 
+// WriteFileToHomeDir writes the file at the given relative path to the volume
 func (op *DockerOPBot) WriteFileToHomeDir(ctx context.Context, relativePath string, contents []byte) error {
 	fw := dockerutil.NewFileWriter(op.log, op.DockerClient, op.testName)
 	if err := fw.WriteFile(ctx, op.volumeName, relativePath, contents); err != nil {
@@ -232,6 +236,7 @@ func (op *DockerOPBot) WriteFileToHomeDir(ctx context.Context, relativePath stri
 	return nil
 }
 
+// ReadFileFromHomeDir reads the file at the given relative path from the volume
 func (op *DockerOPBot) ReadFileFromHomeDir(ctx context.Context, relativePath string) ([]byte, error) {
 	fr := dockerutil.NewFileRetriever(op.log, op.DockerClient, op.testName)
 	bytes, err := fr.SingleFileContent(ctx, op.volumeName, relativePath)
@@ -241,11 +246,12 @@ func (op *DockerOPBot) ReadFileFromHomeDir(ctx context.Context, relativePath str
 	return bytes, nil
 }
 
+// ModifyTomlConfigFile modifies the TOML config file at the given relative path
 func (op *DockerOPBot) ModifyTomlConfigFile(ctx context.Context, relativePath string, modification testutil.Toml) error {
 	return testutil.ModifyTomlConfigFile(ctx, op.log, op.DockerClient, op.testName, op.volumeName, relativePath, modification)
 }
 
-// AddWallet adds a stores a wallet for the given chain ID.
+// AddWallet stores the wallet in the bot's wallet map.
 func (op *DockerOPBot) AddWallet(chainID string, wallet ibc.Wallet) {
 	if _, ok := op.wallets[chainID]; !ok {
 		op.wallets[chainID] = map[string]ibc.Wallet{
@@ -254,6 +260,24 @@ func (op *DockerOPBot) AddWallet(chainID string, wallet ibc.Wallet) {
 	}
 }
 
+// GetWallet returns the wallet from the bot's wallet map.
+func (op *DockerOPBot) GetWallet(chainID string, keyName string) (ibc.Wallet, bool) {
+	chainWallets, ok := op.wallets[chainID]
+	if !ok {
+		return nil, false
+	}
+
+	wallet, ok := chainWallets[keyName]
+	return wallet, ok
+}
+
+// GetWallets returns the wallets from the bot's wallet map.
+func (op *DockerOPBot) GetWallets(chainID string) (map[string]ibc.Wallet, bool) {
+	wallets, ok := op.wallets[chainID]
+	return wallets, ok
+}
+
+// AddKey store the key in the bot's wallet and returns the wallet.
 func (op *DockerOPBot) AddKey(ctx context.Context, chainID, keyName, bech32Prefix string) (ibc.Wallet, error) {
 	cmd := op.c.AddKey(chainID, keyName, bech32Prefix, op.HomeDir())
 
@@ -271,27 +295,35 @@ func (op *DockerOPBot) AddKey(ctx context.Context, chainID, keyName, bech32Prefi
 	if err != nil {
 		return nil, err
 	}
+
+	// Add the wallet to the bot's wallet map.
 	op.AddWallet(chainID, wallet)
+
 	return wallet, nil
 }
 
+// RestoreKey restores the key from the mnemonic and adds it to the bot's wallet.
+func (op *DockerOPBot) RestoreKey(ctx context.Context, chainID, keyName, bech32Prefix, mnemonic string) error {
+	cmd := op.c.RestoreKey(chainID, keyName, bech32Prefix, mnemonic, op.HomeDir())
+
+	// Restoring a key should be near-instantaneous, so add a 1-minute timeout
+	// to detect if Docker has hung.
+	ctx, cancel := context.WithTimeout(ctx, time.Minute)
+	defer cancel()
+
+	res := op.Exec(ctx, cmd, nil)
+	if res.Err != nil {
+		return res.Err
+	}
+	addrBytes := op.c.ParseRestoreKeyOutput(string(res.Stdout), string(res.Stderr))
+
+	op.AddWallet(chainID, op.c.CreateWallet(keyName, addrBytes, mnemonic))
+	return nil
+}
+
+// GetExtraStartupFlags returns the extra startup flags for the bot.
 func (op *DockerOPBot) GetExtraStartupFlags() []string {
 	return op.extraStartupFlags
-}
-
-func (op *DockerOPBot) GetWallet(chainID string, keyName string) (ibc.Wallet, bool) {
-	chainWallets, ok := op.wallets[chainID]
-	if !ok {
-		return nil, false
-	}
-
-	wallet, ok := chainWallets[keyName]
-	return wallet, ok
-}
-
-func (op *DockerOPBot) GetWallets(chainID string) (map[string]ibc.Wallet, bool) {
-	wallets, ok := op.wallets[chainID]
-	return wallets, ok
 }
 
 type CosmosTx struct {
@@ -301,6 +333,7 @@ type CosmosTx struct {
 	Log  string `json:"log"`
 }
 
+// GrantOraclePermissions grants oracle permissions to the oracle bridge executor.
 func (op *DockerOPBot) GrantOraclePermissions(ctx context.Context, oracleBridgeExecutorAddress string) error {
 	cmd := op.c.GrantOraclePermissions(oracleBridgeExecutorAddress, op.HomeDir())
 
@@ -323,6 +356,7 @@ func (op *DockerOPBot) GrantOraclePermissions(ctx context.Context, oracleBridgeE
 	return nil
 }
 
+// Exec executes the command in the bot's container.
 func (op *DockerOPBot) Exec(ctx context.Context, cmd []string, env []string) dockerutil.ContainerExecResult {
 	job := dockerutil.NewImage(op.log, op.DockerClient, op.networkID, op.testName, op.ContainerImage().Repository, op.ContainerImage().Version)
 	opts := dockerutil.ContainerOptions{
@@ -332,24 +366,7 @@ func (op *DockerOPBot) Exec(ctx context.Context, cmd []string, env []string) doc
 	return job.Run(ctx, cmd, opts)
 }
 
-func (op *DockerOPBot) RestoreKey(ctx context.Context, chainID, keyName, bech32Prefix, mnemonic string) error {
-	cmd := op.c.RestoreKey(chainID, keyName, bech32Prefix, mnemonic, op.HomeDir())
-
-	// Restoring a key should be near-instantaneous, so add a 1-minute timeout
-	// to detect if Docker has hung.
-	ctx, cancel := context.WithTimeout(ctx, time.Minute)
-	defer cancel()
-
-	res := op.Exec(ctx, cmd, nil)
-	if res.Err != nil {
-		return res.Err
-	}
-	addrBytes := op.c.ParseRestoreKeyOutput(string(res.Stdout), string(res.Stderr))
-
-	op.AddWallet(chainID, op.c.CreateWallet(keyName, addrBytes, mnemonic))
-	return nil
-}
-
+// Start starts the bot's container.
 func (op *DockerOPBot) Start(ctx context.Context) error {
 	if op.containerLifecycle != nil {
 		return fmt.Errorf("tried to start OPBot again without stopping first")
@@ -381,6 +398,7 @@ func (op *DockerOPBot) Start(ctx context.Context) error {
 	return nil
 }
 
+// Stop stops the bot's container.
 func (op *DockerOPBot) Stop(ctx context.Context) error {
 	if op.containerLifecycle == nil {
 		return nil
@@ -431,6 +449,7 @@ func (op *DockerOPBot) Stop(ctx context.Context) error {
 	return nil
 }
 
+// Pause pauses the bot's container.
 func (op *DockerOPBot) Pause(ctx context.Context) error {
 	if op.containerLifecycle == nil {
 		return fmt.Errorf("container not running")
@@ -438,6 +457,7 @@ func (op *DockerOPBot) Pause(ctx context.Context) error {
 	return op.DockerClient.ContainerPause(ctx, op.containerLifecycle.ContainerID())
 }
 
+// Resume resumes the bot's container.
 func (op *DockerOPBot) Resume(ctx context.Context) error {
 	if op.containerLifecycle == nil {
 		return fmt.Errorf("container not running")
@@ -445,6 +465,7 @@ func (op *DockerOPBot) Resume(ctx context.Context) error {
 	return op.DockerClient.ContainerUnpause(ctx, op.containerLifecycle.ContainerID())
 }
 
+// ContainerImage returns the bot's container image.
 func (op *DockerOPBot) ContainerImage() ibc.DockerImage {
 	if op.customImage != nil {
 		return *op.customImage
@@ -456,6 +477,7 @@ func (op *DockerOPBot) ContainerImage() ibc.DockerImage {
 	}
 }
 
+// pullContainerImageIfNecessary pulls the container image if necessary.
 func (op *DockerOPBot) pullContainerImageIfNecessary(containerImage ibc.DockerImage) error {
 	if !op.pullImage {
 		return nil
@@ -495,15 +517,19 @@ type OPBotCommander interface {
 
 	DockerUser() string
 
+	// create wallet
+	CreateWallet(keyName, address, mnemonic string) ibc.Wallet
+
+	// parse the output of the add key command to get wallet
 	ParseAddKeyOutput(stdout, stderr string) (ibc.Wallet, error)
 
+	// parse the output of the restore key command to get the address
 	ParseRestoreKeyOutput(stdout, stderr string) string
 
+	// create command line arguments
 	Init(botName, homeDir string) []string
-
 	AddKey(chainID, keyName, bech32Prefix, homeDir string) []string
 	RestoreKey(chainID, keyName, bech32Prefix, mnemonic, homeDir string) []string
 	Start(botName string, homeDir string) []string
-	CreateWallet(keyName, address, mnemonic string) ibc.Wallet
 	GrantOraclePermissions(address string, homeDir string) []string
 }
