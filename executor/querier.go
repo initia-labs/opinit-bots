@@ -66,4 +66,14 @@ func (ex *Executor) RegisterQuerier() {
 		}
 		return c.JSON(status)
 	})
+	ex.server.RegisterQuerier("/syncing", func(c *fiber.Ctx) error {
+		status, err := ex.GetStatus()
+		if err != nil {
+			return err
+		}
+		hostSync := status.Host.Node.Syncing != nil && *status.Host.Node.Syncing
+		childSync := status.Child.Node.Syncing != nil && *status.Child.Node.Syncing
+		batchSync := status.BatchSubmitter.Node.Syncing != nil && *status.BatchSubmitter.Node.Syncing
+		return c.JSON(hostSync && childSync && batchSync)
+	})
 }

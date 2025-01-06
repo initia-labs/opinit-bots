@@ -173,6 +173,8 @@ func (b BroadcasterAccount) BroadcastTxSync(ctx context.Context, txBytes []byte)
 // BuildSimTx creates an unsigned tx with an empty single signature and returns
 // the encoded transaction or an error if the unsigned transaction cannot be built.
 func (b BroadcasterAccount) buildSimTx(msgs ...sdk.Msg) ([]byte, error) {
+	unlock := keys.SetSDKConfigContext(b.Bech32Prefix())
+	defer unlock()
 	txb, err := b.txf.BuildUnsignedTx(msgs...)
 	if err != nil {
 		return nil, err
@@ -255,6 +257,9 @@ func (b BroadcasterAccount) SimulateAndSignTx(ctx context.Context, msgs ...sdk.M
 	}
 
 	b.txf = b.txf.WithGas(adjusted)
+
+	unlock := keys.SetSDKConfigContext(b.Bech32Prefix())
+	defer unlock()
 	txb, err := b.txf.BuildUnsignedTx(msgs...)
 	if err != nil {
 		return nil, err
