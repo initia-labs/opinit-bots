@@ -291,7 +291,7 @@ func (op *DockerOPBot) AddKey(ctx context.Context, chainID, keyName, bech32Prefi
 		return nil, res.Err
 	}
 
-	wallet, err := op.c.ParseAddKeyOutput(string(res.Stdout), string(res.Stderr))
+	wallet, err := op.c.ParseAddKeyOutput(string(res.Stdout), string(res.Stderr), bech32Prefix)
 	if err != nil {
 		return nil, err
 	}
@@ -317,7 +317,7 @@ func (op *DockerOPBot) RestoreKey(ctx context.Context, chainID, keyName, bech32P
 	}
 	addrBytes := op.c.ParseRestoreKeyOutput(string(res.Stdout), string(res.Stderr))
 
-	op.AddWallet(chainID, op.c.CreateWallet(keyName, addrBytes, mnemonic))
+	op.AddWallet(chainID, op.c.CreateWallet(keyName, addrBytes, mnemonic, bech32Prefix))
 	return nil
 }
 
@@ -518,10 +518,10 @@ type OPBotCommander interface {
 	DockerUser() string
 
 	// create wallet
-	CreateWallet(keyName, address, mnemonic string) ibc.Wallet
+	CreateWallet(keyName, address, mnemonic, bech32Prefix string) ibc.Wallet
 
 	// parse the output of the add key command to get wallet
-	ParseAddKeyOutput(stdout, stderr string) (ibc.Wallet, error)
+	ParseAddKeyOutput(stdout, stderr, bech32Prefix string) (ibc.Wallet, error)
 
 	// parse the output of the restore key command to get the address
 	ParseRestoreKeyOutput(stdout, stderr string) string

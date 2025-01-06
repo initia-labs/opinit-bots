@@ -3,7 +3,6 @@ package e2e
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -15,9 +14,12 @@ import (
 	"github.com/docker/docker/client"
 	"go.uber.org/zap"
 
+	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/initia-labs/opinit-bots/executor"
 	executortypes "github.com/initia-labs/opinit-bots/executor/types"
 	"github.com/strangelove-ventures/interchaintest/v8/ibc"
+
+	"github.com/pkg/errors"
 )
 
 const (
@@ -215,12 +217,12 @@ func (commander) DefaultContainerVersion() string {
 	return DefaultContainerVersion
 }
 
-func (commander) ParseAddKeyOutput(stdout, stderr string) (ibc.Wallet, error) {
+func (commander) ParseAddKeyOutput(stdout, stderr, bech32Prefix string) (ibc.Wallet, error) {
 	var wallet WalletModel
 	err := json.Unmarshal([]byte(stdout), &wallet)
 
 	for keyName, elem := range wallet {
-		opWallet := NewWallet(keyName, elem.Address, elem.Mnemonic)
+		opWallet := NewWallet(keyName, elem.Address, elem.Mnemonic, bech32Prefix)
 		return opWallet, err
 	}
 	return nil, errors.New("failed to parse wallet")
@@ -237,8 +239,8 @@ func (commander) Init(botName string, homeDir string) []string {
 	}
 }
 
-func (c commander) CreateWallet(keyName, address, mnemonic string) ibc.Wallet {
-	return NewWallet(keyName, address, mnemonic)
+func (c commander) CreateWallet(keyName, address, mnemonic, bech32Prefix string) ibc.Wallet {
+	return NewWallet(keyName, address, mnemonic, bech32Prefix)
 }
 
 var _ ibc.Wallet = &OPWallet{}
@@ -249,16 +251,18 @@ type WalletModel map[string]struct {
 }
 
 type OPWallet struct {
-	mnemonic string
-	address  string
-	keyName  string
+	mnemonic     string
+	address      string
+	keyName      string
+	bech32Prefix string
 }
 
-func NewWallet(keyname string, address string, mnemonic string) *OPWallet {
+func NewWallet(keyname string, address string, mnemonic string, bech32Prefix string) *OPWallet {
 	return &OPWallet{
-		mnemonic: mnemonic,
-		address:  address,
-		keyName:  keyname,
+		mnemonic:     mnemonic,
+		address:      address,
+		keyName:      keyname,
+		bech32Prefix: bech32Prefix,
 	}
 }
 
@@ -276,5 +280,9 @@ func (op *OPWallet) Mnemonic() string {
 
 // Get Address.
 func (op *OPWallet) Address() []byte {
-	return []byte(op.address)
+	addr, err := sdk.GetFromBech32(op.address, op.bech32Prefix)
+	if err != nil {
+		panic(errors.Wrap(err, "failed to decode address"))
+	}
+	return addr
 }
