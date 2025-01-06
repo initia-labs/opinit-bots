@@ -1,8 +1,6 @@
 package host
 
 import (
-	"time"
-
 	"cosmossdk.io/math"
 	nodetypes "github.com/initia-labs/opinit-bots/node/types"
 	hostprovider "github.com/initia-labs/opinit-bots/provider/host"
@@ -23,36 +21,18 @@ func (h *Host) initiateDepositHandler(_ types.Context, args nodetypes.EventHandl
 		// pass other bridge deposit event
 		return nil
 	}
+	if l1Sequence < h.initialL1Sequence {
+		// pass old deposit event
+		return nil
+	}
 
-	return h.handleInitiateDeposit(
-		l1Sequence,
-		args.BlockHeight,
-		args.BlockTime,
-		from,
-		to,
-		l1Denom,
-		l2Denom,
-		amount,
-	)
-}
-
-func (h *Host) handleInitiateDeposit(
-	l1Sequence uint64,
-	blockHeight int64,
-	blockTime time.Time,
-	from string,
-	to string,
-	l1Denom string,
-	l2Denom string,
-	amount string,
-) error {
 	coinAmount, ok := math.NewIntFromString(amount)
 	if !ok {
 		return errors.New("invalid amount")
 	}
 	coin := sdk.NewCoin(l2Denom, coinAmount)
 
-	deposit := challengertypes.NewDeposit(l1Sequence, blockHeight, from, to, l1Denom, coin.String(), blockTime)
+	deposit := challengertypes.NewDeposit(l1Sequence, args.BlockHeight, from, to, l1Denom, coin.String(), args.BlockTime)
 	h.eventQueue = append(h.eventQueue, deposit)
 	return nil
 }
