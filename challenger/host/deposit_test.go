@@ -53,7 +53,7 @@ func TestInitializeDepositHandler(t *testing.T) {
 					To:            "init1z3689ct7pc72yr5an97nsj89dnlefydxwdhcv0",
 					L1Denom:       "l1Denom",
 					Amount:        "100l2denom",
-					Time:          time.Unix(0, 100),
+					Time:          time.Unix(0, 100).UTC(),
 					Timeout:       false,
 				},
 			},
@@ -63,7 +63,7 @@ func TestInitializeDepositHandler(t *testing.T) {
 			initialL1Sequence: 0,
 			eventHandlerArgs: nodetypes.EventHandlerArgs{
 				BlockHeight:     1,
-				BlockTime:       time.Unix(0, 100),
+				BlockTime:       time.Unix(0, 100).UTC(),
 				LatestHeight:    1,
 				TxIndex:         0,
 				EventAttributes: hostprovider.InitiateTokenDepositEvents(2, "init1hrasklz3tr6s9rls4r8fjuf0k4zuha6w9rude5", "init1z3689ct7pc72yr5an97nsj89dnlefydxwdhcv0", sdk.NewInt64Coin("l1Denom", 100), []byte("databytes"), 1, "l2denom"),
@@ -75,7 +75,7 @@ func TestInitializeDepositHandler(t *testing.T) {
 			initialL1Sequence: 2,
 			eventHandlerArgs: nodetypes.EventHandlerArgs{
 				BlockHeight:     1,
-				BlockTime:       time.Unix(0, 100),
+				BlockTime:       time.Unix(0, 100).UTC(),
 				LatestHeight:    1,
 				TxIndex:         0,
 				EventAttributes: hostprovider.InitiateTokenDepositEvents(1, "init1hrasklz3tr6s9rls4r8fjuf0k4zuha6w9rude5", "init1z3689ct7pc72yr5an97nsj89dnlefydxwdhcv0", sdk.NewInt64Coin("l1Denom", 100), []byte("databytes"), 1, "l2denom"),

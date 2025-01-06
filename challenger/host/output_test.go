@@ -37,7 +37,7 @@ func TestProposeOutputHandler(t *testing.T) {
 		{
 			name: "success",
 			eventHandlerArgs: nodetypes.EventHandlerArgs{
-				BlockTime:       time.Unix(0, 100),
+				BlockTime:       time.Unix(0, 100).UTC(),
 				EventAttributes: hostprovider.ProposeOutputEvents("proposer", 1, 2, 3, []byte("output_root")),
 			},
 			expected: []challengertypes.ChallengeEvent{
@@ -46,7 +46,7 @@ func TestProposeOutputHandler(t *testing.T) {
 					L2BlockNumber: 3,
 					OutputIndex:   2,
 					OutputRoot:    []byte("output_root"),
-					Time:          time.Unix(0, 100),
+					Time:          time.Unix(0, 100).UTC(),
 					Timeout:       false,
 				},
 			},
