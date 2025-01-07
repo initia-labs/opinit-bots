@@ -45,6 +45,7 @@ func TestBeginBlockHandler(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, 1, h.stage.Len())
 
+	// clear eventQueue, outputPendingEventQueue and stage
 	err = h.beginBlockHandler(types.Context{}, nodetypes.BeginBlockArgs{})
 	require.NoError(t, err)
 

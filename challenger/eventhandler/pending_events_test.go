@@ -16,10 +16,10 @@ func TestPendingEvent(t *testing.T) {
 	eventHandler := NewChallengeEventHandler(db)
 
 	events := []challengertypes.ChallengeEvent{
-		challengertypes.NewDeposit(1, 2, "from", "to", "l1Denom", "amount", time.Unix(0, 100)),
-		challengertypes.NewDeposit(2, 2, "from", "to", "l1Denom", "amount", time.Unix(0, 101)),
-		challengertypes.NewOracle(3, []byte("data"), time.Unix(0, 103)),
-		challengertypes.NewOracle(4, []byte("data2"), time.Unix(0, 104)),
+		challengertypes.NewDeposit(1, 2, "from", "to", "l1Denom", "amount", time.Unix(0, 100).UTC()),
+		challengertypes.NewDeposit(2, 2, "from", "to", "l1Denom", "amount", time.Unix(0, 101).UTC()),
+		challengertypes.NewOracle(3, []byte("data"), time.Unix(0, 103).UTC()),
+		challengertypes.NewOracle(4, []byte("data2"), time.Unix(0, 104).UTC()),
 	}
 
 	eventHandler.SetPendingEvents(events)

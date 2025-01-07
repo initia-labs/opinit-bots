@@ -8,6 +8,10 @@ import (
 )
 
 func (ch *ChallengeEventHandler) SetPendingEvents(events []challengertypes.ChallengeEvent) {
+	if len(events) == 0 {
+		return
+	}
+
 	ch.pendingEventsMu.Lock()
 	defer ch.pendingEventsMu.Unlock()
 
@@ -40,6 +44,7 @@ func (ch *ChallengeEventHandler) DeletePendingEvent(id challengertypes.Challenge
 	delete(ch.pendingEvents, id)
 }
 
+// get all pending oracle events that are less than toL1BlockHeight
 func (ch *ChallengeEventHandler) getOraclePendingEvents(toL1BlockHeight uint64) []challengertypes.ChallengeEvent {
 	ch.pendingEventsMu.Lock()
 	defer ch.pendingEventsMu.Unlock()

@@ -35,16 +35,16 @@ func TestCheckValue(t *testing.T) {
 
 	ctx := types.NewContext(context.Background(), zap.NewNop(), "")
 
-	challenges, procesedEvents, err := eventHandler.CheckValue(ctx, checkingEvents)
+	challenges, processedEvents, err := eventHandler.CheckValue(ctx, checkingEvents)
 	require.NoError(t, err)
 
 	require.Len(t, challenges, 2)
-	require.Len(t, procesedEvents, 4)
+	require.Len(t, processedEvents, 4)
 
 	require.Equal(t, challenges[0].Id, challengertypes.ChallengeId{Type: challengertypes.EventTypeOracle, Id: 4})
 	require.Equal(t, challenges[1].Id, challengertypes.ChallengeId{Type: challengertypes.EventTypeOutput, Id: 2})
 
-	require.ElementsMatch(t, procesedEvents, append(events[:1], events[2:]...))
+	require.ElementsMatch(t, processedEvents, append(events[:1], events[2:]...))
 }
 
 func TestGetPrevPendingEvent(t *testing.T) {
