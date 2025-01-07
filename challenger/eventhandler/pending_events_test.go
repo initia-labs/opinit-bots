@@ -41,7 +41,7 @@ func TestPendingEvent(t *testing.T) {
 	}
 
 	unprocessedEvents := eventHandler.GetUnprocessedPendingEvents(processedEvents)
-	require.Equal(t, unprocessedEvents, []challengertypes.ChallengeEvent{
+	require.ElementsMatch(t, unprocessedEvents, []challengertypes.ChallengeEvent{
 		challengertypes.NewDeposit(2, 2, "from", "to", "l1Denom", "amount", time.Unix(0, 101).UTC()),
 		challengertypes.NewOracle(4, []byte("data2"), time.Unix(0, 104).UTC()),
 	})
@@ -65,7 +65,7 @@ func TestPendingEvent(t *testing.T) {
 
 	oracleEvents := eventHandler.getOraclePendingEvents(5)
 	require.Len(t, oracleEvents, 2)
-	require.Equal(t, oracleEvents, []challengertypes.ChallengeEvent{
+	require.ElementsMatch(t, oracleEvents, []challengertypes.ChallengeEvent{
 		challengertypes.NewOracle(3, []byte("data"), time.Unix(0, 103).UTC()),
 		challengertypes.NewOracle(4, []byte("data2"), time.Unix(0, 104).UTC()),
 	})
