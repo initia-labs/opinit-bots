@@ -85,7 +85,7 @@ func TestChallenge(t *testing.T) {
 		Time: time.Unix(0, 10000).UTC(),
 	}
 
-	challenges, err := LoadChallenges(db)
+	challenges, err := LoadChallenges(db, 0)
 	require.NoError(t, err)
 
 	require.Empty(t, challenges)
@@ -93,7 +93,7 @@ func TestChallenge(t *testing.T) {
 	err = SaveChallenge(db, challenge)
 	require.NoError(t, err)
 
-	challenges, err = LoadChallenges(db)
+	challenges, err = LoadChallenges(db, 0)
 	require.NoError(t, err)
 
 	require.Len(t, challenges, 1)
@@ -119,7 +119,7 @@ func TestDeleteFutureChallenges(t *testing.T) {
 	err = DeleteFutureChallenges(db, time.Unix(0, 5).UTC())
 	require.NoError(t, err)
 
-	challenges, err := LoadChallenges(db)
+	challenges, err := LoadChallenges(db, 0)
 	require.NoError(t, err)
 
 	require.Len(t, challenges, 4)
@@ -130,7 +130,7 @@ func TestDeleteFutureChallenges(t *testing.T) {
 	err = DeleteFutureChallenges(db, time.Unix(0, 8).UTC())
 	require.NoError(t, err)
 
-	challenges, err = LoadChallenges(db)
+	challenges, err = LoadChallenges(db, 0)
 	require.NoError(t, err)
 
 	require.Len(t, challenges, 4)
@@ -141,7 +141,7 @@ func TestDeleteFutureChallenges(t *testing.T) {
 	err = DeleteFutureChallenges(db, time.Unix(0, 0).UTC())
 	require.NoError(t, err)
 
-	challenges, err = LoadChallenges(db)
+	challenges, err = LoadChallenges(db, 0)
 	require.NoError(t, err)
 
 	require.Len(t, challenges, 0)

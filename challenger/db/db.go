@@ -108,7 +108,11 @@ func SaveChallenge(db types.BasicDB, challenge challengertypes.Challenge) error 
 	return db.Set(challengertypes.PrefixedChallenge(challenge.Time, challenge.Id), value)
 }
 
-func LoadChallenges(db types.DB) (challenges []challengertypes.Challenge, err error) {
+func LoadChallenges(db types.DB, limit int) (challenges []challengertypes.Challenge, err error) {
+	if limit < 0 {
+		return nil, errors.New("limit must be non-negative")
+	}
+
 	iterErr := db.ReverseIterate(challengertypes.ChallengeKey, nil, func(_, value []byte) (stop bool, err error) {
 		challenge := challengertypes.Challenge{}
 		err = challenge.Unmarshal(value)
@@ -116,7 +120,7 @@ func LoadChallenges(db types.DB) (challenges []challengertypes.Challenge, err er
 			return true, err
 		}
 		challenges = append(challenges, challenge)
-		if len(challenges) >= 5 {
+		if limit != 0 && len(challenges) >= limit {
 			return true, nil
 		}
 		return false, nil
