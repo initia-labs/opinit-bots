@@ -28,7 +28,7 @@ func GetPendingEvent(db types.BasicDB, id challengertypes.ChallengeId) (challeng
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to unmarshal challenge event")
 	}
-	return event, err
+	return event, nil
 }
 
 func SavePendingEvents(db types.BasicDB, events []challengertypes.ChallengeEvent) error {
