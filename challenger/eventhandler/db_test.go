@@ -13,7 +13,7 @@ func TestDBPendingEvent(t *testing.T) {
 	db, err := db.NewMemDB()
 	require.NoError(t, err)
 
-	event := challengertypes.NewDeposit(1, 2, "from", "to", "l1Denom", "amount", time.Unix(0, 10000))
+	event := challengertypes.NewDeposit(1, 2, "from", "to", "l1Denom", "amount", time.Unix(0, 10000).UTC())
 
 	_, err = GetPendingEvent(db, event.Id())
 	require.Error(t, err)
@@ -44,7 +44,7 @@ func TestDBPendingEvents(t *testing.T) {
 	var ids []challengertypes.ChallengeId
 
 	for i := uint64(0); i < 10; i++ {
-		event := challengertypes.NewDeposit(i, 2, "from", "to", "l1Denom", "amount", time.Unix(0, 10000))
+		event := challengertypes.NewDeposit(i, 2, "from", "to", "l1Denom", "amount", time.Unix(0, 10000).UTC())
 		events = append(events, event)
 		ids = append(ids, event.Id())
 	}
@@ -86,9 +86,9 @@ func TestDBLoadPendingEvents(t *testing.T) {
 	require.NoError(t, err)
 
 	events := []challengertypes.ChallengeEvent{
-		challengertypes.NewDeposit(1, 2, "from", "to", "l1Denom", "amount", time.Unix(0, 100)),
-		challengertypes.NewDeposit(2, 2, "from", "to", "l1Denom", "amount", time.Unix(0, 101)),
-		challengertypes.NewOracle(1, []byte("data"), time.Unix(0, 102)),
+		challengertypes.NewDeposit(1, 2, "from", "to", "l1Denom", "amount", time.Unix(0, 100).UTC()),
+		challengertypes.NewDeposit(2, 2, "from", "to", "l1Denom", "amount", time.Unix(0, 101).UTC()),
+		challengertypes.NewOracle(1, []byte("data"), time.Unix(0, 102).UTC()),
 	}
 
 	err = SavePendingEvents(db, events)
