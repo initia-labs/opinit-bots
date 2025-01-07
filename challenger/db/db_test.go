@@ -82,7 +82,7 @@ func TestChallenge(t *testing.T) {
 			Type: challengertypes.EventTypeDeposit,
 			Id:   10,
 		},
-		Time: time.Unix(0, 10000),
+		Time: time.Unix(0, 10000).UTC(),
 	}
 
 	challenges, err := LoadChallenges(db)
@@ -110,13 +110,13 @@ func TestDeleteFutureChallenges(t *testing.T) {
 				Type: challengertypes.EventTypeOracle,
 				Id:   uint64(i),
 			},
-			Time: time.Unix(0, int64(i)),
+			Time: time.Unix(0, int64(i)).UTC(),
 		}
 		err = SaveChallenge(db, challenge)
 		require.NoError(t, err)
 	}
 
-	err = DeleteFutureChallenges(db, time.Unix(0, 5))
+	err = DeleteFutureChallenges(db, time.Unix(0, 5).UTC())
 	require.NoError(t, err)
 
 	challenges, err := LoadChallenges(db)
@@ -127,7 +127,7 @@ func TestDeleteFutureChallenges(t *testing.T) {
 		require.Equal(t, uint64(i), challenges[i-1].Id.Id)
 	}
 
-	err = DeleteFutureChallenges(db, time.Unix(0, 8))
+	err = DeleteFutureChallenges(db, time.Unix(0, 8).UTC())
 	require.NoError(t, err)
 
 	challenges, err = LoadChallenges(db)
@@ -138,7 +138,7 @@ func TestDeleteFutureChallenges(t *testing.T) {
 		require.Equal(t, uint64(i), challenges[i-1].Id.Id)
 	}
 
-	err = DeleteFutureChallenges(db, time.Unix(0, 0))
+	err = DeleteFutureChallenges(db, time.Unix(0, 0).UTC())
 	require.NoError(t, err)
 
 	challenges, err = LoadChallenges(db)

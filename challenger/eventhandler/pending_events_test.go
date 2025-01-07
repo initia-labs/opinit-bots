@@ -36,22 +36,22 @@ func TestPendingEvent(t *testing.T) {
 	require.ElementsMatch(t, pendingEvents, events)
 
 	processedEvents := []challengertypes.ChallengeEvent{
-		challengertypes.NewDeposit(1, 2, "from", "to", "l1Denom", "amount", time.Unix(0, 100)),
-		challengertypes.NewOracle(3, []byte("data"), time.Unix(0, 103)),
+		challengertypes.NewDeposit(1, 2, "from", "to", "l1Denom", "amount", time.Unix(0, 100).UTC()),
+		challengertypes.NewOracle(3, []byte("data"), time.Unix(0, 103).UTC()),
 	}
 
 	unprocessedEvents := eventHandler.GetUnprocessedPendingEvents(processedEvents)
 	require.Equal(t, unprocessedEvents, []challengertypes.ChallengeEvent{
-		challengertypes.NewDeposit(2, 2, "from", "to", "l1Denom", "amount", time.Unix(0, 101)),
-		challengertypes.NewOracle(4, []byte("data2"), time.Unix(0, 104)),
+		challengertypes.NewDeposit(2, 2, "from", "to", "l1Denom", "amount", time.Unix(0, 101).UTC()),
+		challengertypes.NewOracle(4, []byte("data2"), time.Unix(0, 104).UTC()),
 	})
 
 	sortedPendingEvents := eventHandler.GetAllSortedPendingEvents()
 	require.Equal(t, sortedPendingEvents, []challengertypes.ChallengeEvent{
-		challengertypes.NewDeposit(1, 2, "from", "to", "l1Denom", "amount", time.Unix(0, 100)),
-		challengertypes.NewDeposit(2, 2, "from", "to", "l1Denom", "amount", time.Unix(0, 101)),
-		challengertypes.NewOracle(3, []byte("data"), time.Unix(0, 103)),
-		challengertypes.NewOracle(4, []byte("data2"), time.Unix(0, 104)),
+		challengertypes.NewDeposit(1, 2, "from", "to", "l1Denom", "amount", time.Unix(0, 100).UTC()),
+		challengertypes.NewDeposit(2, 2, "from", "to", "l1Denom", "amount", time.Unix(0, 101).UTC()),
+		challengertypes.NewOracle(3, []byte("data"), time.Unix(0, 103).UTC()),
+		challengertypes.NewOracle(4, []byte("data2"), time.Unix(0, 104).UTC()),
 	})
 
 	eventHandler.DeletePendingEvent(events[0].Id())
@@ -66,8 +66,8 @@ func TestPendingEvent(t *testing.T) {
 	oracleEvents := eventHandler.getOraclePendingEvents(5)
 	require.Len(t, oracleEvents, 2)
 	require.Equal(t, oracleEvents, []challengertypes.ChallengeEvent{
-		challengertypes.NewOracle(3, []byte("data"), time.Unix(0, 103)),
-		challengertypes.NewOracle(4, []byte("data2"), time.Unix(0, 104)),
+		challengertypes.NewOracle(3, []byte("data"), time.Unix(0, 103).UTC()),
+		challengertypes.NewOracle(4, []byte("data2"), time.Unix(0, 104).UTC()),
 	})
 
 	eventHandler.DeletePendingEvents(events[1:])

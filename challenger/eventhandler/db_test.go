@@ -86,9 +86,9 @@ func TestDBLoadPendingEvents(t *testing.T) {
 	require.NoError(t, err)
 
 	events := []challengertypes.ChallengeEvent{
-		challengertypes.NewDeposit(1, 2, "from", "to", "l1Denom", "amount", time.Unix(0, 100)),
-		challengertypes.NewDeposit(2, 2, "from", "to", "l1Denom", "amount", time.Unix(0, 101)),
-		challengertypes.NewOracle(1, []byte("data"), time.Unix(0, 102)),
+		challengertypes.NewDeposit(1, 2, "from", "to", "l1Denom", "amount", time.Unix(0, 100).UTC()),
+		challengertypes.NewDeposit(2, 2, "from", "to", "l1Denom", "amount", time.Unix(0, 101).UTC()),
+		challengertypes.NewOracle(1, []byte("data"), time.Unix(0, 102).UTC()),
 	}
 
 	err = SavePendingEvents(db, events)
