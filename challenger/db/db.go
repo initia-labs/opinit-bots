@@ -139,7 +139,7 @@ func DeleteFutureChallenges(db types.DB, initialBlockTime time.Time) error {
 		if err != nil {
 			return true, err
 		}
-		if !ts.After(initialBlockTime) {
+		if ts.Before(initialBlockTime) {
 			return true, nil
 		}
 
