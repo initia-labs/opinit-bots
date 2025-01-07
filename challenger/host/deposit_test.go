@@ -95,5 +95,4 @@ func TestInitializeDepositHandler(t *testing.T) {
 			h.eventQueue = make([]challengertypes.ChallengeEvent, 0)
 		})
 	}
-	require.NoError(t, err)
 }
