@@ -1,7 +1,6 @@
 package db
 
 import (
-	"fmt"
 	"testing"
 	"time"
 
@@ -116,14 +115,11 @@ func TestDeleteFutureChallenges(t *testing.T) {
 		err = SaveChallenge(db, challenge)
 		require.NoError(t, err)
 	}
-	challenges, err := LoadChallenges(db, 0)
-	require.NoError(t, err)
-	fmt.Println(challenges)
 
 	err = DeleteFutureChallenges(db, time.Unix(0, 5).UTC())
 	require.NoError(t, err)
 
-	challenges, err = LoadChallenges(db, 0)
+	challenges, err := LoadChallenges(db, 0)
 	require.NoError(t, err)
 
 	require.Len(t, challenges, 4)

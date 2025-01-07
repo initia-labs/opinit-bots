@@ -134,12 +134,8 @@ func LoadChallenges(db types.DB, limit int) (challenges []challengertypes.Challe
 
 func DeleteFutureChallenges(db types.DB, initialBlockTime time.Time) error {
 	deletingKeys := make([][]byte, 0)
-
-	fmt.Println(challengertypes.PrefixedChallengeEventTime(initialBlockTime))
 	iterErr := db.Iterate(challengertypes.ChallengeKey, challengertypes.PrefixedChallengeEventTime(initialBlockTime), func(key []byte, _ []byte) (stop bool, err error) {
 		deletingKeys = append(deletingKeys, key)
-		fmt.Println(key)
-		fmt.Printf("%p\n", key)
 		return false, nil
 	})
 	if iterErr != nil {
@@ -147,8 +143,6 @@ func DeleteFutureChallenges(db types.DB, initialBlockTime time.Time) error {
 	}
 
 	for _, key := range deletingKeys {
-		fmt.Println(key)
-		fmt.Printf("%p\n", key)
 		err := db.Delete(key)
 		if err != nil {
 			return err
