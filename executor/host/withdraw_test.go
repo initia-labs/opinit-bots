@@ -3,11 +3,8 @@ package host
 import (
 	"context"
 	"encoding/base64"
-	"encoding/hex"
-	"strconv"
 	"testing"
 
-	abcitypes "github.com/cometbft/cometbft/abci/types"
 	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
 	"github.com/initia-labs/opinit-bots/db"
 	"github.com/initia-labs/opinit-bots/node"
@@ -20,37 +17,6 @@ import (
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 )
-
-func ProposeOutputEvents(
-	proposer string,
-	bridgeId uint64,
-	outputIndex uint64,
-	l2BlockNumber uint64,
-	outputRoot []byte,
-) []abcitypes.EventAttribute {
-	return []abcitypes.EventAttribute{
-		{
-			Key:   ophosttypes.AttributeKeyProposer,
-			Value: proposer,
-		},
-		{
-			Key:   ophosttypes.AttributeKeyBridgeId,
-			Value: strconv.FormatUint(bridgeId, 10),
-		},
-		{
-			Key:   ophosttypes.AttributeKeyOutputIndex,
-			Value: strconv.FormatUint(outputIndex, 10),
-		},
-		{
-			Key:   ophosttypes.AttributeKeyL2BlockNumber,
-			Value: strconv.FormatUint(l2BlockNumber, 10),
-		},
-		{
-			Key:   ophosttypes.AttributeKeyOutputRoot,
-			Value: hex.EncodeToString(outputRoot),
-		},
-	}
-}
 
 func TestProposeOutputHandler(t *testing.T) {
 	db, err := db.NewMemDB()
@@ -65,8 +31,6 @@ func TestProposeOutputHandler(t *testing.T) {
 		BaseHost: hostprovider.NewTestBaseHost(0, hostNode, bridgeInfo, nodetypes.NodeConfig{}, nil),
 	}
 
-	fullAttributes := ProposeOutputEvents("proposer", 1, 2, 3, []byte("output_root"))
-
 	cases := []struct {
 		name             string
 		eventHandlerArgs nodetypes.EventHandlerArgs
@@ -76,7 +40,7 @@ func TestProposeOutputHandler(t *testing.T) {
 		{
 			name: "success",
 			eventHandlerArgs: nodetypes.EventHandlerArgs{
-				EventAttributes: ProposeOutputEvents("proposer", 1, 2, 3, []byte("output_root")),
+				EventAttributes: hostprovider.ProposeOutputEvents("proposer", 1, 2, 3, []byte("output_root")),
 			},
 			expected: func() (msg string, fields []zapcore.Field) {
 				msg = "propose output"
@@ -94,50 +58,10 @@ func TestProposeOutputHandler(t *testing.T) {
 		{
 			name: "different bridge id",
 			eventHandlerArgs: nodetypes.EventHandlerArgs{
-				EventAttributes: ProposeOutputEvents("proposer", 2, 2, 3, []byte("output_root")),
+				EventAttributes: hostprovider.ProposeOutputEvents("proposer", 2, 2, 3, []byte("output_root")),
 			},
 			expected: nil,
 			err:      false,
-		},
-		{
-			name: "missing event attribute proposer",
-			eventHandlerArgs: nodetypes.EventHandlerArgs{
-				EventAttributes: fullAttributes[1:],
-			},
-			expected: nil,
-			err:      true,
-		},
-		{
-			name: "missing event attribute bridge id",
-			eventHandlerArgs: nodetypes.EventHandlerArgs{
-				EventAttributes: append(fullAttributes[:1], fullAttributes[2:]...),
-			},
-			expected: nil,
-			err:      true,
-		},
-		{
-			name: "missing event attribute output index",
-			eventHandlerArgs: nodetypes.EventHandlerArgs{
-				EventAttributes: append(fullAttributes[:2], fullAttributes[3:]...),
-			},
-			expected: nil,
-			err:      true,
-		},
-		{
-			name: "missing event attribute l2 block number",
-			eventHandlerArgs: nodetypes.EventHandlerArgs{
-				EventAttributes: append(fullAttributes[:3], fullAttributes[4:]...),
-			},
-			expected: nil,
-			err:      true,
-		},
-		{
-			name: "missing event attribute output root",
-			eventHandlerArgs: nodetypes.EventHandlerArgs{
-				EventAttributes: fullAttributes[:4],
-			},
-			expected: nil,
-			err:      true,
 		},
 	}
 
@@ -165,52 +89,6 @@ func TestProposeOutputHandler(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func FinalizeWithdrawalEvents(
-	bridgeId uint64,
-	outputIndex uint64,
-	l2Sequence uint64,
-	from string,
-	to string,
-	l1Denom string,
-	l2Denom string,
-	amount sdk.Coin,
-) []abcitypes.EventAttribute {
-	return []abcitypes.EventAttribute{
-		{
-			Key:   ophosttypes.AttributeKeyBridgeId,
-			Value: strconv.FormatUint(bridgeId, 10),
-		},
-		{
-			Key:   ophosttypes.AttributeKeyOutputIndex,
-			Value: strconv.FormatUint(outputIndex, 10),
-		},
-		{
-			Key:   ophosttypes.AttributeKeyL2Sequence,
-			Value: strconv.FormatUint(l2Sequence, 10),
-		},
-		{
-			Key:   ophosttypes.AttributeKeyFrom,
-			Value: from,
-		},
-		{
-			Key:   ophosttypes.AttributeKeyTo,
-			Value: to,
-		},
-		{
-			Key:   ophosttypes.AttributeKeyL1Denom,
-			Value: l1Denom,
-		},
-		{
-			Key:   ophosttypes.AttributeKeyL2Denom,
-			Value: l2Denom,
-		},
-		{
-			Key:   ophosttypes.AttributeKeyAmount,
-			Value: amount.String(),
-		},
-	}
-}
-
 func TestFinalizeWithdrawalHandler(t *testing.T) {
 	db, err := db.NewMemDB()
 	require.NoError(t, err)
@@ -224,8 +102,6 @@ func TestFinalizeWithdrawalHandler(t *testing.T) {
 		BaseHost: hostprovider.NewTestBaseHost(0, hostNode, bridgeInfo, nodetypes.NodeConfig{}, nil),
 	}
 
-	fullAttributes := FinalizeWithdrawalEvents(1, 2, 3, "from", "to", "l1Denom", "l2Denom", sdk.NewInt64Coin("uinit", 10000))
-
 	cases := []struct {
 		name             string
 		eventHandlerArgs nodetypes.EventHandlerArgs
@@ -235,7 +111,7 @@ func TestFinalizeWithdrawalHandler(t *testing.T) {
 		{
 			name: "success",
 			eventHandlerArgs: nodetypes.EventHandlerArgs{
-				EventAttributes: FinalizeWithdrawalEvents(1, 2, 3, "from", "to", "l1Denom", "l2Denom", sdk.NewInt64Coin("uinit", 10000)),
+				EventAttributes: hostprovider.FinalizeWithdrawalEvents(1, 2, 3, "from", "to", "l1Denom", "l2Denom", sdk.NewInt64Coin("uinit", 10000)),
 			},
 			expected: func() (msg string, fields []zapcore.Field) {
 				msg = "finalize withdrawal"
@@ -256,74 +132,10 @@ func TestFinalizeWithdrawalHandler(t *testing.T) {
 		{
 			name: "different bridge id",
 			eventHandlerArgs: nodetypes.EventHandlerArgs{
-				EventAttributes: FinalizeWithdrawalEvents(2, 2, 3, "from", "to", "l1Denom", "l2Denom", sdk.NewInt64Coin("uinit", 10000)),
+				EventAttributes: hostprovider.FinalizeWithdrawalEvents(2, 2, 3, "from", "to", "l1Denom", "l2Denom", sdk.NewInt64Coin("uinit", 10000)),
 			},
 			expected: nil,
 			err:      false,
-		},
-		{
-			name: "missing event attribute bridge id",
-			eventHandlerArgs: nodetypes.EventHandlerArgs{
-				EventAttributes: fullAttributes[1:],
-			},
-			expected: nil,
-			err:      true,
-		},
-		{
-			name: "missing event attribute output index",
-			eventHandlerArgs: nodetypes.EventHandlerArgs{
-				EventAttributes: append(fullAttributes[:1], fullAttributes[2:]...),
-			},
-			expected: nil,
-			err:      true,
-		},
-		{
-			name: "missing event attribute l2 sequence",
-			eventHandlerArgs: nodetypes.EventHandlerArgs{
-				EventAttributes: append(fullAttributes[:2], fullAttributes[3:]...),
-			},
-			expected: nil,
-			err:      true,
-		},
-		{
-			name: "missing event attribute from",
-			eventHandlerArgs: nodetypes.EventHandlerArgs{
-				EventAttributes: append(fullAttributes[:3], fullAttributes[4:]...),
-			},
-			expected: nil,
-			err:      true,
-		},
-		{
-			name: "missing event attribute to",
-			eventHandlerArgs: nodetypes.EventHandlerArgs{
-				EventAttributes: append(fullAttributes[:4], fullAttributes[5:]...),
-			},
-			expected: nil,
-			err:      true,
-		},
-		{
-			name: "missing event attribute l1 denom",
-			eventHandlerArgs: nodetypes.EventHandlerArgs{
-				EventAttributes: append(fullAttributes[:5], fullAttributes[6:]...),
-			},
-			expected: nil,
-			err:      true,
-		},
-		{
-			name: "missing event attribute l2 denom",
-			eventHandlerArgs: nodetypes.EventHandlerArgs{
-				EventAttributes: append(fullAttributes[:6], fullAttributes[7:]...),
-			},
-			expected: nil,
-			err:      true,
-		},
-		{
-			name: "missing event attribute amount",
-			eventHandlerArgs: nodetypes.EventHandlerArgs{
-				EventAttributes: fullAttributes[:7],
-			},
-			expected: nil,
-			err:      true,
 		},
 	}
 

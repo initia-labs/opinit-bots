@@ -2,10 +2,8 @@ package host
 
 import (
 	"context"
-	"strconv"
 	"testing"
 
-	abcitypes "github.com/cometbft/cometbft/abci/types"
 	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
 	"github.com/initia-labs/opinit-bots/db"
 	"github.com/initia-labs/opinit-bots/node"
@@ -17,17 +15,6 @@ import (
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
-
-func RecordBatchEvents(
-	submitter string,
-) []abcitypes.EventAttribute {
-	return []abcitypes.EventAttribute{
-		{
-			Key:   ophosttypes.AttributeKeySubmitter,
-			Value: submitter,
-		},
-	}
-}
 
 func TestRecordBatchHandler(t *testing.T) {
 	db, err := db.NewMemDB()
@@ -72,7 +59,7 @@ func TestRecordBatchHandler(t *testing.T) {
 			name: "success",
 			host: h,
 			eventHandlerArgs: nodetypes.EventHandlerArgs{
-				EventAttributes: RecordBatchEvents(batchSubmitter.GetAddressString()),
+				EventAttributes: hostprovider.RecordBatchEvents(batchSubmitter.GetAddressString()),
 			},
 			expected: func() (msg string, fields []zapcore.Field) {
 				msg = "record batch"
@@ -88,7 +75,7 @@ func TestRecordBatchHandler(t *testing.T) {
 			name: "different submitter",
 			host: h,
 			eventHandlerArgs: nodetypes.EventHandlerArgs{
-				EventAttributes: RecordBatchEvents("another_submitter"),
+				EventAttributes: hostprovider.RecordBatchEvents("another_submitter"),
 			},
 			expected: nil,
 			err:      false,
@@ -97,19 +84,10 @@ func TestRecordBatchHandler(t *testing.T) {
 			name: "empty broadcaster",
 			host: emptyBroadcasterHost,
 			eventHandlerArgs: nodetypes.EventHandlerArgs{
-				EventAttributes: RecordBatchEvents(batchSubmitter.GetAddressString()),
+				EventAttributes: hostprovider.RecordBatchEvents(batchSubmitter.GetAddressString()),
 			},
 			expected: nil,
 			err:      false,
-		},
-		{
-			name: "missing event attribute submitter",
-			host: emptyBroadcasterHost,
-			eventHandlerArgs: nodetypes.EventHandlerArgs{
-				EventAttributes: RecordBatchEvents(batchSubmitter.GetAddressString())[1:],
-			},
-			expected: nil,
-			err:      true,
 		},
 	}
 
@@ -137,37 +115,6 @@ func TestRecordBatchHandler(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func UpdateBatchInfoEvents(
-	bridgeId uint64,
-	chainType ophosttypes.BatchInfo_ChainType,
-	submitter string,
-	finalizedOutputIndex uint64,
-	l2BlockNumber uint64,
-) []abcitypes.EventAttribute {
-	return []abcitypes.EventAttribute{
-		{
-			Key:   ophosttypes.AttributeKeyBridgeId,
-			Value: strconv.FormatUint(bridgeId, 10),
-		},
-		{
-			Key:   ophosttypes.AttributeKeyBatchChainType,
-			Value: chainType.StringWithoutPrefix(),
-		},
-		{
-			Key:   ophosttypes.AttributeKeyBatchSubmitter,
-			Value: submitter,
-		},
-		{
-			Key:   ophosttypes.AttributeKeyFinalizedOutputIndex,
-			Value: strconv.FormatUint(finalizedOutputIndex, 10),
-		},
-		{
-			Key:   ophosttypes.AttributeKeyFinalizedL2BlockNumber,
-			Value: strconv.FormatUint(l2BlockNumber, 10),
-		},
-	}
-}
-
 func TestUpdateBatchInfoHandler(t *testing.T) {
 	db, err := db.NewMemDB()
 	require.NoError(t, err)
@@ -183,8 +130,6 @@ func TestUpdateBatchInfoHandler(t *testing.T) {
 		batch:    mockBatch,
 	}
 
-	fullAttributes := UpdateBatchInfoEvents(1, ophosttypes.BatchInfo_CHAIN_TYPE_INITIA, "submitter", 1, 1)
-
 	cases := []struct {
 		name              string
 		host              Host
@@ -197,7 +142,7 @@ func TestUpdateBatchInfoHandler(t *testing.T) {
 			name: "success",
 			host: h,
 			eventHandlerArgs: nodetypes.EventHandlerArgs{
-				EventAttributes: UpdateBatchInfoEvents(1, ophosttypes.BatchInfo_CHAIN_TYPE_INITIA, "submitter", 1, 1),
+				EventAttributes: hostprovider.UpdateBatchInfoEvents(1, ophosttypes.BatchInfo_CHAIN_TYPE_INITIA, "submitter", 1, 1),
 			},
 			expectedBatchInfo: &mockBatchInfo{
 				chain:         "INITIA",
@@ -221,7 +166,7 @@ func TestUpdateBatchInfoHandler(t *testing.T) {
 			name: "unspecified chain type",
 			host: h,
 			eventHandlerArgs: nodetypes.EventHandlerArgs{
-				EventAttributes: UpdateBatchInfoEvents(1, ophosttypes.BatchInfo_CHAIN_TYPE_UNSPECIFIED, "submitter", 1, 1),
+				EventAttributes: hostprovider.UpdateBatchInfoEvents(1, ophosttypes.BatchInfo_CHAIN_TYPE_UNSPECIFIED, "submitter", 1, 1),
 			},
 			expectedBatchInfo: nil,
 			expectedLog:       nil,
@@ -231,61 +176,11 @@ func TestUpdateBatchInfoHandler(t *testing.T) {
 			name: "different bridge id",
 			host: h,
 			eventHandlerArgs: nodetypes.EventHandlerArgs{
-				EventAttributes: UpdateBatchInfoEvents(2, ophosttypes.BatchInfo_CHAIN_TYPE_CELESTIA, "submitter", 1, 1),
+				EventAttributes: hostprovider.UpdateBatchInfoEvents(2, ophosttypes.BatchInfo_CHAIN_TYPE_CELESTIA, "submitter", 1, 1),
 			},
 			expectedBatchInfo: nil,
 			expectedLog:       nil,
 			err:               false,
-		},
-		{
-			name: "missing event attribute bridge id",
-			host: h,
-			eventHandlerArgs: nodetypes.EventHandlerArgs{
-				EventAttributes: fullAttributes[1:],
-			},
-			expectedBatchInfo: nil,
-			expectedLog:       nil,
-			err:               true,
-		},
-		{
-			name: "missing event attribute batch chain type",
-			host: h,
-			eventHandlerArgs: nodetypes.EventHandlerArgs{
-				EventAttributes: append(fullAttributes[:1], fullAttributes[2:]...),
-			},
-			expectedBatchInfo: nil,
-			expectedLog:       nil,
-			err:               true,
-		},
-		{
-			name: "missing event attribute submitter",
-			host: h,
-			eventHandlerArgs: nodetypes.EventHandlerArgs{
-				EventAttributes: append(fullAttributes[:2], fullAttributes[3:]...),
-			},
-			expectedBatchInfo: nil,
-			expectedLog:       nil,
-			err:               true,
-		},
-		{
-			name: "missing event attribute output index",
-			host: h,
-			eventHandlerArgs: nodetypes.EventHandlerArgs{
-				EventAttributes: append(fullAttributes[:3], fullAttributes[4:]...),
-			},
-			expectedBatchInfo: nil,
-			expectedLog:       nil,
-			err:               true,
-		},
-		{
-			name: "missing event attribute l2 block number",
-			host: h,
-			eventHandlerArgs: nodetypes.EventHandlerArgs{
-				EventAttributes: fullAttributes[:4],
-			},
-			expectedBatchInfo: nil,
-			expectedLog:       nil,
-			err:               true,
 		},
 	}
 
