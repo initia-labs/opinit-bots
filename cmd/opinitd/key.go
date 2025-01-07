@@ -35,10 +35,11 @@ import (
 )
 
 const (
-	flagRecover      = "recover"
-	flagMnemonicSrc  = "source"
-	flagBech32Prefix = "bech32"
-	flagOutput       = "output"
+	flagRecover        = "recover"
+	flagMnemonicSrc    = "source"
+	flagMnemonicString = "mnemonic"
+	flagBech32Prefix   = "bech32"
+	flagOutput         = "output"
 )
 
 type keyJsonOutput map[string]keyJsonOutputElem
@@ -79,6 +80,7 @@ $ keys add localnet key1
 $ keys add l2 key2 --bech32 celestia
 $ keys add l2 key2 --recover 
 $ keys add l2 key2 --recover --source mnemonic.txt
+$ keys add l2 key2 --recover --mnemonic "[mnemonic...]"
 $ keys add l2 key2 --output json`),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			chainId := args[0]
@@ -106,9 +108,12 @@ $ keys add l2 key2 --output json`),
 			mnemonic := ""
 			recoverFlag, _ := cmd.Flags().GetBool(flagRecover)
 			mnemonicSrc, _ := cmd.Flags().GetString(flagMnemonicSrc)
+			mnemonicString, _ := cmd.Flags().GetString(flagMnemonicString)
 
 			if recoverFlag {
-				if mnemonicSrc != "" {
+				if mnemonicString != "" {
+					mnemonic = mnemonicString
+				} else if mnemonicSrc != "" {
 					file, err := os.Open(mnemonicSrc)
 					if err != nil {
 						return err
@@ -172,6 +177,7 @@ $ keys add l2 key2 --output json`),
 	}
 	cmd.Flags().Bool(flagRecover, false, "Provide seed phrase to recover existing key instead of creating")
 	cmd.Flags().String(flagMnemonicSrc, "", "Import mnemonic from a file")
+	cmd.Flags().String(flagMnemonicString, "", "Import mnemonic from string")
 	cmd.Flags().String(flagBech32Prefix, "init", "Bech32 prefix")
 	cmd.Flags().String(flagOutput, "plain", "Output format (plain|json)")
 	return cmd

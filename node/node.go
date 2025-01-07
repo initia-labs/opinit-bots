@@ -41,6 +41,7 @@ type Node struct {
 	syncedHeight           int64
 
 	startOnce *sync.Once
+	syncing   bool
 }
 
 func NewNode(cfg nodetypes.NodeConfig, db types.DB, cdc codec.Codec, txConfig client.TxConfig) (*Node, error) {
@@ -65,6 +66,7 @@ func NewNode(cfg nodetypes.NodeConfig, db types.DB, cdc codec.Codec, txConfig cl
 		txConfig: txConfig,
 
 		startOnce: &sync.Once{},
+		syncing:   true,
 	}
 	// create broadcaster
 	if n.cfg.BroadcasterConfig != nil {

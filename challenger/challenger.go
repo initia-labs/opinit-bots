@@ -225,6 +225,14 @@ func (c *Challenger) RegisterQuerier() {
 		}
 		return ctx.JSON(pendingEvents)
 	})
+
+	c.server.RegisterQuerier("/syncing", func(ctx *fiber.Ctx) error {
+		status, err := c.GetStatus()
+		if err != nil {
+			return err
+		}
+		return ctx.JSON(*status.Host.Node.Syncing && *status.Child.Node.Syncing)
+	})
 }
 
 func (c *Challenger) getNodeStartHeights(ctx types.Context, bridgeId uint64) (l1StartHeight int64, l2StartHeight int64, startOutputIndex uint64, err error) {
@@ -283,7 +291,6 @@ func (c *Challenger) getNodeStartHeights(ctx types.Context, bridgeId uint64) (l1
 			}
 		}
 	}
-
 	return
 }
 
