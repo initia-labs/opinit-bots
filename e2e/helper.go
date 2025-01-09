@@ -13,6 +13,8 @@ import (
 	"cosmossdk.io/math"
 	"cosmossdk.io/x/feegrant"
 	"github.com/avast/retry-go/v4"
+	ibcclienttypes "github.com/cosmos/ibc-go/v8/modules/core/02-client/types"
+	ibctmlightclients "github.com/cosmos/ibc-go/v8/modules/light-clients/07-tendermint"
 	"github.com/icza/dyno"
 	oracleconfig "github.com/skip-mev/connect/v2/oracle/config"
 	"github.com/skip-mev/connect/v2/providers/apis/marketmap"
@@ -118,6 +120,8 @@ func MinitiaEncoding() *cosmostestutil.TestEncodingConfig {
 	cfg := cosmos.DefaultEncoding()
 	authz.RegisterInterfaces(cfg.InterfaceRegistry)
 	feegrant.RegisterInterfaces(cfg.InterfaceRegistry)
+	ibcclienttypes.RegisterInterfaces(cfg.InterfaceRegistry)
+	ibctmlightclients.RegisterInterfaces(cfg.InterfaceRegistry)
 	opchildtypes.RegisterInterfaces(cfg.InterfaceRegistry)
 	return &cfg
 }
@@ -130,6 +134,7 @@ func SetupTest(
 	l2ChainConfig *ChainConfig,
 	daChainConfig *DAChainConfig,
 	bridgeConfig *BridgeConfig,
+	relayerImpl ibc.RelayerImplementation,
 ) OPTestHelper {
 	require.NotNil(t, l1ChainConfig)
 	require.NotNil(t, l2ChainConfig)
@@ -383,7 +388,7 @@ func SetupTest(
 
 	// relayer setup
 
-	relayer := interchaintest.NewBuiltinRelayerFactory(ibc.CosmosRly, zaptest.NewLogger(t)).Build(t, client, network)
+	relayer := interchaintest.NewBuiltinRelayerFactory(relayerImpl, zaptest.NewLogger(t)).Build(t, client, network)
 
 	ic := interchaintest.NewInterchain().
 		AddChain(initia).
@@ -394,6 +399,9 @@ func SetupTest(
 			Chain2:  minitia,
 			Relayer: relayer,
 			Path:    ibcPath,
+			CreateClientOpts: ibc.CreateClientOptions{
+				TrustingPeriod: initia.Config().TrustingPeriod,
+			},
 		})
 
 	da := initia
@@ -496,7 +504,6 @@ func SetupTest(
 	})
 	err = op.WaitForSync(ctx)
 	require.NoError(t, err)
-
 	return helper
 }
 
@@ -558,7 +565,7 @@ func (op OPTestHelper) ExecutorConfig() *executortypes.Config {
 		L1Node: executortypes.NodeConfig{
 			ChainID:       op.Initia.Config().ChainID,
 			Bech32Prefix:  op.Initia.Config().Bech32Prefix,
-			RPCAddress:    fmt.Sprintf("http://%s:26657", op.Initia.GetFullNode().Name()),
+			RPCAddress:    fmt.Sprintf("http://%s:26657", op.Initia.GetFullNode().HostName()),
 			GasPrice:      op.Initia.Config().GasPrices,
 			GasAdjustment: op.Initia.Config().GasAdjustment,
 			TxTimeout:     10,
@@ -567,7 +574,7 @@ func (op OPTestHelper) ExecutorConfig() *executortypes.Config {
 		L2Node: executortypes.NodeConfig{
 			ChainID:       op.Minitia.Config().ChainID,
 			Bech32Prefix:  op.Minitia.Config().Bech32Prefix,
-			RPCAddress:    fmt.Sprintf("http://%s:26657", op.Minitia.GetFullNode().Name()),
+			RPCAddress:    fmt.Sprintf("http://%s:26657", op.Minitia.GetFullNode().HostName()),
 			GasPrice:      "",
 			GasAdjustment: op.Minitia.Config().GasAdjustment,
 			TxTimeout:     10,
@@ -576,7 +583,7 @@ func (op OPTestHelper) ExecutorConfig() *executortypes.Config {
 		DANode: executortypes.NodeConfig{
 			ChainID:       op.DA.Config().ChainID,
 			Bech32Prefix:  op.DA.Config().Bech32Prefix,
-			RPCAddress:    fmt.Sprintf("http://%s:26657", op.DA.GetFullNode().Name()),
+			RPCAddress:    fmt.Sprintf("http://%s:26657", op.DA.GetFullNode().HostName()),
 			GasPrice:      op.DA.Config().GasPrices,
 			GasAdjustment: op.DA.Config().GasAdjustment,
 			TxTimeout:     10,

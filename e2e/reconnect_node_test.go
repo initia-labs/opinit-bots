@@ -54,7 +54,7 @@ func TestReconnectNodes(t *testing.T) {
 
 	ctx := context.Background()
 
-	op := SetupTest(t, ctx, BotExecutor, l1ChainConfig, l2ChainConfig, daChainConfig, bridgeConfig)
+	op := SetupTest(t, ctx, BotExecutor, l1ChainConfig, l2ChainConfig, daChainConfig, bridgeConfig, ibc.CosmosRly)
 	err := op.Relayer.PauseRelayer(ctx)
 	require.NoError(t, err)
 

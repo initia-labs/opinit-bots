@@ -494,7 +494,7 @@ func (op *DockerOPBot) pullContainerImageIfNecessary(containerImage ibc.DockerIm
 }
 
 func (op *DockerOPBot) Name() string {
-	return op.c.Name() + "-" + op.botName + "-" + dockerutil.SanitizeContainerName(op.testName)
+	return dockerutil.CondenseHostName(dockerutil.SanitizeContainerName(op.c.Name() + "-" + op.botName + "-" + op.testName))
 }
 
 func (op *DockerOPBot) Bind() []string {

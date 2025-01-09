@@ -3,11 +3,14 @@ package batchsubmitter
 import (
 	"context"
 
+	coretypes "github.com/cometbft/cometbft/rpc/core/types"
+	cmttypes "github.com/cometbft/cometbft/types"
 	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
 	executortypes "github.com/initia-labs/opinit-bots/executor/types"
 	btypes "github.com/initia-labs/opinit-bots/node/broadcaster/types"
 	nodetypes "github.com/initia-labs/opinit-bots/node/types"
 	"github.com/initia-labs/opinit-bots/types"
+	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zaptest/observer"
 
@@ -17,11 +20,15 @@ import (
 
 type mockHost struct {
 	batchInfos []ophosttypes.BatchInfoWithOutput
+	blocks     map[int64]*cmttypes.Block
+	chainId    string
 }
 
-func NewMockHost(batchInfos []ophosttypes.BatchInfoWithOutput) *mockHost {
+func NewMockHost(batchInfos []ophosttypes.BatchInfoWithOutput, chainId string) *mockHost {
 	return &mockHost{
 		batchInfos: batchInfos,
+		blocks:     make(map[int64]*cmttypes.Block),
+		chainId:    chainId,
 	}
 }
 
@@ -29,6 +36,23 @@ func (m *mockHost) QueryBatchInfos(ctx context.Context, bridgeId uint64) (*ophos
 	return &ophosttypes.QueryBatchInfosResponse{
 		BatchInfos: m.batchInfos,
 	}, nil
+}
+
+func (m *mockHost) QueryBlock(ctx context.Context, height int64) (*coretypes.ResultBlock, error) {
+	if block, ok := m.blocks[height]; ok {
+		return &coretypes.ResultBlock{
+			Block: block,
+		}, nil
+	}
+	return nil, errors.New("block not found")
+}
+
+func (m *mockHost) SetBlock(height int64, block *cmttypes.Block) {
+	m.blocks[height] = block
+}
+
+func (m *mockHost) ChainId() string {
+	return m.chainId
 }
 
 var _ hostNode = (*mockHost)(nil)
