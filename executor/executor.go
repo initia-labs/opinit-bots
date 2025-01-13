@@ -207,12 +207,6 @@ func (ex *Executor) getNodeStartHeights(ctx types.Context, bridgeId uint64) (l1S
 		if ex.cfg.DisableAutoSetL1Height {
 			l1StartHeight = ex.cfg.L1StartHeight
 		} else {
-			// get the bridge start height from the host
-			l1StartHeight, err = ex.host.QueryCreateBridgeHeight(ctx, bridgeId)
-			if err != nil {
-				return 0, 0, 0, 0, errors.Wrap(err, "failed to query create bridge height")
-			}
-
 			childNextL1Sequence, err := ex.child.QueryNextL1Sequence(ctx, 0)
 			if err != nil {
 				return 0, 0, 0, 0, errors.Wrap(err, "failed to query next l1 sequence")
@@ -237,6 +231,14 @@ func (ex *Executor) getNodeStartHeights(ctx types.Context, bridgeId uint64) (l1S
 
 			if outputL1Height != 0 && outputL1Height+1 < l1StartHeight {
 				l1StartHeight = outputL1Height + 1
+			}
+
+			// if l1 start height is not set, get the bridge start height from the host
+			if l1StartHeight == 0 {
+				l1StartHeight, err = ex.host.QueryCreateBridgeHeight(ctx, bridgeId)
+				if err != nil {
+					return 0, 0, 0, 0, errors.Wrap(err, "failed to query create bridge height")
+				}
 			}
 		}
 	}
