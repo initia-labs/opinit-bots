@@ -64,3 +64,5 @@ func (m *mockChallenger) DB() types.DB {
 func (m *mockChallenger) SendPendingChallenges(challenges []challengertypes.Challenge) {
 	m.pendingChallenges = append(m.pendingChallenges, challenges...)
 }
+
+var _ challenger = (*mockChallenger)(nil)
