@@ -262,12 +262,6 @@ func (c *Challenger) getNodeStartHeights(ctx types.Context, bridgeId uint64) (l1
 	if c.cfg.DisableAutoSetL1Height {
 		l1StartHeight = c.cfg.L1StartHeight
 	} else {
-		// get the bridge start height from the host
-		l1StartHeight, err = c.host.QueryCreateBridgeHeight(ctx, bridgeId)
-		if err != nil {
-			return 0, 0, 0, err
-		}
-
 		if l2StartHeight > 1 {
 			l1Sequence, err := c.child.QueryNextL1Sequence(ctx, l2StartHeight-1)
 			if err != nil {
@@ -290,6 +284,15 @@ func (c *Challenger) getNodeStartHeights(ctx types.Context, bridgeId uint64) (l1
 			}
 			if outputL1Height != 0 && outputL1Height < l1StartHeight {
 				l1StartHeight = outputL1Height + 1
+			}
+		}
+
+		// if l1 start height is not set, get the bridge start height from the host
+		if l1StartHeight == 0 {
+			// get the bridge start height from the host
+			l1StartHeight, err = c.host.QueryCreateBridgeHeight(ctx, bridgeId)
+			if err != nil {
+				return 0, 0, 0, err
 			}
 		}
 	}

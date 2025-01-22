@@ -94,7 +94,7 @@ func (bs *BatchSubmitter) emptyUpdateClientData(ctx types.Context, pbb *cmtproto
 				continue
 			}
 		}
-		return block, nil
+		return block, err
 	}
 
 	for txIndex, txBytes := range pbb.Data.GetTxs() {
