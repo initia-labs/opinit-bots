@@ -5,8 +5,20 @@ import (
 	"sort"
 
 	challengertypes "github.com/initia-labs/opinit-bots/challenger/types"
-	"github.com/pkg/errors"
 )
+
+func (ch *ChallengeEventHandler) SetPendingEvents(events []challengertypes.ChallengeEvent) {
+	if len(events) == 0 {
+		return
+	}
+
+	ch.pendingEventsMu.Lock()
+	defer ch.pendingEventsMu.Unlock()
+
+	for _, event := range events {
+		ch.pendingEvents[event.Id()] = event
+	}
+}
 
 func (ch *ChallengeEventHandler) GetPendingEvent(id challengertypes.ChallengeId) (challengertypes.ChallengeEvent, bool) {
 	ch.pendingEventsMu.Lock()
@@ -32,13 +44,14 @@ func (ch *ChallengeEventHandler) DeletePendingEvent(id challengertypes.Challenge
 	delete(ch.pendingEvents, id)
 }
 
-func (ch *ChallengeEventHandler) getOraclePendingEvents(l1BlockHeight uint64) []challengertypes.ChallengeEvent {
+// get all pending oracle events that are less than toL1BlockHeight
+func (ch *ChallengeEventHandler) getOraclePendingEvents(toL1BlockHeight uint64) []challengertypes.ChallengeEvent {
 	ch.pendingEventsMu.Lock()
 	defer ch.pendingEventsMu.Unlock()
 
 	events := make([]challengertypes.ChallengeEvent, 0)
 	for _, event := range ch.pendingEvents {
-		if event.Type() == challengertypes.EventTypeOracle && event.Id().Id < l1BlockHeight {
+		if event.Type() == challengertypes.EventTypeOracle && event.Id().Id < toL1BlockHeight {
 			events = append(events, event)
 		}
 	}
@@ -85,33 +98,4 @@ func (ch *ChallengeEventHandler) GetUnprocessedPendingEvents(processedEvents []c
 		unprocessedPendingEvents = append(unprocessedPendingEvents, event)
 	}
 	return unprocessedPendingEvents
-}
-
-func (ch *ChallengeEventHandler) SetPendingEvents(events []challengertypes.ChallengeEvent) {
-	ch.pendingEventsMu.Lock()
-	defer ch.pendingEventsMu.Unlock()
-
-	for _, event := range events {
-		ch.pendingEvents[event.Id()] = event
-	}
-}
-
-func (ch *ChallengeEventHandler) loadPendingEvents() (events []challengertypes.ChallengeEvent, err error) {
-	iterErr := ch.db.Iterate(challengertypes.PendingEventKey, nil, func(key, value []byte) (stop bool, err error) {
-		id, err := challengertypes.ParsePendingEvent(key)
-		if err != nil {
-			return true, errors.Wrap(err, "failed to parse pending event key")
-		}
-
-		event, err := challengertypes.UnmarshalChallengeEvent(id.Type, value)
-		if err != nil {
-			return true, errors.Wrap(err, "failed to unmarshal challenge event")
-		}
-		events = append(events, event)
-		return false, nil
-	})
-	if iterErr != nil {
-		return nil, iterErr
-	}
-	return
 }

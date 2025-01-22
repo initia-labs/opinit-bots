@@ -24,6 +24,8 @@ type challenger interface {
 type childNode interface {
 	DB() types.DB
 	SetPendingEvents([]challengertypes.ChallengeEvent)
+	Height() int64
+	QueryNextL1Sequence(context.Context, int64) (uint64, error)
 }
 
 type Host struct {
@@ -32,6 +34,8 @@ type Host struct {
 	child        childNode
 	challenger   challenger
 	eventHandler *eventhandler.ChallengeEventHandler
+
+	initialL1Sequence uint64
 
 	eventQueue              []challengertypes.ChallengeEvent
 	outputPendingEventQueue []challengertypes.ChallengeEvent
@@ -63,7 +67,14 @@ func (h *Host) Initialize(ctx types.Context, processedHeight int64, child childN
 	}
 	h.child = child
 	h.challenger = challenger
-	// TODO: ignore l1Sequence less than child's last l1 sequence
+
+	// fetch next l1 sequence to process, we don't need to process previous l1 sequences
+	// because they are already processed by the challenger.
+	h.initialL1Sequence, err = h.child.QueryNextL1Sequence(ctx, h.child.Height())
+	if err != nil {
+		return time.Time{}, errors.Wrap(err, "failed to query next l1 sequence")
+	}
+
 	h.registerHandlers()
 
 	err = h.eventHandler.Initialize(bridgeInfo.BridgeConfig.SubmissionInterval)

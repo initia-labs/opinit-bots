@@ -2,7 +2,6 @@ package host
 
 import (
 	"encoding/base64"
-	"time"
 
 	nodetypes "github.com/initia-labs/opinit-bots/node/types"
 	hostprovider "github.com/initia-labs/opinit-bots/provider/host"
@@ -22,14 +21,11 @@ func (h *Host) proposeOutputHandler(ctx types.Context, args nodetypes.EventHandl
 		// pass other bridge output proposal event
 		return nil
 	}
-	return h.handleProposeOutput(ctx, bridgeId, proposer, outputIndex, l2BlockNumber, outputRoot, args.BlockTime)
-}
 
-func (h *Host) handleProposeOutput(ctx types.Context, bridgeId uint64, proposer string, outputIndex uint64, l2BlockNumber int64, outputRoot []byte, blockTime time.Time) error {
-	output := challengertypes.NewOutput(l2BlockNumber, outputIndex, outputRoot[:], blockTime)
+	output := challengertypes.NewOutput(l2BlockNumber, outputIndex, outputRoot[:], args.BlockTime)
 
 	h.lastOutputIndex = outputIndex
-	h.lastOutputTime = blockTime
+	h.lastOutputTime = args.BlockTime
 	h.eventQueue = append(h.eventQueue, output)
 	h.outputPendingEventQueue = append(h.outputPendingEventQueue, output)
 

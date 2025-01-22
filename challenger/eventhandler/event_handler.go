@@ -24,7 +24,7 @@ func NewChallengeEventHandler(db types.DB) *ChallengeEventHandler {
 }
 
 func (ch *ChallengeEventHandler) Initialize(timeoutDuration time.Duration) error {
-	pendingEvents, err := ch.loadPendingEvents()
+	pendingEvents, err := LoadPendingEvents(ch.db)
 	if err != nil {
 		return err
 	}
