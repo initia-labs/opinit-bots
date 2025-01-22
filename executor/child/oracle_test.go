@@ -5,8 +5,6 @@ import (
 	"strconv"
 	"testing"
 
-	abcitypes "github.com/cometbft/cometbft/abci/types"
-	opchildtypes "github.com/initia-labs/OPinit/x/opchild/types"
 	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
 	"github.com/initia-labs/opinit-bots/db"
 	"github.com/initia-labs/opinit-bots/node"
@@ -17,22 +15,6 @@ import (
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
-
-func UpdateOracleEvents(
-	l1BlockHeight uint64,
-	from string,
-) []abcitypes.EventAttribute {
-	return []abcitypes.EventAttribute{
-		{
-			Key:   opchildtypes.AttributeKeyHeight,
-			Value: strconv.FormatUint(l1BlockHeight, 10),
-		},
-		{
-			Key:   opchildtypes.AttributeKeyFrom,
-			Value: from,
-		},
-	}
-}
 
 func TestUpdateOracleHandler(t *testing.T) {
 	db, err := db.NewMemDB()
@@ -47,8 +29,6 @@ func TestUpdateOracleHandler(t *testing.T) {
 		BaseChild: childprovider.NewTestBaseChild(0, childNode, nil, bridgeInfo, nil, nodetypes.NodeConfig{}),
 	}
 
-	fullAttributes := UpdateOracleEvents(1, "sender")
-
 	cases := []struct {
 		name             string
 		eventHandlerArgs nodetypes.EventHandlerArgs
@@ -58,7 +38,7 @@ func TestUpdateOracleHandler(t *testing.T) {
 		{
 			name: "success",
 			eventHandlerArgs: nodetypes.EventHandlerArgs{
-				EventAttributes: UpdateOracleEvents(1, "sender"),
+				EventAttributes: childprovider.UpdateOracleEvents(1, "sender"),
 			},
 			expected: func() (msg string, fields []zapcore.Field) {
 				msg = "update oracle"
@@ -69,22 +49,6 @@ func TestUpdateOracleHandler(t *testing.T) {
 				return msg, fields
 			},
 			err: false,
-		},
-		{
-			name: "missing event attribute l1 block height",
-			eventHandlerArgs: nodetypes.EventHandlerArgs{
-				EventAttributes: fullAttributes[1:],
-			},
-			expected: nil,
-			err:      true,
-		},
-		{
-			name: "missing event attribute from",
-			eventHandlerArgs: nodetypes.EventHandlerArgs{
-				EventAttributes: fullAttributes[:1],
-			},
-			expected: nil,
-			err:      true,
 		},
 	}
 

@@ -24,7 +24,7 @@ func missingAttrsError(missingAttrs map[string]struct{}) error {
 }
 
 func ParseFinalizeDeposit(eventAttrs []abcitypes.EventAttribute) (
-	l1BlockHeight int64,
+	finalizeHeight int64,
 	l1Sequence uint64,
 	from, to, baseDenom string,
 	amount sdk.Coin,
@@ -63,7 +63,7 @@ func ParseFinalizeDeposit(eventAttrs []abcitypes.EventAttribute) (
 			}
 			amount.Amount = coinAmount
 		case opchildtypes.AttributeKeyFinalizeHeight:
-			l1BlockHeight, err = strconv.ParseInt(attr.Value, 10, 64)
+			finalizeHeight, err = strconv.ParseInt(attr.Value, 10, 64)
 			if err != nil {
 				err = errors.Wrap(err, "failed to parse l1 block height")
 				return
@@ -106,12 +106,13 @@ func ParseUpdateOracle(eventAttrs []abcitypes.EventAttribute) (
 
 func ParseInitiateWithdrawal(eventAttrs []abcitypes.EventAttribute) (
 	l2Sequence, amount uint64,
-	from, to, baseDenom string,
+	from, to, denom, baseDenom string,
 	err error) {
 	missingAttrs := map[string]struct{}{
 		opchildtypes.AttributeKeyL2Sequence: {},
 		opchildtypes.AttributeKeyFrom:       {},
 		opchildtypes.AttributeKeyTo:         {},
+		opchildtypes.AttributeKeyDenom:      {},
 		opchildtypes.AttributeKeyBaseDenom:  {},
 		opchildtypes.AttributeKeyAmount:     {},
 	}
@@ -127,6 +128,8 @@ func ParseInitiateWithdrawal(eventAttrs []abcitypes.EventAttribute) (
 			from = attr.Value
 		case opchildtypes.AttributeKeyTo:
 			to = attr.Value
+		case opchildtypes.AttributeKeyDenom:
+			denom = attr.Value
 		case opchildtypes.AttributeKeyBaseDenom:
 			baseDenom = attr.Value
 		case opchildtypes.AttributeKeyAmount:

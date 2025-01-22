@@ -5,8 +5,6 @@ import (
 	"strconv"
 	"testing"
 
-	abcitypes "github.com/cometbft/cometbft/abci/types"
-	opchildtypes "github.com/initia-labs/OPinit/x/opchild/types"
 	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
 	"github.com/initia-labs/opinit-bots/db"
 	"github.com/initia-labs/opinit-bots/node"
@@ -19,47 +17,6 @@ import (
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 )
-
-func FinalizeDepositEvents(
-	l1Sequence uint64,
-	sender string,
-	recipient string,
-	denom string,
-	baseDenom string,
-	amount sdk.Coin,
-	finalizeHeight uint64,
-) []abcitypes.EventAttribute {
-	return []abcitypes.EventAttribute{
-		{
-			Key:   opchildtypes.AttributeKeyL1Sequence,
-			Value: strconv.FormatUint(l1Sequence, 10),
-		},
-		{
-			Key:   opchildtypes.AttributeKeySender,
-			Value: sender,
-		},
-		{
-			Key:   opchildtypes.AttributeKeyRecipient,
-			Value: recipient,
-		},
-		{
-			Key:   opchildtypes.AttributeKeyDenom,
-			Value: denom,
-		},
-		{
-			Key:   opchildtypes.AttributeKeyBaseDenom,
-			Value: baseDenom,
-		},
-		{
-			Key:   opchildtypes.AttributeKeyAmount,
-			Value: amount.Amount.String(),
-		},
-		{
-			Key:   opchildtypes.AttributeKeyFinalizeHeight,
-			Value: strconv.FormatUint(finalizeHeight, 10),
-		},
-	}
-}
 
 func TestFinalizeDepositHandler(t *testing.T) {
 	db, err := db.NewMemDB()
@@ -74,8 +31,6 @@ func TestFinalizeDepositHandler(t *testing.T) {
 		BaseChild: childprovider.NewTestBaseChild(0, childNode, nil, bridgeInfo, nil, nodetypes.NodeConfig{}),
 	}
 
-	fullAttributes := FinalizeDepositEvents(1, "sender", "recipient", "denom", "baseDenom", sdk.NewInt64Coin("uinit", 10000), 2)
-
 	cases := []struct {
 		name             string
 		eventHandlerArgs nodetypes.EventHandlerArgs
@@ -85,7 +40,7 @@ func TestFinalizeDepositHandler(t *testing.T) {
 		{
 			name: "success",
 			eventHandlerArgs: nodetypes.EventHandlerArgs{
-				EventAttributes: FinalizeDepositEvents(1, "sender", "recipient", "denom", "baseDenom", sdk.NewInt64Coin("uinit", 10000), 2),
+				EventAttributes: childprovider.FinalizeDepositEvents(1, "sender", "recipient", "denom", "baseDenom", sdk.NewInt64Coin("denom", 10000), 2),
 			},
 			expected: func() (msg string, fields []zapcore.Field) {
 				msg = "finalize token deposit"
@@ -100,62 +55,6 @@ func TestFinalizeDepositHandler(t *testing.T) {
 				return msg, fields
 			},
 			err: false,
-		},
-		{
-			name: "missing event attribute l1 sequence",
-			eventHandlerArgs: nodetypes.EventHandlerArgs{
-				EventAttributes: fullAttributes[1:],
-			},
-			expected: nil,
-			err:      true,
-		},
-		{
-			name: "missing event attribute sender",
-			eventHandlerArgs: nodetypes.EventHandlerArgs{
-				EventAttributes: append(fullAttributes[:1], fullAttributes[2:]...),
-			},
-			expected: nil,
-			err:      true,
-		},
-		{
-			name: "missing event attribute recipient",
-			eventHandlerArgs: nodetypes.EventHandlerArgs{
-				EventAttributes: append(fullAttributes[:2], fullAttributes[3:]...),
-			},
-			expected: nil,
-			err:      true,
-		},
-		{
-			name: "missing event attribute l1 denom",
-			eventHandlerArgs: nodetypes.EventHandlerArgs{
-				EventAttributes: append(fullAttributes[:3], fullAttributes[4:]...),
-			},
-			expected: nil,
-			err:      true,
-		},
-		{
-			name: "missing event attribute l2 denom",
-			eventHandlerArgs: nodetypes.EventHandlerArgs{
-				EventAttributes: append(fullAttributes[:4], fullAttributes[5:]...),
-			},
-			expected: nil,
-			err:      true,
-		},
-		{
-			name: "missing event attribute amount",
-			eventHandlerArgs: nodetypes.EventHandlerArgs{
-				EventAttributes: append(fullAttributes[:5], fullAttributes[6:]...),
-			},
-			expected: nil,
-			err:      true,
-		},
-		{
-			name: "missing event attribute finalize height",
-			eventHandlerArgs: nodetypes.EventHandlerArgs{
-				EventAttributes: fullAttributes[:6],
-			},
-			expected: nil,
-			err:      true,
 		},
 	}
 

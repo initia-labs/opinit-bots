@@ -22,7 +22,7 @@ import (
 )
 
 func (ch *Child) initiateWithdrawalHandler(ctx types.Context, args nodetypes.EventHandlerArgs) error {
-	l2Sequence, amount, from, to, baseDenom, err := childprovider.ParseInitiateWithdrawal(args.EventAttributes)
+	l2Sequence, amount, from, to, _, baseDenom, err := childprovider.ParseInitiateWithdrawal(args.EventAttributes)
 	if err != nil {
 		return errors.Wrap(err, "failed to parse initiate withdrawal event")
 	}

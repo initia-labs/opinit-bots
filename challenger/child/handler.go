@@ -92,7 +92,7 @@ func (ch *Child) endBlockHandler(ctx types.Context, args nodetypes.EndBlockArgs)
 
 	ch.eventHandler.DeletePendingEvents(processedEvents)
 	ch.eventHandler.SetPendingEvents(timeoutEvents)
-	ch.challenger.SendPendingChallenges(challenges)
+	ch.challenger.SendPendingChallenges(pendingChallenges)
 	return nil
 }
 
