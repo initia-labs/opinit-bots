@@ -74,6 +74,6 @@ func (ex *Executor) RegisterQuerier() {
 		hostSync := status.Host.Node.Syncing != nil && *status.Host.Node.Syncing
 		childSync := status.Child.Node.Syncing != nil && *status.Child.Node.Syncing
 		batchSync := status.BatchSubmitter.Node.Syncing != nil && *status.BatchSubmitter.Node.Syncing
-		return c.JSON(hostSync && childSync && batchSync)
+		return c.JSON(hostSync || childSync || batchSync)
 	})
 }

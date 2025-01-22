@@ -231,7 +231,9 @@ func (c *Challenger) RegisterQuerier() {
 		if err != nil {
 			return err
 		}
-		return ctx.JSON(*status.Host.Node.Syncing && *status.Child.Node.Syncing)
+		hostSync := status.Host.Node.Syncing != nil && *status.Host.Node.Syncing
+		childSync := status.Child.Node.Syncing != nil && *status.Child.Node.Syncing
+		return ctx.JSON(hostSync || childSync)
 	})
 }
 
