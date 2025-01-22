@@ -59,7 +59,7 @@ func TestMultipleDepositsAndWithdrawals(t *testing.T) {
 
 	ctx := context.Background()
 
-	op := SetupTest(t, ctx, BotExecutor, l1ChainConfig, l2ChainConfig, daChainConfig, bridgeConfig)
+	op := SetupTest(t, ctx, BotExecutor, l1ChainConfig, l2ChainConfig, daChainConfig, bridgeConfig, ibc.CosmosRly)
 
 	user0 := interchaintest.GetAndFundTestUsers(t, ctx, "user", math.NewInt(100_000), op.Initia, op.Minitia)
 	user1 := interchaintest.GetAndFundTestUsers(t, ctx, "user", math.NewInt(100_000), op.Initia, op.Minitia)

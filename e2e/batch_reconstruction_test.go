@@ -16,6 +16,8 @@ import (
 	cmtypes "github.com/cometbft/cometbft/types"
 	"github.com/cosmos/cosmos-proto/anyutil"
 	gogoproto "github.com/cosmos/gogoproto/proto"
+	ibcclienttypes "github.com/cosmos/ibc-go/v8/modules/core/02-client/types"
+	ibctmlightclients "github.com/cosmos/ibc-go/v8/modules/light-clients/07-tendermint"
 	opchildv1 "github.com/initia-labs/OPinit/api/opinit/opchild/v1"
 	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
 	executortypes "github.com/initia-labs/opinit-bots/executor/types"
@@ -35,7 +37,7 @@ func TestBatchReconstructionTest(t *testing.T) {
 		Gas:            "auto",
 		GasPrices:      "0.025uinit",
 		GasAdjustment:  1.2,
-		TrustingPeriod: "168h",
+		TrustingPeriod: "1h",
 		NumValidators:  1,
 		NumFullNodes:   0,
 	}
@@ -49,7 +51,7 @@ func TestBatchReconstructionTest(t *testing.T) {
 		Gas:            "auto",
 		GasPrices:      "0.025umin",
 		GasAdjustment:  1.2,
-		TrustingPeriod: "168h",
+		TrustingPeriod: "1h",
 		NumValidators:  1,
 		NumFullNodes:   0,
 	}
@@ -65,7 +67,24 @@ func TestBatchReconstructionTest(t *testing.T) {
 	cases := []struct {
 		name          string
 		daChainConfig DAChainConfig
+		relayerImpl   ibc.RelayerImplementation
 	}{
+		{
+			name: "initia with go relayer",
+			daChainConfig: DAChainConfig{
+				ChainConfig: *l1ChainConfig,
+				ChainType:   ophosttypes.BatchInfo_CHAIN_TYPE_INITIA,
+			},
+			relayerImpl: ibc.CosmosRly,
+		},
+		{
+			name: "initia with hermes relayer",
+			daChainConfig: DAChainConfig{
+				ChainConfig: *l1ChainConfig,
+				ChainType:   ophosttypes.BatchInfo_CHAIN_TYPE_INITIA,
+			},
+			relayerImpl: ibc.Hermes,
+		},
 		{
 			name: "celestia",
 			daChainConfig: DAChainConfig{
@@ -78,19 +97,13 @@ func TestBatchReconstructionTest(t *testing.T) {
 					Gas:            "auto",
 					GasPrices:      "0.25utia",
 					GasAdjustment:  1.5,
-					TrustingPeriod: "168h",
+					TrustingPeriod: "1h",
 					NumValidators:  1,
 					NumFullNodes:   0,
 				},
 				ChainType: ophosttypes.BatchInfo_CHAIN_TYPE_CELESTIA,
 			},
-		},
-		{
-			name: "initia",
-			daChainConfig: DAChainConfig{
-				ChainConfig: *l1ChainConfig,
-				ChainType:   ophosttypes.BatchInfo_CHAIN_TYPE_INITIA,
-			},
+			relayerImpl: ibc.CosmosRly,
 		},
 	}
 
@@ -98,7 +111,7 @@ func TestBatchReconstructionTest(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := context.Background()
 
-			op := SetupTest(t, ctx, BotExecutor, l1ChainConfig, l2ChainConfig, &tc.daChainConfig, bridgeConfig)
+			op := SetupTest(t, ctx, BotExecutor, l1ChainConfig, l2ChainConfig, &tc.daChainConfig, bridgeConfig, tc.relayerImpl)
 
 			err := testutil.WaitForBlocks(ctx, 20, op.Initia, op.Minitia)
 			require.NoError(t, err)
@@ -142,7 +155,7 @@ func TestBatchReconstructionTest(t *testing.T) {
 						require.NoError(t, err)
 						require.NotNil(t, block)
 
-						err = fillOracleData(ctx, block, op.Initia)
+						err = fillData(ctx, block, op.Initia)
 						require.NoError(t, err)
 
 						pbb, err := block.ToProto()
@@ -243,7 +256,7 @@ func BlockFromProtoWithNoValidation(bp *cmtproto.Block) (*cmtypes.Block, error) 
 	return b, nil
 }
 
-func fillOracleData(ctx context.Context, block *cmtypes.Block, chain *L1Chain) error {
+func fillData(ctx context.Context, block *cmtypes.Block, chain *L1Chain) error {
 	for i, txBytes := range block.Txs {
 		var raw txv1beta1.TxRaw
 		if err := proto.Unmarshal(txBytes, &raw); err != nil {
@@ -305,6 +318,91 @@ func fillOracleData(ctx context.Context, block *cmtypes.Block, chain *L1Chain) e
 				if err != nil {
 					return errors.Join(errors.New("failed to marshal oracle msg"), err)
 				}
+			case "/ibc.core.client.v1.MsgUpdateClient":
+				updateClientMsg := new(ibcclienttypes.MsgUpdateClient)
+				err := updateClientMsg.Unmarshal(anyMsg.Value)
+				if err != nil {
+					return err
+				}
+
+				if updateClientMsg.ClientMessage.TypeUrl != "/ibc.lightclients.tendermint.v1.Header" {
+					continue
+				}
+
+				tmHeader := new(ibctmlightclients.Header)
+				err = tmHeader.Unmarshal(updateClientMsg.ClientMessage.Value)
+				if err != nil {
+					return err
+				}
+
+				// fill ValidatorSet
+				height := tmHeader.SignedHeader.Commit.Height
+				validators, err := getAllValidators(ctx, chain, height)
+				if err != nil {
+					return err
+				}
+				cmtValidators, _, err := toCmtProtoValidators(validators)
+				if err != nil {
+					return err
+				}
+				if tmHeader.ValidatorSet == nil {
+					tmHeader.ValidatorSet = new(cmtproto.ValidatorSet)
+				}
+				tmHeader.ValidatorSet.Validators = cmtValidators
+				for _, val := range cmtValidators {
+					if bytes.Equal(val.Address, tmHeader.SignedHeader.Header.ProposerAddress) {
+						tmHeader.ValidatorSet.Proposer = val
+					}
+				}
+
+				// fill TrustedValidators
+				height = int64(tmHeader.TrustedHeight.RevisionHeight)
+				validators, err = getAllValidators(ctx, chain, height)
+				if err != nil {
+					return err
+				}
+				cmtValidators, _, err = toCmtProtoValidators(validators)
+				if err != nil {
+					return err
+				}
+				blockHeader, err := chain.GetFullNode().Client.Header(ctx, &height)
+				if err != nil {
+					return err
+				}
+				if tmHeader.TrustedValidators == nil {
+					tmHeader.TrustedValidators = new(cmtproto.ValidatorSet)
+				}
+				tmHeader.TrustedValidators.Validators = cmtValidators
+				for _, val := range cmtValidators {
+					if bytes.Equal(val.Address, blockHeader.Header.ProposerAddress.Bytes()) {
+						tmHeader.TrustedValidators.Proposer = val
+					}
+				}
+
+				// fill commit signatures
+				height = tmHeader.SignedHeader.Commit.Height + 1
+				block, err := chain.GetFullNode().Client.Block(ctx, &height)
+				if err != nil {
+					return err
+				}
+
+				for sigIndex, signature := range tmHeader.SignedHeader.Commit.Signatures {
+					if len(signature.Signature) == 2 {
+						// fill signature
+						blockSigIndex := int(signature.Signature[0]) + int(signature.Signature[1])<<8
+						tmHeader.SignedHeader.Commit.Signatures[sigIndex] = *block.Block.LastCommit.Signatures[blockSigIndex].ToProto()
+					}
+				}
+
+				updateClientMsg.ClientMessage.Value, err = tmHeader.Marshal()
+				if err != nil {
+					return errors.Join(errors.New("failed to marshal tm header"), err)
+				}
+
+				anyMsg.Value, err = updateClientMsg.Marshal()
+				if err != nil {
+					return errors.Join(errors.New("failed to marshal update client msg"), err)
+				}
 			default:
 				continue
 			}
@@ -322,4 +420,40 @@ func fillOracleData(ctx context.Context, block *cmtypes.Block, chain *L1Chain) e
 		block.Txs[i] = convertedTxBytes
 	}
 	return nil
+}
+
+func getAllValidators(ctx context.Context, chain *L1Chain, height int64) ([]*cmtypes.Validator, error) {
+	page := 1
+	perPage := 100
+
+	validators := make([]*cmtypes.Validator, 0)
+	for {
+		result, err := chain.GetFullNode().Client.Validators(ctx, &height, &page, &perPage)
+		if err != nil {
+			return nil, err
+		}
+		validators = append(validators, result.Validators...)
+		page++
+		if len(validators) >= result.Total {
+			break
+		}
+	}
+	return validators, nil
+}
+
+func toCmtProtoValidators(validators []*cmtypes.Validator) ([]*cmtproto.Validator, int64, error) {
+	protoValidators := make([]*cmtproto.Validator, 0, len(validators))
+	totalVotingPower := int64(0)
+
+	for i := range validators {
+		protoValidator, err := validators[i].ToProto()
+		if err != nil {
+			return nil, 0, err
+		}
+		protoValidator.ProposerPriority = 0
+		totalVotingPower += protoValidator.VotingPower
+
+		protoValidators = append(protoValidators, protoValidator)
+	}
+	return protoValidators, totalVotingPower, nil
 }

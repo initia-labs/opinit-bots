@@ -10,6 +10,7 @@ import (
 
 	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
 
+	coretypes "github.com/cometbft/cometbft/rpc/core/types"
 	executortypes "github.com/initia-labs/opinit-bots/executor/types"
 	"github.com/initia-labs/opinit-bots/node"
 	btypes "github.com/initia-labs/opinit-bots/node/broadcaster/types"
@@ -20,7 +21,9 @@ import (
 )
 
 type hostNode interface {
+	ChainId() string
 	QueryBatchInfos(context.Context, uint64) (*ophosttypes.QueryBatchInfosResponse, error)
+	QueryBlock(ctx context.Context, height int64) (*coretypes.ResultBlock, error)
 }
 
 type BatchSubmitter struct {

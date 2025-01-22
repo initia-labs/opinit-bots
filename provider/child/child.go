@@ -15,6 +15,8 @@ import (
 	opchildtypes "github.com/initia-labs/OPinit/x/opchild/types"
 	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
 
+	ibcclienttypes "github.com/cosmos/ibc-go/v8/modules/core/02-client/types"
+	ibctmlightclients "github.com/cosmos/ibc-go/v8/modules/light-clients/07-tendermint"
 	"github.com/initia-labs/opinit-bots/keys"
 	"github.com/initia-labs/opinit-bots/merkle"
 	merkletypes "github.com/initia-labs/opinit-bots/merkle/types"
@@ -22,7 +24,6 @@ import (
 	btypes "github.com/initia-labs/opinit-bots/node/broadcaster/types"
 	nodetypes "github.com/initia-labs/opinit-bots/node/types"
 	"github.com/initia-labs/opinit-bots/types"
-
 	"github.com/pkg/errors"
 )
 
@@ -93,6 +94,8 @@ func GetCodec(bech32Prefix string) (codec.Codec, client.TxConfig, error) {
 	return keys.CreateCodec([]keys.RegisterInterfaces{
 		auth.AppModuleBasic{}.RegisterInterfaces,
 		authz.RegisterInterfaces,
+		ibcclienttypes.RegisterInterfaces,
+		ibctmlightclients.RegisterInterfaces,
 		opchild.AppModuleBasic{}.RegisterInterfaces,
 	})
 }

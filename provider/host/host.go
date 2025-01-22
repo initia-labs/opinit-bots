@@ -116,6 +116,10 @@ func (b BaseHost) BridgeId() uint64 {
 	return b.bridgeInfo.BridgeId
 }
 
+func (b BaseHost) ChainId() string {
+	return b.cfg.ChainID
+}
+
 func (b BaseHost) OracleEnabled() bool {
 	return b.bridgeInfo.BridgeConfig.OracleEnabled
 }

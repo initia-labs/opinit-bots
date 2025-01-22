@@ -113,6 +113,7 @@ func (cfg Config) Validate() error {
 
 func (cfg Config) L1NodeConfig() nodetypes.NodeConfig {
 	nc := nodetypes.NodeConfig{
+		ChainID:      cfg.L1Node.ChainID,
 		RPC:          cfg.L1Node.RPCAddress,
 		ProcessType:  nodetypes.PROCESS_TYPE_DEFAULT,
 		Bech32Prefix: cfg.L1Node.Bech32Prefix,
@@ -122,6 +123,7 @@ func (cfg Config) L1NodeConfig() nodetypes.NodeConfig {
 
 func (cfg Config) L2NodeConfig() nodetypes.NodeConfig {
 	nc := nodetypes.NodeConfig{
+		ChainID:      cfg.L2Node.ChainID,
 		RPC:          cfg.L2Node.RPCAddress,
 		ProcessType:  nodetypes.PROCESS_TYPE_DEFAULT,
 		Bech32Prefix: cfg.L2Node.Bech32Prefix,

@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	coretypes "github.com/cometbft/cometbft/rpc/core/types"
 	query "github.com/cosmos/cosmos-sdk/types/query"
 
 	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
@@ -194,4 +195,8 @@ func (b BaseHost) QueryDepositTxHeight(botCtx types.Context, bridgeId uint64, l1
 		}
 	}
 	return 0, nil
+}
+
+func (b BaseHost) QueryBlock(ctx context.Context, height int64) (*coretypes.ResultBlock, error) {
+	return b.node.GetRPCClient().Block(ctx, &height)
 }
