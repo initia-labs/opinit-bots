@@ -12,6 +12,7 @@ require (
 	github.com/stretchr/testify v1.9.0
 	go.uber.org/zap v1.27.0
 	moul.io/zapfilter v1.7.0
+	github.com/cosmos/ibc-go/v8 v8.5.0
 )
 
 require (
@@ -101,7 +102,6 @@ require (
 	github.com/cosmos/gogoproto v1.7.0
 	github.com/cosmos/iavl v1.2.0 // indirect
 	github.com/cosmos/ibc-go/modules/capability v1.0.1 // indirect
-	github.com/cosmos/ibc-go/v8 v8.5.0
 	github.com/cosmos/ics23/go v0.11.0 // indirect
 	github.com/cosmos/ledger-cosmos-go v0.13.3 // indirect
 	github.com/crate-crypto/go-kzg-4844 v1.0.0 // indirect
