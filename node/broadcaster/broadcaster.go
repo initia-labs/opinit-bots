@@ -160,17 +160,18 @@ func (b *Broadcaster) loadPendingTxs(ctx types.Context, stage types.BasicDB, las
 		pollingTimer := time.NewTicker(ctx.PollingInterval())
 		defer pollingTimer.Stop()
 
+	WAITLOOP:
 		for {
+			if len(pendingTxs) == 0 {
+				return nil
+			}
+
 			select {
 			case <-ctx.Done():
 				return ctx.Err()
 			case <-timer.C:
-				break
+				break WAITLOOP
 			case <-pollingTimer.C:
-			}
-
-			if len(pendingTxs) == 0 {
-				return nil
 			}
 
 			txHash, err := hex.DecodeString(pendingTxs[0].TxHash)
