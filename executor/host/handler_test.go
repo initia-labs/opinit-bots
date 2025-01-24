@@ -1,6 +1,7 @@
 package host
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -9,6 +10,7 @@ import (
 	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
 	"github.com/initia-labs/opinit-bots/db"
 	"github.com/initia-labs/opinit-bots/node"
+	"github.com/initia-labs/opinit-bots/node/broadcaster"
 	btypes "github.com/initia-labs/opinit-bots/node/broadcaster/types"
 	nodetypes "github.com/initia-labs/opinit-bots/node/types"
 	childprovider "github.com/initia-labs/opinit-bots/provider/child"
@@ -377,4 +379,51 @@ func TestTxHandler(t *testing.T) {
 		})
 	}
 	require.NoError(t, err)
+}
+
+func TestEndBlockHandlerMultipleBatches(t *testing.T) {
+	childCodec, _, _ := childprovider.GetCodec("init")
+
+	child := NewMockChild(nil, childCodec, "sender0", "sender1", 1)
+	db, err := db.NewMemDB()
+	defer func() {
+		require.NoError(t, db.Close())
+	}()
+	hostdb := db.WithPrefix([]byte("test_host"))
+	require.NoError(t, err)
+	hostNode := node.NewTestNode(nodetypes.NodeConfig{}, hostdb, nil, nil, nil, nil)
+
+	h := Host{
+		BaseHost: hostprovider.NewTestBaseHost(0, hostNode, ophosttypes.QueryBridgeResponse{}, nodetypes.NodeConfig{}, nil),
+		child:    child,
+		stage:    hostdb.NewStage(),
+	}
+
+	msgQueue := h.GetMsgQueue()
+	require.Empty(t, msgQueue["sender0"])
+
+	// append a buch of messages to the msg queue
+	var numMessages = 100
+
+	for i := 0; i < numMessages; i++ {
+		h.AppendMsgQueue(&opchildtypes.MsgUpdateOracle{}, "sender0")
+	}
+
+	msgQueue = h.GetMsgQueue()
+	require.Len(t, msgQueue["sender0"], numMessages)
+
+	h.AppendProcessedMsgs(broadcaster.MsgsToProcessedMsgs(h.GetMsgQueue())...)
+
+	msgs := h.GetProcessedMsgs()
+	require.Len(t, msgs, 20) // 100 messages / 5 messages per batch = 20 batches
+
+	// Verify that at least one of the batches has the same timestamp
+	for i := 0; i < len(msgs)-1; i++ {
+		if msgs[i].Timestamp == msgs[i+1].Timestamp {
+			// assert that the db key is the same
+			require.Equal(t, msgs[i].Key(), msgs[i+1].Key(), fmt.Sprintf("DB key do not match - %s == %s", msgs[i].Key(), msgs[i+1].Key()))
+
+			require.Fail(t, fmt.Sprintf("timestamps of batch %d and %d are the same. %d == %d", i, i+1, msgs[i].Timestamp, msgs[i+1].Timestamp))
+		}
+	}
 }
