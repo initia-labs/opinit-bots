@@ -127,6 +127,7 @@ func (ch *Child) handleTree(ctx types.Context, blockHeight int64, blockHeader cm
 			return nil, errors.Wrap(err, "failed to finalize working tree")
 		}
 
+		storageRoot = treeRootHash
 		if finalizedTree != nil {
 			err = merkle.SaveFinalizedTree(ch.stage, *finalizedTree)
 			if err != nil {
