@@ -7,12 +7,13 @@ import (
 	"strings"
 	"time"
 
+	rpccoretypes "github.com/cometbft/cometbft/rpc/core/types"
+	"github.com/getsentry/sentry-go"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 
-	rpccoretypes "github.com/cometbft/cometbft/rpc/core/types"
-
 	btypes "github.com/initia-labs/opinit-bots/node/broadcaster/types"
+	"github.com/initia-labs/opinit-bots/sentry_integration"
 	"github.com/initia-labs/opinit-bots/types"
 )
 
@@ -22,6 +23,9 @@ func IsTxNotFoundErr(err error, txHash string) bool {
 
 // CheckPendingTx query tx info to check if pending tx is processed.
 func (b *Broadcaster) CheckPendingTx(ctx types.Context, pendingTx btypes.PendingTxInfo) (*rpccoretypes.ResultTx, time.Time, error) {
+	span, ctx := sentry_integration.StartSentrySpan(ctx, "CheckPendingTx", "query tx info to check if pending tx is processed")
+	defer span.Finish()
+
 	txHash, err := hex.DecodeString(pendingTx.TxHash)
 	if err != nil {
 		return nil, time.Time{}, err
@@ -76,6 +80,8 @@ func (b *Broadcaster) CheckPendingTx(ctx types.Context, pendingTx btypes.Pending
 // RemovePendingTx remove pending tx from local pending txs.
 // It is called when the pending tx is included in the block.
 func (b *Broadcaster) RemovePendingTx(ctx types.Context, pendingTx btypes.PendingTxInfo) error {
+	span, _ := sentry_integration.StartSentrySpan(ctx, "RemovePendingTx", "remove pending tx from local pending txs")
+	defer span.Finish()
 	err := DeletePendingTx(b.db, pendingTx)
 	if err != nil {
 		return err
@@ -111,11 +117,13 @@ func (b *Broadcaster) Start(ctx types.Context) error {
 					}
 					break
 				} else if !msgs.Save {
+					sentry_integration.CaptureCurrentHubException(err, sentry.LevelWarning)
 					ctx.Logger().Warn("discard msgs: failed to handle processed msgs", zap.String("error", err.Error()))
 					// if the message does not need to be saved, we can skip retry
 					err = nil
 					break
 				}
+				sentry_integration.CaptureCurrentHubException(err, sentry.LevelWarning)
 				ctx.Logger().Warn("retry to handle processed msgs", zap.Int("seconds", int(2*math.Exp2(float64(retry)))), zap.Int("count", retry), zap.String("error", err.Error()))
 				if types.SleepWithRetry(ctx, retry) {
 					return nil

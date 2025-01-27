@@ -7,10 +7,13 @@ import (
 	abcitypes "github.com/cometbft/cometbft/abci/types"
 	rpccoretypes "github.com/cometbft/cometbft/rpc/core/types"
 	comettypes "github.com/cometbft/cometbft/types"
-	nodetypes "github.com/initia-labs/opinit-bots/node/types"
-	"github.com/initia-labs/opinit-bots/types"
+	"github.com/getsentry/sentry-go"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
+
+	nodetypes "github.com/initia-labs/opinit-bots/node/types"
+	"github.com/initia-labs/opinit-bots/sentry_integration"
+	"github.com/initia-labs/opinit-bots/types"
 )
 
 // blockProcessLooper fetches new blocks and processes them
@@ -29,6 +32,7 @@ func (n *Node) blockProcessLooper(ctx types.Context, processType nodetypes.Block
 
 		status, err := n.rpcClient.Status(ctx)
 		if err != nil {
+			sentry_integration.CaptureCurrentHubException(fmt.Errorf("failed to handle challenge"), sentry.LevelError)
 			ctx.Logger().Error("failed to get node status ", zap.String("error", err.Error()))
 			continue
 		}
@@ -41,8 +45,10 @@ func (n *Node) blockProcessLooper(ctx types.Context, processType nodetypes.Block
 
 		err = n.processBlocks(ctx, processType, latestHeight)
 		if nodetypes.HandleErrIgnoreAndTryLater(ctx, err) {
+			sentry_integration.CaptureCurrentHubException(err, sentry.LevelWarning)
 			ctx.Logger().Warn("ignore and try later", zap.String("error", err.Error()))
 		} else if err != nil {
+			sentry_integration.CaptureCurrentHubException(err, sentry.LevelError)
 			ctx.Logger().Error("failed to process block", zap.String("error", err.Error()))
 		} else {
 			consecutiveErrors = 0
@@ -54,7 +60,10 @@ func (n *Node) blockProcessLooper(ctx types.Context, processType nodetypes.Block
 // processBlocks fetches new blocks and processes them
 // if the process type is default, it will fetch blocks one by one and handle txs and events
 // if the process type is raw, it will fetch blocks in bulk and send them to the raw block handler
-func (n *Node) processBlocks(ctx types.Context, processType nodetypes.BlockProcessType, latestHeight int64) error {
+func (n *Node) processBlocks(parentCtx types.Context, processType nodetypes.BlockProcessType, latestHeight int64) error {
+	transaction, ctx := sentry_integration.StartSentryTransaction(parentCtx, "processBlocks", "Fetches new blocks and processes them")
+	defer transaction.Finish()
+
 	switch processType {
 	case nodetypes.PROCESS_TYPE_DEFAULT:
 		return n.processBlocksTypeDefault(ctx, latestHeight)
@@ -124,6 +133,8 @@ func (n *Node) processBlocksTypeRaw(ctx types.Context, latestHeight int64) error
 
 // fetchNewBlock fetches a new block and block results given the height
 func (n *Node) fetchNewBlock(ctx types.Context, height int64) (*rpccoretypes.ResultBlock, *rpccoretypes.ResultBlockResults, error) {
+	span, ctx := sentry_integration.StartSentrySpan(ctx, "fetchNewBlock", "Fetches a new block and block results given the height")
+	defer span.Finish()
 	ctx.Logger().Debug("fetch new block", zap.Int64("height", height))
 
 	block, err := n.rpcClient.Block(ctx, &height)
@@ -140,7 +151,9 @@ func (n *Node) fetchNewBlock(ctx types.Context, height int64) (*rpccoretypes.Res
 
 // handleNewBlock handles a new block and block results given the height
 // it sends txs and events to the respective registered handlers
-func (n *Node) handleNewBlock(ctx types.Context, block *rpccoretypes.ResultBlock, blockResult *rpccoretypes.ResultBlockResults, latestChainHeight int64) error {
+func (n *Node) handleNewBlock(parentCtx types.Context, block *rpccoretypes.ResultBlock, blockResult *rpccoretypes.ResultBlockResults, latestChainHeight int64) error {
+	transaction, ctx := sentry_integration.StartSentryTransaction(parentCtx, "handleNewBlock", "Handles a new block and block results")
+	defer transaction.Finish()
 	protoBlock, err := block.Block.ToProto()
 	if err != nil {
 		return errors.Wrap(err, "failed to convert block to proto block")
@@ -170,6 +183,8 @@ func (n *Node) handleNewBlock(ctx types.Context, block *rpccoretypes.ResultBlock
 
 // handleEvent handles the event for the given transaction
 func (n *Node) handleEvent(ctx types.Context, blockHeight int64, blockTime time.Time, latestHeight int64, tx comettypes.Tx, txIndex int64, event abcitypes.Event) error {
+	span, ctx := sentry_integration.StartSentrySpan(ctx, fmt.Sprintf("handleEvent(%s)", event.GetType()), "handles the event for the given transaction")
+	defer span.Finish()
 	// ignore if no event handlers
 	if n.eventHandlers[event.GetType()] == nil {
 		return nil

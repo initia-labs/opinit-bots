@@ -6,14 +6,7 @@ import (
 	"math"
 
 	abci "github.com/cometbft/cometbft/abci/types"
-	"github.com/initia-labs/opinit-bots/keys"
-	btypes "github.com/initia-labs/opinit-bots/node/broadcaster/types"
-	"github.com/initia-labs/opinit-bots/node/rpcclient"
-	"github.com/initia-labs/opinit-bots/txutils"
-	"github.com/initia-labs/opinit-bots/types"
-
 	ctypes "github.com/cometbft/cometbft/rpc/core/types"
-
 	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/client/tx"
 	"github.com/cosmos/cosmos-sdk/codec"
@@ -22,6 +15,12 @@ import (
 	txtypes "github.com/cosmos/cosmos-sdk/types/tx"
 	"github.com/cosmos/cosmos-sdk/types/tx/signing"
 	authsigning "github.com/cosmos/cosmos-sdk/x/auth/signing"
+
+	"github.com/initia-labs/opinit-bots/keys"
+	btypes "github.com/initia-labs/opinit-bots/node/broadcaster/types"
+	"github.com/initia-labs/opinit-bots/node/rpcclient"
+	"github.com/initia-labs/opinit-bots/txutils"
+	"github.com/initia-labs/opinit-bots/types"
 )
 
 // BroadcasterAccount is an account that can be used to sign and broadcast transactions.
@@ -146,7 +145,7 @@ func (b BroadcasterAccount) GetLatestSequence(ctx context.Context) (uint64, erro
 }
 
 func (b BroadcasterAccount) getClientCtx(ctx context.Context) client.Context {
-	return client.Context{}.WithClient(b.rpcClient).
+	return client.Context{}.WithClient(b.rpcClient.HTTP).
 		WithInterfaceRegistry(b.cdc.InterfaceRegistry()).
 		WithChainID(b.cfg.ChainID).
 		WithCodec(b.cdc).
@@ -166,7 +165,7 @@ func (b *BroadcasterAccount) UpdateSequence(sequence uint64) {
 	b.txf = b.txf.WithSequence(sequence)
 }
 
-func (b BroadcasterAccount) BroadcastTxSync(ctx context.Context, txBytes []byte) (*ctypes.ResultBroadcastTx, error) {
+func (b BroadcasterAccount) BroadcastTxSync(ctx types.Context, txBytes []byte) (*ctypes.ResultBroadcastTx, error) {
 	return b.rpcClient.BroadcastTxSync(ctx, txBytes)
 }
 

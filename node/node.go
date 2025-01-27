@@ -4,19 +4,20 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/pkg/errors"
-
 	"cosmossdk.io/core/address"
+	"github.com/cosmos/cosmos-sdk/client"
+	"github.com/cosmos/cosmos-sdk/codec"
+	"github.com/getsentry/sentry-go"
+	"github.com/pkg/errors"
+	"go.uber.org/zap"
+
 	dbtypes "github.com/initia-labs/opinit-bots/db/types"
 	"github.com/initia-labs/opinit-bots/node/broadcaster"
 	btypes "github.com/initia-labs/opinit-bots/node/broadcaster/types"
 	"github.com/initia-labs/opinit-bots/node/rpcclient"
 	nodetypes "github.com/initia-labs/opinit-bots/node/types"
+	"github.com/initia-labs/opinit-bots/sentry_integration"
 	"github.com/initia-labs/opinit-bots/types"
-	"go.uber.org/zap"
-
-	"github.com/cosmos/cosmos-sdk/client"
-	"github.com/cosmos/cosmos-sdk/codec"
 )
 
 type Node struct {
@@ -140,6 +141,7 @@ func (n *Node) start(ctx types.Context) {
 			defer func() {
 				ctx.Logger().Info("tx broadcast looper stopped")
 				if r := recover(); r != nil {
+					sentry_integration.CaptureCurrentHubException(err, sentry.LevelError)
 					ctx.Logger().Error("tx broadcast looper panic", zap.Any("recover", r))
 					err = fmt.Errorf("tx broadcast looper panic: %v", r)
 				}
@@ -159,6 +161,7 @@ func (n *Node) start(ctx types.Context) {
 			defer func() {
 				ctx.Logger().Info("block process looper stopped")
 				if r := recover(); r != nil {
+					sentry_integration.CaptureCurrentHubException(err, sentry.LevelError)
 					ctx.Logger().Error("block process looper panic", zap.Any("recover", r))
 					err = fmt.Errorf("block process looper panic: %v", r)
 				}
@@ -172,6 +175,7 @@ func (n *Node) start(ctx types.Context) {
 		defer func() {
 			ctx.Logger().Info("tx checker looper stopped")
 			if r := recover(); r != nil {
+				sentry_integration.CaptureCurrentHubException(err, sentry.LevelError)
 				ctx.Logger().Error("tx checker panic", zap.Any("recover", r))
 				err = fmt.Errorf("tx checker panic: %v", r)
 			}

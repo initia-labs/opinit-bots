@@ -3,9 +3,12 @@ package node
 import (
 	"time"
 
-	"github.com/initia-labs/opinit-bots/types"
+	"github.com/getsentry/sentry-go"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
+
+	"github.com/initia-labs/opinit-bots/sentry_integration"
+	"github.com/initia-labs/opinit-bots/types"
 )
 
 // txChecker continuously checks for pending transactions and handles events if the transaction is included in a block.
@@ -18,31 +21,34 @@ import (
 //
 // Returns:
 // - error: An error if the txChecker encounters an issue.
-func (n *Node) txChecker(ctx types.Context, enableEventHandler bool) error {
+func (n *Node) txChecker(parentCtx types.Context, enableEventHandler bool) error {
 	if !n.HasBroadcaster() {
 		return nil
 	}
 
-	timer := time.NewTicker(ctx.PollingInterval())
+	timer := time.NewTicker(parentCtx.PollingInterval())
 	defer timer.Stop()
 
 	consecutiveErrors := 0
 	for {
 		select {
-		case <-ctx.Done():
+		case <-parentCtx.Done():
 			return nil
 		case <-timer.C:
 			if n.broadcaster.LenLocalPendingTx() == 0 {
 				continue
 			}
 
-			ctx.Logger().Debug("remaining pending txs", zap.Int("count", n.broadcaster.LenLocalPendingTx()))
+			parentCtx.Logger().Debug("remaining pending txs", zap.Int("count", n.broadcaster.LenLocalPendingTx()))
 
-			if types.SleepWithRetry(ctx, consecutiveErrors) {
+			if types.SleepWithRetry(parentCtx, consecutiveErrors) {
 				return nil
 			}
 			consecutiveErrors++
 		}
+
+		transaction, ctx := sentry_integration.StartSentryTransaction(parentCtx, "txChecker", "continuously checks for pending transactions and handles events if the transaction is included in a block.")
+		defer transaction.Finish()
 
 		pendingTx, err := n.broadcaster.PeekLocalPendingTx()
 		if err != nil {
@@ -56,6 +62,7 @@ func (n *Node) txChecker(ctx types.Context, enableEventHandler bool) error {
 			// tx not found
 			continue
 		} else if err != nil {
+			sentry_integration.CaptureCurrentHubException(err, sentry.LevelError)
 			ctx.Logger().Error("failed to check pending tx", zap.String("tx_hash", pendingTx.TxHash), zap.String("error", err.Error()))
 			continue
 		} else if res != nil {
@@ -73,6 +80,7 @@ func (n *Node) txChecker(ctx types.Context, enableEventHandler bool) error {
 
 					err := n.handleEvent(ctx, res.Height, blockTime, 0, res.Tx, types.MustUint64ToInt64(uint64(res.Index)), event)
 					if err != nil {
+						sentry_integration.CaptureCurrentHubException(err, sentry.LevelError)
 						ctx.Logger().Error("failed to handle event", zap.String("tx_hash", pendingTx.TxHash), zap.Int("event_index", eventIndex), zap.String("error", err.Error()))
 						break
 					}

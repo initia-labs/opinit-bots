@@ -7,18 +7,17 @@ import (
 	"sync"
 	"time"
 
-	"go.uber.org/zap"
-
 	rpccoretypes "github.com/cometbft/cometbft/rpc/core/types"
-
-	"github.com/pkg/errors"
-
 	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/codec"
 	sdk "github.com/cosmos/cosmos-sdk/types"
+	"github.com/getsentry/sentry-go"
+	"github.com/pkg/errors"
+	"go.uber.org/zap"
 
 	btypes "github.com/initia-labs/opinit-bots/node/broadcaster/types"
 	"github.com/initia-labs/opinit-bots/node/rpcclient"
+	"github.com/initia-labs/opinit-bots/sentry_integration"
 	"github.com/initia-labs/opinit-bots/types"
 )
 
@@ -189,6 +188,7 @@ func (b *Broadcaster) loadPendingTxs(ctx types.Context, stage types.BasicDB, las
 				}
 				pendingTxs = pendingTxs[1:]
 			} else if err == nil && res != nil {
+				sentry_integration.CaptureCurrentHubException(err, sentry.LevelWarning)
 				ctx.Logger().Warn("transaction failed",
 					zap.String("hash", pendingTxs[0].TxHash),
 					zap.Uint32("code", res.TxResult.Code),
@@ -277,8 +277,7 @@ func (b *Broadcaster) UpdateSyncedHeight(height int64) {
 // It splits msgs into chunks of 5 msgs and creates processed msgs for each chunk.
 func MsgsToProcessedMsgs(queues map[string][]sdk.Msg) []btypes.ProcessedMsgs {
 	res := make([]btypes.ProcessedMsgs, 0)
-	for sender := range queues {
-		msgs := queues[sender]
+	for sender, msgs := range queues {
 		for i := 0; i < len(msgs); i += 5 {
 			end := i + 5
 			if end > len(msgs) {

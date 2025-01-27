@@ -27,3 +27,7 @@ func BotTypeFromString(name string) BotType {
 	}
 	panic("unknown bot type")
 }
+
+func (b BotType) String() string {
+	return string(b)
+}

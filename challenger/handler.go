@@ -1,12 +1,16 @@
 package challenger
 
 import (
+	"fmt"
 	"sort"
+
+	"github.com/getsentry/sentry-go"
+	"go.uber.org/zap"
 
 	challengerdb "github.com/initia-labs/opinit-bots/challenger/db"
 	challengertypes "github.com/initia-labs/opinit-bots/challenger/types"
+	"github.com/initia-labs/opinit-bots/sentry_integration"
 	"github.com/initia-labs/opinit-bots/types"
-	"go.uber.org/zap"
 )
 
 func (c *Challenger) challengeHandler(ctx types.Context) error {
@@ -71,6 +75,7 @@ func (c *Challenger) getLatestChallenges() []challengertypes.Challenge {
 
 func (c *Challenger) handleChallenge(ctx types.Context, challenge challengertypes.Challenge) error {
 	// TODO: warning log or send to alerting system
+	sentry_integration.CaptureCurrentHubException(fmt.Errorf("failed to handle challenge"), sentry.LevelWarning)
 	ctx.Logger().Error("challenge", zap.Any("challenge", challenge))
 
 	return nil

@@ -8,21 +8,19 @@ import (
 	"strconv"
 	"time"
 
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/encoding"
-	"google.golang.org/grpc/encoding/proto"
-	"google.golang.org/grpc/metadata"
-
 	sdkerrors "cosmossdk.io/errors"
 	abci "github.com/cometbft/cometbft/abci/types"
 	client2 "github.com/cometbft/cometbft/rpc/client"
 	coretypes "github.com/cometbft/cometbft/rpc/core/types"
-	gogogrpc "github.com/cosmos/gogoproto/grpc"
-
 	"github.com/cosmos/cosmos-sdk/codec"
 	"github.com/cosmos/cosmos-sdk/codec/types"
 	legacyerrors "github.com/cosmos/cosmos-sdk/types/errors"
 	grpctypes "github.com/cosmos/cosmos-sdk/types/grpc"
+	gogogrpc "github.com/cosmos/gogoproto/grpc"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/encoding"
+	"google.golang.org/grpc/encoding/proto"
+	"google.golang.org/grpc/metadata"
 
 	clienthttp "github.com/initia-labs/opinit-bots/client"
 )
@@ -33,27 +31,27 @@ var protoCodec = encoding.GetCodec(proto.Name)
 
 // RPCClient defines a gRPC querier client.
 type RPCClient struct {
-	*clienthttp.HTTP
+	*clienthttp.SentryHTTP
 
 	cdc codec.Codec
 }
 
 func NewRPCClient(cdc codec.Codec, rpcAddr string) (*RPCClient, error) {
-	client, err := clienthttp.New(rpcAddr, "/websocket")
+	client, err := clienthttp.NewSentryHTTP(rpcAddr, "/websocket")
 	if err != nil {
 		return nil, err
 	}
 
 	return &RPCClient{
-		HTTP: client,
-		cdc:  cdc,
+		SentryHTTP: client,
+		cdc:        cdc,
 	}, nil
 }
 
-func NewRPCClientWithClient(cdc codec.Codec, client *clienthttp.HTTP) *RPCClient {
+func NewRPCClientWithClient(cdc codec.Codec, client *clienthttp.SentryHTTP) *RPCClient {
 	return &RPCClient{
-		HTTP: client,
-		cdc:  cdc,
+		SentryHTTP: client,
+		cdc:        cdc,
 	}
 }
 

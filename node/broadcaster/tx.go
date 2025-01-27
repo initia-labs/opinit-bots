@@ -6,14 +6,14 @@ import (
 	"strconv"
 	"strings"
 
-	"go.uber.org/zap"
-
-	"github.com/pkg/errors"
-
-	btypes "github.com/initia-labs/opinit-bots/node/broadcaster/types"
-
+	"github.com/getsentry/sentry-go"
 	opchildtypes "github.com/initia-labs/OPinit/x/opchild/types"
 	"github.com/initia-labs/opinit-bots/types"
+	"github.com/pkg/errors"
+	"go.uber.org/zap"
+
+	btypes "github.com/initia-labs/opinit-bots/node/broadcaster/types"
+	"github.com/initia-labs/opinit-bots/sentry_integration"
 )
 
 var ignoringErrors = []error{
@@ -55,6 +55,7 @@ func (b *Broadcaster) handleMsgError(ctx types.Context, err error, broadcasterAc
 		}
 
 		if expected > got {
+			sentry_integration.CaptureCurrentHubException(err, sentry.LevelWarning)
 			ctx.Logger().Warn("ignoring error", zap.String("error", err.Error()))
 			return nil
 		}
@@ -64,6 +65,7 @@ func (b *Broadcaster) handleMsgError(ctx types.Context, err error, broadcasterAc
 
 	for _, e := range ignoringErrors {
 		if strings.Contains(err.Error(), e.Error()) {
+			sentry_integration.CaptureCurrentHubException(err, sentry.LevelWarning)
 			ctx.Logger().Warn("ignoring error", zap.String("error", e.Error()))
 			return nil
 		}
@@ -75,7 +77,9 @@ func (b *Broadcaster) handleMsgError(ctx types.Context, err error, broadcasterAc
 
 // HandleProcessedMsgs handles processed messages by broadcasting them to the network.
 // It stores the transaction in the database and local memory and keep track of the successful broadcast.
-func (b *Broadcaster) handleProcessedMsgs(ctx types.Context, data btypes.ProcessedMsgs, broadcasterAccount *BroadcasterAccount) error {
+func (b *Broadcaster) handleProcessedMsgs(parentCtx types.Context, data btypes.ProcessedMsgs, broadcasterAccount *BroadcasterAccount) error {
+	transaction, ctx := sentry_integration.StartSentryTransaction(parentCtx, "HandleProcessedMsgs", "handles processed messages by broadcasting them to the network.")
+	defer transaction.Finish()
 	sequence := broadcasterAccount.Sequence()
 
 	txBytes, txHash, err := broadcasterAccount.BuildTxWithMsgs(ctx, data.Msgs)

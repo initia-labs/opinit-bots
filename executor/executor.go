@@ -9,6 +9,7 @@ import (
 	"github.com/initia-labs/opinit-bots/executor/celestia"
 	"github.com/initia-labs/opinit-bots/executor/child"
 	"github.com/initia-labs/opinit-bots/executor/host"
+	"github.com/initia-labs/opinit-bots/sentry_integration"
 	"github.com/initia-labs/opinit-bots/server"
 
 	bottypes "github.com/initia-labs/opinit-bots/bot/types"
@@ -36,6 +37,7 @@ type Executor struct {
 }
 
 func NewExecutor(cfg *executortypes.Config, db types.DB, sv *server.Server) *Executor {
+	sentry_integration.Init(bottypes.BotTypeExecutor.String())
 	err := cfg.Validate()
 	if err != nil {
 		panic(err)

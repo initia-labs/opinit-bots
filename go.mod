@@ -9,10 +9,12 @@ require (
 	cosmossdk.io/x/feegrant v0.1.1
 	cosmossdk.io/x/tx v0.13.5
 	github.com/celestiaorg/go-square/v2 v2.0.0
+	github.com/certifi/gocertifi v0.0.0-20210507211836-431795d63e8d
 	github.com/cometbft/cometbft v0.38.12
 	github.com/cosmos/cosmos-sdk v0.50.10
 	github.com/cosmos/go-bip39 v1.0.0
 	github.com/cosmos/gogoproto v1.7.0
+	github.com/getsentry/sentry-go v0.27.0
 	github.com/gofiber/fiber/v2 v2.52.5
 	github.com/initia-labs/OPinit v0.6.1
 	github.com/pkg/errors v0.9.1
@@ -76,7 +78,6 @@ require (
 	github.com/fatih/color v1.17.0 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/fsnotify/fsnotify v1.7.0 // indirect
-	github.com/getsentry/sentry-go v0.27.0 // indirect
 	github.com/go-kit/kit v0.13.0 // indirect
 	github.com/go-kit/log v0.2.1 // indirect
 	github.com/go-logfmt/logfmt v0.6.0 // indirect
