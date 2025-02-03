@@ -51,6 +51,25 @@ func DeleteFutureWorkingTrees(db types.DB, fromVersion uint64) error {
 	return nil
 }
 
+func DeleteFutureNodes(db types.DB, fromVersion uint64) error {
+	var deleteKeys [][]byte
+	err := db.Iterate(dbtypes.AppendSplitter(merkletypes.NodePrefix), merkletypes.PrefixedNodeKeyWithTreeIndex(fromVersion), func(key, _ []byte) (bool, error) {
+		deleteKeys = append(deleteKeys, key)
+		return false, nil
+	})
+	if err != nil {
+		return err
+	}
+
+	for _, key := range deleteKeys {
+		err := db.Delete(key)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // GetWorkingTree returns the working tree with the given version.
 func GetWorkingTree(db types.BasicDB, version uint64) (merkletypes.TreeInfo, error) {
 	data, err := db.Get(merkletypes.PrefixedWorkingTreeKey(version))

@@ -46,6 +46,16 @@ func PrefixedNodeKey(treeIndex uint64, height uint8, nodeIndex uint64) []byte {
 	})
 }
 
+func PrefixedNodeKeyWithTreeIndex(treeIndex uint64) []byte {
+	data := make([]byte, 8)
+	binary.BigEndian.PutUint64(data, treeIndex)
+
+	return dbtypes.GenerateKey([][]byte{
+		NodePrefix,
+		data,
+	})
+}
+
 func ParseFinalizedTreeKey(key []byte) (startLeafIndex uint64, err error) {
 	if len(key) != FinalizedTreeKeyLength {
 		return 0, fmt.Errorf("invalid finalized tree key bytes: expected %d, got %d", FinalizedTreeKeyLength, len(key))

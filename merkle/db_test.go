@@ -231,3 +231,56 @@ func TestDeleteFutureWorkingTrees(t *testing.T) { //nolint
 		require.Error(t, err)
 	}
 }
+
+func TestDeleteFutureNodes(t *testing.T) {
+	db, err := db.NewMemDB()
+	require.NoError(t, err)
+
+	var nodes []merkletypes.Node
+	for treeIndex := uint64(1); treeIndex <= 10; treeIndex++ {
+		for treeHeight := uint8(0); treeHeight <= 5; treeHeight++ {
+			for nodeIndex := uint64(0); nodeIndex <= 10; nodeIndex++ {
+				node := merkletypes.Node{
+					TreeIndex:      treeIndex,
+					Height:         treeHeight,
+					LocalNodeIndex: nodeIndex,
+					Data:           []byte{byte(treeIndex), treeHeight, byte(nodeIndex)},
+				}
+				nodes = append(nodes, node)
+			}
+		}
+	}
+	err = SaveNodes(db, nodes...)
+	require.NoError(t, err)
+
+	err = DeleteFutureNodes(db, 5)
+	require.NoError(t, err)
+	for treeIndex := uint64(1); treeIndex <= 4; treeIndex++ {
+		for treeHeight := uint8(0); treeHeight <= 5; treeHeight++ {
+			for nodeIndex := uint64(0); nodeIndex <= 10; nodeIndex++ {
+				nodeBytes, err := GetNodeBytes(db, treeIndex, treeHeight, nodeIndex)
+				require.NoError(t, err)
+				require.Equal(t, []byte{byte(treeIndex), treeHeight, byte(nodeIndex)}, nodeBytes)
+			}
+		}
+	}
+	for treeIndex := uint64(5); treeIndex <= 10; treeIndex++ {
+		for treeHeight := uint8(0); treeHeight <= 5; treeHeight++ {
+			for nodeIndex := uint64(0); nodeIndex <= 10; nodeIndex++ {
+				_, err := GetNodeBytes(db, treeIndex, treeHeight, nodeIndex)
+				require.Error(t, err)
+			}
+		}
+	}
+
+	err = DeleteFutureNodes(db, 0)
+	require.NoError(t, err)
+	for treeIndex := uint64(0); treeIndex <= 10; treeIndex++ {
+		for treeHeight := uint8(0); treeHeight <= 5; treeHeight++ {
+			for nodeIndex := uint64(0); nodeIndex <= 10; nodeIndex++ {
+				_, err := GetNodeBytes(db, treeIndex, treeHeight, nodeIndex)
+				require.Error(t, err)
+			}
+		}
+	}
+}
