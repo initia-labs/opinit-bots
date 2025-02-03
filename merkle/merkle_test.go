@@ -209,7 +209,6 @@ func TestFillLeaves(t *testing.T) {
 			}
 
 			nodes, err := m.fillLeaves()
-			require.NoError(t, err)
 
 			if tc.expected {
 				require.NoError(t, err)
