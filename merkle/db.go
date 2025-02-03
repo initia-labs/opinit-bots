@@ -13,24 +13,42 @@ import (
 
 // DeleteFutureFinalizedTrees deletes all finalized trees with sequence number greater than or equal to fromSequence.
 func DeleteFutureFinalizedTrees(db types.DB, fromSequence uint64) error {
-	return db.Iterate(dbtypes.AppendSplitter(merkletypes.FinalizedTreePrefix), merkletypes.PrefixedFinalizedTreeKey(fromSequence), func(key, _ []byte) (bool, error) {
-		err := db.Delete(key)
-		if err != nil {
-			return true, err
-		}
+	var deleteKeys [][]byte
+	err := db.Iterate(dbtypes.AppendSplitter(merkletypes.FinalizedTreePrefix), merkletypes.PrefixedFinalizedTreeKey(fromSequence), func(key, _ []byte) (bool, error) {
+		deleteKeys = append(deleteKeys, key)
 		return false, nil
 	})
+	if err != nil {
+		return err
+	}
+
+	for _, key := range deleteKeys {
+		err := db.Delete(key)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // DeleteFutureWorkingTrees deletes all working trees with version greater than or equal to fromVersion.
 func DeleteFutureWorkingTrees(db types.DB, fromVersion uint64) error {
-	return db.Iterate(dbtypes.AppendSplitter(merkletypes.WorkingTreePrefix), merkletypes.PrefixedWorkingTreeKey(fromVersion), func(key, _ []byte) (bool, error) {
-		err := db.Delete(key)
-		if err != nil {
-			return true, err
-		}
+	var deleteKeys [][]byte
+	err := db.Iterate(dbtypes.AppendSplitter(merkletypes.WorkingTreePrefix), merkletypes.PrefixedWorkingTreeKey(fromVersion), func(key, _ []byte) (bool, error) {
+		deleteKeys = append(deleteKeys, key)
 		return false, nil
 	})
+	if err != nil {
+		return err
+	}
+
+	for _, key := range deleteKeys {
+		err := db.Delete(key)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // GetWorkingTree returns the working tree with the given version.

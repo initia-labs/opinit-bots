@@ -34,22 +34,40 @@ func DeleteSyncedHeight(db types.BasicDB) error {
 
 // DeleteProcessedMsgs deletes all processed messages
 func DeleteProcessedMsgs(db types.DB) error {
-	return db.Iterate(dbtypes.AppendSplitter(btypes.ProcessedMsgsPrefix), nil, func(key, _ []byte) (stop bool, err error) {
-		err = db.Delete(key)
-		if err != nil {
-			return stop, err
-		}
+	var deleteKeys [][]byte
+	err := db.Iterate(dbtypes.AppendSplitter(btypes.ProcessedMsgsPrefix), nil, func(key, _ []byte) (stop bool, err error) {
+		deleteKeys = append(deleteKeys, key)
 		return false, nil
 	})
+	if err != nil {
+		return err
+	}
+
+	for _, key := range deleteKeys {
+		err := db.Delete(key)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // DeletePendingTxs deletes all pending txs
 func DeletePendingTxs(db types.DB) error {
-	return db.Iterate(dbtypes.AppendSplitter(btypes.PendingTxsPrefix), nil, func(key, _ []byte) (stop bool, err error) {
-		err = db.Delete(key)
-		if err != nil {
-			return stop, err
-		}
+	var deleteKeys [][]byte
+	err := db.Iterate(dbtypes.AppendSplitter(btypes.PendingTxsPrefix), nil, func(key, _ []byte) (stop bool, err error) {
+		deleteKeys = append(deleteKeys, key)
 		return false, nil
 	})
+	if err != nil {
+		return err
+	}
+
+	for _, key := range deleteKeys {
+		err := db.Delete(key)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
