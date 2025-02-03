@@ -142,7 +142,7 @@ func (b BroadcasterAccount) GetLatestSequence(ctx context.Context) (uint64, erro
 	if err != nil {
 		return 0, err
 	}
-	return account.GetAccountNumber(), nil
+	return account.GetSequence(), nil
 }
 
 func (b BroadcasterAccount) getClientCtx(ctx context.Context) client.Context {
