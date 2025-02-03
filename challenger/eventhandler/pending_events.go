@@ -75,12 +75,7 @@ func (ch *ChallengeEventHandler) GetAllPendingEvents() []challengertypes.Challen
 
 func (ch *ChallengeEventHandler) GetAllSortedPendingEvents() []challengertypes.ChallengeEvent {
 	pendingEvents := ch.GetAllPendingEvents()
-	sort.Slice(pendingEvents, func(i, j int) bool {
-		if pendingEvents[i].Type() == pendingEvents[j].Type() {
-			return pendingEvents[i].Id().Id < pendingEvents[j].Id().Id
-		}
-		return pendingEvents[i].Type() < pendingEvents[j].Type()
-	})
+	SortPendingEvents(pendingEvents)
 	return pendingEvents
 }
 
@@ -97,5 +92,16 @@ func (ch *ChallengeEventHandler) GetUnprocessedPendingEvents(processedEvents []c
 	for _, event := range copiedPendingEvents {
 		unprocessedPendingEvents = append(unprocessedPendingEvents, event)
 	}
+	SortPendingEvents(unprocessedPendingEvents)
 	return unprocessedPendingEvents
+}
+
+func SortPendingEvents(pendingEvents []challengertypes.ChallengeEvent) []challengertypes.ChallengeEvent {
+	sort.Slice(pendingEvents, func(i, j int) bool {
+		if pendingEvents[i].Type() == pendingEvents[j].Type() {
+			return pendingEvents[i].Id().Id < pendingEvents[j].Id().Id
+		}
+		return pendingEvents[i].Type() < pendingEvents[j].Type()
+	})
+	return pendingEvents
 }
