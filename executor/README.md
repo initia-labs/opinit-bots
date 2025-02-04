@@ -242,9 +242,9 @@ type QueryWithdrawalResponse struct {
 	LastBlockHash    []byte     `json:"last_block_hash"`
 
 	// extra info
-	TxTime   int64  `json:"tx_time"`
-	TxHeight int64  `json:"tx_height"`
-	TxHash   string `json:"tx_hash"`
+	TxTime   time.Time  `json:"tx_time"`
+	TxHeight int64      `json:"tx_height"`
+	TxHash   string     `json:"tx_hash"`
 }
 ```
 
@@ -433,9 +433,9 @@ type QueryWithdrawalResponse struct {
   LastBlockHash    []byte     `json:"last_block_hash"`
 
   // extra info
-  TxTime   int64  `json:"tx_time"`
-  TxHeight int64  `json:"tx_height"`
-  TxHash   string `json:"tx_hash"`
+  TxTime   time.Time  `json:"tx_time"`
+  TxHeight int64      `json:"tx_height"`
+  TxHash   string     `json:"tx_hash"`
 }
 ```
 
