@@ -61,16 +61,14 @@ func (n *Node) handleBlockTxs(ctx types.Context, block *rpccoretypes.ResultBlock
 
 // handleFinalizeBlock handles the finalize block.
 func (n *Node) handleFinalizeBlock(ctx types.Context, blockHeight int64, blockTime time.Time, blockResult *rpccoretypes.ResultBlockResults, latestHeight int64) error {
-	span, ctx := sentry_integration.StartSentrySpan(ctx, "handleFinalizeBlock", "Handles the finalize block.")
-	defer span.Finish()
 	return n.handleEvents(ctx, blockHeight, blockTime, blockResult.FinalizeBlockEvents, latestHeight, nil, 0)
 }
 
 // handleEvent handles the event for the given transaction.
 func (n *Node) handleEvents(ctx types.Context, blockHeight int64, blockTime time.Time, events []abcitypes.Event, latestHeight int64, tx comettypes.Tx, txIndex int64) error {
-	span, ctx := sentry_integration.StartSentrySpan(ctx, "handleEvent", "handles the event for the given transaction.")
-	defer span.Finish()
 	if len(n.eventHandlers) != 0 {
+		span, ctx := sentry_integration.StartSentrySpan(ctx, "handleFinalizeBlock", "Handles the finalize block.")
+		defer span.Finish()
 		for eventIndex, event := range events {
 			err := n.handleEvent(ctx, blockHeight, blockTime, latestHeight, tx, txIndex, event)
 			if err != nil {

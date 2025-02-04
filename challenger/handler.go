@@ -74,10 +74,8 @@ func (c *Challenger) getLatestChallenges() []challengertypes.Challenge {
 }
 
 func (c *Challenger) handleChallenge(ctx types.Context, challenge challengertypes.Challenge) error {
-	// TODO: warning log or send to alerting system
 	sentry_integration.CaptureCurrentHubException(fmt.Errorf("failed to handle challenge"), sentry.LevelWarning)
 	ctx.Logger().Error("challenge", zap.Any("challenge", challenge))
-
 	return nil
 }
 

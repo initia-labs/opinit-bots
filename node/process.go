@@ -32,7 +32,7 @@ func (n *Node) blockProcessLooper(ctx types.Context, processType nodetypes.Block
 
 		status, err := n.rpcClient.Status(ctx)
 		if err != nil {
-			sentry_integration.CaptureCurrentHubException(fmt.Errorf("failed to handle challenge"), sentry.LevelError)
+			sentry_integration.CaptureCurrentHubException(fmt.Errorf("failed to get node status"), sentry.LevelError)
 			ctx.Logger().Error("failed to get node status ", zap.String("error", err.Error()))
 			continue
 		}
@@ -151,9 +151,7 @@ func (n *Node) fetchNewBlock(ctx types.Context, height int64) (*rpccoretypes.Res
 
 // handleNewBlock handles a new block and block results given the height
 // it sends txs and events to the respective registered handlers
-func (n *Node) handleNewBlock(parentCtx types.Context, block *rpccoretypes.ResultBlock, blockResult *rpccoretypes.ResultBlockResults, latestChainHeight int64) error {
-	transaction, ctx := sentry_integration.StartSentryTransaction(parentCtx, "handleNewBlock", "Handles a new block and block results")
-	defer transaction.Finish()
+func (n *Node) handleNewBlock(ctx types.Context, block *rpccoretypes.ResultBlock, blockResult *rpccoretypes.ResultBlockResults, latestChainHeight int64) error {
 	protoBlock, err := block.Block.ToProto()
 	if err != nil {
 		return errors.Wrap(err, "failed to convert block to proto block")
@@ -183,13 +181,12 @@ func (n *Node) handleNewBlock(parentCtx types.Context, block *rpccoretypes.Resul
 
 // handleEvent handles the event for the given transaction
 func (n *Node) handleEvent(ctx types.Context, blockHeight int64, blockTime time.Time, latestHeight int64, tx comettypes.Tx, txIndex int64, event abcitypes.Event) error {
-	span, ctx := sentry_integration.StartSentrySpan(ctx, fmt.Sprintf("handleEvent(%s)", event.GetType()), "handles the event for the given transaction")
-	defer span.Finish()
 	// ignore if no event handlers
 	if n.eventHandlers[event.GetType()] == nil {
 		return nil
 	}
-
+	span, ctx := sentry_integration.StartSentrySpan(ctx, fmt.Sprintf("handleEvent(%s)", event.GetType()), "handles the event for the given transaction")
+	defer span.Finish()
 	ctx.Logger().Debug("handle event", zap.Int64("height", blockHeight), zap.String("type", event.GetType()))
 	return n.eventHandlers[event.Type](ctx, nodetypes.EventHandlerArgs{
 		BlockHeight:     blockHeight,
