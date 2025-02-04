@@ -47,7 +47,7 @@ func txCmd(ctx *cmdContext) *cobra.Command {
 func txGrantOracleCmd(baseCtx *cmdContext) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "grant-oracle [oracle-account-address]",
-		Args:  cobra.ExactArgs(2),
+		Args:  cobra.ExactArgs(1),
 		Short: "Grant oracle permission to the given account",
 		Long:  `Grant oracle permission to the given account on L2 chain`,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -120,12 +120,12 @@ func txGrantOracleCmd(baseCtx *cmdContext) *cobra.Command {
 func txUpdateBatchInfoCmd(baseCtx *cmdContext) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "update-batch-info [chain-type] [new-submitter-address]",
-		Args:  cobra.ExactArgs(1),
+		Args:  cobra.ExactArgs(2),
 		Short: "Update batch info with new chain type and new submitter address",
 		Long: `Update batch info with new chain type and new submitter address.
 Before running this command, you need to 
-(1) register a new key for the batch address
-(2) update the batch configuration in the executor config.
+(1) register a new key for the new submitter address
+(2) update the DA configuration in the executor config.
 		`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmdCtx, botDone := context.WithCancel(cmd.Context())
