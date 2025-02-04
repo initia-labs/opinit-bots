@@ -6,9 +6,10 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/initia-labs/opinit-bots/types"
 	"github.com/pkg/errors"
+	"go.uber.org/zap"
 )
 
-func (ex *Executor) RegisterQuerier() {
+func (ex *Executor) RegisterQuerier(ctx types.Context) {
 	ex.server.RegisterQuerier("/withdrawal/:sequence", func(c *fiber.Ctx) error {
 		sequenceStr := c.Params("sequence")
 		if sequenceStr == "" {
@@ -20,7 +21,8 @@ func (ex *Executor) RegisterQuerier() {
 		}
 		res, err := ex.child.QueryWithdrawal(sequence)
 		if err != nil {
-			return err
+			ctx.Logger().Error("failed to query withdrawal", zap.Error(err))
+			return errors.New("failed to query withdrawal")
 		}
 		return c.JSON(res)
 	})
@@ -54,7 +56,8 @@ func (ex *Executor) RegisterQuerier() {
 		}
 		res, err := ex.child.QueryWithdrawals(address, uoffset, ulimit, descOrder)
 		if err != nil {
-			return err
+			ctx.Logger().Error("failed to query withdrawals", zap.Error(err))
+			return errors.New("failed to query withdrawals")
 		}
 		return c.JSON(res)
 	})
@@ -62,14 +65,16 @@ func (ex *Executor) RegisterQuerier() {
 	ex.server.RegisterQuerier("/status", func(c *fiber.Ctx) error {
 		status, err := ex.GetStatus()
 		if err != nil {
-			return err
+			ctx.Logger().Error("failed to query status", zap.Error(err))
+			return errors.New("failed to query status")
 		}
 		return c.JSON(status)
 	})
 	ex.server.RegisterQuerier("/syncing", func(c *fiber.Ctx) error {
 		status, err := ex.GetStatus()
 		if err != nil {
-			return err
+			ctx.Logger().Error("failed to query status", zap.Error(err))
+			return errors.New("failed to query status")
 		}
 		hostSync := status.Host.Node.Syncing != nil && *status.Host.Node.Syncing
 		childSync := status.Child.Node.Syncing != nil && *status.Child.Node.Syncing

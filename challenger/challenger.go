@@ -129,7 +129,7 @@ func (c *Challenger) Initialize(ctx types.Context) error {
 		}
 	}
 
-	c.RegisterQuerier()
+	c.RegisterQuerier(ctx)
 
 	c.pendingChallenges, err = challengerdb.LoadPendingChallenges(c.db)
 	if err != nil {
@@ -176,18 +176,19 @@ func (c *Challenger) Start(ctx types.Context) error {
 	return ctx.ErrGrp().Wait()
 }
 
-func (c *Challenger) RegisterQuerier() {
-	c.server.RegisterQuerier("/status", func(ctx *fiber.Ctx) error {
+func (c *Challenger) RegisterQuerier(ctx types.Context) {
+	c.server.RegisterQuerier("/status", func(fiberCtx *fiber.Ctx) error {
 		status, err := c.GetStatus()
 		if err != nil {
-			return err
+			ctx.Logger().Error("failed to query status", zap.Error(err))
+			return errors.New("failed to query status")
 		}
 
-		return ctx.JSON(status)
+		return fiberCtx.JSON(status)
 	})
-	c.server.RegisterQuerier("/challenges", func(ctx *fiber.Ctx) error {
-		offset := ctx.Query("offset", "")
-		limit := ctx.QueryInt("limit", 10)
+	c.server.RegisterQuerier("/challenges", func(fiberCtx *fiber.Ctx) error {
+		offset := fiberCtx.Query("offset", "")
+		limit := fiberCtx.QueryInt("limit", 10)
 		if limit > 100 {
 			limit = 100
 		}
@@ -198,42 +199,46 @@ func (c *Challenger) RegisterQuerier() {
 		}
 
 		descOrder := true
-		orderStr := ctx.Query("order", "desc")
+		orderStr := fiberCtx.Query("order", "desc")
 		if orderStr == "asc" {
 			descOrder = false
 		}
 
 		res, err := c.QueryChallenges(offset, ulimit, descOrder)
 		if err != nil {
-			return err
+			ctx.Logger().Error("failed to query challenges", zap.Error(err))
+			return errors.New("failed to query challenges")
 		}
-		return ctx.JSON(res)
+		return fiberCtx.JSON(res)
 	})
 
-	c.server.RegisterQuerier("/pending_events/host", func(ctx *fiber.Ctx) error {
+	c.server.RegisterQuerier("/pending_events/host", func(fiberCtx *fiber.Ctx) error {
 		pendingEvents, err := c.host.GetAllPendingEvents()
 		if err != nil {
-			return err
+			ctx.Logger().Error("failed to query pending events", zap.Error(err))
+			return errors.New("failed to query pending events")
 		}
-		return ctx.JSON(pendingEvents)
+		return fiberCtx.JSON(pendingEvents)
 	})
 
-	c.server.RegisterQuerier("/pending_events/child", func(ctx *fiber.Ctx) error {
+	c.server.RegisterQuerier("/pending_events/child", func(fiberCtx *fiber.Ctx) error {
 		pendingEvents, err := c.child.GetAllPendingEvents()
 		if err != nil {
-			return err
+			ctx.Logger().Error("failed to query pending events", zap.Error(err))
+			return errors.New("failed to query pending events")
 		}
-		return ctx.JSON(pendingEvents)
+		return fiberCtx.JSON(pendingEvents)
 	})
 
-	c.server.RegisterQuerier("/syncing", func(ctx *fiber.Ctx) error {
+	c.server.RegisterQuerier("/syncing", func(fiberCtx *fiber.Ctx) error {
 		status, err := c.GetStatus()
 		if err != nil {
-			return err
+			ctx.Logger().Error("failed to query status", zap.Error(err))
+			return errors.New("failed to query status")
 		}
 		hostSync := status.Host.Node.Syncing != nil && *status.Host.Node.Syncing
 		childSync := status.Child.Node.Syncing != nil && *status.Child.Node.Syncing
-		return ctx.JSON(hostSync || childSync)
+		return fiberCtx.JSON(hostSync || childSync)
 	})
 }
 

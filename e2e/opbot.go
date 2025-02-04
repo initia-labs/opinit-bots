@@ -14,10 +14,11 @@ import (
 	"github.com/docker/docker/client"
 	"go.uber.org/zap"
 
-	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/initia-labs/opinit-bots/executor"
 	executortypes "github.com/initia-labs/opinit-bots/executor/types"
 	"github.com/strangelove-ventures/interchaintest/v8/ibc"
+
+	sdk "github.com/cosmos/cosmos-sdk/types"
 
 	"github.com/pkg/errors"
 )

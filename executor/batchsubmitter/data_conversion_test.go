@@ -17,12 +17,13 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 
+	ibcclienttypes "github.com/cosmos/ibc-go/v8/modules/core/02-client/types"
+	ibctmlightclients "github.com/cosmos/ibc-go/v8/modules/light-clients/07-tendermint"
+
 	"github.com/cosmos/cosmos-sdk/client/tx"
 	cdctypes "github.com/cosmos/cosmos-sdk/codec/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/x/authz"
-	ibcclienttypes "github.com/cosmos/ibc-go/v8/modules/core/02-client/types"
-	ibctmlightclients "github.com/cosmos/ibc-go/v8/modules/light-clients/07-tendermint"
 )
 
 func TestEmptyOracleData(t *testing.T) {

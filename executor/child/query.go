@@ -1,6 +1,8 @@
 package child
 
 import (
+	"time"
+
 	"cosmossdk.io/math"
 
 	"github.com/pkg/errors"
@@ -28,7 +30,7 @@ func (ch Child) QueryWithdrawal(sequence uint64) (executortypes.QueryWithdrawalR
 		Amount:   amount,
 		Version:  []byte{ch.Version()},
 		TxHeight: withdrawal.TxHeight,
-		TxTime:   withdrawal.TxTime,
+		TxTime:   time.Unix(0, withdrawal.TxTime),
 		TxHash:   withdrawal.TxHash,
 	}
 

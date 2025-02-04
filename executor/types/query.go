@@ -1,6 +1,10 @@
 package types
 
-import "github.com/cosmos/cosmos-sdk/types"
+import (
+	"time"
+
+	"github.com/cosmos/cosmos-sdk/types"
+)
 
 type QueryWithdrawalResponse struct {
 	// fields required to withdraw funds
@@ -16,9 +20,9 @@ type QueryWithdrawalResponse struct {
 	LastBlockHash    []byte     `json:"last_block_hash"`
 
 	// extra info
-	TxTime   int64  `json:"tx_time"`
-	TxHeight int64  `json:"tx_height"`
-	TxHash   string `json:"tx_hash"`
+	TxTime   time.Time `json:"tx_time"`
+	TxHeight int64     `json:"tx_height"`
+	TxHash   string    `json:"tx_hash"`
 }
 
 type QueryWithdrawalsResponse struct {

@@ -108,7 +108,7 @@ func (ex *Executor) Initialize(ctx types.Context) error {
 		return errors.Wrap(err, "failed to make DA node")
 	}
 	ex.batchSubmitter.SetDANode(da)
-	ex.RegisterQuerier()
+	ex.RegisterQuerier(ctx)
 	return nil
 }
 

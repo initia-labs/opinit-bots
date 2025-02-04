@@ -271,7 +271,7 @@ func Migration0110(db types.DB) error {
 
 func Migration0111(db types.DB) error {
 	childDB := db.WithPrefix([]byte(types.ChildName))
-	merkleDB := db.WithPrefix([]byte(types.MerkleName))
+	merkleDB := childDB.WithPrefix([]byte(types.MerkleName))
 
 	err := merkleDB.Iterate(nil, nil, func(key, value []byte) (bool, error) {
 		err := childDB.Set(key, value)
