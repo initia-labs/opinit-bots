@@ -180,7 +180,7 @@ func (c *Challenger) RegisterQuerier() {
 	c.server.RegisterQuerier("/status", func(ctx *fiber.Ctx) error {
 		status, err := c.GetStatus()
 		if err != nil {
-			return err
+			return errors.New("failed to query status")
 		}
 
 		return ctx.JSON(status)
@@ -205,7 +205,7 @@ func (c *Challenger) RegisterQuerier() {
 
 		res, err := c.QueryChallenges(offset, ulimit, descOrder)
 		if err != nil {
-			return err
+			return errors.New("failed to query challenges")
 		}
 		return ctx.JSON(res)
 	})
@@ -213,7 +213,7 @@ func (c *Challenger) RegisterQuerier() {
 	c.server.RegisterQuerier("/pending_events/host", func(ctx *fiber.Ctx) error {
 		pendingEvents, err := c.host.GetAllPendingEvents()
 		if err != nil {
-			return err
+			return errors.New("failed to query pending events")
 		}
 		return ctx.JSON(pendingEvents)
 	})
@@ -221,7 +221,7 @@ func (c *Challenger) RegisterQuerier() {
 	c.server.RegisterQuerier("/pending_events/child", func(ctx *fiber.Ctx) error {
 		pendingEvents, err := c.child.GetAllPendingEvents()
 		if err != nil {
-			return err
+			return errors.New("failed to query pending events")
 		}
 		return ctx.JSON(pendingEvents)
 	})
@@ -229,7 +229,7 @@ func (c *Challenger) RegisterQuerier() {
 	c.server.RegisterQuerier("/syncing", func(ctx *fiber.Ctx) error {
 		status, err := c.GetStatus()
 		if err != nil {
-			return err
+			return errors.New("failed to query syncing info")
 		}
 		hostSync := status.Host.Node.Syncing != nil && *status.Host.Node.Syncing
 		childSync := status.Child.Node.Syncing != nil && *status.Child.Node.Syncing

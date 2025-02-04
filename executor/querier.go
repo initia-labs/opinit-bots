@@ -20,7 +20,7 @@ func (ex *Executor) RegisterQuerier() {
 		}
 		res, err := ex.child.QueryWithdrawal(sequence)
 		if err != nil {
-			return err
+			return errors.New("failed to query withdrawal")
 		}
 		return c.JSON(res)
 	})
@@ -54,7 +54,7 @@ func (ex *Executor) RegisterQuerier() {
 		}
 		res, err := ex.child.QueryWithdrawals(address, uoffset, ulimit, descOrder)
 		if err != nil {
-			return err
+			return errors.New("failed to query withdrawals")
 		}
 		return c.JSON(res)
 	})
@@ -62,14 +62,14 @@ func (ex *Executor) RegisterQuerier() {
 	ex.server.RegisterQuerier("/status", func(c *fiber.Ctx) error {
 		status, err := ex.GetStatus()
 		if err != nil {
-			return err
+			return errors.New("failed to query status")
 		}
 		return c.JSON(status)
 	})
 	ex.server.RegisterQuerier("/syncing", func(c *fiber.Ctx) error {
 		status, err := ex.GetStatus()
 		if err != nil {
-			return err
+			return errors.New("failed to query status")
 		}
 		hostSync := status.Host.Node.Syncing != nil && *status.Host.Node.Syncing
 		childSync := status.Child.Node.Syncing != nil && *status.Child.Node.Syncing
