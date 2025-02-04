@@ -71,7 +71,7 @@ func TestRawBlockHandler(t *testing.T) {
 		batchInfos: []ophosttypes.BatchInfoWithOutput{
 			{
 				BatchInfo: ophosttypes.BatchInfo{
-					ChainType: ophosttypes.BatchInfo_CHAIN_TYPE_INITIA,
+					ChainType: ophosttypes.BatchInfo_INITIA,
 					Submitter: "submitter0",
 				},
 			},

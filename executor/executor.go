@@ -151,7 +151,7 @@ func (ex *Executor) makeDANode(ctx types.Context, bridgeInfo ophosttypes.QueryBr
 		return nil, errors.New("batch info is not set")
 	}
 	switch batchInfo.BatchInfo.ChainType {
-	case ophosttypes.BatchInfo_CHAIN_TYPE_INITIA:
+	case ophosttypes.BatchInfo_INITIA:
 		// might not exist
 		hostAddrStr, err := ex.host.BaseAccountAddressString()
 		if err != nil && !errors.Is(err, types.ErrKeyNotSet) {
@@ -166,7 +166,7 @@ func (ex *Executor) makeDANode(ctx types.Context, bridgeInfo ophosttypes.QueryBr
 		)
 		err = hostda.InitializeDA(ctx, bridgeInfo, daKeyringConfig)
 		return hostda, errors.Wrap(err, "failed to initialize host DA")
-	case ophosttypes.BatchInfo_CHAIN_TYPE_CELESTIA:
+	case ophosttypes.BatchInfo_CELESTIA:
 		celestiada := celestia.NewDACelestia(
 			ex.cfg.Version,
 			ex.cfg.DANodeConfig(),

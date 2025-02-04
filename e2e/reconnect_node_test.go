@@ -41,7 +41,7 @@ func TestReconnectNodes(t *testing.T) {
 
 	daChainConfig := &DAChainConfig{
 		ChainConfig: *l1ChainConfig,
-		ChainType:   ophosttypes.BatchInfo_CHAIN_TYPE_INITIA,
+		ChainType:   ophosttypes.BatchInfo_INITIA,
 	}
 
 	bridgeConfig := &BridgeConfig{

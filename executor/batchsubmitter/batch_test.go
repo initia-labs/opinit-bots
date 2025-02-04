@@ -53,7 +53,7 @@ func TestPrepareBatch(t *testing.T) {
 			batchInfoQueue: []ophosttypes.BatchInfoWithOutput{
 				{
 					BatchInfo: ophosttypes.BatchInfo{
-						ChainType: ophosttypes.BatchInfo_CHAIN_TYPE_INITIA,
+						ChainType: ophosttypes.BatchInfo_INITIA,
 						Submitter: "submitter0",
 					},
 				},
@@ -80,7 +80,7 @@ func TestPrepareBatch(t *testing.T) {
 			batchInfoQueue: []ophosttypes.BatchInfoWithOutput{
 				{
 					BatchInfo: ophosttypes.BatchInfo{
-						ChainType: ophosttypes.BatchInfo_CHAIN_TYPE_INITIA,
+						ChainType: ophosttypes.BatchInfo_INITIA,
 						Submitter: "submitter0",
 					},
 				},
@@ -107,13 +107,13 @@ func TestPrepareBatch(t *testing.T) {
 			batchInfoQueue: []ophosttypes.BatchInfoWithOutput{
 				{
 					BatchInfo: ophosttypes.BatchInfo{
-						ChainType: ophosttypes.BatchInfo_CHAIN_TYPE_INITIA,
+						ChainType: ophosttypes.BatchInfo_INITIA,
 						Submitter: "submitter0",
 					},
 				},
 				{
 					BatchInfo: ophosttypes.BatchInfo{
-						ChainType: ophosttypes.BatchInfo_CHAIN_TYPE_CELESTIA,
+						ChainType: ophosttypes.BatchInfo_CELESTIA,
 						Submitter: "submitter0",
 					},
 					Output: ophosttypes.Output{
@@ -143,13 +143,13 @@ func TestPrepareBatch(t *testing.T) {
 			batchInfoQueue: []ophosttypes.BatchInfoWithOutput{
 				{
 					BatchInfo: ophosttypes.BatchInfo{
-						ChainType: ophosttypes.BatchInfo_CHAIN_TYPE_INITIA,
+						ChainType: ophosttypes.BatchInfo_INITIA,
 						Submitter: "submitter0",
 					},
 				},
 				{
 					BatchInfo: ophosttypes.BatchInfo{
-						ChainType: ophosttypes.BatchInfo_CHAIN_TYPE_CELESTIA,
+						ChainType: ophosttypes.BatchInfo_CELESTIA,
 						Submitter: "submitter0",
 					},
 					Output: ophosttypes.Output{

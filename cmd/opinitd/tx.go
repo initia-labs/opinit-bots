@@ -198,8 +198,8 @@ Before running this command, you need to
 
 func validateBatchInfoArgs(cfg *executortypes.Config, chainType string, newAddress string) error {
 	chainType = strings.ToUpper(chainType)
-	if chainType != ophosttypes.BatchInfo_CHAIN_TYPE_INITIA.String() && chainType != ophosttypes.BatchInfo_CHAIN_TYPE_CELESTIA.String() {
-		return fmt.Errorf("supported chain type: %s, %s", ophosttypes.BatchInfo_CHAIN_TYPE_INITIA.String(), ophosttypes.BatchInfo_CHAIN_TYPE_CELESTIA.String())
+	if chainType != ophosttypes.BatchInfo_INITIA.String() && chainType != ophosttypes.BatchInfo_CELESTIA.String() {
+		return fmt.Errorf("supported chain type: %s, %s", ophosttypes.BatchInfo_INITIA.String(), ophosttypes.BatchInfo_CELESTIA.String())
 	}
 
 	_, err := keys.DecodeBech32AccAddr(newAddress, cfg.DANodeConfig().Bech32Prefix)

@@ -73,7 +73,7 @@ func TestBatchReconstructionTest(t *testing.T) {
 			name: "initia with go relayer",
 			daChainConfig: DAChainConfig{
 				ChainConfig: *l1ChainConfig,
-				ChainType:   ophosttypes.BatchInfo_CHAIN_TYPE_INITIA,
+				ChainType:   ophosttypes.BatchInfo_INITIA,
 			},
 			relayerImpl: ibc.CosmosRly,
 		},
@@ -81,7 +81,7 @@ func TestBatchReconstructionTest(t *testing.T) {
 			name: "initia with hermes relayer",
 			daChainConfig: DAChainConfig{
 				ChainConfig: *l1ChainConfig,
-				ChainType:   ophosttypes.BatchInfo_CHAIN_TYPE_INITIA,
+				ChainType:   ophosttypes.BatchInfo_INITIA,
 			},
 			relayerImpl: ibc.Hermes,
 		},
@@ -101,7 +101,7 @@ func TestBatchReconstructionTest(t *testing.T) {
 					NumValidators:  1,
 					NumFullNodes:   0,
 				},
-				ChainType: ophosttypes.BatchInfo_CHAIN_TYPE_CELESTIA,
+				ChainType: ophosttypes.BatchInfo_CELESTIA,
 			},
 			relayerImpl: ibc.CosmosRly,
 		},

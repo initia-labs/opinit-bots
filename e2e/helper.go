@@ -343,7 +343,7 @@ func SetupTest(
 		},
 	}
 
-	if daChainConfig.ChainType == ophosttypes.BatchInfo_CHAIN_TYPE_CELESTIA {
+	if daChainConfig.ChainType == ophosttypes.BatchInfo_CELESTIA {
 		specs = append(specs, &interchaintest.ChainSpec{
 			ChainConfig: ibc.ChainConfig{
 				Type:    "cosmos",
