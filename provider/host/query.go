@@ -8,6 +8,7 @@ import (
 	"time"
 
 	coretypes "github.com/cometbft/cometbft/rpc/core/types"
+
 	query "github.com/cosmos/cosmos-sdk/types/query"
 
 	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
