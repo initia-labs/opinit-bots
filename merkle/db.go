@@ -51,9 +51,9 @@ func DeleteFutureWorkingTrees(db types.DB, fromVersion uint64) error {
 	return nil
 }
 
-func DeleteFutureNodes(db types.DB, fromVersion uint64) error {
+func DeleteFutureNodes(db types.DB, treeIndex uint64) error {
 	var deleteKeys [][]byte
-	err := db.Iterate(dbtypes.AppendSplitter(merkletypes.NodePrefix), merkletypes.PrefixedNodeKeyWithTreeIndex(fromVersion), func(key, _ []byte) (bool, error) {
+	err := db.Iterate(dbtypes.AppendSplitter(merkletypes.NodePrefix), merkletypes.PrefixedNodeKeyWithTreeIndex(treeIndex), func(key, _ []byte) (bool, error) {
 		deleteKeys = append(deleteKeys, key)
 		return false, nil
 	})
