@@ -270,6 +270,24 @@ func Migration0110(db types.DB) error {
 }
 
 func Migration0111(db types.DB) error {
+	childDB := db.WithPrefix([]byte(types.ChildName))
+	merkleDB := db.WithPrefix([]byte(types.MerkleName))
+
+	err := merkleDB.Iterate(nil, nil, func(key, value []byte) (bool, error) {
+		err := childDB.Set(key, value)
+		if err != nil {
+			return true, err
+		}
+		err = merkleDB.Delete(key)
+		if err != nil {
+			return true, err
+		}
+		return false, nil
+	})
+	if err != nil {
+		return err
+	}
+
 	DAHostName := "da_host"
 	DACelestiaName := "da_celestia"
 
@@ -314,8 +332,7 @@ func Migration0111(db types.DB) error {
 	}
 
 	// change WithdrawalPrefix to WithdrawalSequencePrefix or WithdrawalAddressPrefix
-	childDB := db.WithPrefix([]byte(types.ChildName))
-	err := childDB.Iterate(executortypes.WithdrawalPrefix, nil, func(key, value []byte) (bool, error) {
+	err = childDB.Iterate(dbtypes.AppendSplitter(executortypes.WithdrawalPrefix), nil, func(key, value []byte) (bool, error) {
 		if len(key) == len(executortypes.WithdrawalPrefix)+1+8 {
 			err := childDB.Set(append(executortypes.WithdrawalSequencePrefix, key[len(executortypes.WithdrawalPrefix):]...), value)
 			if err != nil {
@@ -338,7 +355,7 @@ func Migration0111(db types.DB) error {
 		return err
 	}
 
-	return childDB.Iterate(merkletypes.WorkingTreePrefix, nil, func(key, value []byte) (bool, error) {
+	return childDB.Iterate(dbtypes.AppendSplitter(merkletypes.WorkingTreePrefix), nil, func(key, value []byte) (bool, error) {
 		version, err := merkletypes.ParseWorkingTreeKey(key)
 		if err != nil {
 			return true, errors.Wrap(err, "failed to parse working tree key")
