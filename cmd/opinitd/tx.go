@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"cosmossdk.io/errors"
 	"github.com/spf13/cobra"
@@ -23,6 +24,9 @@ import (
 	"github.com/initia-labs/opinit-bots/provider/child"
 	"github.com/initia-labs/opinit-bots/types"
 
+	opchildtypes "github.com/initia-labs/OPinit/x/opchild/types"
+	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
+
 	sdk "github.com/cosmos/cosmos-sdk/types"
 )
 
@@ -35,6 +39,7 @@ func txCmd(ctx *cmdContext) *cobra.Command {
 
 	cmd.AddCommand(
 		txGrantOracleCmd(ctx),
+		txUpdateBatchInfoCmd(ctx),
 	)
 	return cmd
 }
@@ -42,7 +47,7 @@ func txCmd(ctx *cmdContext) *cobra.Command {
 func txGrantOracleCmd(baseCtx *cmdContext) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "grant-oracle [oracle-account-address]",
-		Args:  cobra.ExactArgs(1),
+		Args:  cobra.ExactArgs(2),
 		Short: "Grant oracle permission to the given account",
 		Long:  `Grant oracle permission to the given account on L2 chain`,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -54,7 +59,12 @@ func txGrantOracleCmd(baseCtx *cmdContext) *cobra.Command {
 			baseCtx := types.NewContext(ctx, baseCtx.logger.Named(string(bottypes.BotTypeExecutor)), baseCtx.homePath).
 				WithErrGrp(errGrp)
 
-			account, err := l2BroadcasterAccount(baseCtx, cmd)
+			cfg, err := getExecutorConfig(baseCtx, cmd)
+			if err != nil {
+				return err
+			}
+
+			account, err := l2BroadcasterAccount(baseCtx, cfg)
 			if err != nil {
 				return err
 			}
@@ -107,7 +117,99 @@ func txGrantOracleCmd(baseCtx *cmdContext) *cobra.Command {
 	return cmd
 }
 
-func l2BroadcasterAccount(ctx types.Context, cmd *cobra.Command) (*broadcaster.BroadcasterAccount, error) {
+func txUpdateBatchInfoCmd(baseCtx *cmdContext) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "update-batch-info [chain-type] [new-submitter-address]",
+		Args:  cobra.ExactArgs(1),
+		Short: "Update batch info with new chain type and new submitter address",
+		Long: `Update batch info with new chain type and new submitter address.
+Before running this command, you need to 
+(1) register a new key for the batch address
+(2) update the batch configuration in the executor config.
+		`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			cmdCtx, botDone := context.WithCancel(cmd.Context())
+			gracefulShutdown(botDone)
+
+			errGrp, ctx := errgroup.WithContext(cmdCtx)
+
+			baseCtx := types.NewContext(ctx, baseCtx.logger.Named(string(bottypes.BotTypeExecutor)), baseCtx.homePath).
+				WithErrGrp(errGrp)
+
+			cfg, err := getExecutorConfig(baseCtx, cmd)
+			if err != nil {
+				return err
+			}
+
+			chainType := args[0]
+			newSubmitterAddress := args[1]
+
+			err = validateBatchInfoArgs(cfg, chainType, newSubmitterAddress)
+			if err != nil {
+				return err
+			}
+
+			bridgeId, err := QueryBridgeId(baseCtx, cfg)
+			if err != nil {
+				return err
+			}
+
+			proposerAccount, err := l1ProposerAccount(baseCtx, cfg, bridgeId)
+			if err != nil {
+				return err
+			}
+
+			err = proposerAccount.Load(baseCtx)
+			if err != nil {
+				return err
+			}
+
+			updateBatchInfoMsg := &ophosttypes.MsgUpdateBatchInfo{
+				Authority: proposerAccount.GetAddressString(),
+				BridgeId:  bridgeId,
+				NewBatchInfo: ophosttypes.BatchInfo{
+					Submitter: newSubmitterAddress,
+					ChainType: ophosttypes.BatchInfo_ChainType(ophosttypes.BatchInfo_ChainType_value[chainType]),
+				},
+			}
+
+			txBytes, _, err := proposerAccount.BuildTxWithMsgs(ctx, []sdk.Msg{updateBatchInfoMsg})
+			if err != nil {
+				return errors.Wrapf(err, "simulation failed")
+			}
+
+			res, err := proposerAccount.BroadcastTxSync(baseCtx, txBytes)
+			if err != nil {
+				// TODO: handle error, may repeat sending tx
+				return fmt.Errorf("broadcast txs: %w", err)
+			}
+			bz, err := json.Marshal(res)
+			if err != nil {
+				return err
+			}
+			fmt.Println(string(bz))
+			return nil
+		},
+	}
+
+	cmd = configFlag(baseCtx.v, cmd)
+	return cmd
+}
+
+func validateBatchInfoArgs(cfg *executortypes.Config, chainType string, newAddress string) error {
+	chainType = strings.ToUpper(chainType)
+	if chainType != ophosttypes.BatchInfo_CHAIN_TYPE_INITIA.String() && chainType != ophosttypes.BatchInfo_CHAIN_TYPE_CELESTIA.String() {
+		return fmt.Errorf("supported chain type: %s, %s", ophosttypes.BatchInfo_CHAIN_TYPE_INITIA.String(), ophosttypes.BatchInfo_CHAIN_TYPE_CELESTIA.String())
+	}
+
+	_, err := keys.DecodeBech32AccAddr(newAddress, cfg.DANodeConfig().Bech32Prefix)
+	if err != nil {
+		return errors.Wrapf(err, "failed to decode address with given bech32 prefix: %s", cfg.DANodeConfig().Bech32Prefix)
+	}
+	return nil
+}
+
+func getExecutorConfig(ctx types.Context, cmd *cobra.Command) (*executortypes.Config, error) {
 	configPath, err := getConfigPath(cmd, ctx.HomePath(), string(bottypes.BotTypeExecutor))
 	if err != nil {
 		return nil, err
@@ -119,6 +221,55 @@ func l2BroadcasterAccount(ctx types.Context, cmd *cobra.Command) (*broadcaster.B
 		return nil, err
 	}
 
+	return cfg, nil
+}
+
+func QueryBridgeId(ctx types.Context, cfg *executortypes.Config) (uint64, error) {
+	l2Config := cfg.L2NodeConfig()
+	cdc, _, err := child.GetCodec(l2Config.BroadcasterConfig.Bech32Prefix)
+	if err != nil {
+		return 0, err
+	}
+
+	l2RpcClient, err := rpcclient.NewRPCClient(cdc, l2Config.RPC)
+	if err != nil {
+		return 0, err
+	}
+	queryCtx, cancel := rpcclient.GetQueryContext(ctx, 0)
+	defer cancel()
+	bridgeInfoResponse, err := opchildtypes.NewQueryClient(l2RpcClient).BridgeInfo(queryCtx, &opchildtypes.QueryBridgeInfoRequest{})
+	if err != nil {
+		return 0, errors.Wrap(err, "failed to query opchild bridge info")
+	}
+	return bridgeInfoResponse.BridgeInfo.BridgeId, nil
+}
+
+func l1ProposerAccount(ctx types.Context, cfg *executortypes.Config, bridgeId uint64) (*broadcaster.BroadcasterAccount, error) {
+	l1Config := cfg.L1NodeConfig()
+	broadcasterConfig := l1Config.BroadcasterConfig
+	cdc, txConfig, err := child.GetCodec(broadcasterConfig.Bech32Prefix)
+	if err != nil {
+		return nil, err
+	}
+
+	rpcClient, err := rpcclient.NewRPCClient(cdc, l1Config.RPC)
+	if err != nil {
+		return nil, err
+	}
+	queryCtx, cancel := rpcclient.GetQueryContext(ctx, 0)
+	defer cancel()
+	bridgeResponse, err := ophosttypes.NewQueryClient(rpcClient).Bridge(queryCtx, &ophosttypes.QueryBridgeRequest{BridgeId: bridgeId})
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to query ophost bridge info")
+	}
+
+	keyringConfig := broadcastertypes.KeyringConfig{
+		Address: bridgeResponse.BridgeConfig.Proposer,
+	}
+	return broadcaster.NewBroadcasterAccount(ctx, *broadcasterConfig, cdc, txConfig, rpcClient, keyringConfig)
+}
+
+func l2BroadcasterAccount(ctx types.Context, cfg *executortypes.Config) (*broadcaster.BroadcasterAccount, error) {
 	l2Config := cfg.L2NodeConfig()
 	broadcasterConfig := l2Config.BroadcasterConfig
 	cdc, txConfig, err := child.GetCodec(broadcasterConfig.Bech32Prefix)
