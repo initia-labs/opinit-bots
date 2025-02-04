@@ -151,6 +151,11 @@ func (b *BaseChild) Initialize(
 		if err != nil {
 			return 0, err
 		}
+
+		err = merkle.DeleteFutureNodes(b.DB(), version+1)
+		if err != nil {
+			return 0, err
+		}
 	}
 
 	// if oracle config is set in the bridge config, check if the oracle account has the grant from one of the executors

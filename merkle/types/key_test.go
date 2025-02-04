@@ -36,6 +36,13 @@ func TestPrefixedNodeKey(t *testing.T) {
 	require.Equal(t, key, append(NodePrefix, []byte{byte('/'), 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x1, 0x0, 0x3, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x10}...))
 }
 
+func TestPrefixedNodeKeyWithTreeIndex(t *testing.T) {
+	treeIndex := uint64(256)
+
+	key := PrefixedNodeKeyWithTreeIndex(treeIndex)
+	require.Equal(t, key, append(NodePrefix, []byte{byte('/'), 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x1, 0x0}...))
+}
+
 func TestParseFinalizedTreeKey(t *testing.T) {
 	startLeafIndex := uint64(256)
 	key := PrefixedFinalizedTreeKey(startLeafIndex)

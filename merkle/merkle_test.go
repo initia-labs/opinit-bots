@@ -209,7 +209,6 @@ func TestFillLeaves(t *testing.T) {
 			}
 
 			nodes, err := m.fillLeaves()
-			require.NoError(t, err)
 
 			if tc.expected {
 				require.NoError(t, err)
@@ -303,10 +302,10 @@ func TestInsertLeaf(t *testing.T) {
 	}, nodes[1])
 	require.Equal(t, merkletypes.Node{
 		TreeIndex:      1,
-		Height:         1,
-		LocalNodeIndex: 1,
-		Data:           hash34[:],
-	}, nodes[1])
+		Height:         2,
+		LocalNodeIndex: 0,
+		Data:           hash1234[:],
+	}, nodes[2])
 
 	// 5 nodes
 	nodes, err = m.InsertLeaf([]byte("node5"))
