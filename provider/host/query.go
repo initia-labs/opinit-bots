@@ -141,13 +141,40 @@ func (b BaseHost) QueryCreateBridgeHeight(ctx context.Context, bridgeId uint64) 
 	return res.Txs[0].Height, nil
 }
 
-func (b BaseHost) QueryBatchInfos(ctx context.Context, bridgeId uint64) (*ophosttypes.QueryBatchInfosResponse, error) {
-	req := &ophosttypes.QueryBatchInfosRequest{
-		BridgeId: bridgeId,
-	}
-	ctx, cancel := rpcclient.GetQueryContext(ctx, 0)
+func (b BaseHost) QueryBatchInfos(botCtx types.Context, bridgeId uint64) ([]ophosttypes.BatchInfoWithOutput, error) {
+	ctx, cancel := rpcclient.GetQueryContext(botCtx, 0)
 	defer cancel()
-	return b.ophostQueryClient.BatchInfos(ctx, req)
+
+	ticker := time.NewTicker(botCtx.PollingInterval())
+	defer ticker.Stop()
+
+	var batchInfos []ophosttypes.BatchInfoWithOutput
+	var nextKey []byte
+	for {
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-ticker.C:
+		}
+
+		req := &ophosttypes.QueryBatchInfosRequest{
+			BridgeId: bridgeId,
+			Pagination: &query.PageRequest{
+				Limit: 100,
+				Key:   nextKey,
+			},
+		}
+		res, err := b.ophostQueryClient.BatchInfos(ctx, req)
+		if err != nil {
+			return nil, err
+		}
+		batchInfos = append(batchInfos, res.BatchInfos...)
+		nextKey = res.Pagination.NextKey
+		if nextKey == nil {
+			break
+		}
+	}
+	return batchInfos, nil
 }
 
 func (b BaseHost) QueryDepositTxHeight(botCtx types.Context, bridgeId uint64, l1Sequence uint64) (int64, error) {
