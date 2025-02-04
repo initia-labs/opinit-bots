@@ -240,8 +240,6 @@ func (b *Broadcaster) loadProcessedMsgsBatch(ctx types.Context, stage types.Basi
 // pendingTxsToProcessedMsgsBatch converts pending txs to processed msgs batch.
 func (b *Broadcaster) pendingTxsToProcessedMsgsBatch(ctx types.Context, pendingTxs []btypes.PendingTxInfo) ([]btypes.ProcessedMsgs, error) {
 	pendingProcessedMsgsBatch := make([]btypes.ProcessedMsgs, 0)
-	queues := make(map[string][]sdk.Msg)
-
 	// convert pending txs to pending msgs
 	for i, pendingTx := range pendingTxs {
 		if !pendingTx.Save {
@@ -256,9 +254,13 @@ func (b *Broadcaster) pendingTxsToProcessedMsgsBatch(ctx types.Context, pendingT
 		if err != nil {
 			return nil, err
 		}
-		queues[pendingTx.Sender] = append(queues[pendingTx.Sender], msgs...)
 
-		pendingProcessedMsgsBatch = append(pendingProcessedMsgsBatch, MsgsToProcessedMsgs(queues)...)
+		pendingProcessedMsgsBatch = append(pendingProcessedMsgsBatch, btypes.ProcessedMsgs{
+			Sender:    pendingTx.Sender,
+			Msgs:      msgs,
+			Timestamp: types.CurrentNanoTimestamp(),
+			Save:      true,
+		})
 		ctx.Logger().Debug("pending tx", zap.Int("index", i), zap.String("tx", pendingTx.String()))
 	}
 	return pendingProcessedMsgsBatch, nil
