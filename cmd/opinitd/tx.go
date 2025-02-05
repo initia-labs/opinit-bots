@@ -144,7 +144,7 @@ Before running this command, you need to
 			chainType := args[0]
 			newSubmitterAddress := args[1]
 
-			err = validateBatchInfoArgs(cfg, chainType, newSubmitterAddress)
+			err = validateBatchInfoArgs(chainType)
 			if err != nil {
 				return err
 			}
@@ -196,15 +196,10 @@ Before running this command, you need to
 	return cmd
 }
 
-func validateBatchInfoArgs(cfg *executortypes.Config, chainType string, newAddress string) error {
+func validateBatchInfoArgs(chainType string) error {
 	chainType = strings.ToUpper(chainType)
 	if chainType != ophosttypes.BatchInfo_INITIA.String() && chainType != ophosttypes.BatchInfo_CELESTIA.String() {
 		return fmt.Errorf("supported chain type: %s, %s", ophosttypes.BatchInfo_INITIA.String(), ophosttypes.BatchInfo_CELESTIA.String())
-	}
-
-	_, err := keys.DecodeBech32AccAddr(newAddress, cfg.DANodeConfig().Bech32Prefix)
-	if err != nil {
-		return errors.Wrapf(err, "failed to decode address with given bech32 prefix: %s", cfg.DANodeConfig().Bech32Prefix)
 	}
 	return nil
 }
