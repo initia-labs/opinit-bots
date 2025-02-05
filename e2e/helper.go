@@ -343,7 +343,7 @@ func SetupTest(
 		},
 	}
 
-	if daChainConfig.ChainType == ophosttypes.BatchInfo_CHAIN_TYPE_CELESTIA {
+	if daChainConfig.ChainType == ophosttypes.BatchInfo_CELESTIA {
 		specs = append(specs, &interchaintest.ChainSpec{
 			ChainConfig: ibc.ChainConfig{
 				Type:    "cosmos",
@@ -483,6 +483,14 @@ func SetupTest(
 	// create bridge
 	helper.CreateBridge(t, ctx)
 	helper.SetOPConfig(t, ctx)
+	if helper.bridgeConfig.OracleEnabled && helper.OP.botName == BotExecutor {
+		// grant oracle permissions
+		_, err := helper.OP.GrantOraclePermissions(ctx, helper.Minitia.OracleBridgeExecutor.FormattedAddress())
+		require.NoError(t, err)
+
+		err = testutil.WaitForBlocks(ctx, 2, helper.Minitia.GetFullNode())
+		require.NoError(t, err)
+	}
 
 	// register validators on l2 chain
 	err = relayer.UpdateClients(ctx, eRep, ibcPath)
@@ -541,14 +549,6 @@ func (op OPTestHelper) SetOPConfig(t *testing.T, ctx context.Context) {
 
 	err = op.OP.WriteFileToHomeDir(ctx, configName, configBz)
 	require.NoError(t, err)
-
-	if op.bridgeConfig.OracleEnabled && op.OP.botName == BotExecutor {
-		// grant oracle permissions
-		err := op.OP.GrantOraclePermissions(ctx, op.Minitia.OracleBridgeExecutor.FormattedAddress())
-		require.NoError(t, err)
-		err = testutil.WaitForBlocks(ctx, 2, op.Minitia.GetFullNode())
-		require.NoError(t, err)
-	}
 }
 
 func (op OPTestHelper) ExecutorConfig() *executortypes.Config {
@@ -640,4 +640,11 @@ func (op *OPTestHelper) CreateBridge(t *testing.T, ctx context.Context) {
 
 	_, err = op.Minitia.SetBridgeInfo(ctx, res.BridgeId, res.BridgeAddr, op.Initia.Config().ChainID, clients[0].ClientID, path.Join(op.Minitia.HomeDir(), bridgeConfigPath))
 	require.NoError(t, err)
+}
+
+func (op *OPTestHelper) ChangeDA(t *testing.T, ctx context.Context, newDA *DAChain) *DAChain {
+	oldDA := op.DA
+	op.DA = newDA
+	op.SetOPConfig(t, ctx)
+	return oldDA
 }

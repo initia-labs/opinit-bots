@@ -63,7 +63,7 @@ func ParseMsgUpdateBatchInfo(eventAttrs []abcitypes.EventAttribute) (
 				return
 			}
 		case ophosttypes.AttributeKeyBatchChainType:
-			if attr.Value != ophosttypes.BatchInfo_CHAIN_TYPE_INITIA.StringWithoutPrefix() && attr.Value != ophosttypes.BatchInfo_CHAIN_TYPE_CELESTIA.StringWithoutPrefix() {
+			if attr.Value != ophosttypes.BatchInfo_INITIA.String() && attr.Value != ophosttypes.BatchInfo_CELESTIA.String() {
 				err = errors.New("unknown chain type")
 				return
 			}

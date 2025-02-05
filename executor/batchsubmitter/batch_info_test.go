@@ -37,7 +37,7 @@ func TestUpdateBatchInfo(t *testing.T) {
 			existingBatchInfos: []ophosttypes.BatchInfoWithOutput{
 				{
 					BatchInfo: ophosttypes.BatchInfo{
-						ChainType: ophosttypes.BatchInfo_CHAIN_TYPE_INITIA,
+						ChainType: ophosttypes.BatchInfo_INITIA,
 						Submitter: "submitter0",
 					},
 					Output: ophosttypes.Output{
@@ -52,7 +52,7 @@ func TestUpdateBatchInfo(t *testing.T) {
 			expectedBatchInfos: []ophosttypes.BatchInfoWithOutput{
 				{
 					BatchInfo: ophosttypes.BatchInfo{
-						ChainType: ophosttypes.BatchInfo_CHAIN_TYPE_INITIA,
+						ChainType: ophosttypes.BatchInfo_INITIA,
 						Submitter: "submitter0",
 					},
 					Output: ophosttypes.Output{
@@ -61,7 +61,7 @@ func TestUpdateBatchInfo(t *testing.T) {
 				},
 				{
 					BatchInfo: ophosttypes.BatchInfo{
-						ChainType: ophosttypes.BatchInfo_CHAIN_TYPE_INITIA,
+						ChainType: ophosttypes.BatchInfo_INITIA,
 						Submitter: "submitter1",
 					},
 					Output: ophosttypes.Output{
@@ -76,7 +76,7 @@ func TestUpdateBatchInfo(t *testing.T) {
 			existingBatchInfos: []ophosttypes.BatchInfoWithOutput{
 				{
 					BatchInfo: ophosttypes.BatchInfo{
-						ChainType: ophosttypes.BatchInfo_CHAIN_TYPE_INITIA,
+						ChainType: ophosttypes.BatchInfo_INITIA,
 						Submitter: "submitter0",
 					},
 					Output: ophosttypes.Output{
@@ -91,7 +91,7 @@ func TestUpdateBatchInfo(t *testing.T) {
 			expectedBatchInfos: []ophosttypes.BatchInfoWithOutput{
 				{
 					BatchInfo: ophosttypes.BatchInfo{
-						ChainType: ophosttypes.BatchInfo_CHAIN_TYPE_INITIA,
+						ChainType: ophosttypes.BatchInfo_INITIA,
 						Submitter: "submitter0",
 					},
 					Output: ophosttypes.Output{

@@ -50,7 +50,7 @@ func UpdateBatchInfoEvents(
 		},
 		{
 			Key:   ophosttypes.AttributeKeyBatchChainType,
-			Value: chainType.StringWithoutPrefix(),
+			Value: chainType.String(),
 		},
 		{
 			Key:   ophosttypes.AttributeKeyBatchSubmitter,

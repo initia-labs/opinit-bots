@@ -14,6 +14,7 @@ import (
 	"go.uber.org/zap"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
+	"github.com/cosmos/cosmos-sdk/types/query"
 )
 
 type L1ChainNode struct {
@@ -140,4 +141,26 @@ func (l1 *L1Chain) QueryOutputProposal(ctx context.Context, bridgeId uint64, out
 
 func (l1 *L1Chain) QueryLastFinalizedOutput(ctx context.Context, bridgeId uint64) (*ophosttypes.QueryLastFinalizedOutputResponse, error) {
 	return ophosttypes.NewQueryClient(l1.GetFullNode().GrpcConn).LastFinalizedOutput(ctx, &ophosttypes.QueryLastFinalizedOutputRequest{BridgeId: bridgeId})
+}
+
+func (l1 *L1Chain) QueryBatchInfos(ctx context.Context, bridgeId uint64) ([]ophosttypes.BatchInfoWithOutput, error) {
+	client := ophosttypes.NewQueryClient(l1.GetFullNode().GrpcConn)
+
+	var batchInfos []ophosttypes.BatchInfoWithOutput
+	var nextKey []byte
+	for {
+		res, err := client.BatchInfos(ctx, &ophosttypes.QueryBatchInfosRequest{BridgeId: bridgeId, Pagination: &query.PageRequest{
+			Limit: 100,
+			Key:   nextKey,
+		}})
+		if err != nil {
+			return nil, err
+		}
+		batchInfos = append(batchInfos, res.BatchInfos...)
+		nextKey = res.Pagination.NextKey
+		if nextKey == nil {
+			break
+		}
+	}
+	return batchInfos, nil
 }

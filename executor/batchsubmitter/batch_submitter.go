@@ -22,7 +22,7 @@ import (
 
 type hostNode interface {
 	ChainId() string
-	QueryBatchInfos(context.Context, uint64) (*ophosttypes.QueryBatchInfosResponse, error)
+	QueryBatchInfos(types.Context, uint64) ([]ophosttypes.BatchInfoWithOutput, error)
 	QueryBlock(ctx context.Context, height int64) (*coretypes.ResultBlock, error)
 }
 
@@ -103,7 +103,7 @@ func (bs *BatchSubmitter) Initialize(ctx types.Context, syncedHeight int64, host
 	if err != nil {
 		return errors.Wrap(err, "failed to query batch infos")
 	}
-	bs.batchInfos = res.BatchInfos
+	bs.batchInfos = res
 	if len(bs.batchInfos) == 0 {
 		return errors.New("no batch info")
 	}

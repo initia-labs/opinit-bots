@@ -32,10 +32,8 @@ func NewMockHost(batchInfos []ophosttypes.BatchInfoWithOutput, chainId string) *
 	}
 }
 
-func (m *mockHost) QueryBatchInfos(ctx context.Context, bridgeId uint64) (*ophosttypes.QueryBatchInfosResponse, error) {
-	return &ophosttypes.QueryBatchInfosResponse{
-		BatchInfos: m.batchInfos,
-	}, nil
+func (m *mockHost) QueryBatchInfos(ctx types.Context, bridgeId uint64) ([]ophosttypes.BatchInfoWithOutput, error) {
+	return m.batchInfos, nil
 }
 
 func (m *mockHost) QueryBlock(ctx context.Context, height int64) (*coretypes.ResultBlock, error) {

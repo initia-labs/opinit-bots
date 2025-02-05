@@ -68,6 +68,29 @@ func (op *OPBot) WaitForSync(ctx context.Context) error {
 	return nil
 }
 
+func (op *OPBot) WaitForStop(ctx context.Context, timeout time.Duration) error {
+	timeoutTimer := time.NewTicker(timeout)
+	defer timeoutTimer.Stop()
+
+	timer := time.NewTicker(5 * time.Second)
+	defer timer.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		case <-timeoutTimer.C:
+			return errors.New("wait for stop timeout")
+		case <-timer.C:
+
+		}
+
+		err := op.containerLifecycle.Running(ctx)
+		if err != nil {
+			return nil
+		}
+	}
+}
+
 func (op *OPBot) query(address string, params map[string]string) (data []byte, err error) {
 	u, err := url.Parse(address)
 	if err != nil {
@@ -206,6 +229,13 @@ func (c commander) Start(botName string, homeDir string) []string {
 func (c commander) GrantOraclePermissions(address string, homeDir string) []string {
 	return []string{
 		"opinitd", "tx", "grant-oracle", address,
+		"--home", homeDir,
+	}
+}
+
+func (c commander) UpdateBatchInfo(chainType string, newBatchSubmitterAddress string, homeDir string) []string {
+	return []string{
+		"opinitd", "tx", "update-batch-info", chainType, newBatchSubmitterAddress,
 		"--home", homeDir,
 	}
 }

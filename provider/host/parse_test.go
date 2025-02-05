@@ -46,7 +46,7 @@ func TestParseMsgRecordBatch(t *testing.T) {
 }
 
 func TestParseUpdateBatchInfo(t *testing.T) {
-	fullAttributes := UpdateBatchInfoEvents(1, ophosttypes.BatchInfo_CHAIN_TYPE_INITIA, "submitter", 1, 1)
+	fullAttributes := UpdateBatchInfoEvents(1, ophosttypes.BatchInfo_INITIA, "submitter", 1, 1)
 	cases := []struct {
 		name          string
 		eventAttrs    []abcitypes.EventAttribute

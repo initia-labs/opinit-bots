@@ -58,16 +58,16 @@ func (da *DAChain) GetFullNode() *DAChainNode {
 
 func (da *DAChain) QueryBatchData(ctx context.Context) ([][]byte, error) {
 	switch da.ChainType {
-	case ophosttypes.BatchInfo_CHAIN_TYPE_INITIA:
+	case ophosttypes.BatchInfo_INITIA:
 		return da.QueryInitiaBatchData(ctx)
-	case ophosttypes.BatchInfo_CHAIN_TYPE_CELESTIA:
+	case ophosttypes.BatchInfo_CELESTIA:
 		return da.QueryCelestiaBatchData(ctx)
 	}
 	return nil, fmt.Errorf("unsupported chain type")
 }
 
 func (da *DAChain) QueryInitiaBatchData(ctx context.Context) ([][]byte, error) {
-	if da.ChainType != ophosttypes.BatchInfo_CHAIN_TYPE_INITIA {
+	if da.ChainType != ophosttypes.BatchInfo_INITIA {
 		return nil, fmt.Errorf("unmatched chain type")
 	}
 
@@ -112,7 +112,7 @@ func (da *DAChain) QueryInitiaBatchData(ctx context.Context) ([][]byte, error) {
 }
 
 func (da *DAChain) QueryCelestiaBatchData(ctx context.Context) ([][]byte, error) {
-	if da.ChainType != ophosttypes.BatchInfo_CHAIN_TYPE_CELESTIA {
+	if da.ChainType != ophosttypes.BatchInfo_CELESTIA {
 		return nil, fmt.Errorf("unmatched chain type")
 	}
 

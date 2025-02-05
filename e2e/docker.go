@@ -334,7 +334,7 @@ type CosmosTx struct {
 }
 
 // GrantOraclePermissions grants oracle permissions to the oracle bridge executor.
-func (op *DockerOPBot) GrantOraclePermissions(ctx context.Context, oracleBridgeExecutorAddress string) error {
+func (op *DockerOPBot) GrantOraclePermissions(ctx context.Context, oracleBridgeExecutorAddress string) (string, error) {
 	cmd := op.c.GrantOraclePermissions(oracleBridgeExecutorAddress, op.HomeDir())
 
 	ctx, cancel := context.WithTimeout(ctx, time.Minute)
@@ -342,18 +342,40 @@ func (op *DockerOPBot) GrantOraclePermissions(ctx context.Context, oracleBridgeE
 
 	res := op.Exec(ctx, cmd, nil)
 	if res.Err != nil {
-		return res.Err
+		return "", res.Err
 	}
 
 	output := CosmosTx{}
 	err := json.Unmarshal(res.Stdout, &output)
 	if err != nil {
-		return err
+		return "", err
 	}
 	if output.Code != 0 {
-		return fmt.Errorf("transaction failed with code %d: %s", output.Code, output.Log)
+		return "", fmt.Errorf("transaction failed with code %d: %s", output.Code, output.Log)
 	}
-	return nil
+	return output.Hash, nil
+}
+
+func (op *DockerOPBot) UpdateBatchInfo(ctx context.Context, chainType string, newBatchSubmitterAddress string) (string, error) {
+	cmd := op.c.UpdateBatchInfo(chainType, newBatchSubmitterAddress, op.HomeDir())
+
+	ctx, cancel := context.WithTimeout(ctx, time.Minute)
+	defer cancel()
+
+	res := op.Exec(ctx, cmd, nil)
+	if res.Err != nil {
+		return "", res.Err
+	}
+
+	output := CosmosTx{}
+	err := json.Unmarshal(res.Stdout, &output)
+	if err != nil {
+		return "", err
+	}
+	if output.Code != 0 {
+		return "", fmt.Errorf("transaction failed with code %d: %s", output.Code, output.Log)
+	}
+	return output.Hash, nil
 }
 
 // Exec executes the command in the bot's container.
@@ -532,4 +554,5 @@ type OPBotCommander interface {
 	RestoreKey(chainID, keyName, bech32Prefix, mnemonic, homeDir string) []string
 	Start(botName string, homeDir string) []string
 	GrantOraclePermissions(address string, homeDir string) []string
+	UpdateBatchInfo(chainType string, newBatchSubmitterAddress string, homeDir string) []string
 }

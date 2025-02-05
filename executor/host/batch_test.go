@@ -142,7 +142,7 @@ func TestUpdateBatchInfoHandler(t *testing.T) {
 			name: "success",
 			host: h,
 			eventHandlerArgs: nodetypes.EventHandlerArgs{
-				EventAttributes: hostprovider.UpdateBatchInfoEvents(1, ophosttypes.BatchInfo_CHAIN_TYPE_INITIA, "submitter", 1, 1),
+				EventAttributes: hostprovider.UpdateBatchInfoEvents(1, ophosttypes.BatchInfo_INITIA, "submitter", 1, 1),
 			},
 			expectedBatchInfo: &mockBatchInfo{
 				chain:         "INITIA",
@@ -166,7 +166,7 @@ func TestUpdateBatchInfoHandler(t *testing.T) {
 			name: "unspecified chain type",
 			host: h,
 			eventHandlerArgs: nodetypes.EventHandlerArgs{
-				EventAttributes: hostprovider.UpdateBatchInfoEvents(1, ophosttypes.BatchInfo_CHAIN_TYPE_UNSPECIFIED, "submitter", 1, 1),
+				EventAttributes: hostprovider.UpdateBatchInfoEvents(1, ophosttypes.BatchInfo_UNSPECIFIED, "submitter", 1, 1),
 			},
 			expectedBatchInfo: nil,
 			expectedLog:       nil,
@@ -176,7 +176,7 @@ func TestUpdateBatchInfoHandler(t *testing.T) {
 			name: "different bridge id",
 			host: h,
 			eventHandlerArgs: nodetypes.EventHandlerArgs{
-				EventAttributes: hostprovider.UpdateBatchInfoEvents(2, ophosttypes.BatchInfo_CHAIN_TYPE_CELESTIA, "submitter", 1, 1),
+				EventAttributes: hostprovider.UpdateBatchInfoEvents(2, ophosttypes.BatchInfo_CELESTIA, "submitter", 1, 1),
 			},
 			expectedBatchInfo: nil,
 			expectedLog:       nil,
