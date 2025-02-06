@@ -56,6 +56,15 @@ func (bs *BatchSubmitter) prepareBatch(blockHeight int64) error {
 			return errors.Wrap(err, "failed to set synced height")
 		}
 
+		err = node.DeleteProcessedMsgs(bs.da.DB())
+		if err != nil {
+			return errors.Wrap(err, "failed to delete processed msgs")
+		}
+		err = node.DeletePendingTxs(bs.da.DB())
+		if err != nil {
+			return errors.Wrap(err, "failed to delete pending txs")
+		}
+
 		// error will restart block process from nextBatchInfo.Output.L2BlockNumber + 1
 		panic(fmt.Errorf("batch info updated: reset from %d", nextBatchInfo.Output.L2BlockNumber))
 	}
