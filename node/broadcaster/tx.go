@@ -21,6 +21,8 @@ var ignoringErrors = []error{
 	opchildtypes.ErrOracleValidatorsNotRegistered,
 	opchildtypes.ErrInvalidOracleHeight,
 	opchildtypes.ErrInvalidOracleTimestamp,
+
+	opchildtypes.ErrRedundantTx,
 }
 var accountSeqRegex = regexp.MustCompile("account sequence mismatch, expected ([0-9]+), got ([0-9]+)")
 var outputIndexRegex = regexp.MustCompile("expected ([0-9]+), got ([0-9]+): invalid output index")
