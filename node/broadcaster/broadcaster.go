@@ -146,25 +146,19 @@ func (b *Broadcaster) loadPendingTxs(ctx types.Context, stage types.BasicDB, las
 	}
 	ctx.Logger().Debug("load pending txs", zap.Int("count", len(pendingTxs)))
 
-	if len(pendingTxs) == 0 {
-		return nil
-	}
-
 	pollingTimer := time.NewTicker(ctx.PollingInterval())
 	defer pollingTimer.Stop()
 
-	for {
-		if len(pendingTxs) == 0 {
-			return nil
-		}
+	reProcessingTxs := make([]btypes.PendingTxInfo, 0)
 
+	for txIndex := 0; txIndex < len(pendingTxs); {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
 		case <-pollingTimer.C:
 		}
 
-		txHash, err := hex.DecodeString(pendingTxs[0].TxHash)
+		txHash, err := hex.DecodeString(pendingTxs[txIndex].TxHash)
 		if err != nil {
 			return err
 		}
@@ -172,22 +166,21 @@ func (b *Broadcaster) loadPendingTxs(ctx types.Context, stage types.BasicDB, las
 		res, err := b.rpcClient.QueryTx(ctx, txHash)
 		if err == nil && res != nil && res.TxResult.Code == 0 {
 			ctx.Logger().Debug("transaction successfully included",
-				zap.String("hash", pendingTxs[0].TxHash),
+				zap.String("hash", pendingTxs[txIndex].TxHash),
 				zap.Int64("height", res.Height))
-			err = DeletePendingTx(b.db, pendingTxs[0])
-			if err != nil {
-				return err
-			}
-			pendingTxs = pendingTxs[1:]
+			txIndex++
 		} else if err == nil && res != nil {
 			ctx.Logger().Warn("transaction failed",
-				zap.String("hash", pendingTxs[0].TxHash),
+				zap.String("hash", pendingTxs[txIndex].TxHash),
 				zap.Uint32("code", res.TxResult.Code),
 				zap.String("log", res.TxResult.Log))
+			reProcessingTxs = append(reProcessingTxs, pendingTxs[txIndex])
+			txIndex++
 		} else if err != nil && txNotFoundRegex.FindStringSubmatch(err.Error()) != nil {
-			pendingTxTime := time.Unix(0, pendingTxs[0].Timestamp).UTC()
+			pendingTxTime := time.Unix(0, pendingTxs[txIndex].Timestamp).UTC()
 			timeoutTime := pendingTxTime.Add(b.cfg.TxTimeout)
 			if lastBlockTime.After(timeoutTime) {
+				reProcessingTxs = append(reProcessingTxs, pendingTxs[txIndex:]...)
 				break
 			}
 		}
@@ -198,7 +191,10 @@ func (b *Broadcaster) loadPendingTxs(ctx types.Context, stage types.BasicDB, las
 		return err
 	}
 
-	processedMsgsBatch, err := b.pendingTxsToProcessedMsgsBatch(ctx, pendingTxs)
+	if len(reProcessingTxs) == 0 {
+		return nil
+	}
+	processedMsgsBatch, err := b.pendingTxsToProcessedMsgsBatch(ctx, reProcessingTxs)
 	if err != nil {
 		return err
 	}
