@@ -191,14 +191,13 @@ func (b *Broadcaster) loadPendingTxs(ctx types.Context, stage types.BasicDB, las
 		return err
 	}
 
-	if len(reProcessingTxs) == 0 {
-		return nil
+	if len(reProcessingTxs) != 0 {
+		processedMsgsBatch, err := b.pendingTxsToProcessedMsgsBatch(ctx, reProcessingTxs)
+		if err != nil {
+			return err
+		}
+		b.pendingProcessedMsgsBatch = append(b.pendingProcessedMsgsBatch, processedMsgsBatch...)
 	}
-	processedMsgsBatch, err := b.pendingTxsToProcessedMsgsBatch(ctx, reProcessingTxs)
-	if err != nil {
-		return err
-	}
-	b.pendingProcessedMsgsBatch = append(b.pendingProcessedMsgsBatch, processedMsgsBatch...)
 	return nil
 }
 
