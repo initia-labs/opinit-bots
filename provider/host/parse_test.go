@@ -373,6 +373,32 @@ func TestParseMsgUpdateOracleConfig(t *testing.T) {
 			oracleEnabled: true,
 			err:           false,
 		},
+		{
+			name:       "missing event attribute bridge id",
+			eventAttrs: fullAttributes[1:],
+			err:        true,
+		},
+		{
+			name:       "missing event attribute oracle enabled",
+			eventAttrs: append(slices.Clone(fullAttributes)[:1], fullAttributes[2:]...),
+			err:        true,
+		},
+		{
+			name: "invalid bridge id",
+			eventAttrs: []abcitypes.EventAttribute{
+				{Key: ophosttypes.AttributeKeyBridgeId, Value: "invalid"},
+				{Key: ophosttypes.AttributeKeyOracleEnabled, Value: "true"},
+			},
+			err: true,
+		},
+		{
+			name: "invalid oracle enabled",
+			eventAttrs: []abcitypes.EventAttribute{
+				{Key: ophosttypes.AttributeKeyBridgeId, Value: "1"},
+				{Key: ophosttypes.AttributeKeyOracleEnabled, Value: "invalid"},
+			},
+			err: true,
+		},
 	}
 
 	for _, tc := range cases {

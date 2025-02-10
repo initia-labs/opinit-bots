@@ -208,8 +208,7 @@ func TestPrepareBatch(t *testing.T) {
 			ctx := types.NewContext(context.Background(), zap.NewNop(), "")
 			if tc.panic {
 				require.Panics(t, func() {
-					err := batchSubmitter.prepareBatch(ctx, tc.blockHeight)
-					require.NoError(t, err)
+					batchSubmitter.prepareBatch(ctx, tc.blockHeight) //nolint:errcheck
 				})
 				for _, expectedKV := range tc.expectedChanges {
 					value, err := baseDB.Get(expectedKV.Key)
