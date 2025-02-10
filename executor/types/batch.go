@@ -28,6 +28,9 @@ type DANode interface {
 	CreateBatchMsg([]byte) (sdk.Msg, string, error)
 
 	GetNodeStatus() (nodetypes.Status, error)
+
+	LenProcessedBatchMsgs() (int, error)
+	LenPendingBatchTxs() (int, error)
 }
 
 var LocalBatchInfoKey = []byte("local_batch_info")

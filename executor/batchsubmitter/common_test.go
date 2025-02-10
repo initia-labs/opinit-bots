@@ -104,6 +104,14 @@ func (m *mockDA) BroadcastProcessedMsgs(msgs ...btypes.ProcessedMsgs) {
 	m.processedMsgs = append(m.processedMsgs, msgs...)
 }
 
+func (m mockDA) LenProcessedBatchMsgs() (int, error) {
+	return len(m.processedMsgs), nil
+}
+
+func (m mockDA) LenPendingBatchTxs() (int, error) {
+	return 0, nil
+}
+
 var _ executortypes.DANode = (*mockDA)(nil)
 
 func logCapturer() (*zap.Logger, *observer.ObservedLogs) {

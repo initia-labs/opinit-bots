@@ -20,6 +20,10 @@ import (
 	"github.com/pkg/errors"
 )
 
+var (
+	BatchMsgType = "/celestia.blob.v1.MsgPayForBlobs"
+)
+
 type batchNode interface {
 	ChainID() string
 	UpdateBatchInfo(string, string, uint64, int64)
@@ -161,4 +165,20 @@ func (c Celestia) keyringConfigs(baseConfig *btypes.KeyringConfig) []btypes.Keyr
 		configs = append(configs, *baseConfig)
 	}
 	return configs
+}
+
+func (c Celestia) LenProcessedBatchMsgs() (int, error) {
+	broadcaster, err := c.node.GetBroadcaster()
+	if err != nil {
+		return 0, errors.Wrap(err, "failed to get broadcaster")
+	}
+	return broadcaster.LenProcessedMsgsByMsgType(BatchMsgType)
+}
+
+func (c Celestia) LenPendingBatchTxs() (int, error) {
+	broadcaster, err := c.node.GetBroadcaster()
+	if err != nil {
+		return 0, errors.Wrap(err, "failed to get broadcaster")
+	}
+	return broadcaster.LenLocalPendingTxByMsgType(BatchMsgType)
 }

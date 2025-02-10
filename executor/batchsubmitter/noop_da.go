@@ -28,3 +28,5 @@ func (n NoopDA) HasBroadcaster() bool                               { return fal
 func (n NoopDA) CreateBatchMsg(_ []byte) (sdk.Msg, string, error)   { return nil, "", nil }
 func (n NoopDA) BroadcastProcessedMsgs(nil ...btypes.ProcessedMsgs) {}
 func (n NoopDA) GetNodeStatus() (nodetypes.Status, error)           { return nodetypes.Status{}, nil }
+func (n NoopDA) LenProcessedBatchMsgs() (int, error)                { return 0, nil }
+func (n NoopDA) LenPendingBatchTxs() (int, error)                   { return 0, nil }

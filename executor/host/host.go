@@ -19,6 +19,10 @@ import (
 	"github.com/pkg/errors"
 )
 
+var (
+	BatchMsgType = "/opinit.ophost.v1.MsgRecordBatch"
+)
+
 type childNode interface {
 	DB() types.DB
 	Codec() codec.Codec
@@ -108,4 +112,20 @@ func (h *Host) registerHandlers() {
 
 func (h *Host) registerDAHandlers() {
 	h.Node().RegisterEventHandler(ophosttypes.EventTypeRecordBatch, h.recordBatchHandler)
+}
+
+func (h *Host) LenProcessedBatchMsgs() (int, error) {
+	broadcaster, err := h.Node().GetBroadcaster()
+	if err != nil {
+		return 0, errors.Wrap(err, "failed to get broadcaster")
+	}
+	return broadcaster.LenProcessedMsgsByMsgType(BatchMsgType)
+}
+
+func (h *Host) LenPendingBatchTxs() (int, error) {
+	broadcaster, err := h.Node().GetBroadcaster()
+	if err != nil {
+		return 0, errors.Wrap(err, "failed to get broadcaster")
+	}
+	return broadcaster.LenLocalPendingTxByMsgType(BatchMsgType)
 }

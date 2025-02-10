@@ -18,7 +18,7 @@ func (bs *BatchSubmitter) rawBlockHandler(ctx types.Context, args nodetypes.RawB
 	bs.processedMsgs = bs.processedMsgs[:0]
 	bs.stage.Reset()
 
-	err := bs.prepareBatch(args.BlockHeight)
+	err := bs.prepareBatch(ctx, args.BlockHeight)
 	if err != nil {
 		return errors.Wrap(err, "failed to prepare batch")
 	}

@@ -308,3 +308,17 @@ func (b Broadcaster) AccountByIndex(index int) (*BroadcasterAccount, error) {
 	}
 	return b.accounts[index], nil
 }
+
+func (b Broadcaster) LenProcessedMsgsByMsgType(msgType string) (int, error) {
+	processedMsgsBatch, err := LoadProcessedMsgsBatch(b.db, b.cdc)
+	if err != nil {
+		return 0, err
+	}
+	count := 0
+	for _, processedMsgs := range processedMsgsBatch {
+		if slices.Contains(processedMsgs.GetMsgTypes(), msgType) {
+			count++
+		}
+	}
+	return count, nil
+}

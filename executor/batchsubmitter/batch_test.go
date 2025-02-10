@@ -191,6 +191,7 @@ func TestPrepareBatch(t *testing.T) {
 				node:        batchNode,
 				batchInfoMu: &sync.Mutex{},
 				batchInfos:  tc.batchInfoQueue,
+				da:          NewMockDA(nil, nil, 1, ""),
 			}
 
 			err = SaveLocalBatchInfo(batchDB, tc.existingLocalBatchInfo)
@@ -204,9 +205,11 @@ func TestPrepareBatch(t *testing.T) {
 			require.NoError(t, err)
 			defer batchSubmitter.batchWriter.Close()
 
+			ctx := types.NewContext(context.Background(), zap.NewNop(), "")
 			if tc.panic {
 				require.Panics(t, func() {
-					batchSubmitter.prepareBatch(tc.blockHeight) //nolint:errcheck
+					err := batchSubmitter.prepareBatch(ctx, tc.blockHeight)
+					require.NoError(t, err)
 				})
 				for _, expectedKV := range tc.expectedChanges {
 					value, err := baseDB.Get(expectedKV.Key)
@@ -218,7 +221,7 @@ func TestPrepareBatch(t *testing.T) {
 				require.NoError(t, err)
 				require.Equal(t, int64(0), fileSize)
 			} else {
-				err := batchSubmitter.prepareBatch(tc.blockHeight)
+				err := batchSubmitter.prepareBatch(ctx, tc.blockHeight)
 				if tc.err {
 					require.Error(t, err)
 				} else {
