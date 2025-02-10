@@ -101,30 +101,42 @@ func TestUpdateOracleConfigHandler(t *testing.T) {
 	}
 
 	cases := []struct {
-		name          string
-		oracleEnabled bool
-		err           bool
+		name                  string
+		bridgeId              uint64
+		oracleEnabled         bool
+		expectedOracleEnabled bool
+		err                   bool
 	}{
 		{
-			name:          "oracle enabled",
-			oracleEnabled: true,
+			name:                  "oracle enabled",
+			bridgeId:              1,
+			oracleEnabled:         true,
+			expectedOracleEnabled: true,
 		},
 		{
-			name:          "oracle disabled",
-			oracleEnabled: false,
+			name:                  "oracle disabled",
+			bridgeId:              1,
+			oracleEnabled:         false,
+			expectedOracleEnabled: false,
+		},
+		{
+			name:                  "another bridge id",
+			bridgeId:              2,
+			oracleEnabled:         true,
+			expectedOracleEnabled: false,
 		},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			err := h.updateOracleConfigHandler(types.NewContext(context.Background(), zap.NewNop(), ""), nodetypes.EventHandlerArgs{
-				EventAttributes: hostprovider.UpdateOracleConfigEvents(1, tc.oracleEnabled),
+				EventAttributes: hostprovider.UpdateOracleConfigEvents(tc.bridgeId, tc.oracleEnabled),
 			})
 			if tc.err {
 				require.Error(t, err)
 			} else {
 				require.NoError(t, err)
-				require.Equal(t, tc.oracleEnabled, h.OracleEnabled())
+				require.Equal(t, tc.expectedOracleEnabled, h.OracleEnabled())
 			}
 		})
 	}

@@ -7,8 +7,9 @@ import (
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 
-	sdk "github.com/cosmos/cosmos-sdk/types"
 	hostprovider "github.com/initia-labs/opinit-bots/provider/host"
+
+	sdk "github.com/cosmos/cosmos-sdk/types"
 )
 
 // If the relay oracle is enabled and the extended commit info contains votes, create a new MsgUpdateOracle message.
