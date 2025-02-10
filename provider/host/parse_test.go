@@ -355,3 +355,36 @@ func TestParseMsgFinalizeWithdrawal(t *testing.T) {
 		})
 	}
 }
+
+func TestParseMsgUpdateOracleConfig(t *testing.T) {
+	fullAttributes := UpdateOracleConfigEvents(1, true)
+
+	cases := []struct {
+		name          string
+		eventAttrs    []abcitypes.EventAttribute
+		bridgeId      uint64
+		oracleEnabled bool
+		err           bool
+	}{
+		{
+			name:          "success",
+			eventAttrs:    fullAttributes,
+			bridgeId:      1,
+			oracleEnabled: true,
+			err:           false,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			bridgeId, oracleEnabled, err := ParseMsgUpdateOracleConfig(tc.eventAttrs)
+			if tc.err {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+				require.Equal(t, tc.bridgeId, bridgeId)
+				require.Equal(t, tc.oracleEnabled, oracleEnabled)
+			}
+		})
+	}
+}

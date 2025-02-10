@@ -1,6 +1,7 @@
 package host
 
 import (
+	"context"
 	"testing"
 
 	opchildtypes "github.com/initia-labs/OPinit/x/opchild/types"
@@ -10,7 +11,9 @@ import (
 	nodetypes "github.com/initia-labs/opinit-bots/node/types"
 	childprovider "github.com/initia-labs/opinit-bots/provider/child"
 	hostprovider "github.com/initia-labs/opinit-bots/provider/host"
+	"github.com/initia-labs/opinit-bots/types"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 )
@@ -82,4 +85,47 @@ func TestOracleTxHandler(t *testing.T) {
 		})
 	}
 	require.NoError(t, err)
+}
+
+func TestUpdateOracleConfigHandler(t *testing.T) {
+	db, err := db.NewMemDB()
+	require.NoError(t, err)
+	hostNode := node.NewTestNode(nodetypes.NodeConfig{}, db.WithPrefix([]byte("test_host")), nil, nil, nil, nil)
+	h := Host{
+		BaseHost: hostprovider.NewTestBaseHost(0, hostNode, ophosttypes.QueryBridgeResponse{
+			BridgeId: 1,
+			BridgeConfig: ophosttypes.BridgeConfig{
+				OracleEnabled: false,
+			},
+		}, nodetypes.NodeConfig{}, nil),
+	}
+
+	cases := []struct {
+		name          string
+		oracleEnabled bool
+		err           bool
+	}{
+		{
+			name:          "oracle enabled",
+			oracleEnabled: true,
+		},
+		{
+			name:          "oracle disabled",
+			oracleEnabled: false,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := h.updateOracleConfigHandler(types.NewContext(context.Background(), zap.NewNop(), ""), nodetypes.EventHandlerArgs{
+				EventAttributes: hostprovider.UpdateOracleConfigEvents(1, tc.oracleEnabled),
+			})
+			if tc.err {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+				require.Equal(t, tc.oracleEnabled, h.OracleEnabled())
+			}
+		})
+	}
 }
