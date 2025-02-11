@@ -214,6 +214,79 @@ func TestEndBlockHandler(t *testing.T) {
 				},
 			},
 			err: false,
+		}, {
+			name:       "update multiple output events",
+			child:      NewMockChild(nil, 1, 1),
+			challenger: NewMockChallenger(nil),
+			pendingEvents: []challengertypes.ChallengeEvent{
+				&challengertypes.Output{
+					EventType:     "Output",
+					L2BlockNumber: 2,
+					OutputIndex:   1,
+					OutputRoot:    []byte(""),
+					Time:          time.Unix(0, 10000).UTC(),
+					Timeout:       false,
+				},
+			},
+			eventQueue: []challengertypes.ChallengeEvent{},
+			outputPendingEventQueue: []challengertypes.ChallengeEvent{
+				&challengertypes.Output{
+					EventType:     "Output",
+					L2BlockNumber: 2,
+					OutputIndex:   2,
+					OutputRoot:    []byte(""),
+					Time:          time.Unix(0, 11000).UTC(),
+					Timeout:       false,
+				},
+				&challengertypes.Output{
+					EventType:     "Output",
+					L2BlockNumber: 2,
+					OutputIndex:   3,
+					OutputRoot:    []byte(""),
+					Time:          time.Unix(0, 11000).UTC(),
+					Timeout:       false,
+				},
+				&challengertypes.Output{
+					EventType:     "Output",
+					L2BlockNumber: 2,
+					OutputIndex:   4,
+					OutputRoot:    []byte(""),
+					Time:          time.Unix(0, 11000).UTC(),
+					Timeout:       false,
+				},
+			},
+			dbChanges: []types.KV{},
+			endBlockArgs: nodetypes.EndBlockArgs{
+				Block: cmtproto.Block{
+					Header: cmtproto.Header{
+						Height: 10,
+						Time:   time.Unix(0, 11000).UTC(),
+					},
+				},
+			},
+			expectedPendingEvents: []challengertypes.ChallengeEvent{
+				&challengertypes.Output{
+					EventType:     "Output",
+					L2BlockNumber: 2,
+					OutputIndex:   4,
+					OutputRoot:    []byte(""),
+					Time:          time.Unix(0, 11000).UTC(),
+					Timeout:       false,
+				},
+			},
+			expectedEventQueue: []challengertypes.ChallengeEvent{},
+			expectedChallenges: []challengertypes.Challenge{},
+			expectedDB: []types.KV{
+				{
+					Key:   []byte("test_host/synced_height"),
+					Value: []byte("10"),
+				},
+				{
+					Key:   append([]byte("test_host/pending_event/"), []byte{0x1, '/', 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x4}...),
+					Value: []byte(`{"event_type":"Output","l2_block_number":2,"output_index":4,"output_root":"","time":"1970-01-01T00:00:00.000011Z","timeout":false}`),
+				},
+			},
+			err: false,
 		},
 		{
 			name:       "output event timeout",
