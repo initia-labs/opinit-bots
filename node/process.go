@@ -5,7 +5,6 @@ import (
 	"time"
 
 	abcitypes "github.com/cometbft/cometbft/abci/types"
-	ctypes "github.com/cometbft/cometbft/rpc/core/types"
 	rpccoretypes "github.com/cometbft/cometbft/rpc/core/types"
 	comettypes "github.com/cometbft/cometbft/types"
 	nodetypes "github.com/initia-labs/opinit-bots/node/types"
@@ -195,7 +194,7 @@ func (n *Node) handleEvent(ctx types.Context, blockHeight int64, blockTime time.
 	})
 }
 
-func (n *Node) fetchBlockWithSentry(ctx types.Context, height int64) (*ctypes.ResultBlock, error) {
+func (n *Node) fetchBlockWithSentry(ctx types.Context, height int64) (*rpccoretypes.ResultBlock, error) {
 	span, ctx := sentry_integration.StartSentrySpan(ctx, "rpc.Block", "Fetches a block given the height")
 	defer span.Finish()
 	span.SetTag("height", fmt.Sprintf("%d", height))
@@ -207,7 +206,7 @@ func (n *Node) fetchBlockWithSentry(ctx types.Context, height int64) (*ctypes.Re
 	return block, nil
 }
 
-func (n *Node) fetchBlockResultsWithSentry(ctx types.Context, height int64) (*ctypes.ResultBlockResults, error) {
+func (n *Node) fetchBlockResultsWithSentry(ctx types.Context, height int64) (*rpccoretypes.ResultBlockResults, error) {
 	span, ctx := sentry_integration.StartSentrySpan(ctx, "rpc.BlockResults", "Fetches block results given the height")
 	defer span.Finish()
 	span.SetTag("height", fmt.Sprintf("%d", height))
