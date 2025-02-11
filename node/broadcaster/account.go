@@ -226,11 +226,11 @@ func (b BroadcasterAccount) CalculateGas(ctx context.Context, msgs ...sdk.Msg) (
 	if err != nil {
 		switch {
 		case sdkerrors.ErrOutOfGas.Is(err):
-			sentry_integration.CaptureCurrentHubException(err, sentry.LevelFatal)
+			sentry_integration.CaptureCurrentHubException(err, sentry.LevelError)
 			return txtypes.SimulateResponse{}, 0, err
 
 		case sdkerrors.ErrInsufficientFee.Is(err):
-			sentry_integration.CaptureCurrentHubException(err, sentry.LevelFatal)
+			sentry_integration.CaptureCurrentHubException(err, sentry.LevelError)
 			return txtypes.SimulateResponse{}, 0, err
 		}
 		return txtypes.SimulateResponse{}, 0, err
