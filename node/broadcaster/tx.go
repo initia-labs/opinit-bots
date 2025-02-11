@@ -8,12 +8,14 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/getsentry/sentry-go"
 	"github.com/pkg/errors"
 
 	btypes "github.com/initia-labs/opinit-bots/node/broadcaster/types"
+	"github.com/initia-labs/opinit-bots/sentry_integration"
+	"github.com/initia-labs/opinit-bots/types"
 
 	opchildtypes "github.com/initia-labs/OPinit/x/opchild/types"
-	"github.com/initia-labs/opinit-bots/types"
 )
 
 var ignoringErrors = []error{
@@ -29,6 +31,7 @@ var outputIndexRegex = regexp.MustCompile("expected ([0-9]+), got ([0-9]+): inva
 // If there is an error known to be ignored, it will be ignored.
 func (b *Broadcaster) handleMsgError(ctx types.Context, err error, broadcasterAccount *BroadcasterAccount) error {
 	if strs := accountSeqRegex.FindStringSubmatch(err.Error()); strs != nil {
+		sentry_integration.CaptureCurrentHubException(err, sentry.LevelWarning)
 		expected, parseErr := strconv.ParseUint(strs[1], 10, 64)
 		if parseErr != nil {
 			return parseErr
