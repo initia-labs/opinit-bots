@@ -3,6 +3,7 @@ package broadcaster
 import (
 	"fmt"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -155,4 +156,17 @@ func (b *Broadcaster) dequeueLocalPendingTx() {
 	defer b.pendingTxMu.Unlock()
 
 	b.pendingTxs = b.pendingTxs[1:]
+}
+
+func (b *Broadcaster) LenLocalPendingTxByMsgType(msgType string) (int, error) {
+	b.pendingTxMu.Lock()
+	defer b.pendingTxMu.Unlock()
+
+	count := 0
+	for _, tx := range b.pendingTxs {
+		if slices.Contains(tx.MsgTypes, msgType) {
+			count++
+		}
+	}
+	return count, nil
 }

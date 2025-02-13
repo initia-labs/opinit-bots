@@ -124,6 +124,10 @@ func (b BaseHost) OracleEnabled() bool {
 	return b.bridgeInfo.BridgeConfig.OracleEnabled
 }
 
+func (b *BaseHost) UpdateOracleEnabled(oracleEnabled bool) {
+	b.bridgeInfo.BridgeConfig.OracleEnabled = oracleEnabled
+}
+
 func (b *BaseHost) SetBridgeInfo(bridgeInfo ophosttypes.QueryBridgeResponse) {
 	b.bridgeInfo = bridgeInfo
 }

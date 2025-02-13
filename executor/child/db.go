@@ -81,20 +81,26 @@ func SaveWithdrawal(db types.BasicDB, data executortypes.WithdrawalData) error {
 
 // DeleteFutureWithdrawals deletes all future withdrawals from the database starting from the given sequence
 func DeleteFutureWithdrawals(db types.DB, fromSequence uint64) error {
-	return db.Iterate(dbtypes.AppendSplitter(executortypes.WithdrawalSequencePrefix), executortypes.PrefixedWithdrawalSequence(fromSequence), func(key, value []byte) (bool, error) {
+	var deletingKeys [][]byte
+
+	err := db.Iterate(dbtypes.AppendSplitter(executortypes.WithdrawalSequencePrefix), executortypes.PrefixedWithdrawalSequence(fromSequence), func(key, value []byte) (bool, error) {
 		data := executortypes.WithdrawalData{}
 		err := data.Unmarshal(value)
 		if err != nil {
 			return true, err
 		}
-		err = db.Delete(executortypes.PrefixedWithdrawalAddressSequence(data.To, data.Sequence))
-		if err != nil {
-			return true, errors.Wrap(err, "failed to delete withdrawal address index")
-		}
-		err = db.Delete(key)
-		if err != nil {
-			return true, errors.Wrap(err, "failed to delete withdrawal data")
-		}
+		deletingKeys = append(deletingKeys, executortypes.PrefixedWithdrawalAddressSequence(data.To, data.Sequence))
+		deletingKeys = append(deletingKeys, key)
 		return false, nil
 	})
+	if err != nil {
+		return errors.Wrap(err, "failed to delete future withdrawals")
+	}
+	for _, key := range deletingKeys {
+		err = db.Delete(key)
+		if err != nil {
+			return errors.Wrap(err, "failed to delete withdrawal data")
+		}
+	}
+	return nil
 }

@@ -187,3 +187,19 @@ func FinalizeWithdrawalEvents(
 		},
 	}
 }
+
+func UpdateOracleConfigEvents(
+	bridgeId uint64,
+	oracleEnabled bool,
+) []abcitypes.EventAttribute {
+	return []abcitypes.EventAttribute{
+		{
+			Key:   ophosttypes.AttributeKeyBridgeId,
+			Value: strconv.FormatUint(bridgeId, 10),
+		},
+		{
+			Key:   ophosttypes.AttributeKeyOracleEnabled,
+			Value: strconv.FormatBool(oracleEnabled),
+		},
+	}
+}

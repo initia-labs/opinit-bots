@@ -21,7 +21,7 @@ import (
 // prepareBatch prepares the batch info for the given block height.
 // if there is more than one batch info in the queue and the start block height of the local batch info is greater than the l2 block number of the next batch info,
 // it finalizes the current batch and occurs a panic to restart the block process from the next batch info's l2 block number + 1.
-func (bs *BatchSubmitter) prepareBatch(blockHeight int64) error {
+func (bs *BatchSubmitter) prepareBatch(ctx types.Context, blockHeight int64) error {
 	localBatchInfo, err := GetLocalBatchInfo(bs.DB())
 	if err != nil {
 		return errors.Wrap(err, "failed to get local batch info")
@@ -32,6 +32,35 @@ func (bs *BatchSubmitter) prepareBatch(blockHeight int64) error {
 	if nextBatchInfo := bs.NextBatchInfo(); nextBatchInfo != nil &&
 		types.MustUint64ToInt64(nextBatchInfo.Output.L2BlockNumber) < bs.localBatchInfo.Start {
 		// if the next batch info is reached, finalize the current batch and update the batch info.
+
+		// wait until all processed msgs and pending txs are processed
+		timer := time.NewTicker(1 * time.Second)
+		defer timer.Stop()
+		for {
+			lenProcessedBatchMsgs, err := bs.da.LenProcessedBatchMsgs()
+			if err != nil {
+				return errors.Wrap(err, "failed to get processed msgs length")
+			}
+			lenPendingBatchTxs, err := bs.da.LenPendingBatchTxs()
+			if err != nil {
+				return errors.Wrap(err, "failed to get pending txs length")
+			}
+			if lenProcessedBatchMsgs == 0 && lenPendingBatchTxs == 0 {
+				break
+			}
+
+			ctx.Logger().Info("waiting for processed batch msgs and pending batch txs to be processed before changing batch info",
+				zap.Int("processed_batch_msgs", lenProcessedBatchMsgs),
+				zap.Int("pending_batch_txs", lenPendingBatchTxs),
+			)
+
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-timer.C:
+			}
+		}
+
 		if bs.batchWriter != nil {
 			err := bs.batchWriter.Close()
 			if err != nil {
@@ -54,15 +83,6 @@ func (bs *BatchSubmitter) prepareBatch(blockHeight int64) error {
 		err = node.SetSyncedHeight(bs.DB(), types.MustUint64ToInt64(nextBatchInfo.Output.L2BlockNumber))
 		if err != nil {
 			return errors.Wrap(err, "failed to set synced height")
-		}
-
-		err = node.DeleteProcessedMsgs(bs.da.DB())
-		if err != nil {
-			return errors.Wrap(err, "failed to delete processed msgs")
-		}
-		err = node.DeletePendingTxs(bs.da.DB())
-		if err != nil {
-			return errors.Wrap(err, "failed to delete pending txs")
 		}
 
 		// error will restart block process from nextBatchInfo.Output.L2BlockNumber + 1

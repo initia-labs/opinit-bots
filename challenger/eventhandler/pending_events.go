@@ -7,6 +7,13 @@ import (
 	challengertypes "github.com/initia-labs/opinit-bots/challenger/types"
 )
 
+func (ch *ChallengeEventHandler) SetPendingEvent(event challengertypes.ChallengeEvent) {
+	ch.pendingEventsMu.Lock()
+	defer ch.pendingEventsMu.Unlock()
+
+	ch.pendingEvents[event.Id()] = event
+}
+
 func (ch *ChallengeEventHandler) SetPendingEvents(events []challengertypes.ChallengeEvent) {
 	if len(events) == 0 {
 		return

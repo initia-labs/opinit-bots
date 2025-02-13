@@ -29,24 +29,21 @@ func (h *Host) endBlockHandler(_ types.Context, args nodetypes.EndBlockArgs) err
 		return errors.Wrap(err, "failed to save pending events on child db")
 	}
 
-	// save all pending events to host db
-	// currently, only output event is considered as pending event
-	if len(h.outputPendingEventQueue) > 1 || (len(h.outputPendingEventQueue) == 1 && h.outputPendingEventQueue[0].Type() != challengertypes.EventTypeOutput) {
-		panic("must not happen, outputPendingEventQueue should have only one output event")
-	}
-
-	err = eventhandler.SavePendingEvents(h.stage, h.outputPendingEventQueue)
-	if err != nil {
-		return err
-	}
-
 	prevEvents := make([]challengertypes.ChallengeEvent, 0)
-	for _, pendingEvent := range h.outputPendingEventQueue {
-		prevEvent, ok := h.eventHandler.GetPrevPendingEvent(pendingEvent)
+
+	if len(h.outputPendingEventQueue) > 0 {
+		// save the last output event to host db
+		err = eventhandler.SavePendingEvent(h.stage, h.outputPendingEventQueue[len(h.outputPendingEventQueue)-1])
+		if err != nil {
+			return errors.Wrap(err, "failed to save pending event on host db")
+		}
+
+		prevEvent, ok := h.eventHandler.GetPrevPendingEvent(h.outputPendingEventQueue[0])
 		if ok {
 			prevEvents = append(prevEvents, prevEvent)
 		}
 	}
+
 	unprocessedEvents := h.eventHandler.GetUnprocessedPendingEvents(prevEvents)
 	pendingChallenges, processedEvents := h.eventHandler.CheckTimeout(args.Block.Header.Time, unprocessedEvents)
 	processedEvents = append(processedEvents, prevEvents...)
@@ -69,7 +66,10 @@ func (h *Host) endBlockHandler(_ types.Context, args nodetypes.EndBlockArgs) err
 
 	h.child.SetPendingEvents(h.eventQueue)
 	h.eventHandler.DeletePendingEvents(processedEvents)
-	h.eventHandler.SetPendingEvents(h.outputPendingEventQueue)
+	// save the last output event
+	if len(h.outputPendingEventQueue) > 0 {
+		h.eventHandler.SetPendingEvent(h.outputPendingEventQueue[len(h.outputPendingEventQueue)-1])
+	}
 	h.challenger.SendPendingChallenges(pendingChallenges)
 	return nil
 }

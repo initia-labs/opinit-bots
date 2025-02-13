@@ -249,3 +249,35 @@ func ParseMsgFinalizeWithdrawal(eventAttrs []abcitypes.EventAttribute) (
 	err = missingAttrsError(missingAttrs)
 	return
 }
+
+func ParseMsgUpdateOracleConfig(eventAttrs []abcitypes.EventAttribute) (
+	bridgeId uint64,
+	oracleEnabled bool,
+	err error) {
+	missingAttrs := map[string]struct{}{
+		ophosttypes.AttributeKeyBridgeId:      {},
+		ophosttypes.AttributeKeyOracleEnabled: {},
+	}
+
+	for _, attr := range eventAttrs {
+		switch attr.Key {
+		case ophosttypes.AttributeKeyBridgeId:
+			bridgeId, err = strconv.ParseUint(attr.Value, 10, 64)
+			if err != nil {
+				err = errors.Wrap(err, "failed to parse bridge id")
+				return
+			}
+		case ophosttypes.AttributeKeyOracleEnabled:
+			oracleEnabled, err = strconv.ParseBool(attr.Value)
+			if err != nil {
+				err = errors.Wrap(err, "failed to parse oracle enabled")
+				return
+			}
+		default:
+			continue
+		}
+		delete(missingAttrs, attr.Key)
+	}
+	err = missingAttrsError(missingAttrs)
+	return
+}
