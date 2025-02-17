@@ -101,8 +101,13 @@ func (n *Node) handleEndBlock(ctx types.Context, blockID []byte, protoBlock *pro
 }
 
 // handleRawBlock handles the raw block bytes.
-func (n *Node) handleRawBlock(ctx types.Context, blockHeight int64, latestHeight int64, blockBytes []byte) error {
+func (n *Node) handleRawBlock(parentCtx types.Context, blockHeight int64, latestHeight int64, blockBytes []byte) error {
 	if n.rawBlockHandler != nil {
+		transactions, ctx := sentry_integration.StartSentryTransaction(parentCtx, "handleRawBlock", "Handles the raw block bytes")
+		defer transactions.Finish()
+		transactions.SetTag("height", fmt.Sprintf("%d", blockHeight))
+		transactions.SetTag("latest_height", fmt.Sprintf("%d", latestHeight))
+
 		return n.rawBlockHandler(ctx, nodetypes.RawBlockArgs{
 			BlockHeight:  blockHeight,
 			LatestHeight: latestHeight,

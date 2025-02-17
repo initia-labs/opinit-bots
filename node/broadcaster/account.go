@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"strings"
 
 	abci "github.com/cometbft/cometbft/abci/types"
 	"github.com/getsentry/sentry-go"
@@ -21,7 +22,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/codec"
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
+
 	txtypes "github.com/cosmos/cosmos-sdk/types/tx"
 	"github.com/cosmos/cosmos-sdk/types/tx/signing"
 	authsigning "github.com/cosmos/cosmos-sdk/x/auth/signing"
@@ -224,15 +225,13 @@ func (b BroadcasterAccount) CalculateGas(ctx context.Context, msgs ...sdk.Msg) (
 
 	res, err := b.rpcClient.QueryABCI(ctx, simQuery)
 	if err != nil {
-		switch {
-		case sdkerrors.ErrOutOfGas.Is(err):
-			sentry_integration.CaptureCurrentHubException(err, sentry.LevelError)
-			return txtypes.SimulateResponse{}, 0, err
-
-		case sdkerrors.ErrInsufficientFee.Is(err):
-			sentry_integration.CaptureCurrentHubException(err, sentry.LevelError)
-			return txtypes.SimulateResponse{}, 0, err
+		for _, e := range sentryCapturedErrors {
+			if strings.Contains(err.Error(), e.Error()) {
+				sentry_integration.CaptureCurrentHubException(err, sentry.LevelError)
+				return txtypes.SimulateResponse{}, 0, err
+			}
 		}
+
 		return txtypes.SimulateResponse{}, 0, err
 	}
 

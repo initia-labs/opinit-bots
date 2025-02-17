@@ -182,6 +182,10 @@ func (n *Node) handleEvent(ctx types.Context, blockHeight int64, blockTime time.
 	if n.eventHandlers[event.GetType()] == nil {
 		return nil
 	}
+	span, ctx := sentry_integration.StartSentrySpan(ctx, "handleEvent", "Handles the event for the given transaction")
+	defer span.Finish()
+	span.SetTag("height", fmt.Sprintf("%d", blockHeight))
+	span.SetTag("type", event.GetType())
 
 	ctx.Logger().Debug("handle event", zap.Int64("height", blockHeight), zap.String("type", event.GetType()))
 	return n.eventHandlers[event.Type](ctx, nodetypes.EventHandlerArgs{

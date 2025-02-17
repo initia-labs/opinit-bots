@@ -15,6 +15,7 @@ import (
 	"github.com/initia-labs/opinit-bots/sentry_integration"
 	"github.com/initia-labs/opinit-bots/types"
 
+	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
 	opchildtypes "github.com/initia-labs/OPinit/x/opchild/types"
 )
 
@@ -26,6 +27,11 @@ var ignoringErrors = []error{
 }
 var accountSeqRegex = regexp.MustCompile("account sequence mismatch, expected ([0-9]+), got ([0-9]+)")
 var outputIndexRegex = regexp.MustCompile("expected ([0-9]+), got ([0-9]+): invalid output index")
+
+var sentryCapturedErrors = []error{
+	sdkerrors.ErrOutOfGas,
+	sdkerrors.ErrInsufficientFunds,
+}
 
 // handleMsgError handles error when processing messages.
 // If there is an error known to be ignored, it will be ignored.
@@ -63,6 +69,13 @@ func (b *Broadcaster) handleMsgError(ctx types.Context, err error, broadcasterAc
 		}
 
 		return err
+	}
+
+	for _, e := range sentryCapturedErrors {
+		if strings.Contains(err.Error(), e.Error()) {
+			sentry_integration.CaptureCurrentHubException(err, sentry.LevelError)
+			return err
+		}
 	}
 
 	for _, e := range ignoringErrors {
