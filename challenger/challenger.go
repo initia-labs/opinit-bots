@@ -10,6 +10,7 @@ import (
 	"github.com/initia-labs/opinit-bots/challenger/child"
 	challengerdb "github.com/initia-labs/opinit-bots/challenger/db"
 	"github.com/initia-labs/opinit-bots/challenger/host"
+	"github.com/initia-labs/opinit-bots/sentry_integration"
 	"github.com/initia-labs/opinit-bots/server"
 
 	bottypes "github.com/initia-labs/opinit-bots/bot/types"
@@ -45,7 +46,12 @@ type Challenger struct {
 }
 
 func NewChallenger(cfg *challengertypes.Config, db types.DB, sv *server.Server) *Challenger {
-	err := cfg.Validate()
+	err := sentry_integration.Init("opinit-bots", string(bottypes.BotTypeChallenger))
+	if err != nil {
+		panic(err)
+	}
+
+	err = cfg.Validate()
 	if err != nil {
 		panic(err)
 	}

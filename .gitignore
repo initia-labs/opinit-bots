@@ -15,3 +15,5 @@ build/
 vendor/
 
 test_key/
+
+.env*

@@ -7,12 +7,14 @@ import (
 	"strings"
 	"time"
 
+	"github.com/getsentry/sentry-go"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 
 	rpccoretypes "github.com/cometbft/cometbft/rpc/core/types"
 
 	btypes "github.com/initia-labs/opinit-bots/node/broadcaster/types"
+	"github.com/initia-labs/opinit-bots/sentry_integration"
 	"github.com/initia-labs/opinit-bots/types"
 )
 
@@ -122,7 +124,9 @@ func (b *Broadcaster) Start(ctx types.Context) error {
 				}
 			}
 			if err != nil {
-				return errors.Wrap(err, "failed to handle processed msgs")
+				err = errors.Wrap(err, "failed to handle processed msgs")
+				sentry_integration.CaptureCurrentHubException(err, sentry.LevelWarning)
+				return err
 			}
 		}
 	}
