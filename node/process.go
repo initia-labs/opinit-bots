@@ -8,6 +8,7 @@ import (
 	rpccoretypes "github.com/cometbft/cometbft/rpc/core/types"
 	comettypes "github.com/cometbft/cometbft/types"
 	nodetypes "github.com/initia-labs/opinit-bots/node/types"
+	"github.com/initia-labs/opinit-bots/sentry_integration"
 	"github.com/initia-labs/opinit-bots/types"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
@@ -123,15 +124,18 @@ func (n *Node) processBlocksTypeRaw(ctx types.Context, latestHeight int64) error
 }
 
 // fetchNewBlock fetches a new block and block results given the height
-func (n *Node) fetchNewBlock(ctx types.Context, height int64) (*rpccoretypes.ResultBlock, *rpccoretypes.ResultBlockResults, error) {
+func (n *Node) fetchNewBlock(parentCtx types.Context, height int64) (*rpccoretypes.ResultBlock, *rpccoretypes.ResultBlockResults, error) {
+	transaction, ctx := sentry_integration.StartSentryTransaction(parentCtx, "fetchNewBlock", "Fetches a new block and block results given the height")
+	defer transaction.Finish()
+	transaction.SetTag("height", fmt.Sprintf("%d", height))
 	ctx.Logger().Debug("fetch new block", zap.Int64("height", height))
 
-	block, err := n.rpcClient.Block(ctx, &height)
+	block, err := n.fetchBlockWithSentry(ctx, height)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	blockResult, err := n.rpcClient.BlockResults(ctx, &height)
+	blockResult, err := n.fetchBlockResultsWithSentry(ctx, height)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -140,7 +144,11 @@ func (n *Node) fetchNewBlock(ctx types.Context, height int64) (*rpccoretypes.Res
 
 // handleNewBlock handles a new block and block results given the height
 // it sends txs and events to the respective registered handlers
-func (n *Node) handleNewBlock(ctx types.Context, block *rpccoretypes.ResultBlock, blockResult *rpccoretypes.ResultBlockResults, latestChainHeight int64) error {
+func (n *Node) handleNewBlock(parentCtx types.Context, block *rpccoretypes.ResultBlock, blockResult *rpccoretypes.ResultBlockResults, latestChainHeight int64) error {
+	transaction, ctx := sentry_integration.StartSentryTransaction(parentCtx, "handleNewBlock", "Handles a new block and block results given the height")
+	defer transaction.Finish()
+	transaction.SetTag("height", fmt.Sprintf("%d", block.Block.Height))
+
 	protoBlock, err := block.Block.ToProto()
 	if err != nil {
 		return errors.Wrap(err, "failed to convert block to proto block")
@@ -174,6 +182,10 @@ func (n *Node) handleEvent(ctx types.Context, blockHeight int64, blockTime time.
 	if n.eventHandlers[event.GetType()] == nil {
 		return nil
 	}
+	span, ctx := sentry_integration.StartSentrySpan(ctx, "handleEvent", "Handles the event for the given transaction")
+	defer span.Finish()
+	span.SetTag("height", fmt.Sprintf("%d", blockHeight))
+	span.SetTag("type", event.GetType())
 
 	ctx.Logger().Debug("handle event", zap.Int64("height", blockHeight), zap.String("type", event.GetType()))
 	return n.eventHandlers[event.Type](ctx, nodetypes.EventHandlerArgs{
@@ -184,4 +196,28 @@ func (n *Node) handleEvent(ctx types.Context, blockHeight int64, blockTime time.
 		Tx:              tx,
 		EventAttributes: event.GetAttributes(),
 	})
+}
+
+func (n *Node) fetchBlockWithSentry(ctx types.Context, height int64) (*rpccoretypes.ResultBlock, error) {
+	span, ctx := sentry_integration.StartSentrySpan(ctx, "rpc.Block", "Fetches a block given the height")
+	defer span.Finish()
+	span.SetTag("height", fmt.Sprintf("%d", height))
+
+	block, err := n.rpcClient.Block(ctx, &height)
+	if err != nil {
+		return nil, err
+	}
+	return block, nil
+}
+
+func (n *Node) fetchBlockResultsWithSentry(ctx types.Context, height int64) (*rpccoretypes.ResultBlockResults, error) {
+	span, ctx := sentry_integration.StartSentrySpan(ctx, "rpc.BlockResults", "Fetches block results given the height")
+	defer span.Finish()
+	span.SetTag("height", fmt.Sprintf("%d", height))
+
+	blockResult, err := n.rpcClient.BlockResults(ctx, &height)
+	if err != nil {
+		return nil, err
+	}
+	return blockResult, nil
 }

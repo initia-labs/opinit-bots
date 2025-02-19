@@ -15,6 +15,7 @@ import (
 	executortypes "github.com/initia-labs/opinit-bots/executor/types"
 	"github.com/initia-labs/opinit-bots/node"
 	btypes "github.com/initia-labs/opinit-bots/node/broadcaster/types"
+	"github.com/initia-labs/opinit-bots/sentry_integration"
 	"github.com/initia-labs/opinit-bots/types"
 )
 
@@ -115,7 +116,11 @@ func (bs *BatchSubmitter) handleBatch(blockBytes []byte) (int, error) {
 // finalizeBatch finalizes the batch by writing the last block's commit to the batch file.
 // it creates batch messages for the batch data and adds them to the processed messages.
 // the batch data is divided into chunks and each chunk is added to the processed messages.
-func (bs *BatchSubmitter) finalizeBatch(ctx types.Context, blockHeight int64) error {
+func (bs *BatchSubmitter) finalizeBatch(parentCtx types.Context, blockHeight int64) error {
+	transaction, ctx := sentry_integration.StartSentryTransaction(parentCtx, "finalizeBatch", "Finalizes the batch")
+	defer transaction.Finish()
+	transaction.SetTag("height", fmt.Sprintf("%d", blockHeight))
+
 	// write last block's commit to batch file
 	rawCommit, err := bs.node.GetRPCClient().QueryRawCommit(ctx, blockHeight)
 	if err != nil {
