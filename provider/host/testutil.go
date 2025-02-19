@@ -203,3 +203,55 @@ func UpdateOracleConfigEvents(
 		},
 	}
 }
+
+func UpdateProposerEvents(
+	bridgeId uint64,
+	proposer string,
+	finalizedOutputIndex uint64,
+	finalizedL2BlockNumber uint64,
+) []abcitypes.EventAttribute {
+	return []abcitypes.EventAttribute{
+		{
+			Key:   ophosttypes.AttributeKeyBridgeId,
+			Value: strconv.FormatUint(bridgeId, 10),
+		},
+		{
+			Key:   ophosttypes.AttributeKeyProposer,
+			Value: proposer,
+		},
+		{
+			Key:   ophosttypes.AttributeKeyFinalizedOutputIndex,
+			Value: strconv.FormatUint(finalizedOutputIndex, 10),
+		},
+		{
+			Key:   ophosttypes.AttributeKeyFinalizedL2BlockNumber,
+			Value: strconv.FormatUint(finalizedL2BlockNumber, 10),
+		},
+	}
+}
+
+func UpdateChallengerEvents(
+	bridgeId uint64,
+	challenger string,
+	finalizedOutputIndex uint64,
+	finalizedL2BlockNumber uint64,
+) []abcitypes.EventAttribute {
+	return []abcitypes.EventAttribute{
+		{
+			Key:   ophosttypes.AttributeKeyBridgeId,
+			Value: strconv.FormatUint(bridgeId, 10),
+		},
+		{
+			Key:   ophosttypes.AttributeKeyChallenger,
+			Value: challenger,
+		},
+		{
+			Key:   ophosttypes.AttributeKeyFinalizedOutputIndex,
+			Value: strconv.FormatUint(finalizedOutputIndex, 10),
+		},
+		{
+			Key:   ophosttypes.AttributeKeyFinalizedL2BlockNumber,
+			Value: strconv.FormatUint(finalizedL2BlockNumber, 10),
+		},
+	}
+}

@@ -8,7 +8,6 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 
 	opchildtypes "github.com/initia-labs/OPinit/x/opchild/types"
-	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
 
 	"github.com/initia-labs/opinit-bots/merkle"
 	"github.com/initia-labs/opinit-bots/node"
@@ -22,7 +21,7 @@ func NewTestBaseChild(
 	node *node.Node,
 	mk *merkle.Merkle,
 
-	bridgeInfo ophosttypes.QueryBridgeResponse,
+	bridgeInfo opchildtypes.BridgeInfo,
 
 	initializeTreeFn func(int64) (bool, error),
 

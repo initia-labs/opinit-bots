@@ -128,6 +128,18 @@ func (b *BaseHost) UpdateOracleEnabled(oracleEnabled bool) {
 	b.bridgeInfo.BridgeConfig.OracleEnabled = oracleEnabled
 }
 
+func (b *BaseHost) UpdateBatchInfo(batchInfo ophosttypes.BatchInfo) {
+	b.bridgeInfo.BridgeConfig.BatchInfo = batchInfo
+}
+
+func (b *BaseHost) UpdateProposer(proposer string) {
+	b.bridgeInfo.BridgeConfig.Proposer = proposer
+}
+
+func (b *BaseHost) UpdateChallenger(challenger string) {
+	b.bridgeInfo.BridgeConfig.Challenger = challenger
+}
+
 func (b *BaseHost) SetBridgeInfo(bridgeInfo ophosttypes.QueryBridgeResponse) {
 	b.bridgeInfo = bridgeInfo
 }

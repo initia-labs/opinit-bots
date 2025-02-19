@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
+	opchildtypes "github.com/initia-labs/OPinit/x/opchild/types"
 	"github.com/initia-labs/opinit-bots/db"
 	executortypes "github.com/initia-labs/opinit-bots/executor/types"
 	"github.com/initia-labs/opinit-bots/merkle"
@@ -139,7 +139,7 @@ func TestQueryWithdrawal(t *testing.T) {
 	childNode := node.NewTestNode(nodetypes.NodeConfig{}, childDB, nil, nil, nil, nil)
 
 	ch := Child{
-		BaseChild: childprovider.NewTestBaseChild(0, childNode, nil, ophosttypes.QueryBridgeResponse{
+		BaseChild: childprovider.NewTestBaseChild(0, childNode, nil, opchildtypes.BridgeInfo{
 			BridgeId: 1,
 		}, nil, nodetypes.NodeConfig{}),
 	}
@@ -283,7 +283,7 @@ func TestQueryWithdrawals(t *testing.T) {
 	childNode := node.NewTestNode(nodetypes.NodeConfig{}, childDB, nil, nil, nil, nil)
 
 	ch := Child{
-		BaseChild: childprovider.NewTestBaseChild(0, childNode, nil, ophosttypes.QueryBridgeResponse{
+		BaseChild: childprovider.NewTestBaseChild(0, childNode, nil, opchildtypes.BridgeInfo{
 			BridgeId: 1,
 		}, nil, nodetypes.NodeConfig{}),
 	}

@@ -91,6 +91,9 @@ func TestUpdateOracleConfigHandler(t *testing.T) {
 	db, err := db.NewMemDB()
 	require.NoError(t, err)
 	hostNode := node.NewTestNode(nodetypes.NodeConfig{}, db.WithPrefix([]byte("test_host")), nil, nil, nil, nil)
+	childCodec, _, err := childprovider.GetCodec("init")
+	require.NoError(t, err)
+	child := NewMockChild(db.WithPrefix([]byte("test_child")), childCodec, "init1z3689ct7pc72yr5an97nsj89dnlefydxwdhcv0", "init1hrasklz3tr6s9rls4r8fjuf0k4zuha6w9rude5", 1)
 	h := Host{
 		BaseHost: hostprovider.NewTestBaseHost(0, hostNode, ophosttypes.QueryBridgeResponse{
 			BridgeId: 1,
@@ -98,6 +101,7 @@ func TestUpdateOracleConfigHandler(t *testing.T) {
 				OracleEnabled: false,
 			},
 		}, nodetypes.NodeConfig{}, nil),
+		child: child,
 	}
 
 	cases := []struct {
@@ -105,6 +109,7 @@ func TestUpdateOracleConfigHandler(t *testing.T) {
 		bridgeId              uint64
 		oracleEnabled         bool
 		expectedOracleEnabled bool
+		expectedMsg           sdk.Msg
 		err                   bool
 	}{
 		{
@@ -112,18 +117,21 @@ func TestUpdateOracleConfigHandler(t *testing.T) {
 			bridgeId:              1,
 			oracleEnabled:         true,
 			expectedOracleEnabled: true,
+			expectedMsg:           opchildtypes.NewMsgSetBridgeInfo("init1z3689ct7pc72yr5an97nsj89dnlefydxwdhcv0", opchildtypes.BridgeInfo{BridgeId: 1, BridgeConfig: ophosttypes.BridgeConfig{OracleEnabled: true}}),
 		},
 		{
 			name:                  "oracle disabled",
 			bridgeId:              1,
 			oracleEnabled:         false,
 			expectedOracleEnabled: false,
+			expectedMsg:           opchildtypes.NewMsgSetBridgeInfo("init1z3689ct7pc72yr5an97nsj89dnlefydxwdhcv0", opchildtypes.BridgeInfo{BridgeId: 1, BridgeConfig: ophosttypes.BridgeConfig{OracleEnabled: false}}),
 		},
 		{
 			name:                  "another bridge id",
 			bridgeId:              2,
 			oracleEnabled:         true,
 			expectedOracleEnabled: false,
+			expectedMsg:           nil,
 		},
 	}
 
@@ -137,7 +145,15 @@ func TestUpdateOracleConfigHandler(t *testing.T) {
 			} else {
 				require.NoError(t, err)
 				require.Equal(t, tc.expectedOracleEnabled, h.OracleEnabled())
+				msg := h.GetMsgQueue()
+				if tc.expectedMsg != nil {
+					require.Equal(t, 1, len(msg))
+					require.Equal(t, tc.expectedMsg, msg[child.baseAccount][0])
+				} else {
+					require.Empty(t, msg[child.baseAccount])
+				}
 			}
+			h.EmptyMsgQueue()
 		})
 	}
 }
