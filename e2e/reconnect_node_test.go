@@ -20,7 +20,7 @@ func TestReconnectNodes(t *testing.T) {
 		Gas:            "auto",
 		GasPrices:      "0.025uinit",
 		GasAdjustment:  1.2,
-		TrustingPeriod: "168h",
+		TrustingPeriod: "144h",
 		NumValidators:  1,
 		NumFullNodes:   0,
 	}
@@ -34,7 +34,7 @@ func TestReconnectNodes(t *testing.T) {
 		Gas:            "auto",
 		GasPrices:      "0.025umin",
 		GasAdjustment:  1.2,
-		TrustingPeriod: "168h",
+		TrustingPeriod: "144h",
 		NumValidators:  1,
 		NumFullNodes:   0,
 	}
