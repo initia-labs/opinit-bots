@@ -2,6 +2,7 @@ package child
 
 import (
 	opchildtypes "github.com/initia-labs/OPinit/x/opchild/types"
+	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
 	"github.com/initia-labs/opinit-bots/types"
 
 	cdctypes "github.com/cosmos/cosmos-sdk/codec/types"
@@ -76,6 +77,32 @@ func (b BaseChild) GetMsgUpdateOracle(
 		return nil, "", errors.Wrap(err, "failed to create authz msg")
 	}
 	return authzMsg, oracleAddressString, nil
+}
+
+func (b BaseChild) GetMsgSetBridgeInfo(
+	bridgeId uint64,
+	bridgeConfig ophosttypes.BridgeConfig,
+) (sdk.Msg, string, error) {
+	sender, err := b.BaseAccountAddressString()
+	if err != nil {
+		if errors.Is(err, types.ErrKeyNotSet) {
+			return nil, "", nil
+		}
+		return nil, "", errors.Wrap(err, "failed to get address")
+	}
+
+	newBridgeInfo := b.BridgeInfo()
+	newBridgeInfo.BridgeConfig = bridgeConfig
+
+	msg := opchildtypes.NewMsgSetBridgeInfo(
+		sender,
+		newBridgeInfo,
+	)
+	err = msg.Validate(b.node.AccountCodec())
+	if err != nil {
+		return nil, "", errors.Wrap(err, "failed to validate msg")
+	}
+	return msg, sender, nil
 }
 
 func CreateAuthzMsg(grantee string, msg sdk.Msg) (sdk.Msg, error) {

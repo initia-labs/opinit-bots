@@ -6,6 +6,7 @@ import (
 	"github.com/initia-labs/opinit-bots/types"
 	"go.uber.org/zap"
 
+	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
 	"github.com/pkg/errors"
 )
 
@@ -50,5 +51,15 @@ func (h *Host) updateBatchInfoHandler(ctx types.Context, args nodetypes.EventHan
 	)
 
 	h.batch.UpdateBatchInfo(chain, submitter, outputIndex, l2BlockNumber)
+	h.UpdateBatchInfo(ophosttypes.BatchInfo{
+		ChainType: ophosttypes.BatchInfo_ChainType(ophosttypes.BatchInfo_ChainType_value[chain]),
+		Submitter: submitter,
+	})
+	msg, sender, err := h.child.GetMsgSetBridgeInfo(bridgeId, h.BridgeInfo().BridgeConfig)
+	if err != nil {
+		return errors.Wrap(err, "failed to handle update challenger")
+	} else if msg != nil {
+		h.AppendMsgQueue(msg, sender)
+	}
 	return nil
 }

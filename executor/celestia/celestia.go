@@ -21,7 +21,7 @@ import (
 )
 
 var (
-	BatchMsgType = "/celestia.blob.v1.MsgPayForBlobs"
+	BatchMsgType = "/celestia.blob.v1.MsgPayForBlobsWithBlob"
 )
 
 type batchNode interface {

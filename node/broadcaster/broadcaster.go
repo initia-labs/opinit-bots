@@ -322,3 +322,18 @@ func (b Broadcaster) LenProcessedMsgsByMsgType(msgType string) (int, error) {
 	}
 	return count, nil
 }
+
+func (b *Broadcaster) LenLocalPendingTxByMsgType(msgType string) (int, error) {
+	pendingTxs, err := LoadPendingTxs(b.db)
+	if err != nil {
+		return 0, err
+	}
+
+	count := 0
+	for _, tx := range pendingTxs {
+		if slices.Contains(tx.MsgTypes, msgType) {
+			count++
+		}
+	}
+	return count, nil
+}

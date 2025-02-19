@@ -4,6 +4,7 @@ import (
 	"context"
 
 	opchildtypes "github.com/initia-labs/OPinit/x/opchild/types"
+	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
 	btypes "github.com/initia-labs/opinit-bots/node/broadcaster/types"
 	"github.com/initia-labs/opinit-bots/types"
 	"github.com/pkg/errors"
@@ -100,6 +101,22 @@ func (m *mockChild) GetMsgUpdateOracle(
 		Grantee: m.oracleAccount,
 		Msgs:    msgsAny,
 	}, m.oracleAccount, nil
+}
+
+func (m *mockChild) GetMsgSetBridgeInfo(
+	bridgeId uint64,
+	bridgeConfig ophosttypes.BridgeConfig,
+) (sdk.Msg, string, error) {
+	if m.baseAccount == "" {
+		return nil, "", nil
+	}
+	return opchildtypes.NewMsgSetBridgeInfo(
+		m.baseAccount,
+		opchildtypes.BridgeInfo{
+			BridgeId:     bridgeId,
+			BridgeConfig: bridgeConfig,
+		},
+	), m.baseAccount, nil
 }
 
 func (m *mockChild) QueryNextL1Sequence(ctx context.Context, height int64) (uint64, error) {

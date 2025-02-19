@@ -281,3 +281,93 @@ func ParseMsgUpdateOracleConfig(eventAttrs []abcitypes.EventAttribute) (
 	err = missingAttrsError(missingAttrs)
 	return
 }
+
+func ParseMsgUpdateProposer(eventAttrs []abcitypes.EventAttribute) ( //nolint
+	bridgeId uint64,
+	proposer string,
+	finalizedOutputIndex uint64,
+	finalizedL2BlockNumber uint64,
+	err error,
+) {
+	missingAttrs := map[string]struct{}{
+		ophosttypes.AttributeKeyBridgeId:               {},
+		ophosttypes.AttributeKeyProposer:               {},
+		ophosttypes.AttributeKeyFinalizedOutputIndex:   {},
+		ophosttypes.AttributeKeyFinalizedL2BlockNumber: {},
+	}
+
+	for _, attr := range eventAttrs {
+		switch attr.Key {
+		case ophosttypes.AttributeKeyBridgeId:
+			bridgeId, err = strconv.ParseUint(attr.Value, 10, 64)
+			if err != nil {
+				err = errors.Wrap(err, "failed to parse bridge id")
+				return
+			}
+		case ophosttypes.AttributeKeyProposer:
+			proposer = attr.Value
+		case ophosttypes.AttributeKeyFinalizedOutputIndex:
+			finalizedOutputIndex, err = strconv.ParseUint(attr.Value, 10, 64)
+			if err != nil {
+				err = errors.Wrap(err, "failed to parse finalized output index")
+				return
+			}
+		case ophosttypes.AttributeKeyFinalizedL2BlockNumber:
+			finalizedL2BlockNumber, err = strconv.ParseUint(attr.Value, 10, 64)
+			if err != nil {
+				err = errors.Wrap(err, "failed to parse finalized l2 block number")
+				return
+			}
+		default:
+			continue
+		}
+		delete(missingAttrs, attr.Key)
+	}
+	err = missingAttrsError(missingAttrs)
+	return
+}
+
+func ParseMsgUpdateChallenger(eventAttrs []abcitypes.EventAttribute) ( //nolint
+	bridgeId uint64,
+	challenger string,
+	finalizedOutputIndex uint64,
+	finalizedL2BlockNumber uint64,
+	err error,
+) {
+	missingAttrs := map[string]struct{}{
+		ophosttypes.AttributeKeyBridgeId:               {},
+		ophosttypes.AttributeKeyChallenger:             {},
+		ophosttypes.AttributeKeyFinalizedOutputIndex:   {},
+		ophosttypes.AttributeKeyFinalizedL2BlockNumber: {},
+	}
+
+	for _, attr := range eventAttrs {
+		switch attr.Key {
+		case ophosttypes.AttributeKeyBridgeId:
+			bridgeId, err = strconv.ParseUint(attr.Value, 10, 64)
+			if err != nil {
+				err = errors.Wrap(err, "failed to parse bridge id")
+				return
+			}
+		case ophosttypes.AttributeKeyChallenger:
+			challenger = attr.Value
+		case ophosttypes.AttributeKeyFinalizedOutputIndex:
+			finalizedOutputIndex, err = strconv.ParseUint(attr.Value, 10, 64)
+			if err != nil {
+				err = errors.Wrap(err, "failed to parse finalized output index")
+				return
+			}
+		case ophosttypes.AttributeKeyFinalizedL2BlockNumber:
+			finalizedL2BlockNumber, err = strconv.ParseUint(attr.Value, 10, 64)
+			if err != nil {
+				err = errors.Wrap(err, "failed to parse finalized l2 block number")
+				return
+			}
+		default:
+			continue
+		}
+		delete(missingAttrs, attr.Key)
+	}
+	err = missingAttrsError(missingAttrs)
+	return
+}

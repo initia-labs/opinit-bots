@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	opchildtypes "github.com/initia-labs/OPinit/x/opchild/types"
 	"github.com/strangelove-ventures/interchaintest/v8/chain/cosmos"
 	"github.com/strangelove-ventures/interchaintest/v8/ibc"
 	"go.uber.org/zap"
@@ -79,4 +80,8 @@ func (l2 *L2Chain) QueryPrices(ctx context.Context, currencyPairIds []string) (*
 	return oracletypes.NewQueryClient(l2.GetFullNode().GrpcConn).GetPrices(ctx, &oracletypes.GetPricesRequest{
 		CurrencyPairIds: currencyPairIds,
 	})
+}
+
+func (l2 *L2Chain) QueryBridgeInfo(ctx context.Context) (*opchildtypes.QueryBridgeInfoResponse, error) {
+	return opchildtypes.NewQueryClient(l2.GetFullNode().GrpcConn).BridgeInfo(ctx, &opchildtypes.QueryBridgeInfoRequest{})
 }

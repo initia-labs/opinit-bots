@@ -65,7 +65,7 @@ func (ch *Child) Initialize(
 	syncedHeight int64,
 	startOutputIndex uint64,
 	host hostNode,
-	bridgeInfo ophosttypes.QueryBridgeResponse,
+	bridgeInfo opchildtypes.BridgeInfo,
 	keyringConfig *btypes.KeyringConfig,
 	oracleKeyringConfig *btypes.KeyringConfig,
 	disableDeleteFutureWithdrawals bool,

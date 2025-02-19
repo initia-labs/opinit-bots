@@ -568,7 +568,7 @@ func (op OPTestHelper) ExecutorConfig() *executortypes.Config {
 			RPCAddress:    fmt.Sprintf("http://%s:26657", op.Initia.GetFullNode().HostName()),
 			GasPrice:      op.Initia.Config().GasPrices,
 			GasAdjustment: op.Initia.Config().GasAdjustment,
-			TxTimeout:     10,
+			TxTimeout:     60,
 		},
 
 		L2Node: executortypes.NodeConfig{
@@ -577,7 +577,7 @@ func (op OPTestHelper) ExecutorConfig() *executortypes.Config {
 			RPCAddress:    fmt.Sprintf("http://%s:26657", op.Minitia.GetFullNode().HostName()),
 			GasPrice:      "",
 			GasAdjustment: op.Minitia.Config().GasAdjustment,
-			TxTimeout:     10,
+			TxTimeout:     60,
 		},
 
 		DANode: executortypes.NodeConfig{
@@ -586,7 +586,7 @@ func (op OPTestHelper) ExecutorConfig() *executortypes.Config {
 			RPCAddress:    fmt.Sprintf("http://%s:26657", op.DA.GetFullNode().HostName()),
 			GasPrice:      op.DA.Config().GasPrices,
 			GasAdjustment: op.DA.Config().GasAdjustment,
-			TxTimeout:     10,
+			TxTimeout:     60,
 		},
 
 		BridgeExecutor:         op.Minitia.BridgeExecutor.KeyName(),

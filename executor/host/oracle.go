@@ -39,5 +39,11 @@ func (h *Host) updateOracleConfigHandler(ctx types.Context, args nodetypes.Event
 	)
 
 	h.UpdateOracleEnabled(oracleEnabled)
+	msg, sender, err := h.child.GetMsgSetBridgeInfo(bridgeId, h.BridgeInfo().BridgeConfig)
+	if err != nil {
+		return errors.Wrap(err, "failed to handle update challenger")
+	} else if msg != nil {
+		h.AppendMsgQueue(msg, sender)
+	}
 	return nil
 }

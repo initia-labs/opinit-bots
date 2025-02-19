@@ -6,6 +6,8 @@ import (
 	challengertypes "github.com/initia-labs/opinit-bots/challenger/types"
 	"github.com/initia-labs/opinit-bots/types"
 	"github.com/pkg/errors"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zaptest/observer"
 )
 
 type mockChild struct {
@@ -66,3 +68,8 @@ func (m *mockChallenger) SendPendingChallenges(challenges []challengertypes.Chal
 }
 
 var _ challenger = (*mockChallenger)(nil)
+
+func logCapturer() (*zap.Logger, *observer.ObservedLogs) {
+	core, logs := observer.New(zap.DebugLevel)
+	return zap.New(core), logs
+}

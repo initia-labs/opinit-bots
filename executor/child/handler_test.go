@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	cmtproto "github.com/cometbft/cometbft/proto/tendermint/types"
+	opchildtypes "github.com/initia-labs/OPinit/x/opchild/types"
 	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
 	"github.com/initia-labs/opinit-bots/db"
 	"github.com/initia-labs/opinit-bots/merkle"
@@ -35,7 +36,7 @@ func TestBeginBlockHandler(t *testing.T) {
 	require.NoError(t, err)
 
 	ch := Child{
-		BaseChild: childprovider.NewTestBaseChild(0, childNode, mk, ophosttypes.QueryBridgeResponse{
+		BaseChild: childprovider.NewTestBaseChild(0, childNode, mk, opchildtypes.BridgeInfo{
 			BridgeId: 1,
 		}, nil, nodetypes.NodeConfig{}),
 		host:  NewMockHost(nil, nil, 1, "", nil),
@@ -235,7 +236,7 @@ func TestEndBlockHandler(t *testing.T) {
 			require.NoError(t, err)
 			tc.host.db = basedb.WithPrefix([]byte("test_host"))
 			ch := Child{
-				BaseChild: childprovider.NewTestBaseChild(0, childNode, mk, ophosttypes.QueryBridgeResponse{}, nil, nodetypes.NodeConfig{}),
+				BaseChild: childprovider.NewTestBaseChild(0, childNode, mk, opchildtypes.BridgeInfo{}, nil, nodetypes.NodeConfig{}),
 				host:      tc.host,
 				stage:     stage,
 			}

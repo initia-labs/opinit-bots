@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"testing"
 
-	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
+	opchildtypes "github.com/initia-labs/OPinit/x/opchild/types"
 	"github.com/initia-labs/opinit-bots/db"
 	"github.com/initia-labs/opinit-bots/node"
 	nodetypes "github.com/initia-labs/opinit-bots/node/types"
@@ -23,7 +23,7 @@ func TestFinalizeDepositHandler(t *testing.T) {
 	require.NoError(t, err)
 
 	childNode := node.NewTestNode(nodetypes.NodeConfig{}, db.WithPrefix([]byte("test_child")), nil, nil, nil, nil)
-	bridgeInfo := ophosttypes.QueryBridgeResponse{
+	bridgeInfo := opchildtypes.BridgeInfo{
 		BridgeId: 1,
 	}
 

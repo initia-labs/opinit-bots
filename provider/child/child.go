@@ -33,7 +33,7 @@ type BaseChild struct {
 	node *node.Node
 	mk   *merkle.Merkle
 
-	bridgeInfo ophosttypes.QueryBridgeResponse
+	bridgeInfo opchildtypes.BridgeInfo
 
 	initializeTreeFn func(int64) (bool, error)
 
@@ -106,7 +106,7 @@ func (b *BaseChild) Initialize(
 	ctx types.Context,
 	processedHeight int64,
 	startOutputIndex uint64,
-	bridgeInfo ophosttypes.QueryBridgeResponse,
+	bridgeInfo opchildtypes.BridgeInfo,
 	keyringConfig *btypes.KeyringConfig,
 	oracleKeyringConfig *btypes.KeyringConfig,
 	disableDeleteFutureWithdrawals bool,
@@ -234,11 +234,11 @@ func (b BaseChild) HasBroadcaster() bool {
 	return b.node.HasBroadcaster()
 }
 
-func (b *BaseChild) SetBridgeInfo(bridgeInfo ophosttypes.QueryBridgeResponse) {
+func (b *BaseChild) SetBridgeInfo(bridgeInfo opchildtypes.BridgeInfo) {
 	b.bridgeInfo = bridgeInfo
 }
 
-func (b BaseChild) BridgeInfo() ophosttypes.QueryBridgeResponse {
+func (b BaseChild) BridgeInfo() opchildtypes.BridgeInfo {
 	return b.bridgeInfo
 }
 
