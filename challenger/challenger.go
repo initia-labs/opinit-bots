@@ -103,6 +103,8 @@ func (c *Challenger) Initialize(ctx types.Context) error {
 		zap.Duration("submission_interval", bridgeInfo.BridgeConfig.SubmissionInterval),
 	)
 
+	childBridgeInfo.BridgeConfig = bridgeInfo.BridgeConfig
+
 	l1StartHeight, l2StartHeight, startOutputIndex, err := c.getNodeStartHeights(ctx, bridgeInfo.BridgeId)
 	if err != nil {
 		return err
@@ -117,7 +119,7 @@ func (c *Challenger) Initialize(ctx types.Context) error {
 		initialBlockTime = hostInitialBlockTime
 	}
 
-	childInitialBlockTime, err := c.child.Initialize(ctx, l2StartHeight-1, startOutputIndex, c.host, *bridgeInfo, c)
+	childInitialBlockTime, err := c.child.Initialize(ctx, l2StartHeight-1, startOutputIndex, c.host, childBridgeInfo, c)
 	if err != nil {
 		return err
 	}

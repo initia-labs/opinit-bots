@@ -13,13 +13,13 @@ This repository contains the Go implementation of OPinit bots.
 
 Before running OPinit bots, make sure you have the following prerequisites installed:
 
-- Go 1.22.2+
+- Go 1.22.5+
 
 To ensure compatibility with the node version, check the following versions:
 
 | L1 Node | MiniMove | MiniWasm | MiniEVM | Celestia-appd |
 | ------- | -------- | -------- | ------- | ------------- |
-| v0.6.4+ | v0.6.5+  | v0.6.5+  | v0.6.7+ | v3.2.0+       |
+| v0.7.2+ | v0.7.0+  | v0.7.0+  | v0.7.2+ | v3.3.2+       |
 
 ### Build and Configure
 
@@ -94,6 +94,7 @@ Executor node types:
 - host
 - child
 - batch
+- da
 
 Challenger node types: 
 - host

@@ -63,7 +63,7 @@ func (ch *Child) Initialize(
 	processedHeight int64,
 	startOutputIndex uint64,
 	host hostNode,
-	bridgeInfo ophosttypes.QueryBridgeResponse,
+	bridgeInfo opchildtypes.BridgeInfo,
 	challenger challenger,
 ) (time.Time, error) {
 	_, err := ch.BaseChild.Initialize(

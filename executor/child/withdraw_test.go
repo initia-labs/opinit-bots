@@ -6,6 +6,7 @@ import (
 	"time"
 
 	cmtproto "github.com/cometbft/cometbft/proto/tendermint/types"
+	opchildtypes "github.com/initia-labs/OPinit/x/opchild/types"
 	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
 	"github.com/initia-labs/opinit-bots/db"
 	"github.com/initia-labs/opinit-bots/merkle"
@@ -22,7 +23,7 @@ import (
 )
 
 func TestInitiateWithdrawalHandler(t *testing.T) {
-	bridgeInfo := ophosttypes.QueryBridgeResponse{
+	bridgeInfo := opchildtypes.BridgeInfo{
 		BridgeId: 1,
 	}
 
@@ -216,7 +217,7 @@ func TestInitiateWithdrawalHandler(t *testing.T) {
 }
 
 func TestPrepareTree(t *testing.T) {
-	bridgeInfo := ophosttypes.QueryBridgeResponse{
+	bridgeInfo := opchildtypes.BridgeInfo{
 		BridgeId: 1,
 	}
 
@@ -359,7 +360,7 @@ func TestPrepareTree(t *testing.T) {
 func TestPrepareOutput(t *testing.T) {
 	cases := []struct {
 		name            string
-		bridgeInfo      ophosttypes.QueryBridgeResponse
+		bridgeInfo      opchildtypes.BridgeInfo
 		hostOutputs     map[uint64]ophosttypes.Output
 		lastWorkingTree merkletypes.TreeInfo
 		expected        func() (lastOutputTime time.Time, nextOutputTime time.Time, finalizingBlockHeight int64)
@@ -367,7 +368,7 @@ func TestPrepareOutput(t *testing.T) {
 	}{
 		{
 			name: "no output, index 1",
-			bridgeInfo: ophosttypes.QueryBridgeResponse{
+			bridgeInfo: opchildtypes.BridgeInfo{
 				BridgeId: 1,
 				BridgeConfig: ophosttypes.BridgeConfig{
 					SubmissionInterval: 100,
@@ -389,7 +390,7 @@ func TestPrepareOutput(t *testing.T) {
 		},
 		{
 			name: "no output, index 3", // chain rolled back
-			bridgeInfo: ophosttypes.QueryBridgeResponse{
+			bridgeInfo: opchildtypes.BridgeInfo{
 				BridgeId: 1,
 				BridgeConfig: ophosttypes.BridgeConfig{
 					SubmissionInterval: 100,
@@ -411,7 +412,7 @@ func TestPrepareOutput(t *testing.T) {
 		},
 		{
 			name: "outputs {1}, index 1", // sync
-			bridgeInfo: ophosttypes.QueryBridgeResponse{
+			bridgeInfo: opchildtypes.BridgeInfo{
 				BridgeId: 1,
 				BridgeConfig: ophosttypes.BridgeConfig{
 					SubmissionInterval: 100,
@@ -438,7 +439,7 @@ func TestPrepareOutput(t *testing.T) {
 		},
 		{
 			name: "outputs {1}, index 2",
-			bridgeInfo: ophosttypes.QueryBridgeResponse{
+			bridgeInfo: opchildtypes.BridgeInfo{
 				BridgeId: 1,
 				BridgeConfig: ophosttypes.BridgeConfig{
 					SubmissionInterval: 300,
@@ -502,7 +503,7 @@ func TestPrepareOutput(t *testing.T) {
 }
 
 func TestHandleTree(t *testing.T) {
-	bridgeInfo := ophosttypes.QueryBridgeResponse{
+	bridgeInfo := opchildtypes.BridgeInfo{
 		BridgeId: 1,
 		BridgeConfig: ophosttypes.BridgeConfig{
 			SubmissionInterval: 300,
@@ -799,7 +800,7 @@ func TestHandleOutput(t *testing.T) {
 		blockId     []byte
 		outputIndex uint64
 		storageRoot []byte
-		bridgeInfo  ophosttypes.QueryBridgeResponse
+		bridgeInfo  opchildtypes.BridgeInfo
 		host        *mockHost
 		expected    sdk.Msg
 		err         bool
@@ -811,7 +812,7 @@ func TestHandleOutput(t *testing.T) {
 			blockId:     []byte("latestBlockHashlatestBlockHashla"),
 			outputIndex: 1,
 			storageRoot: []byte("storageRootstorageRootstorageRoo"),
-			bridgeInfo:  ophosttypes.QueryBridgeResponse{BridgeId: 1},
+			bridgeInfo:  opchildtypes.BridgeInfo{BridgeId: 1},
 			host:        NewMockHost(nil, nil, 1, "sender0", nil),
 			expected: &ophosttypes.MsgProposeOutput{
 				Proposer:      "sender0",
@@ -829,7 +830,7 @@ func TestHandleOutput(t *testing.T) {
 			blockId:     []byte("latestBlockHashlatestBlockHashla"),
 			outputIndex: 1,
 			storageRoot: []byte("storageRootstorageRootstorageRoo"),
-			bridgeInfo:  ophosttypes.QueryBridgeResponse{BridgeId: 1},
+			bridgeInfo:  opchildtypes.BridgeInfo{BridgeId: 1},
 			host:        NewMockHost(nil, nil, 1, "", nil),
 			expected:    nil,
 			err:         false,

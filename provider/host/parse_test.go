@@ -414,3 +414,119 @@ func TestParseMsgUpdateOracleConfig(t *testing.T) {
 		})
 	}
 }
+
+func TestParseMsgUpdateProposer(t *testing.T) { //nolint
+	fullAttributes := UpdateProposerEvents(1, "proposer", 2, 3)
+
+	cases := []struct {
+		name                   string
+		eventAttrs             []abcitypes.EventAttribute
+		bridgeId               uint64
+		proposer               string
+		finalizedOutputIndex   uint64
+		finalizedL2BlockNumber uint64
+		err                    bool
+	}{
+		{
+			name:                   "success",
+			eventAttrs:             fullAttributes,
+			bridgeId:               1,
+			proposer:               "proposer",
+			finalizedOutputIndex:   2,
+			finalizedL2BlockNumber: 3,
+			err:                    false,
+		},
+		{
+			name:       "missing event attribute bridge id",
+			eventAttrs: fullAttributes[1:],
+			err:        true,
+		},
+		{
+			name:       "missing event attribute proposer",
+			eventAttrs: append(slices.Clone(fullAttributes)[:1], fullAttributes[2:]...),
+			err:        true,
+		},
+		{
+			name:       "missing event attribute finalized output index",
+			eventAttrs: append(slices.Clone(fullAttributes)[:2], fullAttributes[3:]...),
+			err:        true,
+		},
+		{
+			name:       "missing event attribute finalized l2 block number",
+			eventAttrs: fullAttributes[:3],
+			err:        true,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			bridgeId, proposer, finalizedOutputIndex, finalizedL2BlockNumber, err := ParseMsgUpdateProposer(tc.eventAttrs)
+			if tc.err {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+				require.Equal(t, tc.bridgeId, bridgeId)
+				require.Equal(t, tc.proposer, proposer)
+				require.Equal(t, tc.finalizedOutputIndex, finalizedOutputIndex)
+				require.Equal(t, tc.finalizedL2BlockNumber, finalizedL2BlockNumber)
+			}
+		})
+	}
+}
+
+func TestParseMsgUpdateChallenger(t *testing.T) { //nolint
+	fullAttributes := UpdateChallengerEvents(1, "challenger", 2, 3)
+
+	cases := []struct {
+		name                   string
+		eventAttrs             []abcitypes.EventAttribute
+		bridgeId               uint64
+		challenger             string
+		finalizedOutputIndex   uint64
+		finalizedL2BlockNumber uint64
+		err                    bool
+	}{
+		{
+			name:                   "success",
+			eventAttrs:             fullAttributes,
+			bridgeId:               1,
+			challenger:             "challenger",
+			finalizedOutputIndex:   2,
+			finalizedL2BlockNumber: 3,
+			err:                    false,
+		},
+		{
+			name:       "missing event attribute bridge id",
+			eventAttrs: fullAttributes[1:],
+			err:        true,
+		},
+		{
+			name:       "missing event attribute challenger",
+			eventAttrs: append(slices.Clone(fullAttributes)[:1], fullAttributes[2:]...),
+			err:        true,
+		},
+		{
+			name:       "missing event attribute finalized output index",
+			eventAttrs: append(slices.Clone(fullAttributes)[:2], fullAttributes[3:]...),
+			err:        true,
+		},
+		{
+			name:       "missing event attribute finalized l2 block number",
+			eventAttrs: fullAttributes[:3],
+			err:        true,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			bridgeId, challenger, finalizedOutputIndex, finalizedL2BlockNumber, err := ParseMsgUpdateChallenger(tc.eventAttrs)
+			if tc.err {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+				require.Equal(t, tc.bridgeId, bridgeId)
+				require.Equal(t, tc.challenger, challenger)
+				require.Equal(t, tc.finalizedOutputIndex, finalizedOutputIndex)
+				require.Equal(t, tc.finalizedL2BlockNumber, finalizedL2BlockNumber)
+			}
+		})
+	}
+}

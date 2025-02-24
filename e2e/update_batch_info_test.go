@@ -16,7 +16,7 @@ import (
 func TestUpdateBatchInfo(t *testing.T) {
 	l1ChainConfig := &ChainConfig{
 		ChainID:        "initiation-2",
-		Image:          ibc.DockerImage{Repository: "ghcr.io/initia-labs/initiad", Version: "v0.6.4", UIDGID: "1000:1000"},
+		Image:          ibc.DockerImage{Repository: "ghcr.io/initia-labs/initiad", Version: "v0.7.2", UIDGID: "1000:1000"},
 		Bin:            "initiad",
 		Bech32Prefix:   "init",
 		Denom:          "uinit",
@@ -30,7 +30,7 @@ func TestUpdateBatchInfo(t *testing.T) {
 
 	l2ChainConfig := &ChainConfig{
 		ChainID:        "minimove-2",
-		Image:          ibc.DockerImage{Repository: "ghcr.io/initia-labs/minimove", Version: "v0.6.5", UIDGID: "1000:1000"},
+		Image:          ibc.DockerImage{Repository: "ghcr.io/initia-labs/minimove", Version: "v0.7.0-1", UIDGID: "1000:1000"},
 		Bin:            "minitiad",
 		Bech32Prefix:   "init",
 		Denom:          "umin",
@@ -53,7 +53,7 @@ func TestUpdateBatchInfo(t *testing.T) {
 	daChainConfig := &DAChainConfig{
 		ChainConfig: ChainConfig{
 			ChainID:        "celestia",
-			Image:          ibc.DockerImage{Repository: "ghcr.io/celestiaorg/celestia-app", Version: "v3.2.0", UIDGID: "10001:10001"},
+			Image:          ibc.DockerImage{Repository: "ghcr.io/celestiaorg/celestia-app", Version: "v3.3.1", UIDGID: "10001:10001"},
 			Bin:            "celestia-appd",
 			Bech32Prefix:   "celestia",
 			Denom:          "utia",
@@ -89,10 +89,6 @@ func TestUpdateBatchInfo(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	// should change executor config before update
-	_, err = op.OP.UpdateBatchInfo(ctx, newDaChainConfig.ChainType.String(), newDAChain.BatchSubmitter.FormattedAddress())
-	require.Error(t, err)
-
 	oldDAChain := op.ChangeDA(t, ctx, newDAChain)
 	err = op.OP.Pause(ctx)
 	require.NoError(t, err)
@@ -117,6 +113,11 @@ func TestUpdateBatchInfo(t *testing.T) {
 	require.NoError(t, err)
 	err = op.OP.Stop(ctx)
 	require.NoError(t, err)
+
+	bridgeInfo, err := op.Minitia.QueryBridgeInfo(ctx)
+	require.NoError(t, err)
+	require.Equal(t, bridgeInfo.BridgeInfo.BridgeConfig.BatchInfo.Submitter, newDAChain.BatchSubmitter.FormattedAddress())
+	require.Equal(t, bridgeInfo.BridgeInfo.BridgeConfig.BatchInfo.ChainType.String(), newDaChainConfig.ChainType.String())
 
 	oldDABatchData, err := oldDAChain.QueryBatchData(ctx)
 	require.NoError(t, err)
@@ -159,4 +160,10 @@ func TestUpdateBatchInfo(t *testing.T) {
 	newBatches, err = op.DA.QueryBatchData(ctx)
 	require.NoError(t, err)
 	require.Greater(t, len(newBatches), len(oldDABatchData))
+
+	bridgeInfo, err = op.Minitia.QueryBridgeInfo(ctx)
+	require.NoError(t, err)
+
+	require.Equal(t, bridgeInfo.BridgeInfo.BridgeConfig.BatchInfo.Submitter, oldDAChain.BatchSubmitter.FormattedAddress())
+	require.Equal(t, bridgeInfo.BridgeInfo.BridgeConfig.BatchInfo.ChainType.String(), oldDAChain.ChainType.String())
 }

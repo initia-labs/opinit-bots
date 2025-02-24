@@ -89,6 +89,8 @@ func (ex *Executor) Initialize(ctx types.Context) error {
 		zap.Duration("submission_interval", bridgeInfo.BridgeConfig.SubmissionInterval),
 	)
 
+	childBridgeInfo.BridgeConfig = bridgeInfo.BridgeConfig
+
 	l1StartHeight, l2StartHeight, startOutputIndex, batchStartHeight, err := ex.getNodeStartHeights(ctx, bridgeInfo.BridgeId)
 	if err != nil {
 		return errors.Wrap(err, "failed to get processed heights")
@@ -100,7 +102,7 @@ func (ex *Executor) Initialize(ctx types.Context) error {
 	if err != nil {
 		return errors.Wrap(err, "failed to initialize host")
 	}
-	err = ex.child.Initialize(ctx, l2StartHeight-1, startOutputIndex, ex.host, *bridgeInfo, childKeyringConfig, childOracleKeyringConfig, ex.cfg.DisableDeleteFutureWithdrawal)
+	err = ex.child.Initialize(ctx, l2StartHeight-1, startOutputIndex, ex.host, childBridgeInfo, childKeyringConfig, childOracleKeyringConfig, ex.cfg.DisableDeleteFutureWithdrawal)
 	if err != nil {
 		return errors.Wrap(err, "failed to initialize child")
 	}
