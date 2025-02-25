@@ -27,6 +27,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 
+	cmttypes "github.com/cometbft/cometbft/types"
 	"github.com/cosmos/cosmos-sdk/client/tx"
 	cdctypes "github.com/cosmos/cosmos-sdk/codec/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -101,6 +102,13 @@ func TestRawBlockHandler(t *testing.T) {
 	}
 
 	mockCaller.SetRawCommit(1, []byte("commit_bytes"))
+	genesisDoc := cmttypes.GenesisDoc{
+		GenesisTime:   time.Unix(0, 1).UTC(),
+		ChainID:       "test_chain",
+		InitialHeight: 1,
+	}
+
+	mockCaller.SetGenesisDoc(genesisDoc)
 	authzMsg := createAuthzMsg(t, "init1z3689ct7pc72yr5an97nsj89dnlefydxwdhcv0", []sdk.Msg{&opchildtypes.MsgUpdateOracle{Sender: "init1hrasklz3tr6s9rls4r8fjuf0k4zuha6w9rude5", Data: []byte("oracle_data2"), Height: 4}})
 	txf := tx.Factory{}.WithChainID("test_chain").WithTxConfig(txConfig)
 	pbb := &cmtproto.Block{
@@ -137,7 +145,109 @@ func TestRawBlockHandler(t *testing.T) {
 		BlockBytes:   blockBytes,
 	})
 	require.NoError(t, err)
-	require.Len(t, mockDA.processedMsgs, 0)
+	// {"genesis_time":"1970-01-01T00:00:00.000000001Z","chain_id":"test_chain","initial_height":1,"app_hash":""}
+	// length: 106
+	require.Len(t, mockDA.processedMsgs, 11)
+
+	require.Equal(
+		t,
+		mockDA.processedMsgs[0].Msgs[0].(*ophosttypes.MsgRecordBatch).BatchBytes,
+		append([]byte{
+			uint8(executortypes.BatchDataTypeGenesis),
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0b,
+		}, []byte("{\"genesis_")...),
+	)
+	require.Equal(
+		t,
+		mockDA.processedMsgs[1].Msgs[0].(*ophosttypes.MsgRecordBatch).BatchBytes,
+		append([]byte{
+			uint8(executortypes.BatchDataTypeGenesis),
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01,
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0b,
+		}, []byte("time\":\"197")...),
+	)
+	require.Equal(
+		t,
+		mockDA.processedMsgs[2].Msgs[0].(*ophosttypes.MsgRecordBatch).BatchBytes,
+		append([]byte{
+			uint8(executortypes.BatchDataTypeGenesis),
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02,
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0b,
+		}, []byte("0-01-01T00")...),
+	)
+	require.Equal(
+		t,
+		mockDA.processedMsgs[3].Msgs[0].(*ophosttypes.MsgRecordBatch).BatchBytes,
+		append([]byte{
+			uint8(executortypes.BatchDataTypeGenesis),
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03,
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0b,
+		}, []byte(":00:00.000")...),
+	)
+	require.Equal(
+		t,
+		mockDA.processedMsgs[4].Msgs[0].(*ophosttypes.MsgRecordBatch).BatchBytes,
+		append([]byte{
+			uint8(executortypes.BatchDataTypeGenesis),
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x04,
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0b,
+		}, []byte("000001Z\",\"")...),
+	)
+	require.Equal(
+		t,
+		mockDA.processedMsgs[5].Msgs[0].(*ophosttypes.MsgRecordBatch).BatchBytes,
+		append([]byte{
+			uint8(executortypes.BatchDataTypeGenesis),
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x05,
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0b,
+		}, []byte("chain_id\":")...),
+	)
+	require.Equal(
+		t,
+		mockDA.processedMsgs[6].Msgs[0].(*ophosttypes.MsgRecordBatch).BatchBytes,
+		append([]byte{
+			uint8(executortypes.BatchDataTypeGenesis),
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x06,
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0b,
+		}, []byte("\"test_chai")...),
+	)
+	require.Equal(
+		t,
+		mockDA.processedMsgs[7].Msgs[0].(*ophosttypes.MsgRecordBatch).BatchBytes,
+		append([]byte{
+			uint8(executortypes.BatchDataTypeGenesis),
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x07,
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0b,
+		}, []byte("n\",\"initia")...),
+	)
+	require.Equal(
+		t,
+		mockDA.processedMsgs[8].Msgs[0].(*ophosttypes.MsgRecordBatch).BatchBytes,
+		append([]byte{
+			uint8(executortypes.BatchDataTypeGenesis),
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x08,
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0b,
+		}, []byte("l_height\":")...),
+	)
+	require.Equal(
+		t,
+		mockDA.processedMsgs[9].Msgs[0].(*ophosttypes.MsgRecordBatch).BatchBytes,
+		append([]byte{
+			uint8(executortypes.BatchDataTypeGenesis),
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x09,
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0b,
+		}, []byte("1,\"app_has")...),
+	)
+	require.Equal(
+		t,
+		mockDA.processedMsgs[10].Msgs[0].(*ophosttypes.MsgRecordBatch).BatchBytes,
+		append([]byte{
+			uint8(executortypes.BatchDataTypeGenesis),
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0a,
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0b,
+		}, []byte("h\":\"\"}")...),
+	)
 
 	syncedHeight, err := node.GetSyncInfo(batchDB)
 	require.NoError(t, err)

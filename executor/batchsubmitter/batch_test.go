@@ -45,7 +45,7 @@ func TestPrepareBatch(t *testing.T) {
 		{
 			name: "not finalized batch info",
 			existingLocalBatchInfo: executortypes.LocalBatchInfo{
-				Start:              1,
+				Start:              2,
 				End:                0,
 				LastSubmissionTime: time.Time{},
 				BatchSize:          100,
@@ -60,7 +60,7 @@ func TestPrepareBatch(t *testing.T) {
 			},
 			blockHeight: 110,
 			expectedLocalBatchInfo: executortypes.LocalBatchInfo{
-				Start:              1,
+				Start:              2,
 				End:                0,
 				LastSubmissionTime: time.Time{},
 				BatchSize:          100,

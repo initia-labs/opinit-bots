@@ -80,3 +80,22 @@ func TestBatchDataChunk(t *testing.T) {
 	require.Equal(t, length, chunk.Length)
 	require.Equal(t, chunkData, chunk.ChunkData)
 }
+
+func TestGenesisChunk(t *testing.T) {
+	index := uint64(0)
+	length := uint64(100)
+	chunkData := []byte("genesis chunk")
+
+	genesisData := MarshalGenesisChunk(
+		index,
+		length,
+		chunkData)
+	require.Equal(t, 1+8+8+13, len(genesisData))
+
+	genesis, err := UnmarshalGenesisChunk(genesisData)
+	require.NoError(t, err)
+
+	require.Equal(t, index, genesis.Index)
+	require.Equal(t, length, genesis.Length)
+	require.Equal(t, chunkData, genesis.ChunkData)
+}

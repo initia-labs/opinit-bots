@@ -78,6 +78,7 @@ type BatchDataType uint8
 const (
 	BatchDataTypeHeader BatchDataType = iota
 	BatchDataTypeChunk
+	BatchDataTypeGenesis
 )
 
 type BatchDataHeader struct {
@@ -89,6 +90,12 @@ type BatchDataHeader struct {
 type BatchDataChunk struct {
 	Start     uint64
 	End       uint64
+	Index     uint64
+	Length    uint64
+	ChunkData []byte
+}
+
+type BatchDataGenesis struct {
 	Index     uint64
 	Length    uint64
 	ChunkData []byte
@@ -182,6 +189,35 @@ func UnmarshalBatchDataChunk(data []byte) (BatchDataChunk, error) {
 	return BatchDataChunk{
 		Start:     start,
 		End:       end,
+		Index:     index,
+		Length:    length,
+		ChunkData: chunkData,
+	}, nil
+}
+
+func MarshalGenesisChunk(
+	index uint64,
+	length uint64,
+	chunkData []byte,
+) []byte {
+	data := make([]byte, 1)
+	data[0] = byte(BatchDataTypeGenesis)
+	data = binary.BigEndian.AppendUint64(data, index)
+	data = binary.BigEndian.AppendUint64(data, length)
+	data = append(data, chunkData...)
+	return data
+}
+
+func UnmarshalGenesisChunk(data []byte) (BatchDataGenesis, error) {
+	if len(data) < 17 {
+		err := fmt.Errorf("invalid data length: %d, expected > 17", len(data))
+		return BatchDataGenesis{}, err
+	}
+	index := binary.BigEndian.Uint64(data[1:9])
+	length := binary.BigEndian.Uint64(data[9:17])
+	chunkData := data[17:]
+
+	return BatchDataGenesis{
 		Index:     index,
 		Length:    length,
 		ChunkData: chunkData,
