@@ -6,6 +6,7 @@ import (
 
 	ctypes "github.com/cometbft/cometbft/rpc/core/types"
 	jsonrpcclient "github.com/cometbft/cometbft/rpc/jsonrpc/client"
+	cmttypes "github.com/cometbft/cometbft/types"
 	clienttypes "github.com/initia-labs/opinit-bots/client/types"
 )
 
@@ -13,6 +14,7 @@ type MockCaller struct {
 	latestHeight int64
 	resultStatus ctypes.ResultStatus
 	rawCommits   map[int64][]byte
+	genesisDoc   cmttypes.GenesisDoc
 }
 
 func NewMockCaller() *MockCaller {
@@ -29,6 +31,8 @@ func (m *MockCaller) Call(ctx context.Context, method string, params map[string]
 		return m.status(params, result.(*ctypes.ResultStatus))
 	case "raw_commit":
 		return m.rawCommit(params, result.(*clienttypes.ResultRawCommit))
+	case "genesis":
+		return m.genesis(params, result.(*ctypes.ResultGenesis))
 	}
 	return nil, errors.New("not supported method")
 }
@@ -50,6 +54,10 @@ func (m *MockCaller) SetRawCommit(height int64, commitBytes []byte) {
 	m.rawCommits[height] = commitBytes
 }
 
+func (m *MockCaller) SetGenesisDoc(genesisDoc cmttypes.GenesisDoc) {
+	m.genesisDoc = genesisDoc
+}
+
 func (m *MockCaller) rawCommit(params map[string]interface{}, result *clienttypes.ResultRawCommit) (interface{}, error) {
 	h := params["height"].(*int64)
 	height := m.latestHeight
@@ -63,6 +71,13 @@ func (m *MockCaller) rawCommit(params map[string]interface{}, result *clienttype
 	}
 	*result = clienttypes.ResultRawCommit{
 		Commit: commitBytes,
+	}
+	return nil, nil
+}
+
+func (m *MockCaller) genesis(_ map[string]interface{}, result *ctypes.ResultGenesis) (interface{}, error) {
+	*result = ctypes.ResultGenesis{
+		Genesis: &m.genesisDoc,
 	}
 	return nil, nil
 }

@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"encoding/binary"
+	"encoding/json"
 	"io"
 
 	authzv1beta1 "cosmossdk.io/api/cosmos/authz/v1beta1"
@@ -116,18 +117,26 @@ func TestBatchReconstruction(t *testing.T) {
 			err := testutil.WaitForBlocks(ctx, 20, op.Initia, op.Minitia)
 			require.NoError(t, err)
 
+			genesisRes, err := op.Minitia.GetFullNode().Client.Genesis(ctx)
+			require.NoError(t, err)
+
 			batches, err := op.DA.QueryBatchData(ctx)
 			require.NoError(t, err)
+
+			genesisChecker := false
 
 			var header executortypes.BatchDataHeader
 			var chunks []executortypes.BatchDataChunk
 			var blockBytes []byte
+			var genesisChunks []executortypes.BatchDataGenesis
+			var genesisBz []byte
 
 			for _, batch := range batches {
-				if batch[0] == byte(executortypes.BatchDataTypeHeader) {
+				switch executortypes.BatchDataType(batch[0]) {
+				case executortypes.BatchDataTypeHeader:
 					header, err = executortypes.UnmarshalBatchDataHeader(batch)
 					require.NoError(t, err)
-				} else {
+				case executortypes.BatchDataTypeChunk:
 					chunk, err := executortypes.UnmarshalBatchDataChunk(batch)
 					require.NoError(t, err)
 					chunks = append(chunks, chunk)
@@ -135,9 +144,29 @@ func TestBatchReconstruction(t *testing.T) {
 					require.Equal(t, header.Start, chunk.Start)
 					require.Equal(t, header.End, chunk.End)
 					require.Equal(t, len(header.Checksums), int(chunk.Length))
+				case executortypes.BatchDataTypeGenesis:
+					if genesisChecker {
+						require.Fail(t, "genesis already found")
+					}
+
+					genesisChunk, err := executortypes.UnmarshalBatchDataGenesis(batch)
+					require.NoError(t, err)
+					genesisChunks = append(genesisChunks, genesisChunk)
+
+					require.Equal(t, len(genesisChunks)-1, int(genesisChunk.Index))
+					genesisBz = append(genesisBz, genesisChunk.ChunkData...)
+				default:
+					require.Fail(t, "unknown batch data type")
 				}
 
-				if len(header.Checksums) == len(chunks) {
+				if !genesisChecker && len(genesisChunks) == int(genesisChunks[0].Length) {
+					expectedBz, err := json.Marshal(genesisRes.Genesis)
+					require.NoError(t, err)
+					require.Equal(t, expectedBz, genesisBz)
+					genesisChecker = true
+				}
+
+				if genesisChecker && len(header.Checksums) > 0 && len(header.Checksums) == len(chunks) {
 					for i, chunk := range chunks {
 						require.Equal(t, i, int(chunk.Index))
 
