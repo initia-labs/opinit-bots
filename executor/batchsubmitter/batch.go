@@ -292,7 +292,7 @@ func (bs *BatchSubmitter) submitGenesis(ctx types.Context) error {
 			break
 		}
 
-		chunkData := executortypes.MarshalGenesisChunk(
+		chunkData := executortypes.MarshalBatchDataGenesis(
 			types.MustInt64ToUint64(int64(i)),
 			types.MustInt64ToUint64(int64(chunkLength)),
 			chunk,
@@ -309,5 +309,9 @@ func (bs *BatchSubmitter) submitGenesis(ctx types.Context) error {
 			})
 		}
 	}
+	ctx.Logger().Info("submit genesis",
+		zap.Int("genesis size", len(genesisBz)),
+		zap.Int("chunk length", chunkLength),
+	)
 	return nil
 }

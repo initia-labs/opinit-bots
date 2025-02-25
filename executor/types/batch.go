@@ -195,7 +195,7 @@ func UnmarshalBatchDataChunk(data []byte) (BatchDataChunk, error) {
 	}, nil
 }
 
-func MarshalGenesisChunk(
+func MarshalBatchDataGenesis(
 	index uint64,
 	length uint64,
 	chunkData []byte,
@@ -208,7 +208,7 @@ func MarshalGenesisChunk(
 	return data
 }
 
-func UnmarshalGenesisChunk(data []byte) (BatchDataGenesis, error) {
+func UnmarshalBatchDataGenesis(data []byte) (BatchDataGenesis, error) {
 	if len(data) < 17 {
 		err := fmt.Errorf("invalid data length: %d, expected > 17", len(data))
 		return BatchDataGenesis{}, err

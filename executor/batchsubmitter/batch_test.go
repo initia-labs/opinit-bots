@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	cmttypes "github.com/cometbft/cometbft/types"
 	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
 	client "github.com/initia-labs/opinit-bots/client"
 	mockclient "github.com/initia-labs/opinit-bots/client/mock"
@@ -739,4 +740,266 @@ func TestPrependLength(t *testing.T) {
 	lengthPrefixed := prependLength(batchBytes)
 
 	require.Equal(t, append([]byte{0x0b, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}, batchBytes...), lengthPrefixed)
+}
+
+func TestSubmitGenesis(t *testing.T) {
+	baseDB, err := db.NewMemDB()
+	require.NoError(t, err)
+
+	batchDB := baseDB.WithPrefix([]byte("test_batch"))
+	daDB := baseDB.WithPrefix([]byte("test_da"))
+
+	appCodec, txConfig, err := childprovider.GetCodec("init")
+	require.NoError(t, err)
+
+	mockCaller := mockclient.NewMockCaller()
+	rpcClient := rpcclient.NewRPCClientWithClient(appCodec, client.NewWithCaller(mockCaller))
+	batchNode := node.NewTestNode(nodetypes.NodeConfig{}, batchDB, appCodec, txConfig, rpcClient, nil)
+
+	hostCdc, _, err := hostprovider.GetCodec("init")
+	require.NoError(t, err)
+
+	mockDA := NewMockDA(daDB, hostCdc, 1, "init1z3689ct7pc72yr5an97nsj89dnlefydxwdhcv0")
+
+	batchConfig := executortypes.BatchConfig{
+		MaxChunks:    100,
+		MaxChunkSize: 10,
+	}
+
+	batchSubmitter := BatchSubmitter{
+		node:     batchNode,
+		da:       mockDA,
+		batchCfg: batchConfig,
+		localBatchInfo: &executortypes.LocalBatchInfo{
+			Start: 1,
+			End:   0,
+		},
+		processedMsgs: make([]btypes.ProcessedMsgs, 0),
+	}
+	batchSubmitter.batchFile, err = os.CreateTemp("", "batchfile")
+	require.NoError(t, err)
+	defer os.Remove(batchSubmitter.batchFile.Name())
+
+	batchSubmitter.batchWriter, err = gzip.NewWriterLevel(batchSubmitter.batchFile, 6)
+	require.NoError(t, err)
+	defer batchSubmitter.batchWriter.Close()
+
+	mockCaller.SetRawCommit(10, []byte("commit_bytes"))
+	genesisDoc := cmttypes.GenesisDoc{
+		GenesisTime:   time.Unix(0, 1).UTC(),
+		ChainID:       "test_chain",
+		InitialHeight: 1,
+	}
+	mockCaller.SetGenesisDoc(genesisDoc)
+
+	logger, observedLogs := logCapturer()
+	ctx := types.NewContext(context.TODO(), logger, "")
+
+	mockCount := int64(0)
+	mockTimestampFetcher := func() int64 {
+		mockCount++
+		return mockCount
+	}
+	types.CurrentNanoTimestamp = mockTimestampFetcher
+
+	err = batchSubmitter.submitGenesis(ctx)
+	require.NoError(t, err)
+
+	logs := observedLogs.TakeAll()
+	require.Len(t, logs, 1)
+
+	require.Equal(t, "submit genesis", logs[0].Message)
+	require.Equal(t, []zapcore.Field{
+		zap.Int("genesis size", 106),
+		zap.Int("chunk length", 11),
+	}, logs[0].Context)
+
+	require.Len(t, batchSubmitter.processedMsgs, 11)
+
+	require.Equal(t, btypes.ProcessedMsgs{
+		Sender: "init1z3689ct7pc72yr5an97nsj89dnlefydxwdhcv0",
+		Msgs: []sdk.Msg{
+			&ophosttypes.MsgRecordBatch{
+				Submitter: "init1z3689ct7pc72yr5an97nsj89dnlefydxwdhcv0",
+				BridgeId:  1,
+				BatchBytes: append([]byte{
+					uint8(executortypes.BatchDataTypeGenesis),
+					0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+					0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0b,
+				}, []byte("{\"genesis_")...),
+			},
+		},
+		Timestamp: 1,
+		Save:      true,
+	}, batchSubmitter.processedMsgs[0])
+
+	require.Equal(t, btypes.ProcessedMsgs{
+		Sender: "init1z3689ct7pc72yr5an97nsj89dnlefydxwdhcv0",
+		Msgs: []sdk.Msg{
+			&ophosttypes.MsgRecordBatch{
+				Submitter: "init1z3689ct7pc72yr5an97nsj89dnlefydxwdhcv0",
+				BridgeId:  1,
+				BatchBytes: append([]byte{
+					uint8(executortypes.BatchDataTypeGenesis),
+					0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01,
+					0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0b,
+				}, []byte("time\":\"197")...),
+			},
+		},
+		Timestamp: 2,
+		Save:      true,
+	}, batchSubmitter.processedMsgs[1])
+
+	require.Equal(t, btypes.ProcessedMsgs{
+		Sender: "init1z3689ct7pc72yr5an97nsj89dnlefydxwdhcv0",
+		Msgs: []sdk.Msg{
+			&ophosttypes.MsgRecordBatch{
+				Submitter: "init1z3689ct7pc72yr5an97nsj89dnlefydxwdhcv0",
+				BridgeId:  1,
+				BatchBytes: append([]byte{
+					uint8(executortypes.BatchDataTypeGenesis),
+					0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02,
+					0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0b,
+				}, []byte("0-01-01T00")...),
+			},
+		},
+		Timestamp: 3,
+		Save:      true,
+	}, batchSubmitter.processedMsgs[2])
+
+	require.Equal(t, btypes.ProcessedMsgs{
+		Sender: "init1z3689ct7pc72yr5an97nsj89dnlefydxwdhcv0",
+		Msgs: []sdk.Msg{
+			&ophosttypes.MsgRecordBatch{
+				Submitter: "init1z3689ct7pc72yr5an97nsj89dnlefydxwdhcv0",
+				BridgeId:  1,
+				BatchBytes: append([]byte{
+					uint8(executortypes.BatchDataTypeGenesis),
+					0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03,
+					0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0b,
+				}, []byte(":00:00.000")...),
+			},
+		},
+		Timestamp: 4,
+		Save:      true,
+	}, batchSubmitter.processedMsgs[3])
+
+	require.Equal(t, btypes.ProcessedMsgs{
+		Sender: "init1z3689ct7pc72yr5an97nsj89dnlefydxwdhcv0",
+		Msgs: []sdk.Msg{
+			&ophosttypes.MsgRecordBatch{
+				Submitter: "init1z3689ct7pc72yr5an97nsj89dnlefydxwdhcv0",
+				BridgeId:  1,
+				BatchBytes: append([]byte{
+					uint8(executortypes.BatchDataTypeGenesis),
+					0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x04,
+					0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0b,
+				}, []byte("000001Z\",\"")...),
+			},
+		},
+		Timestamp: 5,
+		Save:      true,
+	}, batchSubmitter.processedMsgs[4])
+
+	require.Equal(t, btypes.ProcessedMsgs{
+		Sender: "init1z3689ct7pc72yr5an97nsj89dnlefydxwdhcv0",
+		Msgs: []sdk.Msg{
+			&ophosttypes.MsgRecordBatch{
+				Submitter: "init1z3689ct7pc72yr5an97nsj89dnlefydxwdhcv0",
+				BridgeId:  1,
+				BatchBytes: append([]byte{
+					uint8(executortypes.BatchDataTypeGenesis),
+					0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x05,
+					0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0b,
+				}, []byte("chain_id\":")...),
+			},
+		},
+		Timestamp: 6,
+		Save:      true,
+	}, batchSubmitter.processedMsgs[5])
+
+	require.Equal(t, btypes.ProcessedMsgs{
+		Sender: "init1z3689ct7pc72yr5an97nsj89dnlefydxwdhcv0",
+		Msgs: []sdk.Msg{
+			&ophosttypes.MsgRecordBatch{
+				Submitter: "init1z3689ct7pc72yr5an97nsj89dnlefydxwdhcv0",
+				BridgeId:  1,
+				BatchBytes: append([]byte{
+					uint8(executortypes.BatchDataTypeGenesis),
+					0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x06,
+					0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0b,
+				}, []byte("\"test_chai")...),
+			},
+		},
+		Timestamp: 7,
+		Save:      true,
+	}, batchSubmitter.processedMsgs[6])
+
+	require.Equal(t, btypes.ProcessedMsgs{
+		Sender: "init1z3689ct7pc72yr5an97nsj89dnlefydxwdhcv0",
+		Msgs: []sdk.Msg{
+			&ophosttypes.MsgRecordBatch{
+				Submitter: "init1z3689ct7pc72yr5an97nsj89dnlefydxwdhcv0",
+				BridgeId:  1,
+				BatchBytes: append([]byte{
+					uint8(executortypes.BatchDataTypeGenesis),
+					0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x07,
+					0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0b,
+				}, []byte("n\",\"initia")...),
+			},
+		},
+		Timestamp: 8,
+		Save:      true,
+	}, batchSubmitter.processedMsgs[7])
+
+	require.Equal(t, btypes.ProcessedMsgs{
+		Sender: "init1z3689ct7pc72yr5an97nsj89dnlefydxwdhcv0",
+		Msgs: []sdk.Msg{
+			&ophosttypes.MsgRecordBatch{
+				Submitter: "init1z3689ct7pc72yr5an97nsj89dnlefydxwdhcv0",
+				BridgeId:  1,
+				BatchBytes: append([]byte{
+					uint8(executortypes.BatchDataTypeGenesis),
+					0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x08,
+					0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0b,
+				}, []byte("l_height\":")...),
+			},
+		},
+		Timestamp: 9,
+		Save:      true,
+	}, batchSubmitter.processedMsgs[8])
+
+	require.Equal(t, btypes.ProcessedMsgs{
+		Sender: "init1z3689ct7pc72yr5an97nsj89dnlefydxwdhcv0",
+		Msgs: []sdk.Msg{
+			&ophosttypes.MsgRecordBatch{
+				Submitter: "init1z3689ct7pc72yr5an97nsj89dnlefydxwdhcv0",
+				BridgeId:  1,
+				BatchBytes: append([]byte{
+					uint8(executortypes.BatchDataTypeGenesis),
+					0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x09,
+					0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0b,
+				}, []byte("1,\"app_has")...),
+			},
+		},
+		Timestamp: 10,
+		Save:      true,
+	}, batchSubmitter.processedMsgs[9])
+
+	require.Equal(t, btypes.ProcessedMsgs{
+		Sender: "init1z3689ct7pc72yr5an97nsj89dnlefydxwdhcv0",
+		Msgs: []sdk.Msg{
+			&ophosttypes.MsgRecordBatch{
+				Submitter: "init1z3689ct7pc72yr5an97nsj89dnlefydxwdhcv0",
+				BridgeId:  1,
+				BatchBytes: append([]byte{
+					uint8(executortypes.BatchDataTypeGenesis),
+					0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0a,
+					0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0b,
+				}, []byte("h\":\"\"}")...),
+			},
+		},
+		Timestamp: 11,
+		Save:      true,
+	}, batchSubmitter.processedMsgs[10])
 }
