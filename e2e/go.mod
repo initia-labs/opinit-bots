@@ -21,6 +21,7 @@ require (
 	github.com/andybalholm/brotli v1.0.5 // indirect
 	github.com/celestiaorg/go-square/v2 v2.0.0 // indirect
 	github.com/celestiaorg/nmt v0.22.1 // indirect
+	github.com/certifi/gocertifi v0.0.0-20210507211836-431795d63e8d // indirect
 	github.com/containerd/containerd v1.7.24 // indirect
 	github.com/cosmos/interchain-security/v5 v5.1.1 // indirect
 	github.com/cosmos/interchain-security/v6 v6.1.0 // indirect

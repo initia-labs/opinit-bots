@@ -56,6 +56,13 @@ func (bs *BatchSubmitter) rawBlockHandler(ctx types.Context, args nodetypes.RawB
 	}
 	bs.localBatchInfo.BatchSize = fileSize
 
+	if args.BlockHeight == 1 {
+		err := bs.submitGenesis(ctx)
+		if err != nil {
+			return errors.Wrap(err, "failed to handle genesis")
+		}
+	}
+
 	if bs.checkBatch(args.BlockHeight, args.LatestHeight, pbb.Header.Time) {
 		// finalize the batch
 		bs.LastBatchEndBlockNumber = args.BlockHeight

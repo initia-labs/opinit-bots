@@ -3,6 +3,7 @@ package batchsubmitter
 import (
 	"bytes"
 	"encoding/binary"
+	"encoding/json"
 	"fmt"
 	"io"
 	"time"
@@ -266,4 +267,51 @@ func prependLength(data []byte) []byte {
 	lengthBytes := make([]byte, 8)
 	binary.LittleEndian.PutUint64(lengthBytes, uint64(len(data)))
 	return append(lengthBytes, data...)
+}
+
+func (bs *BatchSubmitter) submitGenesis(ctx types.Context) error {
+	res, err := bs.node.GetRPCClient().Genesis(ctx)
+	if err != nil {
+		return errors.Wrap(err, "failed to query genesis")
+	}
+
+	genesisBz, err := json.Marshal(res.Genesis)
+	if err != nil {
+		return errors.Wrap(err, "failed to marshal genesis")
+	}
+
+	chunkLength := (len(genesisBz) + int(bs.batchCfg.MaxChunkSize) - 1) / int(bs.batchCfg.MaxChunkSize)
+	for i := 0; i < chunkLength; i++ {
+		start := i * int(bs.batchCfg.MaxChunkSize)
+		end := start + int(bs.batchCfg.MaxChunkSize)
+		if end > len(genesisBz) {
+			end = len(genesisBz)
+		}
+		chunk := genesisBz[start:end]
+		if len(chunk) == 0 {
+			break
+		}
+
+		chunkData := executortypes.MarshalBatchDataGenesis(
+			types.MustInt64ToUint64(int64(i)),
+			types.MustInt64ToUint64(int64(chunkLength)),
+			chunk,
+		)
+		msg, sender, err := bs.da.CreateBatchMsg(chunkData)
+		if err != nil {
+			return errors.Wrap(err, "failed to create batch msg")
+		} else if msg != nil {
+			bs.processedMsgs = append(bs.processedMsgs, btypes.ProcessedMsgs{
+				Sender:    sender,
+				Msgs:      []sdk.Msg{msg},
+				Timestamp: types.CurrentNanoTimestamp(),
+				Save:      true,
+			})
+		}
+	}
+	ctx.Logger().Info("submit genesis",
+		zap.Int("genesis size", len(genesisBz)),
+		zap.Int("chunk length", chunkLength),
+	)
+	return nil
 }
