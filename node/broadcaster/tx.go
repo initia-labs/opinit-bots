@@ -35,6 +35,8 @@ var sentryCapturedErrors = []error{
 	sdkerrors.ErrInsufficientFunds,
 }
 
+var ErrAccountSequenceMismatch = errors.New("account sequence mismatch")
+
 // handleMsgError handles error when processing messages.
 // If there is an error known to be ignored, it will be ignored.
 func (b *Broadcaster) handleMsgError(ctx types.Context, err error, broadcasterAccount *BroadcasterAccount) error {
@@ -52,7 +54,8 @@ func (b *Broadcaster) handleMsgError(ctx types.Context, err error, broadcasterAc
 		if expected > got {
 			broadcasterAccount.UpdateSequence(expected)
 		}
-		return err
+
+		return errors.Wrapf(ErrAccountSequenceMismatch, "expected %d, got %d", expected, got)
 	}
 
 	if strs := outputIndexRegex.FindStringSubmatch(err.Error()); strs != nil {
