@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"math"
 	"time"
 
 	"github.com/pkg/errors"
@@ -281,13 +280,14 @@ func (bs *BatchSubmitter) submitGenesis(ctx types.Context) error {
 		return errors.Wrap(err, "failed to marshal genesis")
 	}
 
-	chunkLength := int(math.Ceil(float64(len(genesisBz)) / float64(bs.batchCfg.MaxChunkSize)))
+	chunkLength := (len(genesisBz) + int(bs.batchCfg.MaxChunkSize) - 1) / int(bs.batchCfg.MaxChunkSize)
 	for i := 0; i < chunkLength; i++ {
-		endChunk := (i + 1) * int(bs.batchCfg.MaxChunkSize)
-		if endChunk > len(genesisBz) {
-			endChunk = len(genesisBz)
+		start := i * int(bs.batchCfg.MaxChunkSize)
+		end := start + int(bs.batchCfg.MaxChunkSize)
+		if end > len(genesisBz) {
+			end = len(genesisBz)
 		}
-		chunk := genesisBz[i*int(bs.batchCfg.MaxChunkSize) : endChunk]
+		chunk := genesisBz[start:end]
 		if len(chunk) == 0 {
 			break
 		}
