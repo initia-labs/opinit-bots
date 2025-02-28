@@ -15,8 +15,9 @@ import (
 	"github.com/initia-labs/opinit-bots/sentry_integration"
 	"github.com/initia-labs/opinit-bots/types"
 
-	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
 	opchildtypes "github.com/initia-labs/OPinit/x/opchild/types"
+
+	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
 )
 
 var ignoringErrors = []error{
