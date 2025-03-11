@@ -70,10 +70,11 @@ func createCodec(bech32Prefix string) (codec.Codec, client.TxConfig, error) {
 	unlock := keys.SetSDKConfigContext(bech32Prefix)
 	defer unlock()
 
-	return keys.CreateCodec([]keys.RegisterInterfaces{
+	_, cdc, txConfig, err := keys.CreateCodec([]keys.RegisterInterfaces{
 		auth.AppModuleBasic{}.RegisterInterfaces,
 		celestiatypes.RegisterInterfaces,
 	})
+	return cdc, txConfig, err
 }
 
 func (c *Celestia) Initialize(ctx types.Context, batch batchNode, bridgeId uint64, keyringConfig *btypes.KeyringConfig) error {

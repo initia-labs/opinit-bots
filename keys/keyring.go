@@ -20,9 +20,9 @@ func GetKeyDir(homePath string, chainId string) string {
 // If the directory is empty, an in-memory keybase is returned.
 func GetKeyBase(chainId string, dir string, cdc codec.Codec, userInput io.Reader) (keyring.Keyring, error) {
 	if dir == "" {
-		return keyring.NewInMemory(cdc), nil
+		return keyring.NewInMemory(cdc, Option()), nil
 	}
-	return keyring.New(chainId, "test", GetKeyDir(dir, chainId), userInput, cdc)
+	return keyring.New(chainId, "test", GetKeyDir(dir, chainId), userInput, cdc, Option())
 }
 
 // CreateMnemonic generates a new mnemonic.
