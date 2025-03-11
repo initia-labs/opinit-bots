@@ -16,7 +16,7 @@ import (
 func TestUpdateBatchInfo(t *testing.T) {
 	l1ChainConfig := &ChainConfig{
 		ChainID:        "initiation-2",
-		Image:          ibc.DockerImage{Repository: "ghcr.io/initia-labs/initiad", Version: "v0.7.2", UIDGID: "1000:1000"},
+		Image:          ibc.DockerImage{Repository: "ghcr.io/initia-labs/initiad", Version: "v1.0.0-beta.1", UIDGID: "1000:1000"},
 		Bin:            "initiad",
 		Bech32Prefix:   "init",
 		Denom:          "uinit",
@@ -30,7 +30,7 @@ func TestUpdateBatchInfo(t *testing.T) {
 
 	l2ChainConfig := &ChainConfig{
 		ChainID:        "minimove-2",
-		Image:          ibc.DockerImage{Repository: "ghcr.io/initia-labs/minimove", Version: "v0.7.0-1", UIDGID: "1000:1000"},
+		Image:          ibc.DockerImage{Repository: "ghcr.io/initia-labs/minimove", Version: "v1.0.0-beta.2", UIDGID: "1000:1000"},
 		Bin:            "minitiad",
 		Bech32Prefix:   "init",
 		Denom:          "umin",
@@ -154,7 +154,7 @@ func TestUpdateBatchInfo(t *testing.T) {
 	err = op.OP.Start(ctx)
 	require.NoError(t, err)
 
-	err = testutil.WaitForBlocks(ctx, 20, op.Initia, op.Minitia)
+	err = testutil.WaitForBlocks(ctx, 30, op.Initia, op.Minitia)
 	require.NoError(t, err)
 
 	newBatches, err = op.DA.QueryBatchData(ctx)
