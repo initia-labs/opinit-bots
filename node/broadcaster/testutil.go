@@ -12,6 +12,8 @@ import (
 	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/codec"
 	"github.com/cosmos/cosmos-sdk/crypto/hd"
+
+	sdk "github.com/cosmos/cosmos-sdk/types"
 )
 
 func NewTestBroadcaster(cdc codec.Codec, db types.DB, rpcClient *rpcclient.RPCClient, txConfig client.TxConfig, prefix string, numAccounts int) (*Broadcaster, error) {
@@ -44,7 +46,7 @@ func NewTestBroadcaster(cdc codec.Codec, db types.DB, rpcClient *rpcclient.RPCCl
 			return nil, err
 		}
 		keyName := fmt.Sprintf("%d", i)
-		account, err := keybase.NewAccount(keyName, mnemonic, "", hd.CreateHDPath(types.CoinType, 0, 0).String(), keys.EthSecp256k1)
+		account, err := keybase.NewAccount(keyName, mnemonic, "", hd.CreateHDPath(sdk.CoinType, 0, 0).String(), hd.Secp256k1)
 		if err != nil {
 			return nil, err
 		}

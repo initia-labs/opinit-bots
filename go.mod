@@ -1,8 +1,6 @@
 module github.com/initia-labs/opinit-bots
 
-go 1.23.1
-
-toolchain go1.23.6
+go 1.23.6
 
 require (
 	cosmossdk.io/core v0.11.1
