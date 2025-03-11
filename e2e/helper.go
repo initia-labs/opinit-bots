@@ -12,7 +12,9 @@ import (
 
 	"cosmossdk.io/math"
 	"cosmossdk.io/x/feegrant"
+	"cosmossdk.io/x/upgrade"
 	"github.com/avast/retry-go/v4"
+	"github.com/cosmos/ibc-go/modules/capability"
 	ibcclienttypes "github.com/cosmos/ibc-go/v8/modules/core/02-client/types"
 	ibctmlightclients "github.com/cosmos/ibc-go/v8/modules/light-clients/07-tendermint"
 	"github.com/icza/dyno"
@@ -30,8 +32,21 @@ import (
 	"go.uber.org/zap/zaptest"
 	"moul.io/zapfilter"
 
+	"github.com/cosmos/cosmos-sdk/x/genutil"
+	genutiltypes "github.com/cosmos/cosmos-sdk/x/genutil/types"
+
+	"github.com/cosmos/cosmos-sdk/codec"
+	"github.com/cosmos/cosmos-sdk/types/module"
 	cosmostestutil "github.com/cosmos/cosmos-sdk/types/module/testutil"
+	"github.com/cosmos/cosmos-sdk/x/auth"
 	"github.com/cosmos/cosmos-sdk/x/authz"
+	"github.com/cosmos/cosmos-sdk/x/bank"
+	"github.com/cosmos/cosmos-sdk/x/consensus"
+	"github.com/cosmos/cosmos-sdk/x/gov"
+	"github.com/cosmos/cosmos-sdk/x/mint"
+	"github.com/cosmos/cosmos-sdk/x/params"
+	"github.com/cosmos/cosmos-sdk/x/slashing"
+	"github.com/cosmos/cosmos-sdk/x/staking"
 
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
 
@@ -42,6 +57,19 @@ import (
 	bottypes "github.com/initia-labs/opinit-bots/bot/types"
 	executortypes "github.com/initia-labs/opinit-bots/executor/types"
 	servertypes "github.com/initia-labs/opinit-bots/server/types"
+
+	"github.com/initia-labs/opinit-bots/keys"
+
+	transfer "github.com/cosmos/ibc-go/v8/modules/apps/transfer"
+	ibccore "github.com/cosmos/ibc-go/v8/modules/core"
+	ibctm "github.com/cosmos/ibc-go/v8/modules/light-clients/07-tendermint"
+	ccvprovider "github.com/cosmos/interchain-security/v6/x/ccv/provider"
+
+	distr "github.com/cosmos/cosmos-sdk/x/distribution"
+	govclient "github.com/cosmos/cosmos-sdk/x/gov/client"
+	paramsclient "github.com/cosmos/cosmos-sdk/x/params/client"
+
+	ibcwasm "github.com/strangelove-ventures/interchaintest/v8/chain/cosmos/08-wasm-types"
 )
 
 var (
@@ -109,21 +137,102 @@ type OPTestHelper struct {
 	bridgeConfig *BridgeConfig
 }
 
-func InitiaEncoding() *cosmostestutil.TestEncodingConfig {
-	cfg := cosmos.DefaultEncoding()
-	ophosttypes.RegisterInterfaces(cfg.InterfaceRegistry)
-	ophosttypes.RegisterLegacyAminoCodec(cfg.Amino)
-	return &cfg
+func InitiaEncoding(t *testing.T) *cosmostestutil.TestEncodingConfig {
+	aminoCodec := codec.NewLegacyAmino()
+	interfaceRegistry, cdc, txConfig, err := keys.CreateCodec([]keys.RegisterInterfaces{
+		ophosttypes.RegisterInterfaces,
+	})
+	require.NoError(t, err)
+
+	encCfg := cosmostestutil.TestEncodingConfig{
+		InterfaceRegistry: interfaceRegistry,
+		Codec:             cdc,
+		TxConfig:          txConfig,
+		Amino:             aminoCodec,
+	}
+
+	mb := module.NewBasicManager(auth.AppModuleBasic{},
+		genutil.NewAppModuleBasic(genutiltypes.DefaultMessageValidator),
+		bank.AppModuleBasic{},
+		capability.AppModuleBasic{},
+		staking.AppModuleBasic{},
+		mint.AppModuleBasic{},
+		distr.AppModuleBasic{},
+		gov.NewAppModuleBasic(
+			[]govclient.ProposalHandler{
+				paramsclient.ProposalHandler,
+			},
+		),
+		params.AppModuleBasic{},
+		slashing.AppModuleBasic{},
+		upgrade.AppModuleBasic{},
+		consensus.AppModuleBasic{},
+		transfer.AppModuleBasic{},
+		ibccore.AppModuleBasic{},
+		ibctm.AppModuleBasic{},
+		ibcwasm.AppModuleBasic{},
+		ccvprovider.AppModuleBasic{})
+
+	mb.RegisterLegacyAminoCodec(encCfg.Amino)
+	mb.RegisterInterfaces(encCfg.InterfaceRegistry)
+
+	ophosttypes.RegisterLegacyAminoCodec(encCfg.Amino)
+	return &encCfg
 }
 
-func MinitiaEncoding() *cosmostestutil.TestEncodingConfig {
-	cfg := cosmos.DefaultEncoding()
-	authz.RegisterInterfaces(cfg.InterfaceRegistry)
-	feegrant.RegisterInterfaces(cfg.InterfaceRegistry)
-	ibcclienttypes.RegisterInterfaces(cfg.InterfaceRegistry)
-	ibctmlightclients.RegisterInterfaces(cfg.InterfaceRegistry)
-	opchildtypes.RegisterInterfaces(cfg.InterfaceRegistry)
-	return &cfg
+func MinitiaEncoding(t *testing.T) *cosmostestutil.TestEncodingConfig {
+	aminoCodec := codec.NewLegacyAmino()
+	interfaceRegistry, cdc, txConfig, err := keys.CreateCodec([]keys.RegisterInterfaces{
+		authz.RegisterInterfaces,
+		feegrant.RegisterInterfaces,
+		ibcclienttypes.RegisterInterfaces,
+		ibctmlightclients.RegisterInterfaces,
+		opchildtypes.RegisterInterfaces,
+	})
+	require.NoError(t, err)
+
+	encCfg := cosmostestutil.TestEncodingConfig{
+		InterfaceRegistry: interfaceRegistry,
+		Codec:             cdc,
+		TxConfig:          txConfig,
+		Amino:             aminoCodec,
+	}
+
+	mb := module.NewBasicManager(auth.AppModuleBasic{},
+		genutil.NewAppModuleBasic(genutiltypes.DefaultMessageValidator),
+		bank.AppModuleBasic{},
+		capability.AppModuleBasic{},
+		staking.AppModuleBasic{},
+		mint.AppModuleBasic{},
+		distr.AppModuleBasic{},
+		gov.NewAppModuleBasic(
+			[]govclient.ProposalHandler{
+				paramsclient.ProposalHandler,
+			},
+		),
+		params.AppModuleBasic{},
+		slashing.AppModuleBasic{},
+		upgrade.AppModuleBasic{},
+		consensus.AppModuleBasic{},
+		transfer.AppModuleBasic{},
+		ibccore.AppModuleBasic{},
+		ibctm.AppModuleBasic{},
+		ibcwasm.AppModuleBasic{},
+		ccvprovider.AppModuleBasic{})
+
+	mb.RegisterLegacyAminoCodec(encCfg.Amino)
+	mb.RegisterInterfaces(encCfg.InterfaceRegistry)
+
+	ophosttypes.RegisterLegacyAminoCodec(encCfg.Amino)
+	return &encCfg
+
+	// cfg := cosmos.DefaultEncoding()
+	// authz.RegisterInterfaces(cfg.InterfaceRegistry)
+	// feegrant.RegisterInterfaces(cfg.InterfaceRegistry)
+	// ibcclienttypes.RegisterInterfaces(cfg.InterfaceRegistry)
+	// ibctmlightclients.RegisterInterfaces(cfg.InterfaceRegistry)
+	// opchildtypes.RegisterInterfaces(cfg.InterfaceRegistry)
+	// return &cfg
 }
 
 func SetupTest(
@@ -216,7 +325,7 @@ func SetupTest(
 				GasPrices:      l1ChainConfig.GasPrices,
 				GasAdjustment:  l1ChainConfig.GasAdjustment,
 				TrustingPeriod: l1ChainConfig.TrustingPeriod,
-				EncodingConfig: InitiaEncoding(),
+				EncodingConfig: InitiaEncoding(t),
 				NoHostMount:    false,
 				PreGenesis: func(ch ibc.Chain) error {
 					l1Chain := ch.(*cosmos.CosmosChain)
@@ -279,7 +388,7 @@ func SetupTest(
 				GasPrices:      l2ChainConfig.GasPrices,
 				GasAdjustment:  l2ChainConfig.GasAdjustment,
 				TrustingPeriod: l2ChainConfig.TrustingPeriod,
-				EncodingConfig: MinitiaEncoding(),
+				EncodingConfig: MinitiaEncoding(t),
 				NoHostMount:    false,
 				SkipGenTx:      true,
 				PreGenesis: func(ch ibc.Chain) error {
@@ -295,10 +404,20 @@ func SetupTest(
 					err := testutil.ModifyTomlConfigFile(ctx, logger, client, t.Name(), l2Chain.Validators[0].VolumeName, "config/config.toml", c)
 					require.NoError(t, err)
 
-					_, err = ch.BuildWallet(ctx, bridgeExecutor.KeyName(), bridgeExecutor.Mnemonic())
+					command := []string{
+						"sh",
+						"-c",
+						fmt.Sprintf(`echo %q | %s keys add %s --recover --keyring-backend %s --coin-type %d --key-type %s --home %s --output json`, l2Validator.Mnemonic(), l2Chain.GetFullNode().Chain.Config().Bin, l2Validator.KeyName(), keyring.BackendTest, 118, "secp256k1", l2Chain.GetFullNode().HomeDir()),
+					}
+					_, _, err = l2Chain.GetFullNode().Exec(ctx, command, l2Chain.GetFullNode().Chain.Config().Env)
 					require.NoError(t, err)
 
-					_, err = ch.BuildWallet(ctx, l2Validator.KeyName(), l2Validator.Mnemonic())
+					command = []string{
+						"sh",
+						"-c",
+						fmt.Sprintf(`echo %q | %s keys add %s --recover --keyring-backend %s --coin-type %d --key-type %s --home %s --output json`, bridgeExecutor.Mnemonic(), l2Chain.GetFullNode().Chain.Config().Bin, bridgeExecutor.KeyName(), keyring.BackendTest, 118, "secp256k1", l2Chain.GetFullNode().HomeDir()),
+					}
+					_, _, err = l2Chain.GetFullNode().Exec(ctx, command, l2Chain.GetFullNode().Chain.Config().Env)
 					require.NoError(t, err)
 
 					_, _, err = ch.Exec(ctx, []string{"minitiad", "genesis", "add-genesis-account", bridgeExecutor.KeyName(), "", "--home", ch.HomeDir(), "--keyring-backend", keyring.BackendTest}, nil)

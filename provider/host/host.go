@@ -66,10 +66,11 @@ func GetCodec(bech32Prefix string) (codec.Codec, client.TxConfig, error) {
 	unlock := keys.SetSDKConfigContext(bech32Prefix)
 	defer unlock()
 
-	return keys.CreateCodec([]keys.RegisterInterfaces{
+	_, codec, txConfig, err := keys.CreateCodec([]keys.RegisterInterfaces{
 		auth.AppModuleBasic{}.RegisterInterfaces,
 		ophost.AppModuleBasic{}.RegisterInterfaces,
 	})
+	return codec, txConfig, err
 }
 
 func (b *BaseHost) Initialize(ctx types.Context, processedHeight int64, bridgeInfo ophosttypes.QueryBridgeResponse, keyringConfig *btypes.KeyringConfig) error {

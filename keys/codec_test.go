@@ -14,7 +14,7 @@ import (
 
 func TestCreateCodec(t *testing.T) {
 	unlock := SetSDKConfigContext("init")
-	codec, txConfig, err := CreateCodec([]RegisterInterfaces{
+	_, codec, txConfig, err := CreateCodec([]RegisterInterfaces{
 		auth.AppModuleBasic{}.RegisterInterfaces,
 		opchild.AppModuleBasic{}.RegisterInterfaces,
 	})
@@ -35,7 +35,7 @@ func TestCreateCodec(t *testing.T) {
 	require.NoError(t, err)
 
 	unlock = SetSDKConfigContext("cosmos")
-	emptyCodec, emptyTxConfig, err := CreateCodec([]RegisterInterfaces{
+	_, emptyCodec, emptyTxConfig, err := CreateCodec([]RegisterInterfaces{
 		auth.AppModuleBasic{}.RegisterInterfaces,
 	})
 	require.NoError(t, err)

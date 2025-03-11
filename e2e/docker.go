@@ -401,7 +401,7 @@ func (op *DockerOPBot) Start(ctx context.Context) error {
 	op.containerLifecycle = dockerutil.NewContainerLifecycle(op.log, op.DockerClient, op.Name())
 
 	if err := op.containerLifecycle.CreateContainer(
-		ctx, op.testName, op.networkID, containerImage, ports,
+		ctx, op.testName, op.networkID, containerImage, ports, "",
 		op.Bind(), nil, op.Name(), cmd, nil, []string{},
 	); err != nil {
 		return err

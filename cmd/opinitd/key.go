@@ -29,6 +29,9 @@ import (
 	"github.com/cosmos/cosmos-sdk/client/input"
 	"github.com/cosmos/cosmos-sdk/codec"
 	"github.com/cosmos/cosmos-sdk/crypto/hd"
+
+	"github.com/cosmos/cosmos-sdk/crypto/keyring"
+
 	sdk "github.com/cosmos/cosmos-sdk/types"
 
 	"github.com/initia-labs/opinit-bots/keys"
@@ -40,6 +43,8 @@ const (
 	flagMnemonicString = "mnemonic"
 	flagBech32Prefix   = "bech32"
 	flagOutput         = "output"
+	flagKeyType        = "key-type"
+	flagCoinType       = "coin-type"
 )
 
 type keyJsonOutput map[string]keyJsonOutputElem
@@ -138,7 +143,20 @@ $ keys add l2 key2 --output json`),
 				}
 			}
 
-			account, err = keyBase.NewAccount(keyName, mnemonic, "", hd.CreateHDPath(sdk.CoinType, 0, 0).String(), hd.Secp256k1)
+			coinType, _ := cmd.Flags().GetUint32(flagCoinType)
+			keyType, _ := cmd.Flags().GetString(flagKeyType)
+
+			var algo keyring.SignatureAlgo
+			switch keyType {
+			case "eth_secp256k1":
+				algo = keys.EthSecp256k1
+			case "secp256k1":
+				algo = hd.Secp256k1
+			default:
+				return fmt.Errorf("invalid key type: %s", keyType)
+			}
+
+			account, err = keyBase.NewAccount(keyName, mnemonic, "", hd.CreateHDPath(coinType, 0, 0).String(), algo)
 			if err != nil {
 				return err
 			}
@@ -180,6 +198,8 @@ $ keys add l2 key2 --output json`),
 	cmd.Flags().String(flagMnemonicString, "", "Import mnemonic from string")
 	cmd.Flags().String(flagBech32Prefix, "init", "Bech32 prefix")
 	cmd.Flags().String(flagOutput, "plain", "Output format (plain|json)")
+	cmd.Flags().String(flagKeyType, "secp256k1", "Key signing algorithm to generate keys for (eth_secp256k1|secp256k1)")
+	cmd.Flags().Uint32(flagCoinType, sdk.CoinType, "coin type number for HD derivation")
 	return cmd
 }
 
@@ -402,6 +422,6 @@ func getCodec(bech32Prefix string) (codec.Codec, error) {
 	unlock := keys.SetSDKConfigContext(bech32Prefix)
 	defer unlock()
 
-	appCodec, _, err := keys.CreateCodec(nil)
+	_, appCodec, _, err := keys.CreateCodec(nil)
 	return appCodec, err
 }

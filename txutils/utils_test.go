@@ -15,7 +15,7 @@ import (
 
 func TestChangeMsgsFromTx(t *testing.T) {
 	unlock := keys.SetSDKConfigContext("init")
-	_, txConfig, err := keys.CreateCodec([]keys.RegisterInterfaces{
+	_, _, txConfig, err := keys.CreateCodec([]keys.RegisterInterfaces{
 		auth.AppModuleBasic{}.RegisterInterfaces,
 		opchild.AppModuleBasic{}.RegisterInterfaces,
 	})
