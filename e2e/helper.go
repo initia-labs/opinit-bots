@@ -14,8 +14,6 @@ import (
 	"cosmossdk.io/x/feegrant"
 	"cosmossdk.io/x/upgrade"
 	"github.com/avast/retry-go/v4"
-	"github.com/cosmos/cosmos-sdk/x/genutil"
-	genutiltypes "github.com/cosmos/cosmos-sdk/x/genutil/types"
 	"github.com/cosmos/ibc-go/modules/capability"
 	ibcclienttypes "github.com/cosmos/ibc-go/v8/modules/core/02-client/types"
 	ibctmlightclients "github.com/cosmos/ibc-go/v8/modules/light-clients/07-tendermint"
@@ -33,6 +31,9 @@ import (
 	"go.uber.org/zap/zapcore"
 	"go.uber.org/zap/zaptest"
 	"moul.io/zapfilter"
+
+	"github.com/cosmos/cosmos-sdk/x/genutil"
+	genutiltypes "github.com/cosmos/cosmos-sdk/x/genutil/types"
 
 	"github.com/cosmos/cosmos-sdk/codec"
 	"github.com/cosmos/cosmos-sdk/types/module"
