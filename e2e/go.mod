@@ -4,7 +4,7 @@ go 1.23.6
 
 require (
 	cosmossdk.io/math v1.4.0
-	github.com/cosmos/ibc-go/v8 v8.5.3
+	github.com/cosmos/ibc-go/v8 v8.7.0
 	github.com/cosmos/interchain-security/v6 v6.3.0
 	github.com/initia-labs/OPinit v1.0.0-beta.1
 	github.com/initia-labs/OPinit/api v1.0.0-beta.1
@@ -78,7 +78,6 @@ require (
 	github.com/bgentry/go-netrc v0.0.0-20140422174119-9fd32a8b3d3d // indirect
 	github.com/bgentry/speakeasy v0.1.1-0.20220910012023-760eaf8b6816 // indirect
 	github.com/bits-and-blooms/bitset v1.14.2 // indirect
-	github.com/btcsuite/btcd/btcec/v2 v2.3.4 // indirect
 	github.com/cenkalti/backoff/v4 v4.3.0 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/chzyer/readline v1.5.1 // indirect
@@ -93,16 +92,16 @@ require (
 	github.com/consensys/bavard v0.1.13 // indirect
 	github.com/consensys/gnark-crypto v0.12.1 // indirect
 	github.com/cosmos/btcutil v1.0.5 // indirect
-	github.com/cosmos/cosmos-db v1.1.0 // indirect
+	github.com/cosmos/cosmos-db v1.1.1 // indirect
 	github.com/cosmos/cosmos-proto v1.0.0-beta.5
-	github.com/cosmos/cosmos-sdk v0.50.11
+	github.com/cosmos/cosmos-sdk v0.50.13
 	github.com/cosmos/go-bip39 v1.0.0 // indirect
 	github.com/cosmos/gogogateway v1.2.0 // indirect
 	github.com/cosmos/gogoproto v1.7.0
 	github.com/cosmos/iavl v1.2.2 // indirect
 	github.com/cosmos/ibc-go/modules/capability v1.0.1
 	github.com/cosmos/ics23/go v0.11.0 // indirect
-	github.com/cosmos/ledger-cosmos-go v0.13.3 // indirect
+	github.com/cosmos/ledger-cosmos-go v0.14.0 // indirect
 	github.com/crate-crypto/go-kzg-4844 v1.0.0 // indirect
 	github.com/danieljoos/wincred v1.1.2 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
@@ -122,7 +121,7 @@ require (
 	github.com/dvsekhvalnov/jose2go v1.6.0 // indirect
 	github.com/emicklei/dot v1.6.2 // indirect
 	github.com/ethereum/c-kzg-4844 v1.0.0 // indirect
-	github.com/ethereum/go-ethereum v1.14.11 // indirect
+	github.com/ethereum/go-ethereum v1.14.13 // indirect
 	github.com/fatih/color v1.18.0 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/fsnotify/fsnotify v1.7.0 // indirect
@@ -235,7 +234,7 @@ require (
 	github.com/sourcegraph/conc v0.3.0 // indirect
 	github.com/spaolacci/murmur3 v1.1.0 // indirect
 	github.com/spf13/afero v1.11.0 // indirect
-	github.com/spf13/cast v1.7.0 // indirect
+	github.com/spf13/cast v1.7.1 // indirect
 	github.com/spf13/cobra v1.8.1 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/spf13/viper v1.19.0 // indirect
@@ -262,15 +261,15 @@ require (
 	go.opentelemetry.io/otel/metric v1.32.0 // indirect
 	go.opentelemetry.io/otel/trace v1.32.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
-	golang.org/x/crypto v0.32.0 // indirect
+	golang.org/x/crypto v0.35.0 // indirect
 	golang.org/x/exp v0.0.0-20240909161429-701f63a606c0 // indirect
 	golang.org/x/mod v0.22.0 // indirect
-	golang.org/x/net v0.34.0 // indirect
+	golang.org/x/net v0.36.0 // indirect
 	golang.org/x/oauth2 v0.24.0 // indirect
-	golang.org/x/sync v0.10.0 // indirect
-	golang.org/x/sys v0.29.0 // indirect
-	golang.org/x/term v0.28.0 // indirect
-	golang.org/x/text v0.21.0 // indirect
+	golang.org/x/sync v0.11.0 // indirect
+	golang.org/x/sys v0.30.0 // indirect
+	golang.org/x/term v0.29.0 // indirect
+	golang.org/x/text v0.22.0 // indirect
 	golang.org/x/time v0.6.0 // indirect
 	golang.org/x/tools v0.27.0 // indirect
 	google.golang.org/api v0.189.0 // indirect
