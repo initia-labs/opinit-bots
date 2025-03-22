@@ -42,11 +42,12 @@ type Broadcaster struct {
 	txChannel        chan btypes.ProcessedMsgs
 	txChannelStopped chan struct{}
 
-	pendingTxMu *sync.Mutex
 	// local pending txs, which is following Queue data structure
-	pendingTxs []btypes.PendingTxInfo
-
+	pendingTxs                []btypes.PendingTxInfo
 	pendingProcessedMsgsBatch []btypes.ProcessedMsgs
+
+	pendingTxMu               *sync.Mutex
+	broadcastProcessedMsgsMut *sync.Mutex
 
 	syncedHeight int64
 }
@@ -71,9 +72,11 @@ func NewBroadcaster(
 		txChannel:        make(chan btypes.ProcessedMsgs),
 		txChannelStopped: make(chan struct{}),
 
-		pendingTxMu:               &sync.Mutex{},
 		pendingTxs:                make([]btypes.PendingTxInfo, 0),
 		pendingProcessedMsgsBatch: make([]btypes.ProcessedMsgs, 0),
+
+		pendingTxMu:               &sync.Mutex{},
+		broadcastProcessedMsgsMut: &sync.Mutex{},
 	}
 
 	// validate broadcaster config
