@@ -185,7 +185,7 @@ func (op *OPBot) QueryWithdrawals(address string, offset uint64, limit uint64, d
 
 const (
 	DefaultContainerImage   = "ghcr.io/initia-labs/opinitd"
-	DefaultContainerVersion = "v0.1.14-2"
+	DefaultContainerVersion = "v1.0.0-beta.2"
 )
 
 type commander struct {
