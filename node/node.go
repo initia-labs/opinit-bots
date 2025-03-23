@@ -109,6 +109,9 @@ func (n *Node) Initialize(ctx types.Context, processedHeight int64, keyringConfi
 		if err != nil {
 			return err
 		}
+
+		// broadcast pending msgs first before executing block process looper
+		go n.broadcaster.BroadcastPendingProcessedMsgs()
 	}
 
 	// if not found, initialize the height
@@ -147,9 +150,6 @@ func (n *Node) start(ctx types.Context) {
 
 			return n.broadcaster.Start(ctx)
 		})
-
-		// broadcast pending msgs first before executing block process looper
-		n.broadcaster.BroadcastPendingProcessedMsgs()
 	}
 
 	enableEventHandler := true

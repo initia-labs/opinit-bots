@@ -135,19 +135,23 @@ func (b *Broadcaster) Start(ctx types.Context) error {
 // BroadcastPendingProcessedMsgs broadcasts pending processed messages to the Broadcaster.
 // It is called before the node process the block.
 func (b Broadcaster) BroadcastPendingProcessedMsgs() {
-	for _, processedMsg := range b.pendingProcessedMsgsBatch {
-		b.BroadcastProcessedMsgs(processedMsg)
-	}
+	b.BroadcastProcessedMsgs(b.pendingProcessedMsgsBatch...)
 }
 
 // BroadcastProcessedMsgs broadcasts processed messages to the Broadcaster.
-func (b Broadcaster) BroadcastProcessedMsgs(msgs btypes.ProcessedMsgs) {
+func (b Broadcaster) BroadcastProcessedMsgs(msgsArray ...btypes.ProcessedMsgs) {
 	if b.txChannel == nil {
 		return
 	}
 
-	select {
-	case <-b.txChannelStopped:
-	case b.txChannel <- msgs:
+	b.broadcastProcessedMsgsMut.Lock()
+	defer b.broadcastProcessedMsgsMut.Unlock()
+
+	for _, msgs := range msgsArray {
+		select {
+		case <-b.txChannelStopped:
+			return
+		case b.txChannel <- msgs:
+		}
 	}
 }
