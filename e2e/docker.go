@@ -150,6 +150,9 @@ func handleDockerBuildOutput(body io.Reader) {
 
 		_ = json.Unmarshal([]byte(line), &logLine)
 	}
+	if logLine.Error != "" {
+		fmt.Println(logLine.Error)
+	}
 }
 
 func NewDockerOPBot(ctx context.Context, log *zap.Logger, botName string, testName string, cli *client.Client, networkID string, c OPBotCommander, buildLocalImage bool) (*DockerOPBot, error) {
