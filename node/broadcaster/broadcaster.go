@@ -23,7 +23,7 @@ import (
 	"github.com/initia-labs/opinit-bots/types"
 )
 
-var txNotFoundRegex = regexp.MustCompile("Internal error: tx ([A-Fa-f0-9]+) not found")
+var txNotFoundRegex = regexp.MustCompile("tx ([A-Fa-f0-9]+) not found")
 
 type Broadcaster struct {
 	cfg btypes.BroadcasterConfig
