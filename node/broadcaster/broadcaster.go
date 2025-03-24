@@ -3,6 +3,7 @@ package broadcaster
 import (
 	"encoding/hex"
 	"fmt"
+	"math"
 	"regexp"
 	"slices"
 	"sync"
@@ -23,7 +24,7 @@ import (
 	"github.com/initia-labs/opinit-bots/types"
 )
 
-var txNotFoundRegex = regexp.MustCompile("tx ([A-Fa-f0-9]+) not found")
+var txNotFoundRegex = regexp.MustCompile(`tx \(([A-Fa-f0-9]+)\) not found`)
 
 type Broadcaster struct {
 	cfg btypes.BroadcasterConfig
@@ -153,6 +154,7 @@ func (b *Broadcaster) loadPendingTxs(ctx types.Context, stage types.BasicDB, las
 	defer pollingTimer.Stop()
 
 	reProcessingTxs := make([]btypes.PendingTxInfo, 0)
+	retry := 1
 
 	for txIndex := 0; txIndex < len(pendingTxs); {
 		select {
@@ -163,7 +165,7 @@ func (b *Broadcaster) loadPendingTxs(ctx types.Context, stage types.BasicDB, las
 
 		txHash, err := hex.DecodeString(pendingTxs[txIndex].TxHash)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to decode tx hash; hash: %s, error: %s", pendingTxs[txIndex].TxHash, err.Error())
 		}
 
 		res, err := b.rpcClient.QueryTx(ctx, txHash)
@@ -185,6 +187,15 @@ func (b *Broadcaster) loadPendingTxs(ctx types.Context, stage types.BasicDB, las
 			if lastBlockTime.After(timeoutTime) {
 				reProcessingTxs = append(reProcessingTxs, pendingTxs[txIndex:]...)
 				break
+			}
+		} else {
+			ctx.Logger().Warn("retry to query pending tx", zap.String("hash", pendingTxs[txIndex].TxHash), zap.Int("seconds", int(2*math.Exp2(float64(retry)))), zap.Int("count", retry), zap.String("error", err.Error()))
+			if types.SleepWithRetry(ctx, retry) {
+				return ctx.Err()
+			}
+			retry++
+			if retry > types.MaxRetryCount {
+				return fmt.Errorf("failed to query pending tx; hash: %s, error: %s", pendingTxs[txIndex].TxHash, err.Error())
 			}
 		}
 	}
