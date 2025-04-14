@@ -12,7 +12,7 @@ type Server struct {
 }
 
 func NewServer(cfg types.ServerConfig) *Server {
-	app := fiber.New()
+	app := fiber.New(fiber.Config{DisableStartupMessage: true})
 	app.Use(cors.New(cors.Config{
 		AllowOrigins: cfg.AllowOrigins,
 		AllowHeaders: cfg.AllowHeaders,
