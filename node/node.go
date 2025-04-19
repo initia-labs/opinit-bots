@@ -101,9 +101,6 @@ func (n *Node) Initialize(ctx types.Context, processedHeight int64, keyringConfi
 	if err != nil {
 		return err
 	}
-	if status.SyncInfo.CatchingUp {
-		return errors.New("node is catching up")
-	}
 	if n.HasBroadcaster() {
 		err = n.broadcaster.Initialize(ctx, status, keyringConfig)
 		if err != nil {
