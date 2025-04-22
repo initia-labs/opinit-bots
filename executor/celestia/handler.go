@@ -36,6 +36,7 @@ func (c *Celestia) payForBlobsHandler(ctx types.Context, args nodetypes.EventHan
 			namespaces = string(value)
 		}
 	}
+	c.lastUpdatedBatchTime = args.BlockTime
 	ctx.Logger().Info("record batch",
 		zap.String("signer", signer),
 		zap.String("blob_sizes", blobSizes),

@@ -31,6 +31,8 @@ type DANode interface {
 
 	LenProcessedBatchMsgs() (int, error)
 	LenPendingBatchTxs() (int, error)
+
+	LastUpdatedBatchTime() time.Time
 }
 
 var LocalBatchInfoKey = []byte("local_batch_info")

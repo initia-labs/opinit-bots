@@ -22,6 +22,8 @@ func (h *Host) proposeOutputHandler(ctx types.Context, args nodetypes.EventHandl
 
 	h.lastProposedOutputIndex = outputIndex
 	h.lastProposedOutputL2BlockNumber = l2BlockNumber
+	h.lastProposedOutputTime = args.BlockTime
+
 	ctx.Logger().Info("propose output",
 		zap.Uint64("bridge_id", bridgeId),
 		zap.String("proposer", proposer),

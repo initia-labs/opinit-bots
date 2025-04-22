@@ -1,6 +1,8 @@
 package host
 
 import (
+	"time"
+
 	nodetypes "github.com/initia-labs/opinit-bots/node/types"
 	"github.com/pkg/errors"
 )
@@ -9,6 +11,7 @@ type Status struct {
 	Node                            nodetypes.Status `json:"node"`
 	LastProposedOutputIndex         uint64           `json:"last_proposed_output_index"`
 	LastProposedOutputL2BlockNumber int64            `json:"last_proposed_output_l2_block_number"`
+	LastProposedOutputTime          time.Time        `json:"last_proposed_output_time"`
 }
 
 func (h Host) GetStatus() (Status, error) {
@@ -21,6 +24,7 @@ func (h Host) GetStatus() (Status, error) {
 		Node:                            nodeStatus,
 		LastProposedOutputIndex:         h.lastProposedOutputIndex,
 		LastProposedOutputL2BlockNumber: h.lastProposedOutputL2BlockNumber,
+		LastProposedOutputTime:          h.lastProposedOutputTime,
 	}, nil
 }
 

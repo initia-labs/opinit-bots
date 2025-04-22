@@ -2,6 +2,7 @@ package celestia
 
 import (
 	"crypto/sha256"
+	"time"
 
 	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/codec"
@@ -42,6 +43,8 @@ type Celestia struct {
 
 	cfg nodetypes.NodeConfig
 	db  types.DB
+
+	lastUpdatedBatchTime time.Time
 }
 
 func NewDACelestia(version uint8, cfg nodetypes.NodeConfig, db types.DB) *Celestia {
@@ -182,4 +185,8 @@ func (c Celestia) LenPendingBatchTxs() (int, error) {
 		return 0, errors.Wrap(err, "failed to get broadcaster")
 	}
 	return broadcaster.LenLocalPendingTxByMsgType(BatchMsgType)
+}
+
+func (c Celestia) LastUpdatedBatchTime() time.Time {
+	return c.lastUpdatedBatchTime
 }
