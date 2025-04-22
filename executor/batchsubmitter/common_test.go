@@ -2,6 +2,7 @@ package batchsubmitter
 
 import (
 	"context"
+	"time"
 
 	coretypes "github.com/cometbft/cometbft/rpc/core/types"
 	cmttypes "github.com/cometbft/cometbft/types"
@@ -110,6 +111,10 @@ func (m mockDA) LenProcessedBatchMsgs() (int, error) {
 
 func (m mockDA) LenPendingBatchTxs() (int, error) {
 	return 0, nil
+}
+
+func (m mockDA) LastUpdatedBatchTime() time.Time {
+	return time.Time{}
 }
 
 var _ executortypes.DANode = (*mockDA)(nil)

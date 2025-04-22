@@ -1,6 +1,8 @@
 package executor
 
 import (
+	"time"
+
 	"github.com/initia-labs/opinit-bots/executor/batchsubmitter"
 	"github.com/initia-labs/opinit-bots/executor/child"
 	"github.com/initia-labs/opinit-bots/executor/host"
@@ -13,7 +15,12 @@ type Status struct {
 	Host           host.Status           `json:"host,omitempty"`
 	Child          child.Status          `json:"child,omitempty"`
 	BatchSubmitter batchsubmitter.Status `json:"batch_submitter,omitempty"`
-	DA             nodetypes.Status      `json:"da,omitempty"`
+	DA             DAStatus              `json:"da,omitempty"`
+}
+
+type DAStatus struct {
+	Node                 nodetypes.Status `json:"node"`
+	LastUpdatedBatchTime time.Time        `json:"last_updated_batch_time"`
 }
 
 func (ex Executor) GetStatus() (Status, error) {
@@ -39,10 +46,11 @@ func (ex Executor) GetStatus() (Status, error) {
 			return Status{}, errors.Wrap(err, "failed to get batch status")
 		}
 		if ex.batchSubmitter.DA() != nil {
-			s.DA, err = ex.batchSubmitter.DA().GetNodeStatus()
+			s.DA.Node, err = ex.batchSubmitter.DA().GetNodeStatus()
 			if err != nil {
 				return Status{}, errors.Wrap(err, "failed to get DA status")
 			}
+			s.DA.LastUpdatedBatchTime = ex.batchSubmitter.DA().LastUpdatedBatchTime()
 		}
 	}
 	return s, nil

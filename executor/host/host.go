@@ -2,6 +2,7 @@ package host
 
 import (
 	"context"
+	"time"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 
@@ -56,6 +57,9 @@ type Host struct {
 	// status info
 	lastProposedOutputIndex         uint64
 	lastProposedOutputL2BlockNumber int64
+	lastProposedOutputTime          time.Time
+
+	lastUpdatedBatchTime time.Time
 }
 
 func NewHostV1(cfg nodetypes.NodeConfig, db types.DB) *Host {
@@ -132,4 +136,8 @@ func (h *Host) LenPendingBatchTxs() (int, error) {
 		return 0, errors.Wrap(err, "failed to get broadcaster")
 	}
 	return broadcaster.LenLocalPendingTxByMsgType(BatchMsgType)
+}
+
+func (h Host) LastUpdatedBatchTime() time.Time {
+	return h.lastUpdatedBatchTime
 }

@@ -1,6 +1,8 @@
 package batchsubmitter
 
 import (
+	"time"
+
 	executortypes "github.com/initia-labs/opinit-bots/executor/types"
 	btypes "github.com/initia-labs/opinit-bots/node/broadcaster/types"
 	nodetypes "github.com/initia-labs/opinit-bots/node/types"
@@ -30,3 +32,4 @@ func (n NoopDA) BroadcastProcessedMsgs(nil ...btypes.ProcessedMsgs) {}
 func (n NoopDA) GetNodeStatus() (nodetypes.Status, error)           { return nodetypes.Status{}, nil }
 func (n NoopDA) LenProcessedBatchMsgs() (int, error)                { return 0, nil }
 func (n NoopDA) LenPendingBatchTxs() (int, error)                   { return 0, nil }
+func (n NoopDA) LastUpdatedBatchTime() time.Time                    { return time.Time{} }

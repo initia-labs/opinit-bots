@@ -43,6 +43,8 @@ func (h *Host) updateBatchInfoHandler(ctx types.Context, args nodetypes.EventHan
 		return nil
 	}
 
+	h.lastUpdatedBatchTime = args.BlockTime
+
 	ctx.Logger().Info("update batch info",
 		zap.String("chain", chain),
 		zap.String("submitter", submitter),
