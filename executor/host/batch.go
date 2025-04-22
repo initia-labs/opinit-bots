@@ -27,6 +27,7 @@ func (h *Host) recordBatchHandler(ctx types.Context, args nodetypes.EventHandler
 	if submitter != hostAddress {
 		return nil
 	}
+	h.lastUpdatedBatchTime = args.BlockTime
 	ctx.Logger().Info("record batch",
 		zap.String("submitter", submitter),
 	)
@@ -42,8 +43,6 @@ func (h *Host) updateBatchInfoHandler(ctx types.Context, args nodetypes.EventHan
 		// pass other bridge deposit event
 		return nil
 	}
-
-	h.lastUpdatedBatchTime = args.BlockTime
 
 	ctx.Logger().Info("update batch info",
 		zap.String("chain", chain),
