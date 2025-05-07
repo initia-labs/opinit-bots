@@ -1,11 +1,16 @@
 package host
 
 import (
+	"encoding/json"
 	"time"
 
 	challengertypes "github.com/initia-labs/opinit-bots/challenger/types"
 	nodetypes "github.com/initia-labs/opinit-bots/node/types"
 	"github.com/pkg/errors"
+
+	dbtypes "github.com/initia-labs/opinit-bots/db/types"
+	executortypes "github.com/initia-labs/opinit-bots/executor/types"
+	"github.com/initia-labs/opinit-bots/types"
 )
 
 type Status struct {
@@ -42,4 +47,41 @@ func (h Host) GetAllPendingEvents() ([]challengertypes.ChallengeEvent, error) {
 		return nil, errors.New("event handler is not initialized")
 	}
 	return h.eventHandler.GetAllSortedPendingEvents(), nil
+}
+
+type InternalStatus struct {
+	LastOutputIndex uint64
+	LastOutputTime  time.Time
+}
+
+func (h Host) GetInternalStatus() InternalStatus {
+	return InternalStatus{
+		LastOutputIndex: h.lastOutputIndex,
+		LastOutputTime:  h.lastOutputTime,
+	}
+}
+
+func (h Host) SaveInternalStatus(db types.BasicDB) error {
+	internalStatusBytes, err := json.Marshal(h.GetInternalStatus())
+	if err != nil {
+		return errors.Wrap(err, "failed to marshal internal status")
+	}
+	return db.Set(executortypes.InternalStatusKey, internalStatusBytes)
+}
+
+func (h *Host) LoadInternalStatus() error {
+	internalStatusBytes, err := h.DB().Get(executortypes.InternalStatusKey)
+	if errors.Is(err, dbtypes.ErrNotFound) {
+		return nil
+	} else if err != nil {
+		return errors.Wrap(err, "failed to get internal status")
+	}
+	var internalStatus InternalStatus
+	err = json.Unmarshal(internalStatusBytes, &internalStatus)
+	if err != nil {
+		return errors.Wrap(err, "failed to unmarshal internal status")
+	}
+	h.lastOutputIndex = internalStatus.LastOutputIndex
+	h.lastOutputTime = internalStatus.LastOutputTime
+	return nil
 }

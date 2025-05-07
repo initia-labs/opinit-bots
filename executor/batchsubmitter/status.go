@@ -1,11 +1,17 @@
 package batchsubmitter
 
 import (
-	"errors"
+	"encoding/json"
 	"time"
 
+	"github.com/pkg/errors"
+
 	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
+	dbtypes "github.com/initia-labs/opinit-bots/db/types"
 	nodetypes "github.com/initia-labs/opinit-bots/node/types"
+	"github.com/initia-labs/opinit-bots/types"
+
+	executortypes "github.com/initia-labs/opinit-bots/executor/types"
 )
 
 type Status struct {
@@ -34,4 +40,38 @@ func (bs BatchSubmitter) GetStatus() (Status, error) {
 		BatchEndBlockNumber:     bs.localBatchInfo.End,
 		LastBatchSubmissionTime: bs.localBatchInfo.LastSubmissionTime,
 	}, nil
+}
+
+type InternalStatus struct {
+	LastBatchEndBlockNumber int64
+}
+
+func (bs BatchSubmitter) GetInternalStatus() InternalStatus {
+	return InternalStatus{
+		LastBatchEndBlockNumber: bs.LastBatchEndBlockNumber,
+	}
+}
+
+func (bs BatchSubmitter) SaveInternalStatus(db types.BasicDB) error {
+	internalStatusBytes, err := json.Marshal(bs.GetInternalStatus())
+	if err != nil {
+		return errors.Wrap(err, "failed to marshal internal status")
+	}
+	return db.Set(executortypes.InternalStatusKey, internalStatusBytes)
+}
+
+func (bs *BatchSubmitter) LoadInternalStatus() error {
+	internalStatusBytes, err := bs.DB().Get(executortypes.InternalStatusKey)
+	if errors.Is(err, dbtypes.ErrNotFound) {
+		return nil
+	} else if err != nil {
+		return errors.Wrap(err, "failed to get internal status")
+	}
+	var internalStatus InternalStatus
+	err = json.Unmarshal(internalStatusBytes, &internalStatus)
+	if err != nil {
+		return errors.Wrap(err, "failed to unmarshal internal status")
+	}
+	bs.LastBatchEndBlockNumber = internalStatus.LastBatchEndBlockNumber
+	return nil
 }

@@ -94,6 +94,10 @@ func (bs *BatchSubmitter) rawBlockHandler(ctx types.Context, args nodetypes.RawB
 		return errors.Wrap(err, "failed to save local batch info")
 	}
 
+	err = bs.SaveInternalStatus(bs.stage)
+	if err != nil {
+		return errors.Wrap(err, "failed to save internal status")
+	}
 	err = bs.stage.Commit()
 	if err != nil {
 		return errors.Wrap(err, "failed to commit stage")

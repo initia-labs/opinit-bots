@@ -59,6 +59,11 @@ func (h *Host) endBlockHandler(_ types.Context, args nodetypes.EndBlockArgs) err
 		return errors.Wrap(err, "failed to save pending events on child db")
 	}
 
+	err = h.SaveInternalStatus(h.stage)
+	if err != nil {
+		return errors.Wrap(err, "failed to save internal status")
+	}
+
 	err = h.stage.Commit()
 	if err != nil {
 		return errors.Wrap(err, "failed to commit stage")

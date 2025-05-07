@@ -91,7 +91,7 @@ func (ch *Child) Initialize(
 
 	ch.host = host
 	ch.registerHandlers()
-	return nil
+	return ch.LoadInternalStatus()
 }
 
 func (ch *Child) registerHandlers() {

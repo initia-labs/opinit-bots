@@ -95,7 +95,7 @@ func (c *Celestia) Initialize(ctx types.Context, batch batchNode, bridgeId uint6
 	if err != nil {
 		return errors.Wrap(err, "failed to create namespace")
 	}
-	return nil
+	return c.LoadInternalStatus()
 }
 
 func (c *Celestia) RegisterDAHandlers() {

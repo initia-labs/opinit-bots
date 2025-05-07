@@ -11,6 +11,8 @@ var (
 	WithdrawalAddressPrefix  = []byte("withdrawal_address")
 
 	WithdrawalSequenceKeyLength = len(WithdrawalSequencePrefix) + 1 + 8
+
+	InternalStatusKey = []byte("internal_status")
 )
 
 func PrefixedWithdrawalSequence(sequence uint64) []byte {

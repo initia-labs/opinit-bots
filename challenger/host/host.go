@@ -91,6 +91,12 @@ func (h *Host) Initialize(ctx types.Context, processedHeight int64, child childN
 			return time.Time{}, errors.Wrap(err, "failed to query block time")
 		}
 	}
+
+	err = h.LoadInternalStatus()
+	if err != nil {
+		return time.Time{}, errors.Wrap(err, "failed to load internal status")
+	}
+
 	return blockTime, nil
 }
 

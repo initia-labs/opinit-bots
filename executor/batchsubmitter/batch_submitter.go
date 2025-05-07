@@ -145,7 +145,7 @@ func (bs *BatchSubmitter) Initialize(ctx types.Context, syncedHeight int64, host
 	}
 
 	bs.node.RegisterRawBlockHandler(bs.rawBlockHandler)
-	return nil
+	return bs.LoadInternalStatus()
 }
 
 func (bs *BatchSubmitter) SetDANode(da executortypes.DANode) {
