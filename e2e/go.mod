@@ -6,8 +6,8 @@ require (
 	cosmossdk.io/math v1.4.0
 	github.com/cosmos/ibc-go/v8 v8.7.0
 	github.com/cosmos/interchain-security/v6 v6.3.0
-	github.com/initia-labs/OPinit v1.0.0-beta.1
-	github.com/initia-labs/OPinit/api v1.0.0-beta.1
+	github.com/initia-labs/OPinit v1.0.0
+	github.com/initia-labs/OPinit/api v1.0.0
 	github.com/initia-labs/opinit-bots v0.1.16
 	github.com/skip-mev/connect/v2 v2.3.0
 	github.com/strangelove-ventures/interchaintest/v8 v8.8.1
