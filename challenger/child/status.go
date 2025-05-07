@@ -72,7 +72,7 @@ type InternalStatus struct {
 	LastOutputSubmissionTime          time.Time `json:"last_output_submission_time"`
 }
 
-func (ch *Child) GetInternalStatus() InternalStatus {
+func (ch Child) GetInternalStatus() InternalStatus {
 	return InternalStatus{
 		LastUpdatedOracleL1Height:         ch.lastUpdatedOracleL1Height,
 		LastFinalizedDepositL1BlockHeight: ch.lastFinalizedDepositL1BlockHeight,
@@ -81,7 +81,7 @@ func (ch *Child) GetInternalStatus() InternalStatus {
 	}
 }
 
-func (ch *Child) SaveInternalStatus(db types.BasicDB) error {
+func (ch Child) SaveInternalStatus(db types.BasicDB) error {
 	internalStatusBytes, err := json.Marshal(ch.GetInternalStatus())
 	if err != nil {
 		return errors.Wrap(err, "failed to marshal internal status")
