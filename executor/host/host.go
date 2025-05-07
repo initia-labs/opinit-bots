@@ -88,7 +88,7 @@ func (h *Host) Initialize(
 		return errors.Wrap(err, "failed to query next L1 sequence")
 	}
 	h.registerHandlers()
-	return nil
+	return h.LoadInternalStatus()
 }
 
 func (h *Host) InitializeDA(

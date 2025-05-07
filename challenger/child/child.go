@@ -34,6 +34,7 @@ type Child struct {
 
 	eventQueue []challengertypes.ChallengeEvent
 
+	nextOutputTime        time.Time
 	finalizingBlockHeight int64
 
 	// status info
@@ -41,7 +42,6 @@ type Child struct {
 	lastFinalizedDepositL1BlockHeight int64
 	lastFinalizedDepositL1Sequence    uint64
 	lastOutputTime                    time.Time
-	nextOutputTime                    time.Time
 
 	stage types.CommitDB
 }

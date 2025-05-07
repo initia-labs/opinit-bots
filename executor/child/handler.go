@@ -62,6 +62,11 @@ func (ch *Child) endBlockHandler(ctx types.Context, args nodetypes.EndBlockArgs)
 		ch.EmptyProcessedMsgs()
 	}
 
+	err = ch.SaveInternalStatus(ch.stage)
+	if err != nil {
+		return errors.Wrap(err, "failed to save internal status")
+	}
+
 	err = ch.stage.Commit()
 	if err != nil {
 		return errors.Wrap(err, "failed to commit stage")

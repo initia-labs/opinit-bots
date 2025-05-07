@@ -42,5 +42,5 @@ func (c *Celestia) payForBlobsHandler(ctx types.Context, args nodetypes.EventHan
 		zap.String("blob_sizes", blobSizes),
 		zap.String("namespaces", namespaces),
 	)
-	return nil
+	return c.SaveInternalStatus(c.db)
 }
