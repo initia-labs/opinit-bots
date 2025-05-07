@@ -8,6 +8,7 @@ import (
 	"github.com/initia-labs/opinit-bots/txutils"
 	"github.com/initia-labs/opinit-bots/types"
 
+	authz "github.com/cosmos/cosmos-sdk/x/authz"
 	opchildtypes "github.com/initia-labs/OPinit/x/opchild/types"
 	challengerdb "github.com/initia-labs/opinit-bots/challenger/db"
 	"github.com/pkg/errors"
@@ -114,10 +115,33 @@ func (ch *Child) txHandler(ctx types.Context, args nodetypes.TxHandlerArgs) erro
 		// we only expect one message for oracle tx
 		return nil
 	}
-	msg, ok := msgs[0].(*opchildtypes.MsgUpdateOracle)
-	if !ok {
+
+	var msgSender string
+	var msgHeight int64
+	var msgData []byte
+
+	switch msg := msgs[0].(type) {
+	case *opchildtypes.MsgUpdateOracle:
+		msgSender = msg.Sender
+		msgHeight = types.MustUint64ToInt64(msg.Height)
+		msgData = msg.Data
+	case *authz.MsgExec:
+		msgSender = msg.Grantee
+
+		if len(msg.Msgs) != 1 || msg.Msgs[0].TypeUrl != "/opinit.opchild.v1.MsgUpdateOracle" {
+			return nil
+		}
+		oracleMsg := new(opchildtypes.MsgUpdateOracle)
+		err = oracleMsg.Unmarshal(msg.Msgs[0].Value)
+		if err != nil {
+			return err
+		}
+		msgHeight = types.MustUint64ToInt64(oracleMsg.Height)
+		msgData = oracleMsg.Data
+	default:
 		return nil
 	}
-	ch.oracleTxHandler(ctx, args.BlockTime, msg.Sender, types.MustUint64ToInt64(msg.Height), msg.Data)
+
+	ch.oracleTxHandler(ctx, args.BlockTime, msgSender, msgHeight, msgData)
 	return nil
 }
