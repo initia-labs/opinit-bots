@@ -1,6 +1,7 @@
 package broadcaster
 
 import (
+	"context"
 	"encoding/hex"
 	"fmt"
 	"math"
@@ -350,4 +351,12 @@ func (b *Broadcaster) LenLocalPendingTxByMsgType(msgType string) (int, error) {
 		}
 	}
 	return count, nil
+}
+
+func (b Broadcaster) BroadcastTxSync(ctx context.Context, txBytes []byte) (*rpccoretypes.ResultBroadcastTx, error) {
+	return b.rpcClient.BroadcastTxSync(ctx, txBytes)
+}
+
+func (b Broadcaster) BroadcastTxAsync(ctx context.Context, txBytes []byte) (*rpccoretypes.ResultBroadcastTx, error) {
+	return b.rpcClient.BroadcastTxAsync(ctx, txBytes)
 }
