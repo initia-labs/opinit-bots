@@ -7,6 +7,7 @@ import (
 	"github.com/pkg/errors"
 
 	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
+	dbtypes "github.com/initia-labs/opinit-bots/db/types"
 	nodetypes "github.com/initia-labs/opinit-bots/node/types"
 	"github.com/initia-labs/opinit-bots/types"
 
@@ -61,7 +62,9 @@ func (bs BatchSubmitter) SaveInternalStatus(db types.BasicDB) error {
 
 func (bs *BatchSubmitter) LoadInternalStatus() error {
 	internalStatusBytes, err := bs.DB().Get(executortypes.InternalStatusKey)
-	if err != nil {
+	if errors.Is(err, dbtypes.ErrNotFound) {
+		return nil
+	} else if err != nil {
 		return errors.Wrap(err, "failed to get internal status")
 	}
 	var internalStatus InternalStatus

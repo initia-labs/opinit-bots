@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"time"
 
+	dbtypes "github.com/initia-labs/opinit-bots/db/types"
 	nodetypes "github.com/initia-labs/opinit-bots/node/types"
 	"github.com/initia-labs/opinit-bots/types"
 	"github.com/pkg/errors"
@@ -74,7 +75,9 @@ func (ch *Child) SaveInternalStatus(db types.BasicDB) error {
 
 func (ch *Child) LoadInternalStatus() error {
 	internalStatusBytes, err := ch.DB().Get(executortypes.InternalStatusKey)
-	if err != nil {
+	if errors.Is(err, dbtypes.ErrNotFound) {
+		return nil
+	} else if err != nil {
 		return errors.Wrap(err, "failed to get internal status")
 	}
 	var internalStatus InternalStatus

@@ -9,6 +9,7 @@ import (
 	nodetypes "github.com/initia-labs/opinit-bots/node/types"
 	"github.com/initia-labs/opinit-bots/types"
 
+	dbtypes "github.com/initia-labs/opinit-bots/db/types"
 	executortypes "github.com/initia-labs/opinit-bots/executor/types"
 )
 
@@ -39,7 +40,9 @@ func (c Celestia) SaveInternalStatus(db types.BasicDB) error {
 
 func (c *Celestia) LoadInternalStatus() error {
 	internalStatusBytes, err := c.DB().Get(executortypes.InternalStatusKey)
-	if err != nil {
+	if errors.Is(err, dbtypes.ErrNotFound) {
+		return nil
+	} else if err != nil {
 		return errors.Wrap(err, "failed to get internal status")
 	}
 	var internalStatus InternalStatus
