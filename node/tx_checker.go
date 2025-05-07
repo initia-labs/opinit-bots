@@ -54,6 +54,9 @@ func (n *Node) txChecker(ctx types.Context, enableEventHandler bool) error {
 		res, blockTime, err := n.broadcaster.CheckPendingTx(ctx, pendingTx)
 		if errors.Is(err, types.ErrTxNotFound) {
 			// tx not found
+			// it does not check the result of the broadcast
+			// this is in case the Tx gets removed from the mempool
+			n.broadcaster.BroadcastTxAsync(ctx, pendingTx.Tx) //nolint:errcheck
 			continue
 		} else if err != nil {
 			ctx.Logger().Error("failed to check pending tx", zap.String("tx_hash", pendingTx.TxHash), zap.String("error", err.Error()))

@@ -7,7 +7,8 @@ import (
 	"time"
 )
 
-const MaxRetryCount = 7
+// ~ 30 seconds
+const MaxRetryCount = 4
 
 // SleepWithRetry sleeps with exponential backoff.
 func SleepWithRetry(ctx context.Context, retry int) bool {
