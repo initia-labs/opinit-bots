@@ -65,6 +65,12 @@ func (b *Broadcaster) CheckPendingTx(ctx types.Context, pendingTx btypes.Pending
 	} else if txerr != nil {
 		return nil, time.Time{}, txerr
 	} else if res.TxResult.Code != 0 {
+		for _, e := range ignoringErrors {
+			if strings.Contains(res.TxResult.Log, e.Error()) {
+				ctx.Logger().Warn("ignoring error", zap.String("error", e.Error()))
+				return nil, time.Time{}, nil
+			}
+		}
 		panic(fmt.Errorf("tx failed, tx hash: %s, code: %d, log: %s; you might need to check gas adjustment config or balance", pendingTx.TxHash, res.TxResult.Code, res.TxResult.Log))
 	}
 
