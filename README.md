@@ -114,7 +114,7 @@ In your configuration file (`~/.opinit/[bot-name].json`), you can specify a list
   "l1_node": {
     "chain_id": "testnet-l1-1",
     "bech32_prefix": "init",
-    "rpc_address": [
+    "rpc_addresses": [
       "tcp://doi-rpc:26657",
       "tcp://another-l1-rpc:26657"
     ]
@@ -122,16 +122,16 @@ In your configuration file (`~/.opinit/[bot-name].json`), you can specify a list
   "l2_node": {
     "chain_id": "testnet-l2-1",
     "bech32_prefix": "init",
-    "rpc_address": [
-      "tcp://rpc:27657",
+    "rpc_addresses": [
+      "tcp://moro-rpc:27657",
       "tcp://another-l2-rpc:27657"
     ]
   },
   "da_node": {
     "chain_id": "testnet-l1-1",
     "bech32_prefix": "init",
-    "rpc_address": [
-      "tcp://rpc:26657",
+    "rpc_addresses": [
+      "tcp://rene-rpc:26657",
       "tcp://another-da-rpc:26657"
     ]
   }

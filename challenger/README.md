@@ -28,7 +28,7 @@ To configure the Challenger, fill in the values in the `~/.opinit/challenger.jso
   "l1_node": {
     "chain_id": "testnet-l1-1",
     "bech32_prefix": "init",
-    "rpc_address": [
+    "rpc_addresses": [
       "tcp://doi-rpc:26657",
       "tcp://localhost:26657"
     ],
@@ -36,8 +36,8 @@ To configure the Challenger, fill in the values in the `~/.opinit/challenger.jso
   "l2_node": {
     "chain_id": "testnet-l2-1",
     "bech32_prefix": "init",
-    "rpc_address": [
-      "tcp://another-rpc:26657",
+    "rpc_addresses": [
+      "tcp://moro-rpc:26657",
       "tcp://localhost:27657"
     ],
   },
