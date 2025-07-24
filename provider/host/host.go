@@ -53,7 +53,7 @@ func NewBaseHostV1(cfg nodetypes.NodeConfig, db types.DB) *BaseHost {
 
 		cfg: cfg,
 
-		ophostQueryClient: ophosttypes.NewQueryClient(node.GetRPCClient()),
+		// ophostQueryClient will be initialized in Initialize() method after node is initialized
 
 		processedMsgs: make([]btypes.ProcessedMsgs, 0),
 		msgQueue:      make(map[string][]sdk.Msg),
@@ -73,11 +73,44 @@ func GetCodec(bech32Prefix string) (codec.Codec, client.TxConfig, error) {
 	return codec, txConfig, err
 }
 
-func (b *BaseHost) Initialize(ctx types.Context, processedHeight int64, bridgeInfo ophosttypes.QueryBridgeResponse, keyringConfig *btypes.KeyringConfig) error {
-	err := b.node.Initialize(ctx, processedHeight, b.keyringConfigs(keyringConfig))
-	if err != nil {
-		return errors.Wrap(err, "failed to initialize node")
+// InitializeQueryClient initializes just the RPC client and query client for basic queries
+// This should be called before QueryBridgeConfig is needed, before full initialization
+func (b *BaseHost) InitializeQueryClient(ctx types.Context) error {
+	if b.ophostQueryClient != nil {
+		return nil // Already initialized
 	}
+	
+	// Initialize the node's RPC client with minimal configuration
+	err := b.node.Initialize(ctx, 0, []btypes.KeyringConfig{})
+	if err != nil {
+		return errors.Wrap(err, "failed to initialize node for query client")
+	}
+	
+	// Initialize the ophost query client
+	b.ophostQueryClient = ophosttypes.NewQueryClient(b.node.GetRPCClient())
+	
+	return nil
+}
+
+func (b *BaseHost) Initialize(ctx types.Context, processedHeight int64, bridgeInfo ophosttypes.QueryBridgeResponse, keyringConfig *btypes.KeyringConfig) error {
+	// Initialize the node if not already done by InitializeQueryClient
+	var err error
+	if b.ophostQueryClient == nil {
+		err = b.node.Initialize(ctx, processedHeight, b.keyringConfigs(keyringConfig))
+		if err != nil {
+			return errors.Wrap(err, "failed to initialize node")
+		}
+		
+		// Initialize the ophost query client after the node's RPC client is ready
+		b.ophostQueryClient = ophosttypes.NewQueryClient(b.node.GetRPCClient())
+	} else {
+		// Node was already initialized by InitializeQueryClient, just reinitialize with proper config
+		err = b.node.Initialize(ctx, processedHeight, b.keyringConfigs(keyringConfig))
+		if err != nil {
+			return errors.Wrap(err, "failed to initialize node")
+		}
+	}
+	
 	b.SetBridgeInfo(bridgeInfo)
 	return nil
 }

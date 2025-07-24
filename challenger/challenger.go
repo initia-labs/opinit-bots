@@ -84,12 +84,24 @@ func NewChallenger(cfg *challengertypes.Config, db types.DB, sv *server.Server) 
 }
 
 func (c *Challenger) Initialize(ctx types.Context) error {
+	// Initialize the child's query client first so we can query bridge info
+	err := c.child.InitializeQueryClient(ctx)
+	if err != nil {
+		return errors.Wrap(err, "failed to initialize child query client")
+	}
+	
 	childBridgeInfo, err := c.child.QueryBridgeInfo(ctx)
 	if err != nil {
 		return err
 	}
 	if childBridgeInfo.BridgeId == 0 {
 		return errors.New("bridge info is not set")
+	}
+
+	// Initialize the host's query client so we can query bridge config
+	err = c.host.InitializeQueryClient(ctx)
+	if err != nil {
+		return errors.Wrap(err, "failed to initialize host query client")
 	}
 
 	bridgeInfo, err := c.host.QueryBridgeConfig(ctx, childBridgeInfo.BridgeId)
@@ -179,8 +191,25 @@ func (c *Challenger) Start(ctx types.Context) error {
 		return c.challengeHandler(ctx)
 	})
 
-	c.host.Start(ctx)
-	c.child.Start(ctx)
+	// Start components in separate goroutines to ensure proper shutdown handling
+	ctx.ErrGrp().Go(func() (err error) {
+		defer func() {
+			ctx.Logger().Info("host stopped")
+		}()
+		c.host.Start(ctx)
+		<-ctx.Done()
+		return nil
+	})
+
+	ctx.ErrGrp().Go(func() (err error) {
+		defer func() {
+			ctx.Logger().Info("child stopped")
+		}()
+		c.child.Start(ctx)
+		<-ctx.Done()
+		return nil
+	})
+
 	return ctx.ErrGrp().Wait()
 }
 

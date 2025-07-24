@@ -79,7 +79,7 @@ v0.1.9-2: Fill block hash of finalized tree
 					return err
 				}
 
-				rpcClient, err := rpcclient.NewRPCClient(cdc, l2Config.RPC)
+				rpcClient, err := rpcclient.NewRPCClient(cdc, l2Config.RPC, baseCtx.Logger().Named("migration-rpcclient"))
 				if err != nil {
 					return err
 				}

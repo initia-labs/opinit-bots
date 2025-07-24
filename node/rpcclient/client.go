@@ -41,20 +41,14 @@ type RPCClient struct {
 	pool *RPCPool
 }
 
-func NewRPCClient(cdc codec.Codec, rpcAddrs []string) (*RPCClient, error) {
+func NewRPCClient(cdc codec.Codec, rpcAddrs []string, logger *zap.Logger) (*RPCClient, error) {
 	if len(rpcAddrs) == 0 {
 		return nil, errors.New("no RPC addresses provided")
 	}
 
-	// Create logger
-	logger, err := zap.NewProduction()
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to create logger")
-	}
-
 	// Create RPC pool
 	pool := NewRPCPool(rpcAddrs, logger)
-	
+
 	// Create HTTP client with the first endpoint
 	client, err := clienthttp.New(pool.GetCurrentEndpoint(), "/websocket")
 	if err != nil {
@@ -68,15 +62,9 @@ func NewRPCClient(cdc codec.Codec, rpcAddrs []string) (*RPCClient, error) {
 	}, nil
 }
 
-func NewRPCClientWithClient(cdc codec.Codec, client *clienthttp.HTTP, endpoints []string) (*RPCClient, error) {
+func NewRPCClientWithClient(cdc codec.Codec, client *clienthttp.HTTP, endpoints []string, logger *zap.Logger) (*RPCClient, error) {
 	if len(endpoints) == 0 {
 		return nil, errors.New("no RPC endpoints provided")
-	}
-
-	// Create logger
-	logger, err := zap.NewProduction()
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to create logger")
 	}
 
 	// Create RPC pool
@@ -228,7 +216,7 @@ func GetQueryContext(ctx context.Context, height int64) (context.Context, contex
 func (q RPCClient) QueryRawCommit(ctx context.Context, height int64) ([]byte, error) {
 	ctx, cancel := GetQueryContext(ctx, height)
 	defer cancel()
-	
+
 	var result []byte
 	var err error
 
@@ -248,7 +236,7 @@ func (q RPCClient) QueryRawCommit(ctx context.Context, height int64) ([]byte, er
 func (q *RPCClient) QueryBlockBulk(ctx context.Context, start int64, end int64) ([][]byte, error) {
 	ctx, cancel := GetQueryContext(ctx, 0)
 	defer cancel()
-	
+
 	var result [][]byte
 	var err error
 
@@ -282,7 +270,7 @@ func (q *RPCClient) updateHTTPClient() error {
 	if q.HTTP.Remote() == "" {
 		return nil
 	}
-	
+
 	currentEndpoint := q.pool.GetCurrentEndpoint()
 	if q.HTTP.Remote() != currentEndpoint {
 		// Create new HTTP client with current endpoint
@@ -349,7 +337,7 @@ func (q *RPCClient) BlockResults(ctx context.Context, height *int64) (*coretypes
 func (q *RPCClient) QueryTx(ctx context.Context, txHash []byte) (*coretypes.ResultTx, error) {
 	ctx, cancel := GetQueryContext(ctx, 0)
 	defer cancel()
-	
+
 	var result *coretypes.ResultTx
 	var err error
 

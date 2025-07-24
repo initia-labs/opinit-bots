@@ -49,14 +49,7 @@ func NewNode(cfg nodetypes.NodeConfig, db types.DB, cdc codec.Codec, txConfig cl
 		return nil, err
 	}
 
-	rpcClient, err := rpcclient.NewRPCClient(cdc, cfg.RPC)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to create RPC client")
-	}
-
 	n := &Node{
-		rpcClient: rpcClient,
-
 		cfg: cfg,
 		db:  db,
 
@@ -67,19 +60,6 @@ func NewNode(cfg nodetypes.NodeConfig, db types.DB, cdc codec.Codec, txConfig cl
 
 		startOnce: &sync.Once{},
 		syncing:   true,
-	}
-	// create broadcaster
-	if n.cfg.BroadcasterConfig != nil {
-		n.broadcaster, err = broadcaster.NewBroadcaster(
-			*n.cfg.BroadcasterConfig,
-			n.db,
-			n.cdc,
-			n.txConfig,
-			rpcClient,
-		)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to create broadcaster")
-		}
 	}
 
 	syncedHeight, err := GetSyncInfo(n.db)
@@ -96,6 +76,28 @@ func NewNode(cfg nodetypes.NodeConfig, db types.DB, cdc codec.Codec, txConfig cl
 // If it is 0, the latest height is used.
 // If the latest height exists in the database, this is ignored.
 func (n *Node) Initialize(ctx types.Context, processedHeight int64, keyringConfig []btypes.KeyringConfig) (err error) {
+	// Create RPC client with shared logger from context
+	if n.rpcClient == nil {
+		n.rpcClient, err = rpcclient.NewRPCClient(n.cdc, n.cfg.RPC, ctx.Logger().Named("rpcclient"))
+		if err != nil {
+			return errors.Wrap(err, "failed to create RPC client")
+		}
+	}
+
+	// Create broadcaster if needed
+	if n.cfg.BroadcasterConfig != nil && n.broadcaster == nil {
+		n.broadcaster, err = broadcaster.NewBroadcaster(
+			*n.cfg.BroadcasterConfig,
+			n.db,
+			n.cdc,
+			n.txConfig,
+			n.rpcClient,
+		)
+		if err != nil {
+			return errors.Wrap(err, "failed to create broadcaster")
+		}
+	}
+
 	// check if node is catching up
 	status, err := n.rpcClient.Status(ctx)
 	if err != nil {
@@ -233,6 +235,9 @@ func (n Node) MustGetBroadcaster() *broadcaster.Broadcaster {
 }
 
 func (n Node) GetRPCClient() *rpcclient.RPCClient {
+	if n.rpcClient == nil {
+		panic("RPC client not initialized - call Initialize() first")
+	}
 	return n.rpcClient
 }
 
