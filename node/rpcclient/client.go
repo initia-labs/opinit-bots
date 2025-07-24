@@ -2,7 +2,6 @@ package rpcclient
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"reflect"
 	"strconv"
@@ -17,7 +16,10 @@ import (
 	abci "github.com/cometbft/cometbft/abci/types"
 	client2 "github.com/cometbft/cometbft/rpc/client"
 	coretypes "github.com/cometbft/cometbft/rpc/core/types"
+	cmttypes "github.com/cometbft/cometbft/types"
 	gogogrpc "github.com/cosmos/gogoproto/grpc"
+	"github.com/pkg/errors"
+	"go.uber.org/zap"
 
 	"github.com/cosmos/cosmos-sdk/codec"
 	"github.com/cosmos/cosmos-sdk/codec/types"
@@ -35,11 +37,26 @@ var protoCodec = encoding.GetCodec(proto.Name)
 type RPCClient struct {
 	*clienthttp.HTTP
 
-	cdc codec.Codec
+	cdc  codec.Codec
+	pool *RPCPool
 }
 
-func NewRPCClient(cdc codec.Codec, rpcAddr string) (*RPCClient, error) {
-	client, err := clienthttp.New(rpcAddr, "/websocket")
+func NewRPCClient(cdc codec.Codec, rpcAddrs []string) (*RPCClient, error) {
+	if len(rpcAddrs) == 0 {
+		return nil, errors.New("no RPC addresses provided")
+	}
+
+	// Create logger
+	logger, err := zap.NewProduction()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to create logger")
+	}
+
+	// Create RPC pool
+	pool := NewRPCPool(rpcAddrs, logger)
+	
+	// Create HTTP client with the first endpoint
+	client, err := clienthttp.New(pool.GetCurrentEndpoint(), "/websocket")
 	if err != nil {
 		return nil, err
 	}
@@ -47,14 +64,29 @@ func NewRPCClient(cdc codec.Codec, rpcAddr string) (*RPCClient, error) {
 	return &RPCClient{
 		HTTP: client,
 		cdc:  cdc,
+		pool: pool,
 	}, nil
 }
 
-func NewRPCClientWithClient(cdc codec.Codec, client *clienthttp.HTTP) *RPCClient {
+func NewRPCClientWithClient(cdc codec.Codec, client *clienthttp.HTTP, endpoints []string) (*RPCClient, error) {
+	if len(endpoints) == 0 {
+		return nil, errors.New("no RPC endpoints provided")
+	}
+
+	// Create logger
+	logger, err := zap.NewProduction()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to create logger")
+	}
+
+	// Create RPC pool
+	pool := NewRPCPool(endpoints, logger)
+
 	return &RPCClient{
 		HTTP: client,
 		cdc:  cdc,
-	}
+		pool: pool,
+	}, nil
 }
 
 // Invoke implements the grpc ClientConq.Invoke method
@@ -153,9 +185,16 @@ func (q RPCClient) QueryABCI(ctx context.Context, req abci.RequestQuery) (abci.R
 		Prove:  req.Prove,
 	}
 
-	result, err := q.ABCIQueryWithOptions(ctx, req.Path, req.Data, opts)
-	if err != nil {
-		return abci.ResponseQuery{}, err
+	var result *coretypes.ResultABCIQuery
+	var err error
+
+	execErr := q.ExecuteWithFallback(ctx, func(ctx context.Context) error {
+		result, err = q.ABCIQueryWithOptions(ctx, req.Path, req.Data, opts)
+		return err
+	})
+
+	if execErr != nil {
+		return abci.ResponseQuery{}, execErr
 	}
 
 	if !result.Response.IsOK() {
@@ -189,18 +228,190 @@ func GetQueryContext(ctx context.Context, height int64) (context.Context, contex
 func (q RPCClient) QueryRawCommit(ctx context.Context, height int64) ([]byte, error) {
 	ctx, cancel := GetQueryContext(ctx, height)
 	defer cancel()
-	return q.RawCommit(ctx, &height)
+	
+	var result []byte
+	var err error
+
+	execErr := q.ExecuteWithFallback(ctx, func(ctx context.Context) error {
+		result, err = q.RawCommit(ctx, &height)
+		return err
+	})
+
+	if execErr != nil {
+		return nil, execErr
+	}
+
+	return result, nil
 }
 
-// QueryBlockBulk queries blocks in bulk.
-func (q RPCClient) QueryBlockBulk(ctx context.Context, start int64, end int64) ([][]byte, error) {
+// QueryBlockBulk queries blocks in bulk with fallback and retry logic.
+func (q *RPCClient) QueryBlockBulk(ctx context.Context, start int64, end int64) ([][]byte, error) {
 	ctx, cancel := GetQueryContext(ctx, 0)
 	defer cancel()
-	return q.BlockBulk(ctx, &start, &end)
+	
+	var result [][]byte
+	var err error
+
+	execErr := q.ExecuteWithFallback(ctx, func(ctx context.Context) error {
+		result, err = q.BlockBulk(ctx, &start, &end)
+		return err
+	})
+
+	if execErr != nil {
+		return nil, execErr
+	}
+
+	return result, nil
 }
 
-func (q RPCClient) QueryTx(ctx context.Context, txHash []byte) (*coretypes.ResultTx, error) {
+// ExecuteWithFallback executes the given function with fallback to other endpoints if it fails
+func (q *RPCClient) ExecuteWithFallback(ctx context.Context, fn func(context.Context) error) error {
+	return q.pool.ExecuteWithFallback(ctx, func(ctx context.Context) error {
+		// Update HTTP client to current endpoint before executing
+		if err := q.updateHTTPClient(); err != nil {
+			return err
+		}
+		return fn(ctx)
+	})
+}
+
+// updateHTTPClient updates the HTTP client to use the current endpoint from the pool
+func (q *RPCClient) updateHTTPClient() error {
+	// If this is a mock client (created with NewWithCaller), don't replace it
+	// Mock clients have empty remote and nil rpc field
+	if q.HTTP.Remote() == "" {
+		return nil
+	}
+	
+	currentEndpoint := q.pool.GetCurrentEndpoint()
+	if q.HTTP.Remote() != currentEndpoint {
+		// Create new HTTP client with current endpoint
+		client, err := clienthttp.New(currentEndpoint, "/websocket")
+		if err != nil {
+			return err
+		}
+		q.HTTP = client
+	}
+	return nil
+}
+
+// Status returns the status of the node with fallback and retry logic
+func (q *RPCClient) Status(ctx context.Context) (*coretypes.ResultStatus, error) {
+	var result *coretypes.ResultStatus
+	var err error
+
+	execErr := q.ExecuteWithFallback(ctx, func(ctx context.Context) error {
+		result, err = q.HTTP.Status(ctx)
+		return err
+	})
+
+	if execErr != nil {
+		return nil, execErr
+	}
+
+	return result, nil
+}
+
+// Block returns the block at the given height with fallback and retry logic
+func (q *RPCClient) Block(ctx context.Context, height *int64) (*coretypes.ResultBlock, error) {
+	var result *coretypes.ResultBlock
+	var err error
+
+	execErr := q.ExecuteWithFallback(ctx, func(ctx context.Context) error {
+		result, err = q.HTTP.Block(ctx, height)
+		return err
+	})
+
+	if execErr != nil {
+		return nil, execErr
+	}
+
+	return result, nil
+}
+
+// BlockResults returns the block results at the given height with fallback and retry logic
+func (q *RPCClient) BlockResults(ctx context.Context, height *int64) (*coretypes.ResultBlockResults, error) {
+	var result *coretypes.ResultBlockResults
+	var err error
+
+	execErr := q.ExecuteWithFallback(ctx, func(ctx context.Context) error {
+		result, err = q.HTTP.BlockResults(ctx, height)
+		return err
+	})
+
+	if execErr != nil {
+		return nil, execErr
+	}
+
+	return result, nil
+}
+
+func (q *RPCClient) QueryTx(ctx context.Context, txHash []byte) (*coretypes.ResultTx, error) {
 	ctx, cancel := GetQueryContext(ctx, 0)
 	defer cancel()
-	return q.Tx(ctx, txHash, false)
+	
+	var result *coretypes.ResultTx
+	var err error
+
+	execErr := q.ExecuteWithFallback(ctx, func(ctx context.Context) error {
+		result, err = q.Tx(ctx, txHash, false)
+		return err
+	})
+
+	if execErr != nil {
+		return nil, execErr
+	}
+
+	return result, nil
+}
+
+// Tx returns the transaction with the given hash with fallback and retry logic
+func (q *RPCClient) Tx(ctx context.Context, hash []byte, prove bool) (*coretypes.ResultTx, error) {
+	var result *coretypes.ResultTx
+	var err error
+
+	execErr := q.ExecuteWithFallback(ctx, func(ctx context.Context) error {
+		result, err = q.HTTP.Tx(ctx, hash, prove)
+		return err
+	})
+
+	if execErr != nil {
+		return nil, execErr
+	}
+
+	return result, nil
+}
+
+// BroadcastTxSync broadcasts a transaction synchronously with fallback and retry logic
+func (q *RPCClient) BroadcastTxSync(ctx context.Context, tx cmttypes.Tx) (*coretypes.ResultBroadcastTx, error) {
+	var result *coretypes.ResultBroadcastTx
+	var err error
+
+	execErr := q.ExecuteWithFallback(ctx, func(ctx context.Context) error {
+		result, err = q.HTTP.BroadcastTxSync(ctx, tx)
+		return err
+	})
+
+	if execErr != nil {
+		return nil, execErr
+	}
+
+	return result, nil
+}
+
+// BroadcastTxAsync broadcasts a transaction asynchronously with fallback and retry logic
+func (q *RPCClient) BroadcastTxAsync(ctx context.Context, tx cmttypes.Tx) (*coretypes.ResultBroadcastTx, error) {
+	var result *coretypes.ResultBroadcastTx
+	var err error
+
+	execErr := q.ExecuteWithFallback(ctx, func(ctx context.Context) error {
+		result, err = q.HTTP.BroadcastTxAsync(ctx, tx)
+		return err
+	})
+
+	if execErr != nil {
+		return nil, execErr
+	}
+
+	return result, nil
 }

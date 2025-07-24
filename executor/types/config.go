@@ -11,12 +11,12 @@ import (
 )
 
 type NodeConfig struct {
-	ChainID       string  `json:"chain_id"`
-	Bech32Prefix  string  `json:"bech32_prefix"`
-	RPCAddress    string  `json:"rpc_address"`
-	GasPrice      string  `json:"gas_price"`
-	GasAdjustment float64 `json:"gas_adjustment"`
-	TxTimeout     int64   `json:"tx_timeout"` // seconds
+	ChainID       string   `json:"chain_id"`
+	Bech32Prefix  string   `json:"bech32_prefix"`
+	RPCAddress    []string `json:"rpc_address"`
+	GasPrice      string   `json:"gas_price"`
+	GasAdjustment float64  `json:"gas_adjustment"`
+	TxTimeout     int64    `json:"tx_timeout"` // seconds
 }
 
 func (nc NodeConfig) Validate() error {
@@ -26,7 +26,7 @@ func (nc NodeConfig) Validate() error {
 	if nc.Bech32Prefix == "" {
 		return errors.New("bech32 prefix is required")
 	}
-	if nc.RPCAddress == "" {
+	if len(nc.RPCAddress) == 0 {
 		return errors.New("RPC address is required")
 	}
 	return nil
@@ -109,7 +109,7 @@ func DefaultConfig() *Config {
 		L1Node: NodeConfig{
 			ChainID:       "testnet-l1-1",
 			Bech32Prefix:  "init",
-			RPCAddress:    "tcp://localhost:26657",
+			RPCAddress:    []string{"tcp://localhost:26657"},
 			GasPrice:      "0.15uinit",
 			GasAdjustment: 1.5,
 			TxTimeout:     60,
@@ -118,7 +118,7 @@ func DefaultConfig() *Config {
 		L2Node: NodeConfig{
 			ChainID:       "testnet-l2-1",
 			Bech32Prefix:  "init",
-			RPCAddress:    "tcp://localhost:27657",
+			RPCAddress:    []string{"tcp://localhost:27657"},
 			GasPrice:      "",
 			GasAdjustment: 1.5,
 			TxTimeout:     60,
@@ -127,7 +127,7 @@ func DefaultConfig() *Config {
 		DANode: NodeConfig{
 			ChainID:       "testnet-l1-1",
 			Bech32Prefix:  "init",
-			RPCAddress:    "tcp://localhost:26657",
+			RPCAddress:    []string{"tcp://localhost:26657"},
 			GasPrice:      "0.15uinit",
 			GasAdjustment: 1.5,
 			TxTimeout:     60,

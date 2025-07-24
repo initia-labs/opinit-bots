@@ -26,7 +26,10 @@ To configure the Executor, fill in the values in the `~/.opinit/executor.json` f
   "l1_node": {
     "chain_id": "testnet-l1-1",
     "bech32_prefix": "init",
-    "rpc_address": "tcp://localhost:26657",
+    "rpc_address": [
+      "tcp://doi-rpc.com",
+      "tcp://localhost:26657"
+    ],
     "gas_price": "0.15uinit",
     "gas_adjustment": 1.5,
     "tx_timeout": 60
@@ -34,7 +37,10 @@ To configure the Executor, fill in the values in the `~/.opinit/executor.json` f
   "l2_node": {
     "chain_id": "testnet-l2-1",
     "bech32_prefix": "init",
-    "rpc_address": "tcp://localhost:27657",
+    "rpc_address": [
+      "tcp://another-rpc:27657",
+      "tcp://localhost:27657"
+    ],
     "gas_price": "",
     "gas_adjustment": 1.5,
     "tx_timeout": 60
@@ -42,7 +48,10 @@ To configure the Executor, fill in the values in the `~/.opinit/executor.json` f
   "da_node": {
     "chain_id": "testnet-l1-1",
     "bech32_prefix": "init",
-    "rpc_address": "tcp://localhost:26657",
+    "rpc_address": [
+      "tcp://another-rpc:26657",
+      "tcp://localhost:26657"
+    ],
     "gas_price": "0.15uinit",
     "gas_adjustment": 1.5,
     "tx_timeout": 60

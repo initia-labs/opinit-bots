@@ -28,12 +28,18 @@ To configure the Challenger, fill in the values in the `~/.opinit/challenger.jso
   "l1_node": {
     "chain_id": "testnet-l1-1",
     "bech32_prefix": "init",
-    "rpc_address": "tcp://localhost:26657",
+    "rpc_address": [
+      "tcp://doi-rpc:26657",
+      "tcp://localhost:26657"
+    ],
   },
   "l2_node": {
     "chain_id": "testnet-l2-1",
     "bech32_prefix": "init",
-    "rpc_address": "tcp://localhost:27657",
+    "rpc_address": [
+      "tcp://another-rpc:26657",
+      "tcp://localhost:27657"
+    ],
   },
   // DisableAutoSetL1Height is the flag to disable the automatic setting of the l1 height.
   // If it is false, it will finds the optimal height and sets l1_start_height automatically

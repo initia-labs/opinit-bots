@@ -51,7 +51,7 @@ func NewNode(cfg nodetypes.NodeConfig, db types.DB, cdc codec.Codec, txConfig cl
 
 	rpcClient, err := rpcclient.NewRPCClient(cdc, cfg.RPC)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "failed to create RPC client")
 	}
 
 	n := &Node{

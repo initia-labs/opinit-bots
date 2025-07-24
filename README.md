@@ -100,3 +100,51 @@ Challenger node types:
 - host
 - child
 ```
+
+## RPC Pool Configuration
+
+To enhance reliability, the bots support multiple RPC endpoints for L1, L2, and DA nodes. This allows for automatic fallback and retries if an endpoint becomes unavailable.
+
+### Endpoint Configuration
+
+In your configuration file (`~/.opinit/[bot-name].json`), you can specify a list of RPC addresses for each node:
+
+```json
+{
+  "l1_node": {
+    "chain_id": "testnet-l1-1",
+    "bech32_prefix": "init",
+    "rpc_address": [
+      "tcp://doi-rpc:26657",
+      "tcp://another-l1-rpc:26657"
+    ]
+  },
+  "l2_node": {
+    "chain_id": "testnet-l2-1",
+    "bech32_prefix": "init",
+    "rpc_address": [
+      "tcp://rpc:27657",
+      "tcp://another-l2-rpc:27657"
+    ]
+  },
+  "da_node": {
+    "chain_id": "testnet-l1-1",
+    "bech32_prefix": "init",
+    "rpc_address": [
+      "tcp://rpc:26657",
+      "tcp://another-da-rpc:26657"
+    ]
+  }
+}
+```
+
+The bot will try the endpoints in the order they are listed. If a request to the first endpoint fails, it will automatically fall back to the next one in the list.
+
+### Timeout Configuration
+
+You can configure the timeout for each RPC request using the `RPC_TIMEOUT_SECONDS` environment variable. The value is in seconds. If the variable is not set, the default timeout is 5 seconds.
+
+```bash
+export RPC_TIMEOUT_SECONDS=10
+opinitd start [bot-name]
+```
