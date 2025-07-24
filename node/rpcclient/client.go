@@ -80,7 +80,7 @@ func NewRPCClientWithClient(cdc codec.Codec, client *clienthttp.HTTP, endpoints 
 }
 
 // Invoke implements the grpc ClientConq.Invoke method
-func (q RPCClient) Invoke(ctx context.Context, method string, req, reply interface{}, opts ...grpc.CallOption) (err error) {
+func (q *RPCClient) Invoke(ctx context.Context, method string, req, reply interface{}, opts ...grpc.CallOption) (err error) {
 	// In both cases, we don't allow empty request req (it will panic unexpectedly).
 	if reflect.ValueOf(req).IsNil() {
 		return sdkerrors.Wrap(legacyerrors.ErrInvalidRequest, "request cannot be nil")
@@ -113,7 +113,7 @@ func (q RPCClient) Invoke(ctx context.Context, method string, req, reply interfa
 }
 
 // NewStream implements the grpc ClientConq.NewStream method
-func (q RPCClient) NewStream(context.Context, *grpc.StreamDesc, string, ...grpc.CallOption) (grpc.ClientStream, error) {
+func (q *RPCClient) NewStream(context.Context, *grpc.StreamDesc, string, ...grpc.CallOption) (grpc.ClientStream, error) {
 	return nil, fmt.Errorf("streaming rpc not supported")
 }
 
@@ -121,7 +121,7 @@ func (q RPCClient) NewStream(context.Context, *grpc.StreamDesc, string, ...grpc.
 // arguments for the gRPC method, and returns the ABCI response. It is used
 // to factorize code between client (Invoke) and server (RegisterGRPCServer)
 // gRPC handlers.
-func (q RPCClient) RunGRPCQuery(ctx context.Context, method string, req interface{}, md metadata.MD) (abci.ResponseQuery, metadata.MD, error) {
+func (q *RPCClient) RunGRPCQuery(ctx context.Context, method string, req interface{}, md metadata.MD) (abci.ResponseQuery, metadata.MD, error) {
 	reqBz, err := protoCodec.Marshal(req)
 	if err != nil {
 		return abci.ResponseQuery{}, nil, err
@@ -169,7 +169,7 @@ func (q RPCClient) RunGRPCQuery(ctx context.Context, method string, req interfac
 }
 
 // QueryABCI performs an ABCI query and returns the appropriate response and error sdk error code.
-func (q RPCClient) QueryABCI(ctx context.Context, req abci.RequestQuery) (abci.ResponseQuery, error) {
+func (q *RPCClient) QueryABCI(ctx context.Context, req abci.RequestQuery) (abci.ResponseQuery, error) {
 	opts := client2.ABCIQueryOptions{
 		Height: req.Height,
 		Prove:  req.Prove,
@@ -215,7 +215,7 @@ func GetQueryContext(ctx context.Context, height int64) (context.Context, contex
 }
 
 // QueryRawCommit queries the raw commit at a given height.
-func (q RPCClient) QueryRawCommit(ctx context.Context, height int64) ([]byte, error) {
+func (q *RPCClient) QueryRawCommit(ctx context.Context, height int64) ([]byte, error) {
 	ctx, cancel := GetQueryContext(ctx, height)
 	defer cancel()
 

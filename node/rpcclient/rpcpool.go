@@ -186,7 +186,7 @@ func (p *RPCPool) ExecuteWithFallback(ctx context.Context, fn func(context.Conte
 			zap.Int("max_retries", p.maxRetries))
 
 		// Use SleepWithRetry for exponential backoff with jitter
-		if cancelled := types.SleepWithRetry(ctx, retry); cancelled {
+		if canceled := types.SleepWithRetry(ctx, retry); canceled {
 			return ctx.Err()
 		}
 
