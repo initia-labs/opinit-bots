@@ -12,8 +12,8 @@ import (
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 
-	clienthttp "github.com/initia-labs/opinit-bots/client"
 	"github.com/cosmos/cosmos-sdk/codec"
+	clienthttp "github.com/initia-labs/opinit-bots/client"
 )
 
 const (
@@ -43,8 +43,8 @@ func NewRPCPool(endpoints []string, logger *zap.Logger) *RPCPool {
 		if t, err := strconv.Atoi(timeoutStr); err == nil && t > 0 {
 			timeout = t
 		} else {
-			logger.Warn("Invalid RPC_TIMEOUT_SECONDS value, using default", 
-				zap.String("value", timeoutStr), 
+			logger.Warn("Invalid RPC_TIMEOUT_SECONDS value, using default",
+				zap.String("value", timeoutStr),
 				zap.Int("default", DefaultRPCTimeout))
 		}
 	}
@@ -82,26 +82,26 @@ func (p *RPCPool) ExecuteWithFallback(ctx context.Context, fn func(context.Conte
 	// Try all endpoints
 	for i := 0; i < len(p.endpoints); i++ {
 		currentEndpoint := p.GetCurrentEndpoint()
-		
+
 		// Create a timeout context
 		timeoutCtx, cancel := context.WithTimeout(ctx, p.rpcTimeout)
 		defer cancel()
-		
+
 		p.logger.Debug("Trying RPC endpoint", zap.String("endpoint", currentEndpoint))
-		
+
 		err := fn(timeoutCtx)
 		if err == nil {
 			return nil
 		}
-		
-		p.logger.Warn("RPC request failed, trying next endpoint", 
-			zap.String("endpoint", currentEndpoint), 
+
+		p.logger.Warn("RPC request failed, trying next endpoint",
+			zap.String("endpoint", currentEndpoint),
 			zap.String("error", err.Error()))
-		
+
 		// Move to the next endpoint
 		p.MoveToNextEndpoint()
 	}
-	
+
 	// If all endpoints failed, retry with exponential backoff
 	return p.retryWithBackoff(ctx, fn)
 }
@@ -109,51 +109,51 @@ func (p *RPCPool) ExecuteWithFallback(ctx context.Context, fn func(context.Conte
 // retryWithBackoff retries the given function with exponential backoff
 func (p *RPCPool) retryWithBackoff(ctx context.Context, fn func(context.Context) error) error {
 	var lastErr error
-	
+
 	for retry := 0; retry < p.maxRetries; retry++ {
 		// Calculate backoff duration
 		backoffDuration := time.Duration(math.Pow(2, float64(retry))) * p.retryInterval
-		
-		p.logger.Info("All RPC endpoints failed, retrying after backoff", 
-			zap.Duration("backoff", backoffDuration), 
-			zap.Int("retry", retry+1), 
+
+		p.logger.Info("All RPC endpoints failed, retrying after backoff",
+			zap.Duration("backoff", backoffDuration),
+			zap.Int("retry", retry+1),
 			zap.Int("max_retries", p.maxRetries))
-		
+
 		// Wait for backoff duration
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
 		case <-time.After(backoffDuration):
 		}
-		
+
 		// Try all endpoints again
 		for i := 0; i < len(p.endpoints); i++ {
 			currentEndpoint := p.GetCurrentEndpoint()
-			
+
 			// Create a timeout context
 			timeoutCtx, cancel := context.WithTimeout(ctx, p.rpcTimeout)
 			defer cancel()
-			
-			p.logger.Debug("Retrying RPC endpoint", 
-				zap.String("endpoint", currentEndpoint), 
+
+			p.logger.Debug("Retrying RPC endpoint",
+				zap.String("endpoint", currentEndpoint),
 				zap.Int("retry", retry+1))
-			
+
 			err := fn(timeoutCtx)
 			if err == nil {
 				return nil
 			}
-			
+
 			lastErr = err
-			p.logger.Warn("RPC request failed during retry, trying next endpoint", 
-				zap.String("endpoint", currentEndpoint), 
-				zap.String("error", err.Error()), 
+			p.logger.Warn("RPC request failed during retry, trying next endpoint",
+				zap.String("endpoint", currentEndpoint),
+				zap.String("error", err.Error()),
 				zap.Int("retry", retry+1))
-			
+
 			// Move to the next endpoint
 			p.MoveToNextEndpoint()
 		}
 	}
-	
+
 	return fmt.Errorf("all RPC endpoints failed after %d retries: %w", p.maxRetries, lastErr)
 }
 
@@ -162,22 +162,22 @@ func CreateRPCClient(cdc codec.Codec, rpcAddresses []string, logger *zap.Logger)
 	if len(rpcAddresses) == 0 {
 		return nil, errors.New("no RPC addresses provided")
 	}
-	
+
 	// Create RPC pool
 	pool := NewRPCPool(rpcAddresses, logger)
-	
+
 	// Create HTTP client with the first endpoint
 	client, err := clienthttp.New(pool.GetCurrentEndpoint(), "/websocket")
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// Create RPC client
 	rpcClient := &RPCClient{
 		HTTP: client,
 		cdc:  cdc,
 		pool: pool,
 	}
-	
+
 	return rpcClient, nil
 }
