@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"reflect"
 	"strconv"
+	"sync"
 	"time"
 
 	"google.golang.org/grpc"
@@ -39,6 +40,7 @@ type RPCClient struct {
 
 	cdc  codec.Codec
 	pool *RPCPool
+	mu   sync.RWMutex
 }
 
 func NewRPCClient(cdc codec.Codec, rpcAddrs []string, logger *zap.Logger) (*RPCClient, error) {
@@ -278,7 +280,9 @@ func (q *RPCClient) updateHTTPClient() error {
 		if err != nil {
 			return err
 		}
+		q.mu.Lock()
 		q.HTTP = client
+		q.mu.Unlock()
 	}
 	return nil
 }
