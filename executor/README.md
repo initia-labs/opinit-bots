@@ -329,7 +329,7 @@ If the batch info registered in the chain is changed to change the account or DA
 
 ```go
 {
- RPCAddress string `json:"rpc_address"`
+ RPCAddresses []string `json:"rpc_addresses"`
  GasPrice string `json:"gas_price"`
  GasAdjustment string `json:"gas_adjustment"`
  ChainID string `json:"chain_id"`

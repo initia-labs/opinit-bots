@@ -684,7 +684,7 @@ func (op OPTestHelper) ExecutorConfig() *executortypes.Config {
 		L1Node: executortypes.NodeConfig{
 			ChainID:       op.Initia.Config().ChainID,
 			Bech32Prefix:  op.Initia.Config().Bech32Prefix,
-			RPCAddress:    fmt.Sprintf("http://%s:26657", op.Initia.GetFullNode().HostName()),
+			RPCAddresses:  []string{fmt.Sprintf("http://%s:26657", op.Initia.GetFullNode().HostName())},
 			GasPrice:      op.Initia.Config().GasPrices,
 			GasAdjustment: op.Initia.Config().GasAdjustment,
 			TxTimeout:     60,
@@ -693,7 +693,7 @@ func (op OPTestHelper) ExecutorConfig() *executortypes.Config {
 		L2Node: executortypes.NodeConfig{
 			ChainID:       op.Minitia.Config().ChainID,
 			Bech32Prefix:  op.Minitia.Config().Bech32Prefix,
-			RPCAddress:    fmt.Sprintf("http://%s:26657", op.Minitia.GetFullNode().HostName()),
+			RPCAddresses:  []string{fmt.Sprintf("http://%s:26657", op.Minitia.GetFullNode().HostName())},
 			GasPrice:      "",
 			GasAdjustment: op.Minitia.Config().GasAdjustment,
 			TxTimeout:     60,
@@ -702,7 +702,7 @@ func (op OPTestHelper) ExecutorConfig() *executortypes.Config {
 		DANode: executortypes.NodeConfig{
 			ChainID:       op.DA.Config().ChainID,
 			Bech32Prefix:  op.DA.Config().Bech32Prefix,
-			RPCAddress:    fmt.Sprintf("http://%s:26657", op.DA.GetFullNode().HostName()),
+			RPCAddresses:  []string{fmt.Sprintf("http://%s:26657", op.DA.GetFullNode().HostName())},
 			GasPrice:      op.DA.Config().GasPrices,
 			GasAdjustment: op.DA.Config().GasAdjustment,
 			TxTimeout:     60,
