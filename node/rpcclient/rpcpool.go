@@ -3,7 +3,6 @@ package rpcclient
 import (
 	"context"
 	"fmt"
-	"math"
 	"os"
 	"strconv"
 	"sync"
@@ -94,6 +93,31 @@ func (p *RPCPool) setCurrentIndex(index int) {
 	p.currentIndex = index
 }
 
+// logEndpointAttempt logs the attempt to use an RPC endpoint
+func (p *RPCPool) logEndpointAttempt(endpoint string, retryAttempt int) {
+	if retryAttempt == 0 {
+		p.logger.Debug("Trying RPC endpoint", zap.String("endpoint", endpoint))
+	} else {
+		p.logger.Debug("Retrying RPC endpoint",
+			zap.String("endpoint", endpoint),
+			zap.Int("retry", retryAttempt))
+	}
+}
+
+// logEndpointFailure logs the failure of an RPC endpoint
+func (p *RPCPool) logEndpointFailure(endpoint string, err error, retryAttempt int) {
+	if retryAttempt == 0 {
+		p.logger.Warn("RPC request failed, trying next endpoint",
+			zap.String("endpoint", endpoint),
+			zap.String("error", err.Error()))
+	} else {
+		p.logger.Warn("RPC request failed during retry, trying next endpoint",
+			zap.String("endpoint", endpoint),
+			zap.String("error", err.Error()),
+			zap.Int("retry", retryAttempt))
+	}
+}
+
 // tryAllEndpoints tries the given function on all endpoints once
 // Returns nil on first success or the last encountered error if all endpoints fail
 func (p *RPCPool) tryAllEndpoints(ctx context.Context, fn func(context.Context) error, retryAttempt int) error {
@@ -104,13 +128,7 @@ func (p *RPCPool) tryAllEndpoints(ctx context.Context, fn func(context.Context) 
 	// Create a timeout context
 	timeoutCtx, cancel := context.WithTimeout(ctx, p.rpcTimeout)
 
-	if retryAttempt == 0 {
-		p.logger.Debug("Trying RPC endpoint", zap.String("endpoint", currentEndpoint))
-	} else {
-		p.logger.Debug("Retrying RPC endpoint",
-			zap.String("endpoint", currentEndpoint),
-			zap.Int("retry", retryAttempt))
-	}
+	p.logEndpointAttempt(currentEndpoint, retryAttempt)
 
 	err := fn(timeoutCtx)
 	cancel()
@@ -120,16 +138,7 @@ func (p *RPCPool) tryAllEndpoints(ctx context.Context, fn func(context.Context) 
 	}
 
 	var lastErr = err
-	if retryAttempt == 0 {
-		p.logger.Warn("RPC request failed, trying next endpoint",
-			zap.String("endpoint", currentEndpoint),
-			zap.String("error", err.Error()))
-	} else {
-		p.logger.Warn("RPC request failed during retry, trying next endpoint",
-			zap.String("endpoint", currentEndpoint),
-			zap.String("error", err.Error()),
-			zap.Int("retry", retryAttempt))
-	}
+	p.logEndpointFailure(currentEndpoint, err, retryAttempt)
 
 	// Current endpoint failed, try the remaining endpoints
 	for i := 1; i < len(p.endpoints); i++ {
@@ -139,13 +148,7 @@ func (p *RPCPool) tryAllEndpoints(ctx context.Context, fn func(context.Context) 
 		// Create a timeout context
 		timeoutCtx, cancel := context.WithTimeout(ctx, p.rpcTimeout)
 
-		if retryAttempt == 0 {
-			p.logger.Debug("Trying RPC endpoint", zap.String("endpoint", currentEndpoint))
-		} else {
-			p.logger.Debug("Retrying RPC endpoint",
-				zap.String("endpoint", currentEndpoint),
-				zap.Int("retry", retryAttempt))
-		}
+		p.logEndpointAttempt(currentEndpoint, retryAttempt)
 
 		err := fn(timeoutCtx)
 		cancel()
@@ -155,16 +158,7 @@ func (p *RPCPool) tryAllEndpoints(ctx context.Context, fn func(context.Context) 
 		}
 
 		lastErr = err
-		if retryAttempt == 0 {
-			p.logger.Warn("RPC request failed, trying next endpoint",
-				zap.String("endpoint", currentEndpoint),
-				zap.String("error", err.Error()))
-		} else {
-			p.logger.Warn("RPC request failed during retry, trying next endpoint",
-				zap.String("endpoint", currentEndpoint),
-				zap.String("error", err.Error()),
-				zap.Int("retry", retryAttempt))
-		}
+		p.logEndpointFailure(currentEndpoint, err, retryAttempt)
 	}
 
 	// Reset to original position if all endpoints failed
@@ -184,26 +178,20 @@ func (p *RPCPool) ExecuteWithFallback(ctx context.Context, fn func(context.Conte
 		return nil
 	}
 
-	// If all endpoints failed, retry with exponential backoff
+	// If all endpoints failed, retry with exponential backoff using SleepWithRetry
 	var lastErr error
-	for retry := 0; retry < p.maxRetries; retry++ {
-		// Calculate backoff duration
-		backoffDuration := time.Duration(math.Pow(2, float64(retry))) * p.retryInterval
-
+	for retry := 1; retry <= p.maxRetries; retry++ {
 		p.logger.Info("All RPC endpoints failed, retrying after backoff",
-			zap.Duration("backoff", backoffDuration),
-			zap.Int("retry", retry+1),
+			zap.Int("retry", retry),
 			zap.Int("max_retries", p.maxRetries))
 
-		// Wait for backoff duration
-		select {
-		case <-ctx.Done():
+		// Use SleepWithRetry for exponential backoff with jitter
+		if cancelled := types.SleepWithRetry(ctx, retry); cancelled {
 			return ctx.Err()
-		case <-time.After(backoffDuration):
 		}
 
 		// Try all endpoints again
-		err := p.tryAllEndpoints(ctx, fn, retry+1)
+		err := p.tryAllEndpoints(ctx, fn, retry)
 		if err == nil {
 			return nil
 		}
