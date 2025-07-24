@@ -141,7 +141,7 @@ func TestRPCPool_ExecuteWithFallback_ContextCancellation(t *testing.T) {
 	endpoints := []string{"doi", "moro"}
 	pool := NewRPCPool(endpoints, logger)
 
-	// Create a context that will be cancelled
+	// Create a context that will be canceled
 	ctx, cancel := context.WithCancel(context.Background())
 
 	// Cancel the context after a short delay
@@ -150,7 +150,7 @@ func TestRPCPool_ExecuteWithFallback_ContextCancellation(t *testing.T) {
 		cancel()
 	}()
 
-	// Function should return context cancelled error
+	// Function should return context canceled error
 	err := pool.ExecuteWithFallback(ctx, func(ctx context.Context) error {
 		select {
 		case <-ctx.Done():
