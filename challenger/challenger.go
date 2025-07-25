@@ -89,7 +89,7 @@ func (c *Challenger) Initialize(ctx types.Context) error {
 	if err != nil {
 		return errors.Wrap(err, "failed to initialize child query client")
 	}
-	
+
 	childBridgeInfo, err := c.child.QueryBridgeInfo(ctx)
 	if err != nil {
 		return err

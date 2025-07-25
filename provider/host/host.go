@@ -79,16 +79,16 @@ func (b *BaseHost) InitializeQueryClient(ctx types.Context) error {
 	if b.ophostQueryClient != nil {
 		return nil // Already initialized
 	}
-	
+
 	// Initialize the node's RPC client with minimal configuration
 	err := b.node.Initialize(ctx, 0, []btypes.KeyringConfig{})
 	if err != nil {
 		return errors.Wrap(err, "failed to initialize node for query client")
 	}
-	
+
 	// Initialize the ophost query client
 	b.ophostQueryClient = ophosttypes.NewQueryClient(b.node.GetRPCClient())
-	
+
 	return nil
 }
 
@@ -100,7 +100,7 @@ func (b *BaseHost) Initialize(ctx types.Context, processedHeight int64, bridgeIn
 		if err != nil {
 			return errors.Wrap(err, "failed to initialize node")
 		}
-		
+
 		// Initialize the ophost query client after the node's RPC client is ready
 		b.ophostQueryClient = ophosttypes.NewQueryClient(b.node.GetRPCClient())
 	} else {
@@ -110,7 +110,7 @@ func (b *BaseHost) Initialize(ctx types.Context, processedHeight int64, bridgeIn
 			return errors.Wrap(err, "failed to initialize node")
 		}
 	}
-	
+
 	b.SetBridgeInfo(bridgeInfo)
 	return nil
 }

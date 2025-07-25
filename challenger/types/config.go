@@ -8,9 +8,9 @@ import (
 )
 
 type NodeConfig struct {
-	ChainID       string   `json:"chain_id"`
-	Bech32Prefix  string   `json:"bech32_prefix"`
-	RPCAddresses  []string `json:"rpc_addresses"`
+	ChainID      string   `json:"chain_id"`
+	Bech32Prefix string   `json:"bech32_prefix"`
+	RPCAddresses []string `json:"rpc_addresses"`
 }
 
 func (nc NodeConfig) Validate() error {
@@ -64,14 +64,14 @@ func DefaultConfig() *Config {
 		},
 
 		L1Node: NodeConfig{
-			ChainID:       "testnet-l1-1",
-			Bech32Prefix:  "init",
+			ChainID:      "testnet-l1-1",
+			Bech32Prefix: "init",
 			RPCAddresses: []string{"tcp://localhost:26657"},
 		},
 
 		L2Node: NodeConfig{
-			ChainID:       "testnet-l2-1",
-			Bech32Prefix:  "init",
+			ChainID:      "testnet-l2-1",
+			Bech32Prefix: "init",
 			RPCAddresses: []string{"tcp://localhost:27657"},
 		},
 		DisableAutoSetL1Height: false,
