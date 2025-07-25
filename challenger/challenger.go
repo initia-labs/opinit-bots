@@ -22,9 +22,13 @@ import (
 
 var _ bottypes.Bot = &Challenger{}
 
-// Executor charges the execution of the bridge between the host and the child chain
-// - relay l1 deposit messages to l2
-// - generate l2 output root and submit to l1
+// Challenger is responsible for:
+// Verifying that the MsgInitiateTokenDeposit event is properly relayed to MsgFinalizeTokenDeposit
+// Checking whether MsgInitiateTokenDeposit was relayed on time
+// Verifying that the Oracle data is properly relayed to MsgUpdateOracle
+// Checking whether Oracle was relayed on time
+// Verifying that the OutputRoot submitted with MsgProposeOutput is correct
+// Checking whether next MsgProposeOutput was submitted on time
 type Challenger struct {
 	host  *host.Host
 	child *child.Child
