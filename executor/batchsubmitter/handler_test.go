@@ -47,7 +47,8 @@ func TestRawBlockHandler(t *testing.T) {
 
 	mockCaller := mockclient.NewMockCaller()
 	testLogger, _ := zap.NewDevelopment()
-	rpcClient, err := rpcclient.NewRPCClientWithClient(appCodec, client.NewWithCaller(mockCaller), []string{"http://localhost:26657"}, testLogger)
+	testCtx := types.NewContext(context.Background(), testLogger, "/tmp").WithRPCTimeout(5 * time.Second)
+	rpcClient, err := rpcclient.NewRPCClientWithClient(testCtx, appCodec, client.NewWithCaller(mockCaller), []string{"http://localhost:26657"}, testLogger)
 	require.NoError(t, err)
 	batchNode := node.NewTestNode(nodetypes.NodeConfig{}, batchDB, appCodec, txConfig, rpcClient, nil)
 

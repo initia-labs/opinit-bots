@@ -10,12 +10,20 @@ import (
 	"go.uber.org/zap"
 	"go.uber.org/zap/zaptest"
 	"go.uber.org/zap/zaptest/observer"
+
+	"github.com/initia-labs/opinit-bots/types"
 )
+
+// createTestContext creates a test context with default RPC timeout
+func createTestContext(logger *zap.Logger) types.Context {
+	return types.NewContext(context.Background(), logger, "/tmp").
+		WithRPCTimeout(5 * time.Second)
+}
 
 func TestRPCPool_GetCurrentEndpoint(t *testing.T) {
 	logger := zaptest.NewLogger(t)
 	endpoints := []string{"doi", "moro", "rene"}
-	pool := NewRPCPool(endpoints, logger)
+	pool := NewRPCPool(createTestContext(logger), endpoints, logger)
 
 	// Initial endpoint should be the first one
 	assert.Equal(t, "doi", pool.GetCurrentEndpoint())
@@ -24,7 +32,7 @@ func TestRPCPool_GetCurrentEndpoint(t *testing.T) {
 func TestRPCPool_MoveToNextEndpoint(t *testing.T) {
 	logger := zaptest.NewLogger(t)
 	endpoints := []string{"doi", "moro", "rene"}
-	pool := NewRPCPool(endpoints, logger)
+	pool := NewRPCPool(createTestContext(logger), endpoints, logger)
 
 	// Move to next endpoint
 	assert.Equal(t, "moro", pool.MoveToNextEndpoint())
@@ -42,7 +50,7 @@ func TestRPCPool_MoveToNextEndpoint(t *testing.T) {
 func TestRPCPool_ExecuteWithFallback_Success(t *testing.T) {
 	logger := zaptest.NewLogger(t)
 	endpoints := []string{"doi", "moro", "rene"}
-	pool := NewRPCPool(endpoints, logger)
+	pool := NewRPCPool(createTestContext(logger), endpoints, logger)
 
 	// Function succeeds on first try
 	callCount := 0
@@ -59,7 +67,7 @@ func TestRPCPool_ExecuteWithFallback_Success(t *testing.T) {
 func TestRPCPool_ExecuteWithFallback_FallbackSuccess(t *testing.T) {
 	logger := zaptest.NewLogger(t)
 	endpoints := []string{"doi", "moro", "rene"}
-	pool := NewRPCPool(endpoints, logger)
+	pool := NewRPCPool(createTestContext(logger), endpoints, logger)
 
 	// Function fails on first endpoint, succeeds on second
 	callCount := 0
@@ -79,7 +87,7 @@ func TestRPCPool_ExecuteWithFallback_FallbackSuccess(t *testing.T) {
 func TestRPCPool_ExecuteWithFallback_AllFail(t *testing.T) {
 	logger := zaptest.NewLogger(t)
 	endpoints := []string{"doi", "moro"}
-	pool := NewRPCPool(endpoints, logger)
+	pool := NewRPCPool(createTestContext(logger), endpoints, logger)
 	pool.maxRetries = 1 // Set to 1 for faster test
 
 	// All endpoints fail
@@ -98,7 +106,7 @@ func TestRPCPool_ExecuteWithFallback_AllFail(t *testing.T) {
 func TestRPCPool_ExecuteWithFallback_Timeout(t *testing.T) {
 	logger := zaptest.NewLogger(t)
 	endpoints := []string{"doi"}
-	pool := NewRPCPool(endpoints, logger)
+	pool := NewRPCPool(createTestContext(logger), endpoints, logger)
 	pool.rpcTimeout = 100 * time.Millisecond
 
 	// Function takes too long
@@ -118,7 +126,7 @@ func TestRPCPool_ExecuteWithFallback_Timeout(t *testing.T) {
 func TestRPCPool_ExecuteWithFallback_RetrySuccess(t *testing.T) {
 	logger := zaptest.NewLogger(t)
 	endpoints := []string{"doi"}
-	pool := NewRPCPool(endpoints, logger)
+	pool := NewRPCPool(createTestContext(logger), endpoints, logger)
 	pool.maxRetries = 2
 	pool.retryInterval = 10 * time.Millisecond
 
@@ -139,7 +147,7 @@ func TestRPCPool_ExecuteWithFallback_RetrySuccess(t *testing.T) {
 func TestRPCPool_ExecuteWithFallback_ContextCancellation(t *testing.T) {
 	logger := zaptest.NewLogger(t)
 	endpoints := []string{"doi", "moro"}
-	pool := NewRPCPool(endpoints, logger)
+	pool := NewRPCPool(createTestContext(logger), endpoints, logger)
 
 	// Create a context that will be canceled
 	ctx, cancel := context.WithCancel(context.Background())
@@ -170,7 +178,7 @@ func TestRPCPool_Logging(t *testing.T) {
 	logger := zap.New(core)
 
 	endpoints := []string{"doi", "moro"}
-	pool := NewRPCPool(endpoints, logger)
+	pool := NewRPCPool(createTestContext(logger), endpoints, logger)
 
 	// Function fails on first endpoint, succeeds on second
 	_ = pool.ExecuteWithFallback(context.Background(), func(ctx context.Context) error {

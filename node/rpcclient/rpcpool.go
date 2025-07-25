@@ -3,8 +3,6 @@ package rpcclient
 import (
 	"context"
 	"fmt"
-	"os"
-	"strconv"
 	"sync"
 	"time"
 
@@ -33,29 +31,22 @@ type RPCPool struct {
 }
 
 // NewRPCPool creates a new RPC pool with the given endpoints
-func NewRPCPool(endpoints []string, logger *zap.Logger) *RPCPool {
+func NewRPCPool(ctx types.Context, endpoints []string, logger *zap.Logger) *RPCPool {
 	if len(endpoints) == 0 {
 		panic("endpoints slice cannot be empty")
 	}
 
-	// Get timeout from environment variable or use default
-	timeoutStr := os.Getenv("RPC_TIMEOUT_SECONDS")
-	timeout := DefaultRPCTimeout
-	if timeoutStr != "" {
-		if t, err := strconv.Atoi(timeoutStr); err == nil && t > 0 {
-			timeout = t
-		} else {
-			logger.Warn("Invalid RPC_TIMEOUT_SECONDS value, using default",
-				zap.String("value", timeoutStr),
-				zap.Int("default", DefaultRPCTimeout))
-		}
+	// Get timeout from context or use default
+	rpcTimeout := ctx.RPCTimeout()
+	if rpcTimeout == 0 {
+		rpcTimeout = time.Duration(DefaultRPCTimeout) * time.Second
 	}
 
 	return &RPCPool{
 		endpoints:     endpoints,
 		currentIndex:  0,
 		mu:            sync.RWMutex{},
-		rpcTimeout:    time.Duration(timeout) * time.Second,
+		rpcTimeout:    rpcTimeout,
 		logger:        logger,
 		maxRetries:    types.MaxRetryCount,
 		retryInterval: 1 * time.Second,
@@ -202,13 +193,13 @@ func (p *RPCPool) ExecuteWithFallback(ctx context.Context, fn func(context.Conte
 }
 
 // CreateRPCClient creates a new RPC client with the given codec and RPC addresses
-func CreateRPCClient(cdc codec.Codec, rpcAddresses []string, logger *zap.Logger) (*RPCClient, error) {
+func CreateRPCClient(ctx types.Context, cdc codec.Codec, rpcAddresses []string, logger *zap.Logger) (*RPCClient, error) {
 	if len(rpcAddresses) == 0 {
 		return nil, errors.New("no RPC addresses provided")
 	}
 
 	// Create RPC pool
-	pool := NewRPCPool(rpcAddresses, logger)
+	pool := NewRPCPool(ctx, rpcAddresses, logger)
 
 	// Create HTTP client with the first endpoint
 	client, err := clienthttp.New(pool.GetCurrentEndpoint(), "/websocket")

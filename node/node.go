@@ -78,7 +78,7 @@ func NewNode(cfg nodetypes.NodeConfig, db types.DB, cdc codec.Codec, txConfig cl
 func (n *Node) Initialize(ctx types.Context, processedHeight int64, keyringConfig []btypes.KeyringConfig) (err error) {
 	// Create RPC client with shared logger from context
 	if n.rpcClient == nil {
-		n.rpcClient, err = rpcclient.NewRPCClient(n.cdc, n.cfg.RPC, ctx.Logger().Named("rpcclient"))
+		n.rpcClient, err = rpcclient.NewRPCClient(ctx, n.cdc, n.cfg.RPC, ctx.Logger().Named("rpcclient"))
 		if err != nil {
 			return errors.Wrap(err, "failed to create RPC client")
 		}

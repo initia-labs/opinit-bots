@@ -58,8 +58,14 @@ v0.1.9-2: Fill block hash of finalized tree
 					return err
 				}
 
+				rpcTimeout, err := cmd.Flags().GetDuration(flagRPCTimeout)
+				if err != nil {
+					return err
+				}
+
 				baseCtx := types.NewContext(cmdCtx, ctx.logger.Named(string(bottypes.BotTypeExecutor)), ctx.homePath).
-					WithPollingInterval(interval)
+					WithPollingInterval(interval).
+					WithRPCTimeout(rpcTimeout)
 
 				configPath, err := getConfigPath(cmd, ctx.homePath, string(bottypes.BotTypeExecutor))
 				if err != nil {
@@ -79,7 +85,7 @@ v0.1.9-2: Fill block hash of finalized tree
 					return err
 				}
 
-				rpcClient, err := rpcclient.NewRPCClient(cdc, l2Config.RPC, baseCtx.Logger().Named("migration-rpcclient"))
+				rpcClient, err := rpcclient.NewRPCClient(baseCtx, cdc, l2Config.RPC, baseCtx.Logger().Named("migration-rpcclient"))
 				if err != nil {
 					return err
 				}
@@ -106,5 +112,6 @@ v0.1.9-2: Fill block hash of finalized tree
 	}
 	cmd = configFlag(ctx.v, cmd)
 	cmd.Flags().Duration(flagPollingInterval, 100*time.Millisecond, "Polling interval in milliseconds")
+	cmd.Flags().Duration(flagRPCTimeout, 5*time.Second, "RPC timeout duration")
 	return cmd
 }

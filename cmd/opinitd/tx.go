@@ -226,7 +226,7 @@ func QueryBridgeId(ctx types.Context, cfg *executortypes.Config) (uint64, error)
 		return 0, err
 	}
 
-	l2RpcClient, err := rpcclient.NewRPCClient(cdc, l2Config.RPC, ctx.Logger().Named("l2-rpcclient"))
+	l2RpcClient, err := rpcclient.NewRPCClient(ctx, cdc, l2Config.RPC, ctx.Logger().Named("l2-rpcclient"))
 	if err != nil {
 		return 0, err
 	}
@@ -247,7 +247,7 @@ func l1ProposerAccount(ctx types.Context, cfg *executortypes.Config, bridgeId ui
 		return nil, err
 	}
 
-	rpcClient, err := rpcclient.NewRPCClient(cdc, l1Config.RPC, ctx.Logger().Named("l1-rpcclient"))
+	rpcClient, err := rpcclient.NewRPCClient(ctx, cdc, l1Config.RPC, ctx.Logger().Named("l1-rpcclient"))
 	if err != nil {
 		return nil, err
 	}
@@ -272,7 +272,7 @@ func l2BroadcasterAccount(ctx types.Context, cfg *executortypes.Config) (*broadc
 		return nil, err
 	}
 
-	rpcClient, err := rpcclient.NewRPCClient(cdc, l2Config.RPC, ctx.Logger().Named("l2-rpcclient"))
+	rpcClient, err := rpcclient.NewRPCClient(ctx, cdc, l2Config.RPC, ctx.Logger().Named("l2-rpcclient"))
 	if err != nil {
 		return nil, err
 	}

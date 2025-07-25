@@ -28,6 +28,7 @@ import (
 	grpctypes "github.com/cosmos/cosmos-sdk/types/grpc"
 
 	clienthttp "github.com/initia-labs/opinit-bots/client"
+	opTypes "github.com/initia-labs/opinit-bots/types"
 )
 
 var _ gogogrpc.ClientConn = &RPCClient{}
@@ -43,13 +44,13 @@ type RPCClient struct {
 	mu   sync.RWMutex
 }
 
-func NewRPCClient(cdc codec.Codec, rpcAddrs []string, logger *zap.Logger) (*RPCClient, error) {
+func NewRPCClient(ctx opTypes.Context, cdc codec.Codec, rpcAddrs []string, logger *zap.Logger) (*RPCClient, error) {
 	if len(rpcAddrs) == 0 {
 		return nil, errors.New("no RPC addresses provided")
 	}
 
 	// Create RPC pool
-	pool := NewRPCPool(rpcAddrs, logger)
+	pool := NewRPCPool(ctx, rpcAddrs, logger)
 
 	// Create HTTP client with the first endpoint
 	client, err := clienthttp.New(pool.GetCurrentEndpoint(), "/websocket")
@@ -64,13 +65,13 @@ func NewRPCClient(cdc codec.Codec, rpcAddrs []string, logger *zap.Logger) (*RPCC
 	}, nil
 }
 
-func NewRPCClientWithClient(cdc codec.Codec, client *clienthttp.HTTP, endpoints []string, logger *zap.Logger) (*RPCClient, error) {
+func NewRPCClientWithClient(ctx opTypes.Context, cdc codec.Codec, client *clienthttp.HTTP, endpoints []string, logger *zap.Logger) (*RPCClient, error) {
 	if len(endpoints) == 0 {
 		return nil, errors.New("no RPC endpoints provided")
 	}
 
 	// Create RPC pool
-	pool := NewRPCPool(endpoints, logger)
+	pool := NewRPCPool(ctx, endpoints, logger)
 
 	return &RPCClient{
 		HTTP: client,
