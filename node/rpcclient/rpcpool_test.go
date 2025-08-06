@@ -26,25 +26,31 @@ func TestRPCPool_GetCurrentEndpoint(t *testing.T) {
 	pool := NewRPCPool(createTestContext(logger), endpoints, logger)
 
 	// Initial endpoint should be the first one
-	assert.Equal(t, "doi", pool.GetCurrentEndpoint())
+	assert.Equal(t, "doi", pool.GetCurrentClient().endpoint)
 }
 
-func TestRPCPool_MoveToNextEndpoint(t *testing.T) {
+func TestRPCPool_MoveToNextHealthyClient(t *testing.T) {
 	logger := zaptest.NewLogger(t)
 	endpoints := []string{"doi", "moro", "rene"}
 	pool := NewRPCPool(createTestContext(logger), endpoints, logger)
 
-	// Move to next endpoint
-	assert.Equal(t, "moro", pool.MoveToNextEndpoint())
-	assert.Equal(t, "moro", pool.GetCurrentEndpoint())
+	// Move to next healthy client
+	client := pool.MoveToNextHealthyClient()
+	assert.NotNil(t, client)
+	assert.Equal(t, "moro", client.endpoint)
+	assert.Equal(t, "moro", pool.GetCurrentClient().endpoint)
 
-	// Move to next endpoint again
-	assert.Equal(t, "rene", pool.MoveToNextEndpoint())
-	assert.Equal(t, "rene", pool.GetCurrentEndpoint())
+	// Move to next healthy client again
+	client = pool.MoveToNextHealthyClient()
+	assert.NotNil(t, client)
+	assert.Equal(t, "rene", client.endpoint)
+	assert.Equal(t, "rene", pool.GetCurrentClient().endpoint)
 
-	// Move to next endpoint should wrap around
-	assert.Equal(t, "doi", pool.MoveToNextEndpoint())
-	assert.Equal(t, "doi", pool.GetCurrentEndpoint())
+	// Move to next healthy client should wrap around
+	client = pool.MoveToNextHealthyClient()
+	assert.NotNil(t, client)
+	assert.Equal(t, "doi", client.endpoint)
+	assert.Equal(t, "doi", pool.GetCurrentClient().endpoint)
 }
 
 func TestRPCPool_ExecuteWithFallback_Success(t *testing.T) {
@@ -61,7 +67,7 @@ func TestRPCPool_ExecuteWithFallback_Success(t *testing.T) {
 
 	assert.NoError(t, err)
 	assert.Equal(t, 1, callCount)
-	assert.Equal(t, "doi", pool.GetCurrentEndpoint())
+	assert.Equal(t, "doi", pool.GetCurrentClient().endpoint)
 }
 
 func TestRPCPool_ExecuteWithFallback_FallbackSuccess(t *testing.T) {
@@ -81,7 +87,7 @@ func TestRPCPool_ExecuteWithFallback_FallbackSuccess(t *testing.T) {
 
 	assert.NoError(t, err)
 	assert.Equal(t, 2, callCount)
-	assert.Equal(t, "moro", pool.GetCurrentEndpoint())
+	assert.Equal(t, "moro", pool.GetCurrentClient().endpoint)
 }
 
 func TestRPCPool_ExecuteWithFallback_AllFail(t *testing.T) {
@@ -182,7 +188,7 @@ func TestRPCPool_Logging(t *testing.T) {
 
 	// Function fails on first endpoint, succeeds on second
 	_ = pool.ExecuteWithFallback(context.Background(), func(ctx context.Context) error {
-		if pool.GetCurrentEndpoint() == "doi" {
+		if pool.GetCurrentClient().endpoint == "doi" {
 			return errors.New("first endpoint failed")
 		}
 		return nil
