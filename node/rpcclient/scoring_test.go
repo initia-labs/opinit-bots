@@ -50,7 +50,9 @@ func TestRPCPool_UpdateScoreOnSuccess(t *testing.T) {
 	endpoints := []string{"http://endpoint1:26657", "http://endpoint2:26657"}
 	pool := createTestRPCPool(t, endpoints)
 
+	pool.mu.RLock()
 	initialScore := pool.clients[0].score
+	pool.mu.RUnlock()
 
 	// Update score on success
 	pool.UpdateScoreOnSuccess()
@@ -67,7 +69,9 @@ func TestRPCPool_UpdateScoreOnFailure(t *testing.T) {
 	endpoints := []string{"http://endpoint1:26657", "http://endpoint2:26657"}
 	pool := createTestRPCPool(t, endpoints)
 
+	pool.mu.RLock()
 	initialScore := pool.clients[0].score
+	pool.mu.RUnlock()
 	testErr := fmt.Errorf("test error")
 
 	// Test regular failure
@@ -86,7 +90,9 @@ func TestRPCPool_UpdateScoreOnTimeout(t *testing.T) {
 	endpoints := []string{"http://endpoint1:26657", "http://endpoint2:26657"}
 	pool := createTestRPCPool(t, endpoints)
 
+	pool.mu.RLock()
 	initialScore := pool.clients[0].score
+	pool.mu.RUnlock()
 	testErr := fmt.Errorf("timeout error")
 
 	// Test timeout failure
@@ -373,7 +379,9 @@ func TestRPCPool_ScoreInflationPrevention(t *testing.T) {
 	endpoints := []string{"http://endpoint1:26657"}
 	pool := createTestRPCPool(t, endpoints)
 
+	pool.mu.RLock()
 	initialScore := pool.clients[0].score
+	pool.mu.RUnlock()
 
 	// Test multiple successful requests - score should only increase once
 	pool.UpdateScoreOnSuccess()

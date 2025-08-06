@@ -227,7 +227,7 @@ func (p *RPCPool) UpdateScoreOnSuccess() {
 	currentClient := p.clients[p.currentIndex]
 	p.updateScore(currentClient, true, false)
 
-	p.logger.Info("Updated endpoint score on success",
+	p.logger.Debug("Updated endpoint score on success",
 		zap.String("endpoint", currentClient.endpoint),
 		zap.Float64("score", currentClient.score),
 		zap.Int64("success_count", currentClient.successCount))
@@ -241,7 +241,7 @@ func (p *RPCPool) UpdateScoreOnFailure(err error, isTimeout bool) {
 	currentClient := p.clients[p.currentIndex]
 	p.updateScore(currentClient, false, isTimeout)
 
-	p.logger.Info("Updated endpoint score on failure",
+	p.logger.Debug("Updated endpoint score on failure",
 		zap.String("endpoint", currentClient.endpoint),
 		zap.Float64("score", currentClient.score),
 		zap.Int64("failure_count", currentClient.failureCount),
