@@ -40,8 +40,8 @@ func (n *Node) blockProcessLooper(ctx types.Context, processType nodetypes.Block
 		if n.syncedHeight >= latestHeight {
 			n.syncing = false
 
-			// sleep for 3 seconds to wait next block
-			sleep := time.NewTimer(3 * time.Second)
+			// sleep for 2 seconds to wait next block
+			sleep := time.NewTimer(2 * time.Second)
 			select {
 			case <-ctx.Done():
 			case <-sleep.C:
