@@ -25,29 +25,43 @@ func (n *Node) blockProcessLooper(ctx types.Context, processType nodetypes.Block
 			if types.SleepWithRetry(ctx, consecutiveErrors) {
 				return nil
 			}
-			consecutiveErrors++
 		}
 
 		status, err := n.rpcClient.Status(ctx)
 		if err != nil {
 			ctx.Logger().Error("failed to get node status ", zap.String("error", err.Error()))
+			consecutiveErrors++
 			continue
+		} else {
+			consecutiveErrors = 0
 		}
 
 		latestHeight := status.SyncInfo.LatestBlockHeight
 		if n.syncedHeight >= latestHeight {
 			n.syncing = false
+
+			// sleep for 3 seconds to wait next block
+			sleep := time.NewTimer(3 * time.Second)
+			select {
+			case <-ctx.Done():
+			case <-sleep.C:
+			}
+
 			continue
 		}
 
 		err = n.processBlocks(ctx, processType, latestHeight)
 		if nodetypes.HandleErrIgnoreAndTryLater(ctx, err) {
 			ctx.Logger().Warn("ignore and try later", zap.String("error", err.Error()))
+			continue
 		} else if err != nil {
 			ctx.Logger().Error("failed to process block", zap.String("error", err.Error()))
+			consecutiveErrors++
+			continue
 		} else {
 			consecutiveErrors = 0
 		}
+
 		n.syncing = false
 	}
 }
