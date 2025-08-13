@@ -50,7 +50,15 @@ func (n *Node) blockProcessLooper(ctx types.Context, processType nodetypes.Block
 			continue
 		}
 
+		syncedHeight := n.syncedHeight
 		err = n.processBlocks(ctx, processType, latestHeight)
+
+		// Reset consecutive error counter when progress is made (synced height increased).
+		// This ensures we only apply exponential backoff when genuinely stuck.
+		if syncedHeight != n.syncedHeight {
+			consecutiveErrors = 0
+		}
+
 		if nodetypes.HandleErrIgnoreAndTryLater(ctx, err) {
 			ctx.Logger().Warn("ignore and try later", zap.String("error", err.Error()))
 			continue
@@ -58,8 +66,6 @@ func (n *Node) blockProcessLooper(ctx types.Context, processType nodetypes.Block
 			ctx.Logger().Error("failed to process block", zap.String("error", err.Error()))
 			consecutiveErrors++
 			continue
-		} else {
-			consecutiveErrors = 0
 		}
 
 		n.syncing = false
