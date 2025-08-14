@@ -155,7 +155,9 @@ func (p *RPCPool) MarkClientUnhealthy(err error) {
 		zap.Error(err))
 }
 
-// AttemptClientRecovery attempts to recover an unhealthy client by recreating the HTTP client
+// AttemptClientRecovery attempts to recover an unhealthy client by recreating the HTTP client.
+// This is useful for resolving issues like transient network errors, stale connections, or
+// when an RPC endpoint comes back online after a period of unavailability.
 func (p *RPCPool) AttemptClientRecovery(clientInfo *RPCClientInfo) bool {
 	newClient, err := clienthttp.New(clientInfo.endpoint, "/websocket")
 	if err != nil {
