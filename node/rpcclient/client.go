@@ -60,7 +60,11 @@ func NewRPCClientWithClient(ctx opTypes.Context, cdc codec.Codec, client *client
 		// If a specific HTTP client is provided (likely for testing), don't create pool
 		pool = nil
 	} else {
-		pool = NewRPCPool(ctx, endpoints, logger)
+		var err error
+		pool, err = NewRPCPool(ctx, endpoints, logger)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return &RPCClient{

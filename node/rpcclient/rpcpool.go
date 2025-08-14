@@ -55,8 +55,11 @@ type RPCPool struct {
 	lastScoreReset time.Time // Last time scores were reset across all endpoints
 }
 
-// NewRPCPool creates a new RPC pool with the given endpoints
-func NewRPCPool(ctx types.Context, endpoints []string, logger *zap.Logger) *RPCPool {
+// NewRPCPool creates a new RPC pool with the given endpoints.
+// Invalid endpoints (those that fail clienthttp.New) are automatically dropped during initialization
+// and logged as warnings. Returns an error if all provided endpoints are invalid and no valid
+// endpoints remain after filtering.
+func NewRPCPool(ctx types.Context, endpoints []string, logger *zap.Logger) (*RPCPool, error) {
 	if len(endpoints) == 0 {
 		panic("endpoints slice cannot be empty")
 	}
@@ -98,7 +101,7 @@ func NewRPCPool(ctx types.Context, endpoints []string, logger *zap.Logger) *RPCP
 
 	// Ensure we have at least one valid endpoint
 	if len(clients) == 0 {
-		panic("no valid endpoints found - all endpoints failed to create HTTP clients")
+		return nil, errors.New("no valid endpoints found - all endpoints failed to create HTTP clients")
 	}
 
 	return &RPCPool{
@@ -110,7 +113,7 @@ func NewRPCPool(ctx types.Context, endpoints []string, logger *zap.Logger) *RPCP
 		maxRetries:     types.MaxRetryCount,
 		retryInterval:  1 * time.Second,
 		lastScoreReset: now,
-	}
+	}, nil
 }
 
 // GetCurrentClient returns the current RPC client info
@@ -442,7 +445,10 @@ func CreateRPCClient(ctx types.Context, cdc codec.Codec, rpcAddresses []string, 
 	}
 
 	// Create RPC pool with persistent HTTP clients
-	pool := NewRPCPool(ctx, rpcAddresses, logger)
+	pool, err := NewRPCPool(ctx, rpcAddresses, logger)
+	if err != nil {
+		return nil, err
+	}
 
 	// Get the first healthy client from the pool
 	currentClient := pool.GetCurrentClient()

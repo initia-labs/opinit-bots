@@ -18,7 +18,8 @@ func createTestRPCPool(t *testing.T, endpoints []string) *RPCPool {
 	ctx := types.NewContext(context.Background(), zap.NewNop(), "")
 	logger := zap.NewNop()
 
-	pool := NewRPCPool(ctx, endpoints, logger)
+	pool, err := NewRPCPool(ctx, endpoints, logger)
+	require.NoError(t, err)
 
 	// Mark all clients as healthy for testing (since endpoints are fake)
 	pool.mu.Lock()
