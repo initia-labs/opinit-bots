@@ -67,42 +67,38 @@ func NewRPCPool(ctx types.Context, endpoints []string, logger *zap.Logger) *RPCP
 		rpcTimeout = time.Duration(DefaultRPCTimeout) * time.Second
 	}
 
-	// Create HTTP clients for each endpoint
-	clients := make([]*RPCClientInfo, len(endpoints))
+	// Create HTTP clients for each endpoint, filtering out invalid ones
+	var clients []*RPCClientInfo
 	now := time.Now()
-	for i, endpoint := range endpoints {
+
+	for _, endpoint := range endpoints {
 		client, err := clienthttp.New(endpoint, "/websocket")
 		if err != nil {
-			logger.Warn("Failed to create HTTP client for endpoint",
+			// Log the error and remove invalid endpoint from the pool
+			logger.Warn("Removing invalid endpoint from pool",
 				zap.String("endpoint", endpoint),
 				zap.Error(err))
-			// Mark as unhealthy but still include in pool
-			clients[i] = &RPCClientInfo{
-				client:       nil,
-				endpoint:     endpoint,
-				healthy:      false,
-				lastError:    err,
-				lastCheck:    now,
-				score:        DefaultInitialScore,
-				successCount: 0,
-				failureCount: 0,
-				timeoutCount: 0,
-				lastReset:    now,
-			}
-		} else {
-			clients[i] = &RPCClientInfo{
-				client:       client,
-				endpoint:     endpoint,
-				healthy:      true,
-				lastError:    nil,
-				lastCheck:    now,
-				score:        DefaultInitialScore,
-				successCount: 0,
-				failureCount: 0,
-				timeoutCount: 0,
-				lastReset:    now,
-			}
+			continue // Skip this endpoint entirely
 		}
+
+		// Only add valid endpoints and their clients to the pool
+		clients = append(clients, &RPCClientInfo{
+			client:       client,
+			endpoint:     endpoint,
+			healthy:      true,
+			lastError:    nil,
+			lastCheck:    now,
+			score:        DefaultInitialScore,
+			successCount: 0,
+			failureCount: 0,
+			timeoutCount: 0,
+			lastReset:    now,
+		})
+	}
+
+	// Ensure we have at least one valid endpoint
+	if len(clients) == 0 {
+		panic("no valid endpoints found - all endpoints failed to create HTTP clients")
 	}
 
 	return &RPCPool{
