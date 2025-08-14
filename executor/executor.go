@@ -70,12 +70,24 @@ func NewExecutor(cfg *executortypes.Config, db types.DB, sv *server.Server) *Exe
 }
 
 func (ex *Executor) Initialize(ctx types.Context) error {
+	// Initialize the child's query client first so we can query bridge info
+	err := ex.child.InitializeQueryClient(ctx)
+	if err != nil {
+		return errors.Wrap(err, "failed to initialize child query client")
+	}
+
 	childBridgeInfo, err := ex.child.QueryBridgeInfo(ctx)
 	if err != nil {
 		return err
 	}
 	if childBridgeInfo.BridgeId == 0 {
 		return errors.New("bridge info is not set")
+	}
+
+	// Initialize the host's query client so we can query bridge config
+	err = ex.host.InitializeQueryClient(ctx)
+	if err != nil {
+		return errors.Wrap(err, "failed to initialize host query client")
 	}
 
 	bridgeInfo, err := ex.host.QueryBridgeConfig(ctx, childBridgeInfo.BridgeId)

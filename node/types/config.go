@@ -19,7 +19,7 @@ type NodeConfig struct {
 	ChainID string
 
 	// RPC is the RPC address of the chain.
-	RPC string
+	RPC []string
 
 	// BlockProcessType is the type of block process.
 	ProcessType BlockProcessType
@@ -36,7 +36,7 @@ func (nc NodeConfig) Validate() error {
 		return fmt.Errorf("chain ID is empty")
 	}
 
-	if nc.RPC == "" {
+	if len(nc.RPC) == 0 {
 		return fmt.Errorf("rpc is empty")
 	}
 

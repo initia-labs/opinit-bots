@@ -272,7 +272,10 @@ func TestFinalizeBatch(t *testing.T) {
 	require.NoError(t, err)
 
 	mockCaller := mockclient.NewMockCaller()
-	rpcClient := rpcclient.NewRPCClientWithClient(appCodec, client.NewWithCaller(mockCaller))
+	testLogger, _ := zap.NewDevelopment()
+	testCtx := types.NewContext(context.Background(), testLogger, "/tmp").WithRPCTimeout(5 * time.Second)
+	rpcClient, err := rpcclient.NewRPCClientWithClient(testCtx, appCodec, client.NewWithCaller(mockCaller), []string{"http://localhost:26657"}, testLogger)
+	require.NoError(t, err)
 	batchNode := node.NewTestNode(nodetypes.NodeConfig{}, batchDB, appCodec, txConfig, rpcClient, nil)
 
 	hostCdc, _, err := hostprovider.GetCodec("init")
@@ -753,7 +756,10 @@ func TestSubmitGenesis(t *testing.T) {
 	require.NoError(t, err)
 
 	mockCaller := mockclient.NewMockCaller()
-	rpcClient := rpcclient.NewRPCClientWithClient(appCodec, client.NewWithCaller(mockCaller))
+	testLogger, _ := zap.NewDevelopment()
+	testCtx := types.NewContext(context.Background(), testLogger, "/tmp").WithRPCTimeout(5 * time.Second)
+	rpcClient, err := rpcclient.NewRPCClientWithClient(testCtx, appCodec, client.NewWithCaller(mockCaller), []string{"http://localhost:26657"}, testLogger)
+	require.NoError(t, err)
 	batchNode := node.NewTestNode(nodetypes.NodeConfig{}, batchDB, appCodec, txConfig, rpcClient, nil)
 
 	hostCdc, _, err := hostprovider.GetCodec("init")
