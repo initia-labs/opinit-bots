@@ -76,7 +76,7 @@ func NewBaseChildV1(
 
 		cfg: cfg,
 
-		opchildQueryClient: opchildtypes.NewQueryClient(node.GetRPCClient()),
+		// opchildQueryClient will be initialized in Initialize() method after node is initialized
 
 		processedMsgs: make([]btypes.ProcessedMsgs, 0),
 		msgQueue:      make(map[string][]sdk.Msg),
@@ -101,6 +101,25 @@ func GetCodec(bech32Prefix string) (codec.Codec, client.TxConfig, error) {
 	return codec, txConfig, err
 }
 
+// InitializeQueryClient initializes just the RPC client and query client for basic queries
+// This should be called before QueryBridgeInfo is needed, before full initialization
+func (b *BaseChild) InitializeQueryClient(ctx types.Context) error {
+	if b.opchildQueryClient != nil {
+		return nil // Already initialized
+	}
+
+	// Initialize the node's RPC client with minimal configuration
+	err := b.node.Initialize(ctx, 0, []btypes.KeyringConfig{})
+	if err != nil {
+		return errors.Wrap(err, "failed to initialize node for query client")
+	}
+
+	// Initialize the opchild query client
+	b.opchildQueryClient = opchildtypes.NewQueryClient(b.node.GetRPCClient())
+
+	return nil
+}
+
 // Initialize initializes the child node.
 // if the synced height of the node is initialized, it will delete the future working trees and set initializeTreeFn.
 func (b *BaseChild) Initialize(
@@ -114,9 +133,22 @@ func (b *BaseChild) Initialize(
 ) (uint64, error) {
 	b.SetBridgeInfo(bridgeInfo)
 
-	err := b.node.Initialize(ctx, processedHeight, b.keyringConfigs(keyringConfig, oracleKeyringConfig))
-	if err != nil {
-		return 0, err
+	// Initialize the node if not already done by InitializeQueryClient
+	var err error
+	if b.opchildQueryClient == nil {
+		err = b.node.Initialize(ctx, processedHeight, b.keyringConfigs(keyringConfig, oracleKeyringConfig))
+		if err != nil {
+			return 0, err
+		}
+
+		// Initialize the opchild query client after the node's RPC client is ready
+		b.opchildQueryClient = opchildtypes.NewQueryClient(b.node.GetRPCClient())
+	} else {
+		// Node was already initialized by InitializeQueryClient, just reinitialize with proper config
+		err = b.node.Initialize(ctx, processedHeight, b.keyringConfigs(keyringConfig, oracleKeyringConfig))
+		if err != nil {
+			return 0, err
+		}
 	}
 
 	var l2Sequence uint64
