@@ -22,42 +22,42 @@ func createTestContext(logger *zap.Logger) types.Context {
 
 func TestRPCPool_GetCurrentEndpoint(t *testing.T) {
 	logger := zaptest.NewLogger(t)
-	endpoints := []string{"doi", "moro", "rene"}
+	endpoints := []string{"http://doi:26657", "http://moro:26657", "http://rene:26657"}
 	pool, err := NewRPCPool(createTestContext(logger), endpoints, logger)
 	assert.NoError(t, err)
 
 	// Initial endpoint should be the first one
-	assert.Equal(t, "doi", pool.GetCurrentClient().endpoint)
+	assert.Equal(t, "http://doi:26657", pool.GetCurrentClient().endpoint)
 }
 
 func TestRPCPool_MoveToNextHealthyClient(t *testing.T) {
 	logger := zaptest.NewLogger(t)
-	endpoints := []string{"doi", "moro", "rene"}
+	endpoints := []string{"http://doi:26657", "http://moro:26657", "http://rene:26657"}
 	pool, err := NewRPCPool(createTestContext(logger), endpoints, logger)
 	assert.NoError(t, err)
 
 	// Move to next healthy client
 	client := pool.MoveToNextHealthyClient()
 	assert.NotNil(t, client)
-	assert.Equal(t, "moro", client.endpoint)
-	assert.Equal(t, "moro", pool.GetCurrentClient().endpoint)
+	assert.Equal(t, "http://moro:26657", client.endpoint)
+	assert.Equal(t, "http://moro:26657", pool.GetCurrentClient().endpoint)
 
 	// Move to next healthy client again
 	client = pool.MoveToNextHealthyClient()
 	assert.NotNil(t, client)
-	assert.Equal(t, "rene", client.endpoint)
-	assert.Equal(t, "rene", pool.GetCurrentClient().endpoint)
+	assert.Equal(t, "http://rene:26657", client.endpoint)
+	assert.Equal(t, "http://rene:26657", pool.GetCurrentClient().endpoint)
 
 	// Move to next healthy client should wrap around
 	client = pool.MoveToNextHealthyClient()
 	assert.NotNil(t, client)
-	assert.Equal(t, "doi", client.endpoint)
-	assert.Equal(t, "doi", pool.GetCurrentClient().endpoint)
+	assert.Equal(t, "http://doi:26657", client.endpoint)
+	assert.Equal(t, "http://doi:26657", pool.GetCurrentClient().endpoint)
 }
 
 func TestRPCPool_ExecuteWithFallback_Success(t *testing.T) {
 	logger := zaptest.NewLogger(t)
-	endpoints := []string{"doi", "moro", "rene"}
+	endpoints := []string{"http://doi:26657", "http://moro:26657", "http://rene:26657"}
 	pool, err := NewRPCPool(createTestContext(logger), endpoints, logger)
 	assert.NoError(t, err)
 
@@ -70,12 +70,12 @@ func TestRPCPool_ExecuteWithFallback_Success(t *testing.T) {
 
 	assert.NoError(t, err)
 	assert.Equal(t, 1, callCount)
-	assert.Equal(t, "doi", pool.GetCurrentClient().endpoint)
+	assert.Equal(t, "http://doi:26657", pool.GetCurrentClient().endpoint)
 }
 
 func TestRPCPool_ExecuteWithFallback_FallbackSuccess(t *testing.T) {
 	logger := zaptest.NewLogger(t)
-	endpoints := []string{"doi", "moro", "rene"}
+	endpoints := []string{"http://doi:26657", "http://moro:26657", "http://rene:26657"}
 	pool, err := NewRPCPool(createTestContext(logger), endpoints, logger)
 	assert.NoError(t, err)
 
@@ -91,12 +91,12 @@ func TestRPCPool_ExecuteWithFallback_FallbackSuccess(t *testing.T) {
 
 	assert.NoError(t, err)
 	assert.Equal(t, 2, callCount)
-	assert.Equal(t, "moro", pool.GetCurrentClient().endpoint)
+	assert.Equal(t, "http://moro:26657", pool.GetCurrentClient().endpoint)
 }
 
 func TestRPCPool_ExecuteWithFallback_AllFail(t *testing.T) {
 	logger := zaptest.NewLogger(t)
-	endpoints := []string{"doi", "moro"}
+	endpoints := []string{"http://doi:26657", "http://moro:26657"}
 	pool, err := NewRPCPool(createTestContext(logger), endpoints, logger)
 	assert.NoError(t, err)
 	pool.maxRetries = 1 // Set to 1 for faster test
@@ -116,7 +116,7 @@ func TestRPCPool_ExecuteWithFallback_AllFail(t *testing.T) {
 
 func TestRPCPool_ExecuteWithFallback_Timeout(t *testing.T) {
 	logger := zaptest.NewLogger(t)
-	endpoints := []string{"doi"}
+	endpoints := []string{"http://doi:26657"}
 	pool, err := NewRPCPool(createTestContext(logger), endpoints, logger)
 	assert.NoError(t, err)
 	pool.rpcTimeout = 100 * time.Millisecond
@@ -137,7 +137,7 @@ func TestRPCPool_ExecuteWithFallback_Timeout(t *testing.T) {
 
 func TestRPCPool_ExecuteWithFallback_RetrySuccess(t *testing.T) {
 	logger := zaptest.NewLogger(t)
-	endpoints := []string{"doi"}
+	endpoints := []string{"http://doi:26657"}
 	pool, err := NewRPCPool(createTestContext(logger), endpoints, logger)
 	assert.NoError(t, err)
 	pool.maxRetries = 2
@@ -159,7 +159,7 @@ func TestRPCPool_ExecuteWithFallback_RetrySuccess(t *testing.T) {
 
 func TestRPCPool_ExecuteWithFallback_ContextCancellation(t *testing.T) {
 	logger := zaptest.NewLogger(t)
-	endpoints := []string{"doi", "moro"}
+	endpoints := []string{"http://doi:26657", "http://moro:26657"}
 	pool, err := NewRPCPool(createTestContext(logger), endpoints, logger)
 	assert.NoError(t, err)
 
@@ -191,13 +191,13 @@ func TestRPCPool_Logging(t *testing.T) {
 	core, recorded := observer.New(zap.InfoLevel)
 	logger := zap.New(core)
 
-	endpoints := []string{"doi", "moro"}
+	endpoints := []string{"http://doi:26657", "http://moro:26657"}
 	pool, err := NewRPCPool(createTestContext(logger), endpoints, logger)
 	assert.NoError(t, err)
 
 	// Function fails on first endpoint, succeeds on second
 	_ = pool.ExecuteWithFallback(context.Background(), func(ctx context.Context) error {
-		if pool.GetCurrentClient().endpoint == "doi" {
+		if pool.GetCurrentClient().endpoint == "http://doi:26657" {
 			return errors.New("first endpoint failed")
 		}
 		return nil
