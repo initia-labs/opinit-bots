@@ -119,7 +119,7 @@ func TestRPCPool_ScoreBounds(t *testing.T) {
 	pool.mu.RLock()
 	targetClient := pool.clients[0]
 	pool.mu.RUnlock()
-	
+
 	for i := 0; i < 50; i++ {
 		pool.UpdateScoreOnSuccess(targetClient)
 	}

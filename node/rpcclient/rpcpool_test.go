@@ -276,7 +276,7 @@ func TestNewRPCPool_EmptyEndpoints(t *testing.T) {
 
 	emptyEndpoints := []string{}
 	pool, err := NewRPCPool(ctx, emptyEndpoints, logger)
-	
+
 	assert.Error(t, err, "NewRPCPool should return error with empty endpoints")
 	assert.Nil(t, pool, "Pool should be nil when no endpoints provided")
 	assert.Contains(t, err.Error(), "no RPC endpoints provided", "Error should indicate no endpoints provided")
