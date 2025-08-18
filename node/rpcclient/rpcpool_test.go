@@ -269,13 +269,15 @@ func TestNewRPCPool_MixedEndpoints(t *testing.T) {
 	assert.True(t, foundWarning, "Should have logged warning for invalid endpoint")
 }
 
-// TestNewRPCPool_EmptyEndpoints tests NewRPCPool with empty endpoints (should panic)
+// TestNewRPCPool_EmptyEndpoints tests NewRPCPool with empty endpoints (should return error)
 func TestNewRPCPool_EmptyEndpoints(t *testing.T) {
 	logger := zaptest.NewLogger(t)
 	ctx := createTestContext(logger)
 
-	assert.Panics(t, func() {
-		emptyEndpoints := []string{}
-		_, _ = NewRPCPool(ctx, emptyEndpoints, logger)
-	}, "NewRPCPool should panic with empty endpoints")
+	emptyEndpoints := []string{}
+	pool, err := NewRPCPool(ctx, emptyEndpoints, logger)
+	
+	assert.Error(t, err, "NewRPCPool should return error with empty endpoints")
+	assert.Nil(t, pool, "Pool should be nil when no endpoints provided")
+	assert.Contains(t, err.Error(), "no RPC endpoints provided", "Error should indicate no endpoints provided")
 }

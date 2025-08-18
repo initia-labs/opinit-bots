@@ -143,18 +143,17 @@ func (p *RPCPool) MoveToNextHealthyClient() *RPCClientInfo {
 	return nil
 }
 
-// MarkClientUnhealthy marks the current client as unhealthy
-func (p *RPCPool) MarkClientUnhealthy(err error) {
+// MarkClientUnhealthy marks the target client as unhealthy
+func (p *RPCPool) MarkClientUnhealthy(target *RPCClientInfo, err error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	client := p.clients[p.currentIndex]
-	client.healthy = false
-	client.lastError = err
-	client.lastCheck = time.Now()
+	target.healthy = false
+	target.lastError = err
+	target.lastCheck = time.Now()
 
 	p.logger.Warn("Marked RPC client as unhealthy",
-		zap.String("endpoint", client.endpoint),
+		zap.String("endpoint", target.endpoint),
 		zap.Error(err))
 }
 
@@ -195,33 +194,31 @@ func (p *RPCPool) updateScore(clientInfo *RPCClientInfo, success bool, isTimeout
 	}
 }
 
-// UpdateScoreOnSuccess updates the score for the current client on successful request
-func (p *RPCPool) UpdateScoreOnSuccess() {
+// UpdateScoreOnSuccess updates the score for the target client on successful request
+func (p *RPCPool) UpdateScoreOnSuccess(target *RPCClientInfo) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	currentClient := p.clients[p.currentIndex]
-	p.updateScore(currentClient, true, false)
+	p.updateScore(target, true, false)
 
 	p.logger.Debug("Updated endpoint score on success",
-		zap.String("endpoint", currentClient.endpoint),
-		zap.Float64("score", currentClient.score),
-		zap.Int64("success_count", currentClient.successCount))
+		zap.String("endpoint", target.endpoint),
+		zap.Float64("score", target.score),
+		zap.Int64("success_count", target.successCount))
 }
 
-// UpdateScoreOnFailure updates the score for the current client on failed request
-func (p *RPCPool) UpdateScoreOnFailure(err error, isTimeout bool) {
+// UpdateScoreOnFailure updates the score for the target client on failed request
+func (p *RPCPool) UpdateScoreOnFailure(target *RPCClientInfo, err error, isTimeout bool) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	currentClient := p.clients[p.currentIndex]
-	p.updateScore(currentClient, false, isTimeout)
+	p.updateScore(target, false, isTimeout)
 
 	p.logger.Debug("Updated endpoint score on failure",
-		zap.String("endpoint", currentClient.endpoint),
-		zap.Float64("score", currentClient.score),
-		zap.Int64("failure_count", currentClient.failureCount),
-		zap.Int64("timeout_count", currentClient.timeoutCount),
+		zap.String("endpoint", target.endpoint),
+		zap.Float64("score", target.score),
+		zap.Int64("failure_count", target.failureCount),
+		zap.Int64("timeout_count", target.timeoutCount),
 		zap.Bool("is_timeout", isTimeout),
 		zap.Error(err))
 }
@@ -336,7 +333,7 @@ func (p *RPCPool) tryAllEndpointsWithScoring(ctx context.Context, fn func(contex
 		isHealthy := client.healthy
 		clientPtr := client.client
 		p.mu.RUnlock()
-		
+
 		// Skip unhealthy clients
 		if !isHealthy || clientPtr == nil {
 			continue
@@ -364,13 +361,13 @@ func (p *RPCPool) tryAllEndpointsWithScoring(ctx context.Context, fn func(contex
 		isTimeout = err != nil && (errors.Is(timeoutCtx.Err(), context.DeadlineExceeded))
 
 		if err == nil {
-			p.UpdateScoreOnSuccess()
+			p.UpdateScoreOnSuccess(client)
 			return nil
 		}
 
 		// Failure - update score negatively and mark as unhealthy
-		p.UpdateScoreOnFailure(err, isTimeout)
-		p.MarkClientUnhealthy(err)
+		p.UpdateScoreOnFailure(client, err, isTimeout)
+		p.MarkClientUnhealthy(client, err)
 		lastErr = err
 		p.logEndpointFailure(client.endpoint, err, retryAttempt)
 	}

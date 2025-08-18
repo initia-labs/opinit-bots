@@ -53,16 +53,17 @@ func TestRPCPool_UpdateScoreOnSuccess(t *testing.T) {
 
 	pool.mu.RLock()
 	initialScore := pool.clients[0].score
+	currentClient := pool.clients[pool.currentIndex]
 	pool.mu.RUnlock()
 
 	// Update score on success
-	pool.UpdateScoreOnSuccess()
+	pool.UpdateScoreOnSuccess(currentClient)
 
 	pool.mu.RLock()
-	currentClient := pool.clients[pool.currentIndex]
-	assert.Equal(t, initialScore+ScoreIncreaseOnSuccess, currentClient.score, "Score should increase on success")
-	assert.Equal(t, int64(1), currentClient.successCount, "Success count should increment")
-	assert.Equal(t, int64(0), currentClient.failureCount, "Failure count should remain 0")
+	updatedClient := pool.clients[pool.currentIndex]
+	assert.Equal(t, initialScore+ScoreIncreaseOnSuccess, updatedClient.score, "Score should increase on success")
+	assert.Equal(t, int64(1), updatedClient.successCount, "Success count should increment")
+	assert.Equal(t, int64(0), updatedClient.failureCount, "Failure count should remain 0")
 	pool.mu.RUnlock()
 }
 
@@ -72,18 +73,19 @@ func TestRPCPool_UpdateScoreOnFailure(t *testing.T) {
 
 	pool.mu.RLock()
 	initialScore := pool.clients[0].score
+	currentClient := pool.clients[pool.currentIndex]
 	pool.mu.RUnlock()
 	testErr := fmt.Errorf("test error")
 
 	// Test regular failure
-	pool.UpdateScoreOnFailure(testErr, false)
+	pool.UpdateScoreOnFailure(currentClient, testErr, false)
 
 	pool.mu.RLock()
-	currentClient := pool.clients[pool.currentIndex]
-	assert.Equal(t, initialScore-ScoreDecayOnFailure, currentClient.score, "Score should decrease on failure")
-	assert.Equal(t, int64(0), currentClient.successCount, "Success count should remain 0")
-	assert.Equal(t, int64(1), currentClient.failureCount, "Failure count should increment")
-	assert.Equal(t, int64(0), currentClient.timeoutCount, "Timeout count should remain 0")
+	updatedClient := pool.clients[pool.currentIndex]
+	assert.Equal(t, initialScore-ScoreDecayOnFailure, updatedClient.score, "Score should decrease on failure")
+	assert.Equal(t, int64(0), updatedClient.successCount, "Success count should remain 0")
+	assert.Equal(t, int64(1), updatedClient.failureCount, "Failure count should increment")
+	assert.Equal(t, int64(0), updatedClient.timeoutCount, "Timeout count should remain 0")
 	pool.mu.RUnlock()
 }
 
@@ -93,18 +95,19 @@ func TestRPCPool_UpdateScoreOnTimeout(t *testing.T) {
 
 	pool.mu.RLock()
 	initialScore := pool.clients[0].score
+	currentClient := pool.clients[pool.currentIndex]
 	pool.mu.RUnlock()
 	testErr := fmt.Errorf("timeout error")
 
 	// Test timeout failure
-	pool.UpdateScoreOnFailure(testErr, true)
+	pool.UpdateScoreOnFailure(currentClient, testErr, true)
 
 	pool.mu.RLock()
-	currentClient := pool.clients[pool.currentIndex]
-	assert.Equal(t, initialScore-ScoreDecayOnTimeout, currentClient.score, "Score should decrease more on timeout")
-	assert.Equal(t, int64(0), currentClient.successCount, "Success count should remain 0")
-	assert.Equal(t, int64(1), currentClient.failureCount, "Failure count should increment")
-	assert.Equal(t, int64(1), currentClient.timeoutCount, "Timeout count should increment")
+	updatedClient := pool.clients[pool.currentIndex]
+	assert.Equal(t, initialScore-ScoreDecayOnTimeout, updatedClient.score, "Score should decrease more on timeout")
+	assert.Equal(t, int64(0), updatedClient.successCount, "Success count should remain 0")
+	assert.Equal(t, int64(1), updatedClient.failureCount, "Failure count should increment")
+	assert.Equal(t, int64(1), updatedClient.timeoutCount, "Timeout count should increment")
 	pool.mu.RUnlock()
 }
 
@@ -113,8 +116,12 @@ func TestRPCPool_ScoreBounds(t *testing.T) {
 	pool := createTestRPCPool(t, endpoints)
 
 	// Test maximum score bound
+	pool.mu.RLock()
+	targetClient := pool.clients[0]
+	pool.mu.RUnlock()
+	
 	for i := 0; i < 50; i++ {
-		pool.UpdateScoreOnSuccess()
+		pool.UpdateScoreOnSuccess(targetClient)
 	}
 
 	pool.mu.RLock()
@@ -129,7 +136,7 @@ func TestRPCPool_ScoreBounds(t *testing.T) {
 	// Test minimum score bound
 	testErr := fmt.Errorf("test error")
 	for i := 0; i < 50; i++ {
-		pool.UpdateScoreOnFailure(testErr, false)
+		pool.UpdateScoreOnFailure(targetClient, testErr, false)
 	}
 
 	pool.mu.RLock()
@@ -382,10 +389,11 @@ func TestRPCPool_ScoreInflationPrevention(t *testing.T) {
 
 	pool.mu.RLock()
 	initialScore := pool.clients[0].score
+	targetClient := pool.clients[0]
 	pool.mu.RUnlock()
 
 	// Test multiple successful requests - score should only increase once
-	pool.UpdateScoreOnSuccess()
+	pool.UpdateScoreOnSuccess(targetClient)
 	pool.mu.RLock()
 	firstSuccessScore := pool.clients[0].score
 	firstSuccessCount := pool.clients[0].successCount
@@ -396,7 +404,7 @@ func TestRPCPool_ScoreInflationPrevention(t *testing.T) {
 
 	// Additional successful requests should continue to increase score
 	for i := 0; i < 5; i++ {
-		pool.UpdateScoreOnSuccess()
+		pool.UpdateScoreOnSuccess(targetClient)
 	}
 
 	pool.mu.RLock()
@@ -410,7 +418,7 @@ func TestRPCPool_ScoreInflationPrevention(t *testing.T) {
 
 	// Test that failure resets the success state
 	testErr := fmt.Errorf("test error")
-	pool.UpdateScoreOnFailure(testErr, false)
+	pool.UpdateScoreOnFailure(targetClient, testErr, false)
 
 	pool.mu.RLock()
 	afterFailureScore := pool.clients[0].score
@@ -419,7 +427,7 @@ func TestRPCPool_ScoreInflationPrevention(t *testing.T) {
 	assert.Equal(t, expectedFinalScore-ScoreDecayOnFailure, afterFailureScore, "Score should decrease on failure")
 
 	// Test that score can increase again after failure
-	pool.UpdateScoreOnSuccess()
+	pool.UpdateScoreOnSuccess(targetClient)
 
 	pool.mu.RLock()
 	recoveryScore := pool.clients[0].score
@@ -432,13 +440,17 @@ func TestRPCPool_ConcurrentScoreUpdates(t *testing.T) {
 	endpoints := []string{"http://endpoint1:26657"}
 	pool := createTestRPCPool(t, endpoints)
 
+	pool.mu.RLock()
+	targetClient := pool.clients[0]
+	pool.mu.RUnlock()
+
 	// Run concurrent score updates
 	done := make(chan bool, 2)
 
 	// Goroutine 1: Success updates
 	go func() {
 		for i := 0; i < 50; i++ {
-			pool.UpdateScoreOnSuccess()
+			pool.UpdateScoreOnSuccess(targetClient)
 		}
 		done <- true
 	}()
@@ -447,7 +459,7 @@ func TestRPCPool_ConcurrentScoreUpdates(t *testing.T) {
 	go func() {
 		testErr := fmt.Errorf("test error")
 		for i := 0; i < 10; i++ {
-			pool.UpdateScoreOnFailure(testErr, false)
+			pool.UpdateScoreOnFailure(targetClient, testErr, false)
 		}
 		done <- true
 	}()
