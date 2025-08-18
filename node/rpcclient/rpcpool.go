@@ -61,7 +61,7 @@ type RPCPool struct {
 // endpoints remain after filtering.
 func NewRPCPool(ctx types.Context, endpoints []string, logger *zap.Logger) (*RPCPool, error) {
 	if len(endpoints) == 0 {
-		panic("endpoints slice cannot be empty")
+		return nil, errors.New("no RPC endpoints provided")
 	}
 
 	// Get timeout from context or use default
@@ -331,8 +331,14 @@ func (p *RPCPool) tryAllEndpointsWithScoring(ctx context.Context, fn func(contex
 
 	// Try endpoints in order of their scores (highest first)
 	for _, client := range sortedClients {
+		// Take a snapshot of client fields under read lock to avoid data races
+		p.mu.RLock()
+		isHealthy := client.healthy
+		clientPtr := client.client
+		p.mu.RUnlock()
+		
 		// Skip unhealthy clients
-		if !client.healthy || client.client == nil {
+		if !isHealthy || clientPtr == nil {
 			continue
 		}
 
