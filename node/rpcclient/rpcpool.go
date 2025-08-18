@@ -158,30 +158,6 @@ func (p *RPCPool) MarkClientUnhealthy(err error) {
 		zap.Error(err))
 }
 
-// AttemptClientRecovery attempts to recover an unhealthy client by recreating the HTTP client.
-// This is useful for resolving issues like transient network errors, stale connections, or
-// when an RPC endpoint comes back online after a period of unavailability.
-func (p *RPCPool) AttemptClientRecovery(clientInfo *RPCClientInfo) bool {
-	newClient, err := clienthttp.New(clientInfo.endpoint, "/websocket")
-	if err != nil {
-		clientInfo.lastError = err
-		clientInfo.lastCheck = time.Now()
-		p.logger.Debug("Failed to recover RPC client",
-			zap.String("endpoint", clientInfo.endpoint),
-			zap.Error(err))
-		return false
-	}
-
-	// Replace the old client
-	clientInfo.client = newClient
-	clientInfo.healthy = true
-	clientInfo.lastError = nil
-	clientInfo.lastCheck = time.Now()
-
-	p.logger.Info("Successfully recovered RPC client",
-		zap.String("endpoint", clientInfo.endpoint))
-	return true
-}
 
 // GetHealthyClientCount returns the number of healthy clients
 func (p *RPCPool) GetHealthyClientCount() int {
@@ -257,10 +233,16 @@ func (p *RPCPool) TryRecoverUnhealthyClients() {
 	defer p.mu.Unlock()
 
 	for _, client := range p.clients {
-		if !client.healthy || client.client == nil {
+		if !client.healthy && client.client != nil {
 			// Only attempt recovery if enough time has passed since last check
 			if time.Since(client.lastCheck) > p.retryInterval {
-				p.AttemptClientRecovery(client)
+				// Mark client as healthy again for retry - net/http handles connection recovery
+				client.healthy = true
+				client.lastError = nil
+				client.lastCheck = time.Now()
+
+				p.logger.Info("Marked RPC client as healthy for retry",
+					zap.String("endpoint", client.endpoint))
 			}
 		}
 	}
