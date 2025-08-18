@@ -158,7 +158,6 @@ func (p *RPCPool) MarkClientUnhealthy(err error) {
 		zap.Error(err))
 }
 
-
 // GetHealthyClientCount returns the number of healthy clients
 func (p *RPCPool) GetHealthyClientCount() int {
 	p.mu.RLock()
