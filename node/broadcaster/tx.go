@@ -105,6 +105,8 @@ func (b *Broadcaster) handleProcessedMsgs(ctx types.Context, data btypes.Process
 		return errors.Wrapf(err, "simulation failed")
 	}
 
+	ctx.Logger().Debug("broadcast tx", zap.String("tx_hash", txHash), zap.Uint64("sequence", sequence))
+
 	res, err := b.rpcClient.BroadcastTxSync(ctx, txBytes)
 	if err != nil {
 		// TODO: handle error, may repeat sending tx
@@ -113,8 +115,6 @@ func (b *Broadcaster) handleProcessedMsgs(ctx types.Context, data btypes.Process
 	if res.Code != 0 {
 		return fmt.Errorf("broadcast txs: %s", res.Log)
 	}
-
-	ctx.Logger().Debug("broadcast tx", zap.String("tx_hash", txHash), zap.Uint64("sequence", sequence))
 
 	err = DeleteProcessedMsgs(b.db, data)
 	if err != nil {
