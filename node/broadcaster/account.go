@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	abci "github.com/cometbft/cometbft/abci/types"
+	"github.com/cometbft/cometbft/libs/rand"
 	"github.com/getsentry/sentry-go"
 	"github.com/initia-labs/opinit-bots/keys"
 	btypes "github.com/initia-labs/opinit-bots/node/broadcaster/types"
@@ -267,7 +268,8 @@ func (b BroadcasterAccount) SimulateAndSignTx(ctx context.Context, msgs ...sdk.M
 		return nil, err
 	}
 
-	b.txf = b.txf.WithGas(adjusted)
+	// create random string memo to avoid tx hash collision
+	b.txf = b.txf.WithGas(adjusted).WithMemo(rand.Str(10))
 
 	unlock := keys.SetSDKConfigContext(b.Bech32Prefix())
 	defer unlock()
