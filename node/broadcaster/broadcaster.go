@@ -5,7 +5,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"math"
-	"regexp"
 	"slices"
 	"sync"
 	"time"
@@ -24,8 +23,6 @@ import (
 	"github.com/initia-labs/opinit-bots/node/rpcclient"
 	"github.com/initia-labs/opinit-bots/types"
 )
-
-var txNotFoundRegex = regexp.MustCompile(`tx \(([A-Fa-f0-9]+)\) not found`)
 
 type Broadcaster struct {
 	cfg btypes.BroadcasterConfig
@@ -175,6 +172,7 @@ func (b *Broadcaster) loadPendingTxs(ctx types.Context, stage types.BasicDB, las
 				zap.String("hash", pendingTxs[txIndex].TxHash),
 				zap.Int64("height", res.Height))
 			txIndex++
+			retry = 1
 		} else if err == nil && res != nil {
 			ctx.Logger().Warn("transaction failed",
 				zap.String("hash", pendingTxs[txIndex].TxHash),
@@ -182,14 +180,22 @@ func (b *Broadcaster) loadPendingTxs(ctx types.Context, stage types.BasicDB, las
 				zap.String("log", res.TxResult.Log))
 			reProcessingTxs = append(reProcessingTxs, pendingTxs[txIndex])
 			txIndex++
-		} else if err != nil && txNotFoundRegex.FindStringSubmatch(err.Error()) != nil {
-			pendingTxTime := time.Unix(0, pendingTxs[txIndex].Timestamp).UTC()
-			timeoutTime := pendingTxTime.Add(b.cfg.TxTimeout)
-			if lastBlockTime.After(timeoutTime) {
-				reProcessingTxs = append(reProcessingTxs, pendingTxs[txIndex:]...)
-				break
+			retry = 1
+		} else if err != nil {
+			if IsTxNotFoundErr(err, pendingTxs[txIndex].TxHash) {
+				pendingTxTime := time.Unix(0, pendingTxs[txIndex].Timestamp).UTC()
+				timeoutTime := pendingTxTime.Add(b.cfg.TxTimeout)
+				if lastBlockTime.After(timeoutTime) {
+					reProcessingTxs = append(reProcessingTxs, pendingTxs[txIndex:]...)
+					break
+				}
+
+				// re-broadcast all left pending txs
+				for i := txIndex; i < len(pendingTxs); i++ {
+					b.BroadcastTxAsync(ctx, pendingTxs[i].Tx) //nolint:errcheck
+				}
 			}
-		} else {
+
 			ctx.Logger().Warn("retry to query pending tx", zap.String("hash", pendingTxs[txIndex].TxHash), zap.Int("seconds", int(2*math.Exp2(float64(retry)))), zap.Int("count", retry), zap.String("error", err.Error()))
 			if types.SleepWithRetry(ctx, retry) {
 				return ctx.Err()
@@ -197,6 +203,12 @@ func (b *Broadcaster) loadPendingTxs(ctx types.Context, stage types.BasicDB, las
 			retry++
 			if retry > types.MaxRetryCount {
 				return fmt.Errorf("failed to query pending tx; hash: %s, error: %s", pendingTxs[txIndex].TxHash, err.Error())
+			}
+
+			// update last block time
+			header, err := b.rpcClient.Header(ctx, nil)
+			if err == nil {
+				lastBlockTime = header.Header.Time
 			}
 		}
 	}
