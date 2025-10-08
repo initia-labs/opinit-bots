@@ -206,11 +206,9 @@ func (b *Broadcaster) loadPendingTxs(ctx types.Context, stage types.BasicDB, las
 			}
 
 			// update last block time
-			if res != nil {
-				header, err := b.rpcClient.Header(ctx, &res.Height)
-				if err == nil {
-					lastBlockTime = header.Header.Time
-				}
+			header, err := b.rpcClient.Header(ctx, nil)
+			if err == nil {
+				lastBlockTime = header.Header.Time
 			}
 		}
 	}
