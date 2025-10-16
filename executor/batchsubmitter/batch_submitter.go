@@ -1,10 +1,8 @@
 package batchsubmitter
 
 import (
-	"bytes"
 	"compress/gzip"
 	"context"
-	"encoding/binary"
 	"io"
 	"os"
 	"sync"
@@ -132,7 +130,6 @@ func (bs *BatchSubmitter) Initialize(ctx types.Context, syncedHeight int64, host
 		return errors.Wrap(err, "failed to open batch file")
 	}
 
-	var recoveredBlocks [][]byte
 	if bs.node.HeightInitialized() {
 		bs.localBatchInfo.Start = bs.node.GetHeight()
 		bs.localBatchInfo.End = 0
@@ -147,49 +144,13 @@ func (bs *BatchSubmitter) Initialize(ctx types.Context, syncedHeight int64, host
 		if err != nil {
 			return errors.Wrap(err, "failed to empty batch file")
 		}
-	} else {
-		recoveredBlocks, err = bs.recoverIncompleteBatch(ctx)
-		if err != nil {
-			return errors.Wrap(err, "failed to recover incomplete batch")
-		}
+	} else if err := bs.checkBatchFileCorruption(); err != nil {
+		return err
 	}
 	// linux command gzip use level 6 as default
 	bs.batchWriter, err = gzip.NewWriterLevel(bs.batchFile, 6)
 	if err != nil {
 		return errors.Wrap(err, "failed to create gzip writer")
-	}
-	fileInfo, statErr := bs.batchFile.Stat()
-	if statErr != nil {
-		return errors.Wrap(statErr, "failed to stat batch file")
-	}
-	if len(recoveredBlocks) == 0 {
-		bs.localBatchInfo.BatchSize = fileInfo.Size()
-		if err := SaveLocalBatchInfo(bs.DB(), *bs.localBatchInfo); err != nil {
-			return errors.Wrap(err, "failed to persist batch info")
-		}
-	}
-	if len(recoveredBlocks) > 0 {
-		for _, block := range recoveredBlocks {
-			if _, err := bs.batchWriter.Write(prependLength(block)); err != nil {
-				return errors.Wrap(err, "failed to rewrite recovered batch data")
-			}
-		}
-		if err := bs.batchWriter.Flush(); err != nil {
-			return errors.Wrap(err, "failed to flush recovered batch data")
-		}
-		fileInfo, statErr = bs.batchFile.Stat()
-		if statErr != nil {
-			return errors.Wrap(statErr, "failed to stat batch file after recovery")
-		}
-		bs.localBatchInfo.BatchSize = fileInfo.Size()
-		if err := SaveLocalBatchInfo(bs.DB(), *bs.localBatchInfo); err != nil {
-			return errors.Wrap(err, "failed to persist recovered batch info")
-		}
-		ctx.Logger().Warn("recovered incomplete batch data",
-			zap.Int("recovered_blocks", len(recoveredBlocks)),
-			zap.Int64("batch_start", bs.localBatchInfo.Start),
-			zap.Int64("batch_size", bs.localBatchInfo.BatchSize),
-		)
 	}
 
 	bs.node.RegisterRawBlockHandler(bs.rawBlockHandler)
@@ -234,83 +195,32 @@ func (bs BatchSubmitter) DB() types.DB {
 	return bs.node.DB()
 }
 
-func (bs *BatchSubmitter) recoverIncompleteBatch(ctx types.Context) ([][]byte, error) {
+func (bs *BatchSubmitter) checkBatchFileCorruption() error {
 	info, err := bs.batchFile.Stat()
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to stat batch file")
+		return errors.Wrap(err, "failed to stat batch file")
 	}
 	if info.Size() == 0 {
-		return nil, nil
+		return nil
 	}
 
-	if bs.localBatchInfo == nil {
-		bs.localBatchInfo = &executortypes.LocalBatchInfo{}
-	}
-
-	if bs.localBatchInfo.End != 0 {
-		ctx.Logger().Warn("found residual batch file after finalized batch; dropping",
-			zap.Int64("batch_start", bs.localBatchInfo.Start),
-			zap.Int64("batch_end", bs.localBatchInfo.End),
-		)
-		if err := bs.emptyBatchFile(); err != nil {
-			return nil, errors.Wrap(err, "failed to empty batch file")
-		}
-		bs.localBatchInfo.BatchSize = 0
-		return nil, nil
-	}
-
-	if _, err := bs.batchFile.Seek(0, 0); err != nil {
-		return nil, errors.Wrap(err, "failed to seek batch file")
+	if _, err := bs.batchFile.Seek(0, io.SeekStart); err != nil {
+		return errors.Wrap(err, "failed to seek batch file")
 	}
 
 	reader, err := gzip.NewReader(bs.batchFile)
 	if err != nil {
-		ctx.Logger().Warn("failed to open gzip reader for batch file; dropping file",
-			zap.String("error", err.Error()))
-		if err := bs.emptyBatchFile(); err != nil {
-			return nil, errors.Wrap(err, "failed to empty batch file")
-		}
-		bs.localBatchInfo.BatchSize = 0
-		return nil, nil
+		return errors.Wrapf(err, "Please restart the DA height from %d. The batch file is corrupted.", bs.localBatchInfo.Start)
 	}
 	defer reader.Close()
 
-	buf := new(bytes.Buffer)
-	_, readErr := buf.ReadFrom(reader)
-
-	data := buf.Bytes()
-	blocks := make([][]byte, 0)
-	partial := false
-	for offset := 0; offset < len(data); {
-		if len(data)-offset < 8 {
-			partial = true
-			break
-		}
-		length := binary.LittleEndian.Uint64(data[offset : offset+8])
-		offset += 8
-
-		if int(length) > len(data)-offset {
-			partial = true
-			break
-		}
-
-		block := make([]byte, int(length))
-		copy(block, data[offset:offset+int(length)])
-		blocks = append(blocks, block)
-		offset += int(length)
+	// #nosec G110
+	if _, err := io.Copy(io.Discard, reader); err != nil {
+		return errors.Wrapf(err, "Please restart the DA height from %d. The batch file is corrupted.", bs.localBatchInfo.Start)
 	}
 
-	if err := bs.emptyBatchFile(); err != nil {
-		return nil, errors.Wrap(err, "failed to empty batch file")
+	if _, err := bs.batchFile.Seek(0, io.SeekEnd); err != nil {
+		return errors.Wrap(err, "failed to seek batch file")
 	}
-
-	if readErr != nil && !errors.Is(readErr, io.EOF) && !errors.Is(readErr, io.ErrUnexpectedEOF) {
-		return blocks, errors.Wrap(readErr, "failed to read batch file")
-	}
-
-	if partial || errors.Is(readErr, io.ErrUnexpectedEOF) {
-		ctx.Logger().Warn("recovered partial batch data",
-			zap.Int("recovered_blocks", len(blocks)))
-	}
-	return blocks, nil
+	return nil
 }
