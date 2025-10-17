@@ -116,7 +116,8 @@ func (b *Broadcaster) handleProcessedMsgs(ctx types.Context, data btypes.Process
 		return fmt.Errorf("broadcast txs: %s", res.Log)
 	}
 
-	err = DeleteProcessedMsgs(b.db, data)
+	stage := b.db.NewStage()
+	err = DeleteProcessedMsgs(stage, data)
 	if err != nil {
 		return err
 	}
@@ -135,10 +136,15 @@ func (b *Broadcaster) handleProcessedMsgs(ctx types.Context, data btypes.Process
 
 	if pendingTx.Save {
 		// save pending transaction to the database for handling after restart
-		err = SavePendingTx(b.db, pendingTx)
+		err = SavePendingTx(stage, pendingTx)
 		if err != nil {
 			return err
 		}
+	}
+
+	err = stage.Commit()
+	if err != nil {
+		return err
 	}
 
 	// save pending tx to local memory to handle this tx in this session
