@@ -2,10 +2,10 @@ package rpcclient
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"reflect"
 	"strconv"
+	"sync"
 	"time"
 
 	"google.golang.org/grpc"
@@ -17,7 +17,10 @@ import (
 	abci "github.com/cometbft/cometbft/abci/types"
 	client2 "github.com/cometbft/cometbft/rpc/client"
 	coretypes "github.com/cometbft/cometbft/rpc/core/types"
+	cmttypes "github.com/cometbft/cometbft/types"
 	gogogrpc "github.com/cosmos/gogoproto/grpc"
+	"github.com/pkg/errors"
+	"go.uber.org/zap"
 
 	"github.com/cosmos/cosmos-sdk/codec"
 	"github.com/cosmos/cosmos-sdk/codec/types"
@@ -25,6 +28,7 @@ import (
 	grpctypes "github.com/cosmos/cosmos-sdk/types/grpc"
 
 	clienthttp "github.com/initia-labs/opinit-bots/client"
+	opTypes "github.com/initia-labs/opinit-bots/types"
 )
 
 var _ gogogrpc.ClientConn = &RPCClient{}
@@ -35,30 +39,43 @@ var protoCodec = encoding.GetCodec(proto.Name)
 type RPCClient struct {
 	*clienthttp.HTTP
 
-	cdc codec.Codec
+	cdc  codec.Codec
+	pool *RPCPool
+	mu   sync.RWMutex
 }
 
-func NewRPCClient(cdc codec.Codec, rpcAddr string) (*RPCClient, error) {
-	client, err := clienthttp.New(rpcAddr, "/websocket")
-	if err != nil {
-		return nil, err
+func NewRPCClient(ctx opTypes.Context, cdc codec.Codec, rpcAddrs []string, logger *zap.Logger) (*RPCClient, error) {
+	return CreateRPCClient(ctx, cdc, rpcAddrs, logger)
+}
+
+func NewRPCClientWithClient(ctx opTypes.Context, cdc codec.Codec, client *clienthttp.HTTP, endpoints []string, logger *zap.Logger) (*RPCClient, error) {
+	if len(endpoints) == 0 {
+		return nil, errors.New("no RPC endpoints provided")
+	}
+
+	// For test clients with mocked HTTP client, don't create a pool
+	// This allows tests to bypass the pool fallback logic
+	var pool *RPCPool
+	if client != nil {
+		// If a specific HTTP client is provided (likely for testing), don't create pool
+		pool = nil
+	} else {
+		var err error
+		pool, err = NewRPCPool(ctx, endpoints, logger)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return &RPCClient{
 		HTTP: client,
 		cdc:  cdc,
+		pool: pool,
 	}, nil
 }
 
-func NewRPCClientWithClient(cdc codec.Codec, client *clienthttp.HTTP) *RPCClient {
-	return &RPCClient{
-		HTTP: client,
-		cdc:  cdc,
-	}
-}
-
 // Invoke implements the grpc ClientConq.Invoke method
-func (q RPCClient) Invoke(ctx context.Context, method string, req, reply interface{}, opts ...grpc.CallOption) (err error) {
+func (q *RPCClient) Invoke(ctx context.Context, method string, req, reply interface{}, opts ...grpc.CallOption) (err error) {
 	// In both cases, we don't allow empty request req (it will panic unexpectedly).
 	if reflect.ValueOf(req).IsNil() {
 		return sdkerrors.Wrap(legacyerrors.ErrInvalidRequest, "request cannot be nil")
@@ -91,7 +108,7 @@ func (q RPCClient) Invoke(ctx context.Context, method string, req, reply interfa
 }
 
 // NewStream implements the grpc ClientConq.NewStream method
-func (q RPCClient) NewStream(context.Context, *grpc.StreamDesc, string, ...grpc.CallOption) (grpc.ClientStream, error) {
+func (q *RPCClient) NewStream(context.Context, *grpc.StreamDesc, string, ...grpc.CallOption) (grpc.ClientStream, error) {
 	return nil, fmt.Errorf("streaming rpc not supported")
 }
 
@@ -99,7 +116,7 @@ func (q RPCClient) NewStream(context.Context, *grpc.StreamDesc, string, ...grpc.
 // arguments for the gRPC method, and returns the ABCI response. It is used
 // to factorize code between client (Invoke) and server (RegisterGRPCServer)
 // gRPC handlers.
-func (q RPCClient) RunGRPCQuery(ctx context.Context, method string, req interface{}, md metadata.MD) (abci.ResponseQuery, metadata.MD, error) {
+func (q *RPCClient) RunGRPCQuery(ctx context.Context, method string, req interface{}, md metadata.MD) (abci.ResponseQuery, metadata.MD, error) {
 	reqBz, err := protoCodec.Marshal(req)
 	if err != nil {
 		return abci.ResponseQuery{}, nil, err
@@ -147,15 +164,22 @@ func (q RPCClient) RunGRPCQuery(ctx context.Context, method string, req interfac
 }
 
 // QueryABCI performs an ABCI query and returns the appropriate response and error sdk error code.
-func (q RPCClient) QueryABCI(ctx context.Context, req abci.RequestQuery) (abci.ResponseQuery, error) {
+func (q *RPCClient) QueryABCI(ctx context.Context, req abci.RequestQuery) (abci.ResponseQuery, error) {
 	opts := client2.ABCIQueryOptions{
 		Height: req.Height,
 		Prove:  req.Prove,
 	}
 
-	result, err := q.ABCIQueryWithOptions(ctx, req.Path, req.Data, opts)
-	if err != nil {
-		return abci.ResponseQuery{}, err
+	var result *coretypes.ResultABCIQuery
+	var err error
+
+	execErr := q.ExecuteWithFallback(ctx, func(ctx context.Context) error {
+		result, err = q.ABCIQueryWithOptions(ctx, req.Path, req.Data, opts)
+		return err
+	})
+
+	if execErr != nil {
+		return abci.ResponseQuery{}, execErr
 	}
 
 	if !result.Response.IsOK() {
@@ -186,21 +210,186 @@ func GetQueryContext(ctx context.Context, height int64) (context.Context, contex
 }
 
 // QueryRawCommit queries the raw commit at a given height.
-func (q RPCClient) QueryRawCommit(ctx context.Context, height int64) ([]byte, error) {
+func (q *RPCClient) QueryRawCommit(ctx context.Context, height int64) ([]byte, error) {
 	ctx, cancel := GetQueryContext(ctx, height)
 	defer cancel()
-	return q.RawCommit(ctx, &height)
+
+	var result []byte
+	var err error
+
+	execErr := q.ExecuteWithFallback(ctx, func(ctx context.Context) error {
+		result, err = q.RawCommit(ctx, &height)
+		return err
+	})
+
+	if execErr != nil {
+		return nil, execErr
+	}
+
+	return result, nil
 }
 
-// QueryBlockBulk queries blocks in bulk.
-func (q RPCClient) QueryBlockBulk(ctx context.Context, start int64, end int64) ([][]byte, error) {
+// QueryBlockBulk queries blocks in bulk with fallback and retry logic.
+func (q *RPCClient) QueryBlockBulk(ctx context.Context, start int64, end int64) ([][]byte, error) {
 	ctx, cancel := GetQueryContext(ctx, 0)
 	defer cancel()
-	return q.BlockBulk(ctx, &start, &end)
+
+	var result [][]byte
+	var err error
+
+	execErr := q.ExecuteWithFallback(ctx, func(ctx context.Context) error {
+		result, err = q.BlockBulk(ctx, &start, &end)
+		return err
+	})
+
+	if execErr != nil {
+		return nil, execErr
+	}
+
+	return result, nil
 }
 
-func (q RPCClient) QueryTx(ctx context.Context, txHash []byte) (*coretypes.ResultTx, error) {
+// ExecuteWithFallback executes the given function with fallback to other endpoints if it fails
+func (q *RPCClient) ExecuteWithFallback(ctx context.Context, fn func(context.Context) error) error {
+	// If pool is nil, this is likely a test client with mocked HTTP client
+	// Execute directly without pool fallback logic
+	if q.pool == nil {
+		return fn(ctx)
+	}
+
+	return q.pool.ExecuteWithFallback(ctx, func(ctx context.Context) error {
+		// Get current HTTP client from pool
+		currentClient := q.pool.GetCurrentClient()
+		if currentClient == nil || currentClient.client == nil {
+			return fmt.Errorf("no healthy HTTP client available")
+		}
+
+		// Update the RPCClient to use the current pool client
+		q.mu.Lock()
+		q.HTTP = currentClient.client
+		q.mu.Unlock()
+
+		return fn(ctx)
+	})
+}
+
+// Status returns the status of the node with fallback and retry logic
+func (q *RPCClient) Status(ctx context.Context) (*coretypes.ResultStatus, error) {
+	var result *coretypes.ResultStatus
+	var err error
+
+	execErr := q.ExecuteWithFallback(ctx, func(ctx context.Context) error {
+		result, err = q.HTTP.Status(ctx)
+		return err
+	})
+
+	if execErr != nil {
+		return nil, execErr
+	}
+
+	return result, nil
+}
+
+// Block returns the block at the given height with fallback and retry logic
+func (q *RPCClient) Block(ctx context.Context, height *int64) (*coretypes.ResultBlock, error) {
+	var result *coretypes.ResultBlock
+	var err error
+
+	execErr := q.ExecuteWithFallback(ctx, func(ctx context.Context) error {
+		result, err = q.HTTP.Block(ctx, height)
+		return err
+	})
+
+	if execErr != nil {
+		return nil, execErr
+	}
+
+	return result, nil
+}
+
+// BlockResults returns the block results at the given height with fallback and retry logic
+func (q *RPCClient) BlockResults(ctx context.Context, height *int64) (*coretypes.ResultBlockResults, error) {
+	var result *coretypes.ResultBlockResults
+	var err error
+
+	execErr := q.ExecuteWithFallback(ctx, func(ctx context.Context) error {
+		result, err = q.HTTP.BlockResults(ctx, height)
+		return err
+	})
+
+	if execErr != nil {
+		return nil, execErr
+	}
+
+	return result, nil
+}
+
+func (q *RPCClient) QueryTx(ctx context.Context, txHash []byte) (*coretypes.ResultTx, error) {
 	ctx, cancel := GetQueryContext(ctx, 0)
 	defer cancel()
-	return q.Tx(ctx, txHash, false)
+
+	var result *coretypes.ResultTx
+	var err error
+
+	execErr := q.ExecuteWithFallback(ctx, func(ctx context.Context) error {
+		result, err = q.Tx(ctx, txHash, false)
+		return err
+	})
+
+	if execErr != nil {
+		return nil, execErr
+	}
+
+	return result, nil
+}
+
+// Tx returns the transaction with the given hash with fallback and retry logic
+func (q *RPCClient) Tx(ctx context.Context, hash []byte, prove bool) (*coretypes.ResultTx, error) {
+	var result *coretypes.ResultTx
+	var err error
+
+	execErr := q.ExecuteWithFallback(ctx, func(ctx context.Context) error {
+		result, err = q.HTTP.Tx(ctx, hash, prove)
+		return err
+	})
+
+	if execErr != nil {
+		return nil, execErr
+	}
+
+	return result, nil
+}
+
+// BroadcastTxSync broadcasts a transaction synchronously with fallback and retry logic
+func (q *RPCClient) BroadcastTxSync(ctx context.Context, tx cmttypes.Tx) (*coretypes.ResultBroadcastTx, error) {
+	var result *coretypes.ResultBroadcastTx
+	var err error
+
+	execErr := q.ExecuteWithFallback(ctx, func(ctx context.Context) error {
+		result, err = q.HTTP.BroadcastTxSync(ctx, tx)
+		return err
+	})
+
+	if execErr != nil {
+		return nil, execErr
+	}
+
+	return result, nil
+}
+
+// BroadcastTxAsync broadcasts a transaction asynchronously with fallback and retry logic
+func (q *RPCClient) BroadcastTxAsync(ctx context.Context, tx cmttypes.Tx) (*coretypes.ResultBroadcastTx, error) {
+	var result *coretypes.ResultBroadcastTx
+	var err error
+
+	execErr := q.ExecuteWithFallback(ctx, func(ctx context.Context) error {
+		result, err = q.HTTP.BroadcastTxAsync(ctx, tx)
+		return err
+	})
+
+	if execErr != nil {
+		return nil, execErr
+	}
+
+	return result, nil
 }

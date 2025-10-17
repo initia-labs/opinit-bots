@@ -16,6 +16,7 @@ type Context struct {
 	errGrp          *errgroup.Group
 	pollingInterval time.Duration
 	txTimeout       time.Duration
+	rpcTimeout      time.Duration
 	homePath        string
 }
 
@@ -71,6 +72,11 @@ func (c Context) WithTxTimeout(timeout time.Duration) Context {
 	return c
 }
 
+func (c Context) WithRPCTimeout(timeout time.Duration) Context {
+	c.rpcTimeout = timeout
+	return c
+}
+
 func (c Context) WithHomePath(homePath string) Context {
 	c.homePath = homePath
 	return c
@@ -94,6 +100,10 @@ func (c Context) PollingInterval() time.Duration {
 
 func (c Context) TxTimeout() time.Duration {
 	return c.txTimeout
+}
+
+func (c Context) RPCTimeout() time.Duration {
+	return c.rpcTimeout
 }
 
 func (c Context) HomePath() string {

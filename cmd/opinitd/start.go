@@ -19,6 +19,7 @@ import (
 
 const (
 	flagPollingInterval = "polling-interval"
+	flagRPCTimeout      = "rpc-timeout"
 )
 
 func startCmd(cmdCtx *cmdContext) *cobra.Command {
@@ -62,9 +63,15 @@ Currently supported bots:
 				return err
 			}
 
+			rpcTimeout, err := cmd.Flags().GetDuration(flagRPCTimeout)
+			if err != nil {
+				return err
+			}
+
 			baseCtx := types.NewContext(ctx, cmdCtx.logger.Named(string(botType)), cmdCtx.homePath).
 				WithErrGrp(errGrp).
-				WithPollingInterval(interval)
+				WithPollingInterval(interval).
+				WithRPCTimeout(rpcTimeout)
 			err = bot.Initialize(baseCtx)
 			if err != nil {
 				return err
@@ -75,6 +82,7 @@ Currently supported bots:
 
 	cmd = configFlag(cmdCtx.v, cmd)
 	cmd.Flags().Duration(flagPollingInterval, 100*time.Millisecond, "Polling interval in milliseconds")
+	cmd.Flags().Duration(flagRPCTimeout, 5*time.Second, "RPC timeout duration")
 	return cmd
 }
 

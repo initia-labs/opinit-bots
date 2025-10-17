@@ -11,12 +11,12 @@ import (
 )
 
 type NodeConfig struct {
-	ChainID       string  `json:"chain_id"`
-	Bech32Prefix  string  `json:"bech32_prefix"`
-	RPCAddress    string  `json:"rpc_address"`
-	GasPrice      string  `json:"gas_price"`
-	GasAdjustment float64 `json:"gas_adjustment"`
-	TxTimeout     int64   `json:"tx_timeout"` // seconds
+	ChainID       string   `json:"chain_id"`
+	Bech32Prefix  string   `json:"bech32_prefix"`
+	RPCAddresses  []string `json:"rpc_addresses"`
+	GasPrice      string   `json:"gas_price"`
+	GasAdjustment float64  `json:"gas_adjustment"`
+	TxTimeout     int64    `json:"tx_timeout"` // seconds
 }
 
 func (nc NodeConfig) Validate() error {
@@ -26,7 +26,7 @@ func (nc NodeConfig) Validate() error {
 	if nc.Bech32Prefix == "" {
 		return errors.New("bech32 prefix is required")
 	}
-	if nc.RPCAddress == "" {
+	if len(nc.RPCAddresses) == 0 {
 		return errors.New("RPC address is required")
 	}
 	return nil
@@ -109,7 +109,7 @@ func DefaultConfig() *Config {
 		L1Node: NodeConfig{
 			ChainID:       "testnet-l1-1",
 			Bech32Prefix:  "init",
-			RPCAddress:    "tcp://localhost:26657",
+			RPCAddresses:  []string{"tcp://localhost:26657"},
 			GasPrice:      "0.15uinit",
 			GasAdjustment: 1.5,
 			TxTimeout:     60,
@@ -118,7 +118,7 @@ func DefaultConfig() *Config {
 		L2Node: NodeConfig{
 			ChainID:       "testnet-l2-1",
 			Bech32Prefix:  "init",
-			RPCAddress:    "tcp://localhost:27657",
+			RPCAddresses:  []string{"tcp://localhost:27657"},
 			GasPrice:      "",
 			GasAdjustment: 1.5,
 			TxTimeout:     60,
@@ -127,7 +127,7 @@ func DefaultConfig() *Config {
 		DANode: NodeConfig{
 			ChainID:       "testnet-l1-1",
 			Bech32Prefix:  "init",
-			RPCAddress:    "tcp://localhost:26657",
+			RPCAddresses:  []string{"tcp://localhost:26657"},
 			GasPrice:      "0.15uinit",
 			GasAdjustment: 1.5,
 			TxTimeout:     60,
@@ -204,7 +204,7 @@ func (cfg *Config) Validate() error {
 func (cfg Config) L1NodeConfig() nodetypes.NodeConfig {
 	nc := nodetypes.NodeConfig{
 		ChainID:      cfg.L1Node.ChainID,
-		RPC:          cfg.L1Node.RPCAddress,
+		RPC:          cfg.L1Node.RPCAddresses,
 		ProcessType:  nodetypes.PROCESS_TYPE_DEFAULT,
 		Bech32Prefix: cfg.L1Node.Bech32Prefix,
 	}
@@ -225,7 +225,7 @@ func (cfg Config) L1NodeConfig() nodetypes.NodeConfig {
 func (cfg Config) L2NodeConfig() nodetypes.NodeConfig {
 	nc := nodetypes.NodeConfig{
 		ChainID:      cfg.L2Node.ChainID,
-		RPC:          cfg.L2Node.RPCAddress,
+		RPC:          cfg.L2Node.RPCAddresses,
 		ProcessType:  nodetypes.PROCESS_TYPE_DEFAULT,
 		Bech32Prefix: cfg.L2Node.Bech32Prefix,
 	}
@@ -246,7 +246,7 @@ func (cfg Config) L2NodeConfig() nodetypes.NodeConfig {
 func (cfg Config) DANodeConfig() nodetypes.NodeConfig {
 	nc := nodetypes.NodeConfig{
 		ChainID:      cfg.DANode.ChainID,
-		RPC:          cfg.DANode.RPCAddress,
+		RPC:          cfg.DANode.RPCAddresses,
 		ProcessType:  nodetypes.PROCESS_TYPE_ONLY_BROADCAST,
 		Bech32Prefix: cfg.DANode.Bech32Prefix,
 	}
