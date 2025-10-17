@@ -134,6 +134,8 @@ func (bs *BatchSubmitter) Initialize(ctx types.Context, syncedHeight int64, host
 				return err
 			}
 			syncedHeight = bs.localBatchInfo.Start - 1
+
+			bs.node.UpdateSyncedHeight(0) // reset synced height to 0
 		}
 	}
 	// linux command gzip use level 6 as default
