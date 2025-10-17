@@ -40,8 +40,9 @@ func TestCheckBatchFileCorruption_Corrupted(t *testing.T) {
 		localBatchInfo: &executortypes.LocalBatchInfo{Start: 1, End: 0},
 	}
 
-	err = batchSubmitter.checkBatchFileCorruption()
-	require.Error(t, err)
+	corrupted, err := batchSubmitter.checkBatchFileCorruption()
+	require.True(t, corrupted)
+	require.NoError(t, err)
 }
 
 func TestCheckBatchFileCorruption_Success(t *testing.T) {
@@ -77,6 +78,7 @@ func TestCheckBatchFileCorruption_Success(t *testing.T) {
 		localBatchInfo: &executortypes.LocalBatchInfo{Start: 1, End: 0},
 	}
 
-	err = batchSubmitter.checkBatchFileCorruption()
+	corrupted, err := batchSubmitter.checkBatchFileCorruption()
+	require.False(t, corrupted)
 	require.NoError(t, err)
 }

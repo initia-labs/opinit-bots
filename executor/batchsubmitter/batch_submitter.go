@@ -93,7 +93,56 @@ func NewBatchSubmitterV1(
 }
 
 func (bs *BatchSubmitter) Initialize(ctx types.Context, syncedHeight int64, host hostNode, bridgeInfo ophosttypes.QueryBridgeResponse) error {
-	err := bs.node.Initialize(ctx, syncedHeight, nil)
+	localBatchInfo, err := GetLocalBatchInfo(bs.DB())
+	if err != nil {
+		return errors.Wrap(err, "failed to get local batch info")
+	}
+	bs.localBatchInfo = &localBatchInfo
+
+	fileFlag := os.O_CREATE | os.O_RDWR | os.O_APPEND
+	bs.batchFile, err = os.OpenFile(ctx.HomePath()+"/batch", fileFlag, 0640)
+	if err != nil {
+		return errors.Wrap(err, "failed to open batch file")
+	}
+
+	resetBatchFile := func(height int64) error {
+		bs.localBatchInfo.Start = height
+		bs.localBatchInfo.End = 0
+		bs.localBatchInfo.BatchSize = 0
+
+		err = SaveLocalBatchInfo(bs.DB(), *bs.localBatchInfo)
+		if err != nil {
+			return errors.Wrap(err, "failed to save local batch info")
+		}
+		// reset batch file
+		return bs.emptyBatchFile()
+	}
+
+	if bs.node.GetSyncedHeight() == 0 { // HeightInitialized
+		err = resetBatchFile(syncedHeight + 1)
+		if err != nil {
+			return err
+		}
+	} else {
+		corrupted, err := bs.checkBatchFileCorruption()
+		if err != nil {
+			return err
+		} else if corrupted {
+			ctx.Logger().Warn("batch file is corrupted, resetting batch file", zap.Int64("start_height", bs.localBatchInfo.Start))
+			err = resetBatchFile(bs.localBatchInfo.Start)
+			if err != nil {
+				return err
+			}
+			syncedHeight = bs.localBatchInfo.Start - 1
+		}
+	}
+	// linux command gzip use level 6 as default
+	bs.batchWriter, err = gzip.NewWriterLevel(bs.batchFile, 6)
+	if err != nil {
+		return errors.Wrap(err, "failed to create gzip writer")
+	}
+
+	err = bs.node.Initialize(ctx, syncedHeight, nil)
 	if err != nil {
 		return errors.Wrap(err, "failed to initialize node")
 	}
@@ -109,12 +158,6 @@ func (bs *BatchSubmitter) Initialize(ctx types.Context, syncedHeight int64, host
 		return errors.New("no batch info")
 	}
 
-	localBatchInfo, err := GetLocalBatchInfo(bs.DB())
-	if err != nil {
-		return errors.Wrap(err, "failed to get local batch info")
-	}
-	bs.localBatchInfo = &localBatchInfo
-
 	for i, batchInfo := range bs.batchInfos {
 		if batchInfo.Output.L2BlockNumber != 0 && types.MustUint64ToInt64(batchInfo.Output.L2BlockNumber+1) > bs.node.GetHeight() {
 			break
@@ -122,35 +165,6 @@ func (bs *BatchSubmitter) Initialize(ctx types.Context, syncedHeight int64, host
 			// dequeue the previous batch info
 			bs.DequeueBatchInfo()
 		}
-	}
-
-	fileFlag := os.O_CREATE | os.O_RDWR | os.O_APPEND
-	bs.batchFile, err = os.OpenFile(ctx.HomePath()+"/batch", fileFlag, 0640)
-	if err != nil {
-		return errors.Wrap(err, "failed to open batch file")
-	}
-
-	if bs.node.HeightInitialized() {
-		bs.localBatchInfo.Start = bs.node.GetHeight()
-		bs.localBatchInfo.End = 0
-		bs.localBatchInfo.BatchSize = 0
-
-		err = SaveLocalBatchInfo(bs.DB(), *bs.localBatchInfo)
-		if err != nil {
-			return errors.Wrap(err, "failed to save local batch info")
-		}
-		// reset batch file
-		err = bs.emptyBatchFile()
-		if err != nil {
-			return errors.Wrap(err, "failed to empty batch file")
-		}
-	} else if err := bs.checkBatchFileCorruption(); err != nil {
-		return err
-	}
-	// linux command gzip use level 6 as default
-	bs.batchWriter, err = gzip.NewWriterLevel(bs.batchFile, 6)
-	if err != nil {
-		return errors.Wrap(err, "failed to create gzip writer")
 	}
 
 	bs.node.RegisterRawBlockHandler(bs.rawBlockHandler)
@@ -195,32 +209,32 @@ func (bs BatchSubmitter) DB() types.DB {
 	return bs.node.DB()
 }
 
-func (bs *BatchSubmitter) checkBatchFileCorruption() error {
+func (bs *BatchSubmitter) checkBatchFileCorruption() (bool, error) {
 	info, err := bs.batchFile.Stat()
 	if err != nil {
-		return errors.Wrap(err, "failed to stat batch file")
+		return false, errors.Wrap(err, "failed to stat batch file")
 	}
 	if info.Size() == 0 {
-		return nil
+		return false, nil
 	}
 
 	if _, err := bs.batchFile.Seek(0, io.SeekStart); err != nil {
-		return errors.Wrap(err, "failed to seek batch file")
+		return false, errors.Wrap(err, "failed to seek batch file")
 	}
 
 	reader, err := gzip.NewReader(bs.batchFile)
 	if err != nil {
-		return errors.Wrapf(err, "Please restart the DA height from %d. The batch file is corrupted.", bs.localBatchInfo.Start)
+		return true, nil
 	}
 	defer reader.Close()
 
 	// #nosec G110
 	if _, err := io.Copy(io.Discard, reader); err != nil {
-		return errors.Wrapf(err, "Please restart the DA height from %d. The batch file is corrupted.", bs.localBatchInfo.Start)
+		return true, nil
 	}
 
 	if _, err := bs.batchFile.Seek(0, io.SeekEnd); err != nil {
-		return errors.Wrap(err, "failed to seek batch file")
+		return false, errors.Wrap(err, "failed to seek batch file")
 	}
-	return nil
+	return false, nil
 }
