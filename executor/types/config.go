@@ -11,12 +11,13 @@ import (
 )
 
 type NodeConfig struct {
-	ChainID       string  `json:"chain_id"`
-	Bech32Prefix  string  `json:"bech32_prefix"`
-	RPCAddress    string  `json:"rpc_address"`
-	GasPrice      string  `json:"gas_price"`
-	GasAdjustment float64 `json:"gas_adjustment"`
-	TxTimeout     int64   `json:"tx_timeout"` // seconds
+	ChainID         string                 `json:"chain_id"`
+	Bech32Prefix    string                 `json:"bech32_prefix"`
+	RPCAddress      string                 `json:"rpc_address"`
+	GasPrice        string                 `json:"gas_price"`
+	GasAdjustment   float64                `json:"gas_adjustment"`
+	TxTimeout       int64                  `json:"tx_timeout"` // seconds
+	BroadcastOption btypes.BroadcastOption `json:"broadcast_option"`
 }
 
 func (nc NodeConfig) Validate() error {
@@ -28,6 +29,9 @@ func (nc NodeConfig) Validate() error {
 	}
 	if nc.RPCAddress == "" {
 		return errors.New("RPC address is required")
+	}
+	if nc.BroadcastOption > btypes.BROADCAST_OPTION_COMMIT {
+		return errors.New("invalid broadcast option")
 	}
 	return nil
 }
@@ -211,11 +215,12 @@ func (cfg Config) L1NodeConfig() nodetypes.NodeConfig {
 
 	if !cfg.DisableOutputSubmitter {
 		nc.BroadcasterConfig = &btypes.BroadcasterConfig{
-			ChainID:       cfg.L1Node.ChainID,
-			GasPrice:      cfg.L1Node.GasPrice,
-			GasAdjustment: cfg.L1Node.GasAdjustment,
-			TxTimeout:     time.Duration(cfg.L1Node.TxTimeout) * time.Second,
-			Bech32Prefix:  cfg.L1Node.Bech32Prefix,
+			ChainID:         cfg.L1Node.ChainID,
+			GasPrice:        cfg.L1Node.GasPrice,
+			GasAdjustment:   cfg.L1Node.GasAdjustment,
+			TxTimeout:       time.Duration(cfg.L1Node.TxTimeout) * time.Second,
+			Bech32Prefix:    cfg.L1Node.Bech32Prefix,
+			BroadcastOption: cfg.L1Node.BroadcastOption,
 		}
 	}
 
@@ -232,11 +237,12 @@ func (cfg Config) L2NodeConfig() nodetypes.NodeConfig {
 
 	if cfg.BridgeExecutor != "" || cfg.OracleBridgeExecutor != "" {
 		nc.BroadcasterConfig = &btypes.BroadcasterConfig{
-			ChainID:       cfg.L2Node.ChainID,
-			GasPrice:      cfg.L2Node.GasPrice,
-			GasAdjustment: cfg.L2Node.GasAdjustment,
-			TxTimeout:     time.Duration(cfg.L2Node.TxTimeout) * time.Second,
-			Bech32Prefix:  cfg.L2Node.Bech32Prefix,
+			ChainID:         cfg.L2Node.ChainID,
+			GasPrice:        cfg.L2Node.GasPrice,
+			GasAdjustment:   cfg.L2Node.GasAdjustment,
+			TxTimeout:       time.Duration(cfg.L2Node.TxTimeout) * time.Second,
+			Bech32Prefix:    cfg.L2Node.Bech32Prefix,
+			BroadcastOption: cfg.L2Node.BroadcastOption,
 		}
 	}
 
@@ -253,11 +259,12 @@ func (cfg Config) DANodeConfig() nodetypes.NodeConfig {
 
 	if !cfg.DisableBatchSubmitter {
 		nc.BroadcasterConfig = &btypes.BroadcasterConfig{
-			ChainID:       cfg.DANode.ChainID,
-			GasPrice:      cfg.DANode.GasPrice,
-			GasAdjustment: cfg.DANode.GasAdjustment,
-			TxTimeout:     time.Duration(cfg.DANode.TxTimeout) * time.Second,
-			Bech32Prefix:  cfg.DANode.Bech32Prefix,
+			ChainID:         cfg.DANode.ChainID,
+			GasPrice:        cfg.DANode.GasPrice,
+			GasAdjustment:   cfg.DANode.GasAdjustment,
+			TxTimeout:       time.Duration(cfg.DANode.TxTimeout) * time.Second,
+			Bech32Prefix:    cfg.DANode.Bech32Prefix,
+			BroadcastOption: cfg.DANode.BroadcastOption,
 		}
 	}
 	return nc
