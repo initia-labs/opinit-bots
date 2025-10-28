@@ -115,7 +115,7 @@ func (b *Broadcaster) handleProcessedMsgs(ctx types.Context, data btypes.Process
 			return fmt.Errorf("broadcast txs: %s", res.Log)
 		}
 	} else {
-		res, err := b.rpcClient.BroadcastTxCommit(ctx, txBytes)
+		res, err := b.rpcClient.CustomBroadcastTxCommit(ctx, txBytes)
 		if err != nil {
 			return err
 		} else if res.TxResult.Code != 0 || res.CheckTx.Code != 0 {
