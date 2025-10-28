@@ -260,6 +260,18 @@ func (c *baseRPCClient) BroadcastTxCommit(
 	return result, nil
 }
 
+func (c *baseRPCClient) CustomBroadcastTxCommit(
+	ctx context.Context,
+	tx types.Tx,
+) (*clienttypes.ResultBroadcastTxCommit, error) {
+	result := new(clienttypes.ResultBroadcastTxCommit)
+	_, err := c.caller.Call(ctx, "broadcast_tx_commit", map[string]interface{}{"tx": tx}, result)
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
 func (c *baseRPCClient) BroadcastTxAsync(
 	ctx context.Context,
 	tx types.Tx,

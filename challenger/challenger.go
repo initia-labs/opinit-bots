@@ -111,7 +111,7 @@ func (c *Challenger) Initialize(ctx types.Context) error {
 	}
 
 	var initialBlockTime time.Time
-	hostInitialBlockTime, err := c.host.Initialize(ctx, l1StartHeight-1, c.child, *bridgeInfo, c)
+	hostInitialBlockTime, err := c.host.Initialize(ctx.WithLogger(ctx.Logger().Named("host")), l1StartHeight-1, c.child, *bridgeInfo, c)
 	if err != nil {
 		return err
 	}
@@ -119,7 +119,7 @@ func (c *Challenger) Initialize(ctx types.Context) error {
 		initialBlockTime = hostInitialBlockTime
 	}
 
-	childInitialBlockTime, err := c.child.Initialize(ctx, l2StartHeight-1, startOutputIndex, c.host, childBridgeInfo, c)
+	childInitialBlockTime, err := c.child.Initialize(ctx.WithLogger(ctx.Logger().Named("child")), l2StartHeight-1, startOutputIndex, c.host, childBridgeInfo, c)
 	if err != nil {
 		return err
 	}
@@ -179,8 +179,8 @@ func (c *Challenger) Start(ctx types.Context) error {
 		return c.challengeHandler(ctx)
 	})
 
-	c.host.Start(ctx)
-	c.child.Start(ctx)
+	c.host.Start(ctx.WithLogger(ctx.Logger().Named("host")))
+	c.child.Start(ctx.WithLogger(ctx.Logger().Named("child")))
 	return ctx.ErrGrp().Wait()
 }
 

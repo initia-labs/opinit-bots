@@ -107,13 +107,20 @@ func (b *Broadcaster) handleProcessedMsgs(ctx types.Context, data btypes.Process
 
 	ctx.Logger().Debug("broadcast tx", zap.String("tx_hash", txHash), zap.Uint64("sequence", sequence))
 
-	res, err := b.rpcClient.BroadcastTxSync(ctx, txBytes)
-	if err != nil {
-		// TODO: handle error, may repeat sending tx
-		return fmt.Errorf("broadcast txs: %w", err)
-	}
-	if res.Code != 0 {
-		return fmt.Errorf("broadcast txs: %s", res.Log)
+	if b.cfg.BroadcastOption == btypes.BROADCAST_OPTION_SYNC {
+		res, err := b.rpcClient.BroadcastTxSync(ctx, txBytes)
+		if err != nil {
+			return err
+		} else if res.Code != 0 {
+			return fmt.Errorf("broadcast txs: %s", res.Log)
+		}
+	} else {
+		res, err := b.rpcClient.CustomBroadcastTxCommit(ctx, txBytes)
+		if err != nil {
+			return err
+		} else if res.TxResult.Code != 0 || res.CheckTx.Code != 0 {
+			return fmt.Errorf("broadcast txs: %s, %s", res.TxResult.Log, res.CheckTx.Log)
+		}
 	}
 
 	stage := b.db.NewStage()

@@ -98,20 +98,20 @@ func (ex *Executor) Initialize(ctx types.Context) error {
 
 	hostKeyringConfig, childKeyringConfig, childOracleKeyringConfig, daKeyringConfig := ex.getKeyringConfigs(*bridgeInfo)
 
-	err = ex.host.Initialize(ctx, l1StartHeight-1, ex.child, ex.batchSubmitter, *bridgeInfo, hostKeyringConfig)
+	err = ex.host.Initialize(ctx.WithLogger(ctx.Logger().Named("host")), l1StartHeight-1, ex.child, ex.batchSubmitter, *bridgeInfo, hostKeyringConfig)
 	if err != nil {
 		return errors.Wrap(err, "failed to initialize host")
 	}
-	err = ex.child.Initialize(ctx, l2StartHeight-1, startOutputIndex, ex.host, childBridgeInfo, childKeyringConfig, childOracleKeyringConfig, ex.cfg.DisableDeleteFutureWithdrawal)
+	err = ex.child.Initialize(ctx.WithLogger(ctx.Logger().Named("child")), l2StartHeight-1, startOutputIndex, ex.host, childBridgeInfo, childKeyringConfig, childOracleKeyringConfig, ex.cfg.DisableDeleteFutureWithdrawal)
 	if err != nil {
 		return errors.Wrap(err, "failed to initialize child")
 	}
-	err = ex.batchSubmitter.Initialize(ctx, batchStartHeight-1, ex.host, *bridgeInfo)
+	err = ex.batchSubmitter.Initialize(ctx.WithLogger(ctx.Logger().Named("batchSubmitter")), batchStartHeight-1, ex.host, *bridgeInfo)
 	if err != nil {
 		return errors.Wrap(err, "failed to initialize batch")
 	}
 
-	da, err := ex.makeDANode(ctx, *bridgeInfo, daKeyringConfig)
+	da, err := ex.makeDANode(ctx.WithLogger(ctx.Logger().Named("da")), *bridgeInfo, daKeyringConfig)
 	if err != nil {
 		return errors.Wrap(err, "failed to make DA node")
 	}
@@ -134,10 +134,10 @@ func (ex *Executor) Start(ctx types.Context) error {
 		}()
 		return ex.server.Start()
 	})
-	ex.host.Start(ctx)
-	ex.child.Start(ctx)
-	ex.batchSubmitter.Start(ctx)
-	ex.batchSubmitter.DA().Start(ctx)
+	ex.host.Start(ctx.WithLogger(ctx.Logger().Named("host")))
+	ex.child.Start(ctx.WithLogger(ctx.Logger().Named("child")))
+	ex.batchSubmitter.Start(ctx.WithLogger(ctx.Logger().Named("batchSubmitter")))
+	ex.batchSubmitter.DA().Start(ctx.WithLogger(ctx.Logger().Named("da")))
 	return ctx.ErrGrp().Wait()
 }
 

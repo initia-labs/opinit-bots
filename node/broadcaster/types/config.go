@@ -15,6 +15,13 @@ import (
 type BuildTxWithMsgsFn func(context.Context, []sdk.Msg) ([]byte, string, error)
 type MsgsFromTxFn func([]byte) ([]sdk.Msg, error)
 
+type BroadcastOption uint8
+
+const (
+	BROADCAST_OPTION_SYNC BroadcastOption = iota
+	BROADCAST_OPTION_COMMIT
+)
+
 type BroadcasterConfig struct {
 	// ChainID is the chain ID.
 	ChainID string
@@ -30,6 +37,9 @@ type BroadcasterConfig struct {
 
 	// Bech32Prefix is the Bech32 prefix.
 	Bech32Prefix string
+
+	// BroadcastOption is the broadcast option.
+	BroadcastOption BroadcastOption
 }
 
 func (bc BroadcasterConfig) Validate() error {
