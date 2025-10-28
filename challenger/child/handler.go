@@ -8,10 +8,11 @@ import (
 	"github.com/initia-labs/opinit-bots/txutils"
 	"github.com/initia-labs/opinit-bots/types"
 
-	authz "github.com/cosmos/cosmos-sdk/x/authz"
 	opchildtypes "github.com/initia-labs/OPinit/x/opchild/types"
 	challengerdb "github.com/initia-labs/opinit-bots/challenger/db"
 	"github.com/pkg/errors"
+
+	authz "github.com/cosmos/cosmos-sdk/x/authz"
 )
 
 func (ch *Child) beginBlockHandler(ctx types.Context, args nodetypes.BeginBlockArgs) (err error) {

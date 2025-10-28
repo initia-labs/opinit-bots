@@ -3,7 +3,6 @@ package types
 import (
 	"cosmossdk.io/api/tendermint/abci"
 	"github.com/cometbft/cometbft/libs/bytes"
-	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 )
 
 // Result of block bulk
@@ -25,10 +24,6 @@ type ResultBroadcastTxCommit struct {
 }
 
 type ResponseCheckTx struct {
-	state         protoimpl.MessageState
-	sizeCache     protoimpl.SizeCache
-	unknownFields protoimpl.UnknownFields
-
 	Code      uint32        `protobuf:"varint,1,opt,name=code,proto3" json:"code,omitempty"`
 	Data      []byte        `protobuf:"bytes,2,opt,name=data,proto3" json:"data,omitempty"`
 	Log       string        `protobuf:"bytes,3,opt,name=log,proto3" json:"log,omitempty"`   // nondeterministic
