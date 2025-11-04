@@ -156,7 +156,7 @@ func TestGetProofs(t *testing.T) {
 	require.Equal(t, hash5666[:], proofs[2])
 }
 
-func TestDeleteFutureFinalizedTrees(t *testing.T) { //nolint
+func TestDeleteFutureFinalizedTrees(t *testing.T) {
 	db, err := db.NewMemDB()
 	require.NoError(t, err)
 
@@ -194,7 +194,7 @@ func TestDeleteFutureFinalizedTrees(t *testing.T) { //nolint
 	}
 }
 
-func TestDeleteFutureWorkingTrees(t *testing.T) { //nolint
+func TestDeleteFutureWorkingTrees(t *testing.T) {
 	db, err := db.NewMemDB()
 	require.NoError(t, err)
 

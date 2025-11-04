@@ -282,7 +282,7 @@ func ParseMsgUpdateOracleConfig(eventAttrs []abcitypes.EventAttribute) (
 	return
 }
 
-func ParseMsgUpdateProposer(eventAttrs []abcitypes.EventAttribute) ( //nolint
+func ParseMsgUpdateProposer(eventAttrs []abcitypes.EventAttribute) (
 	bridgeId uint64,
 	proposer string,
 	finalizedOutputIndex uint64,
@@ -327,7 +327,7 @@ func ParseMsgUpdateProposer(eventAttrs []abcitypes.EventAttribute) ( //nolint
 	return
 }
 
-func ParseMsgUpdateChallenger(eventAttrs []abcitypes.EventAttribute) ( //nolint
+func ParseMsgUpdateChallenger(eventAttrs []abcitypes.EventAttribute) (
 	bridgeId uint64,
 	challenger string,
 	finalizedOutputIndex uint64,

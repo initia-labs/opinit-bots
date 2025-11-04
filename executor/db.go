@@ -141,7 +141,7 @@ func Migration019_1(db types.DB) error {
 
 			treeHeight := types.MustIntToUint8(bits.Len64(workingTree.LeafCount - 1))
 			if workingTree.LeafCount <= 1 {
-				treeHeight = uint8(workingTree.LeafCount) //nolint
+				treeHeight = uint8(workingTree.LeafCount)
 			}
 
 			treeRootHash := workingTree.LastSiblings[treeHeight]

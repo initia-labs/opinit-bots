@@ -284,6 +284,33 @@ func (b BroadcasterAccount) SimulateAndSignTx(ctx context.Context, msgs ...sdk.M
 	return txb.GetTx(), nil
 }
 
+func (b BroadcasterAccount) BuildTxWithNewMemo(ctx context.Context, txBytes []byte, sequence uint64) ([]byte, string, error) {
+	decodedTx, err := txutils.DecodeTx(b.txConfig, txBytes)
+	if err != nil {
+		return nil, "", err
+	}
+
+	txf := b.txf.WithGas(decodedTx.GetGas()).WithMemo(rand.Str(10)).WithSequence(sequence)
+	unlock := keys.SetSDKConfigContext(b.Bech32Prefix())
+	defer unlock()
+	txb, err := txf.BuildUnsignedTx(decodedTx.GetMsgs()...)
+	if err != nil {
+		return nil, "", err
+	}
+
+	if err = tx.Sign(ctx, txf, b.keyName, txb, true); err != nil {
+		return nil, "", err
+	}
+
+	newTx := txb.GetTx()
+
+	txBytes, err = txutils.EncodeTx(b.txConfig, newTx)
+	if err != nil {
+		return nil, "", err
+	}
+	return txBytes, txutils.TxHash(txBytes), nil
+}
+
 // DefaultBuildTxWithMsgs creates a transaction with the provided messages and returns the encoded transaction.
 func (b *BroadcasterAccount) DefaultBuildTxWithMsgs(
 	ctx context.Context,

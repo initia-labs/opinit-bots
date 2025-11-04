@@ -670,7 +670,7 @@ func TestHandleTree(t *testing.T) {
 			err:           false,
 			panic:         true,
 		},
-		{ //nolint
+		{
 			name:         "output time not reached",
 			blockHeight:  5,
 			latestHeight: 5,
@@ -702,7 +702,7 @@ func TestHandleTree(t *testing.T) {
 			err:   false,
 			panic: false,
 		},
-		{ //nolint
+		{
 			name:         "latest height not reached",
 			blockHeight:  5,
 			latestHeight: 6,
