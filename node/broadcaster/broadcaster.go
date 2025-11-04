@@ -185,7 +185,7 @@ func (b *Broadcaster) loadPendingTxs(ctx types.Context, stage types.BasicDB, las
 			if IsTxNotFoundErr(err, pendingTxs[txIndex].TxHash) {
 				pendingTxTime := time.Unix(0, pendingTxs[txIndex].Timestamp).UTC()
 				timeoutTime := pendingTxTime.Add(b.cfg.TxTimeout)
-				if lastBlockTime.After(timeoutTime) {
+				if lastBlockTime.After(timeoutTime) || time.Now().UTC().After(pendingTxTime.Add(time.Minute*10)) {
 					reProcessingTxs = append(reProcessingTxs, pendingTxs[txIndex:]...)
 					break
 				}
