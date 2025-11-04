@@ -1,10 +1,9 @@
 package node
 
 import (
-	"strconv"
 	"time"
 
-	"github.com/initia-labs/opinit-bots/node/broadcaster"
+	btypes "github.com/initia-labs/opinit-bots/node/broadcaster/types"
 	"github.com/initia-labs/opinit-bots/types"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
@@ -72,10 +71,11 @@ func (n *Node) txChecker(ctx types.Context, enableEventHandler bool) error {
 
 			// this is about 5 minutes.
 			if consecutiveErrors > types.MaxBroadcastErrorCount {
-				pendingTx, err = n.broadcaster.RebuildPendingTxs(ctx)
+				rebuiltPendingTx, err := n.broadcaster.RebuildPendingTxs(ctx)
 				if err != nil {
 					ctx.Logger().Error("failed to rebuild pending txs", zap.String("tx_hash", pendingTx.TxHash), zap.String("error", err.Error()))
 				}
+				pendingTx = rebuiltPendingTx
 			}
 
 			res, err := n.broadcaster.BroadcastTxSync(ctx, pendingTx.Tx)
@@ -91,26 +91,20 @@ func (n *Node) txChecker(ctx types.Context, enableEventHandler bool) error {
 			// if it is, remove the pending txs until the expected sequence
 			// otherwise, ignore the error
 			if checkString != "" {
-				if strs := broadcaster.AccountSeqRegex.FindStringSubmatch(checkString); strs != nil {
-					expected, parseErr := strconv.ParseUint(strs[1], 10, 64)
-					if parseErr != nil {
-						return parseErr
+				expected, got, err := btypes.ParseAccountSequenceMismatch(checkString)
+				if err == nil && expected > got {
+					ctx.Logger().Warn("pending txs are already processed", zap.Uint64("expected", expected), zap.Uint64("got", got))
+					err = n.broadcaster.RemovePendingTxsUntil(ctx, expected-1)
+					if err != nil {
+						ctx.Logger().Error("failed to remove pending txs until expected sequence", zap.String("tx_hash", pendingTx.TxHash), zap.Error(err))
+						return err
 					}
-					got, parseErr := strconv.ParseUint(strs[2], 10, 64)
-					if parseErr != nil {
-						return parseErr
-					}
-
-					if expected > got {
-						ctx.Logger().Warn("pending txs are already processed", zap.Uint64("expected", expected), zap.Uint64("got", got))
-						n.broadcaster.RemovePendingTxsUntil(ctx, expected-1)
-						ctx.Logger().Info("remove pending txs until expected sequence",
-							zap.Uint64("from", pendingTx.Sequence),
-							zap.Uint64("to", expected-1),
-						)
-						consecutiveErrors = 0
-						continue
-					}
+					ctx.Logger().Info("remove pending txs until expected sequence",
+						zap.Uint64("from", pendingTx.Sequence),
+						zap.Uint64("to", expected-1),
+					)
+					consecutiveErrors = 0
+					continue
 				}
 			}
 			continue

@@ -1,7 +1,6 @@
 package broadcaster
 
 import (
-	"context"
 	"fmt"
 	"regexp"
 	"strconv"
@@ -29,7 +28,6 @@ var ignoringErrors = []error{
 
 	opchildtypes.ErrRedundantTx,
 }
-var AccountSeqRegex = regexp.MustCompile("account sequence mismatch, expected ([0-9]+), got ([0-9]+)")
 var outputIndexRegex = regexp.MustCompile("expected ([0-9]+), got ([0-9]+): invalid output index")
 
 var sentryCapturedErrors = []error{
@@ -42,21 +40,12 @@ var ErrAccountSequenceMismatch = errors.New("account sequence mismatch")
 // handleMsgError handles error when processing messages.
 // If there is an error known to be ignored, it will be ignored.
 func (b *Broadcaster) handleMsgError(ctx types.Context, err error, broadcasterAccount *BroadcasterAccount) error {
-	if strs := AccountSeqRegex.FindStringSubmatch(err.Error()); strs != nil {
+	expected, got, err := btypes.ParseAccountSequenceMismatch(err.Error())
+	if err == nil {
 		sentry_integration.CaptureCurrentHubException(err, sentry.LevelWarning)
-		expected, parseErr := strconv.ParseUint(strs[1], 10, 64)
-		if parseErr != nil {
-			return parseErr
-		}
-		got, parseErr := strconv.ParseUint(strs[2], 10, 64)
-		if parseErr != nil {
-			return parseErr
-		}
-
 		if expected > got {
 			broadcasterAccount.UpdateSequence(expected)
 		}
-
 		return errors.Wrapf(ErrAccountSequenceMismatch, "expected %d, got %d", expected, got)
 	}
 
@@ -191,23 +180,34 @@ func (b *Broadcaster) dequeueLocalPendingTx() {
 	b.pendingTxs = b.pendingTxs[1:]
 }
 
-func (b *Broadcaster) RemovePendingTxsUntil(ctx types.Context, until uint64) {
+func (b *Broadcaster) RemovePendingTxsUntil(ctx types.Context, until uint64) error {
 	b.pendingTxMu.Lock()
 	defer b.pendingTxMu.Unlock()
 
 	start := 0
+	stage := b.db.NewStage()
+
 	for _, pendingTx := range b.pendingTxs {
 		if pendingTx.Sequence > until {
 			break
 		}
 		start++
+		err := DeletePendingTx(stage, pendingTx)
+		if err != nil {
+			return err
+		}
 	}
 	b.pendingTxs = b.pendingTxs[start:]
+	return stage.Commit()
 }
 
-func (b *Broadcaster) RebuildPendingTxs(ctx context.Context) (btypes.PendingTxInfo, error) {
+func (b *Broadcaster) RebuildPendingTxs(ctx types.Context) (btypes.PendingTxInfo, error) {
 	b.pendingTxMu.Lock()
 	defer b.pendingTxMu.Unlock()
+
+	if len(b.pendingTxs) == 0 {
+		return btypes.PendingTxInfo{}, errors.New("no pending txs")
+	}
 
 	newPendingTxs := make([]btypes.PendingTxInfo, len(b.pendingTxs))
 
