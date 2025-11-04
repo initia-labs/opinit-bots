@@ -71,11 +71,11 @@ func (n *Node) txChecker(ctx types.Context, enableEventHandler bool) error {
 
 			// this is about 5 minutes.
 			if consecutiveErrors > types.MaxBroadcastErrorCount {
-				rebuiltPendingTx, err := n.broadcaster.RebuildPendingTxs(ctx)
-				if err != nil {
+				if rebuiltPendingTx, err := n.broadcaster.RebuildPendingTxs(ctx); err != nil {
 					ctx.Logger().Error("failed to rebuild pending txs", zap.String("tx_hash", pendingTx.TxHash), zap.String("error", err.Error()))
+				} else {
+					pendingTx = rebuiltPendingTx
 				}
-				pendingTx = rebuiltPendingTx
 			}
 
 			res, err := n.broadcaster.BroadcastTxSync(ctx, pendingTx.Tx)
