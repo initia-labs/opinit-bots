@@ -197,8 +197,16 @@ func (b *Broadcaster) RemovePendingTxsUntil(ctx types.Context, until uint64) err
 			return err
 		}
 	}
+
+	// apply changes to DB
+	if err := stage.Commit(); err != nil {
+		return err
+	}
+
+	// if successful, remove from local pending txs
 	b.pendingTxs = b.pendingTxs[start:]
-	return stage.Commit()
+
+	return nil
 }
 
 func (b *Broadcaster) RebuildPendingTxs(ctx types.Context) (btypes.PendingTxInfo, error) {
