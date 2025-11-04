@@ -415,7 +415,7 @@ func TestParseMsgUpdateOracleConfig(t *testing.T) {
 	}
 }
 
-func TestParseMsgUpdateProposer(t *testing.T) { //nolint
+func TestParseMsgUpdateProposer(t *testing.T) {
 	fullAttributes := UpdateProposerEvents(1, "proposer", 2, 3)
 
 	cases := []struct {
@@ -473,7 +473,7 @@ func TestParseMsgUpdateProposer(t *testing.T) { //nolint
 	}
 }
 
-func TestParseMsgUpdateChallenger(t *testing.T) { //nolint
+func TestParseMsgUpdateChallenger(t *testing.T) {
 	fullAttributes := UpdateChallengerEvents(1, "challenger", 2, 3)
 
 	cases := []struct {

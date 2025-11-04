@@ -119,22 +119,22 @@ func (bs *BatchSubmitter) emptyUpdateClientData(ctx types.Context, pbb *cmtproto
 					return nil, errors.Wrap(err, "failed to unpack oracle msg from authz msg")
 				}
 
-				if clientMsg.SignedHeader.Header.ChainID != bs.host.ChainId() {
+				if clientMsg.Header.ChainID != bs.host.ChainId() {
 					continue
 				}
 
-				block, err := blockQuerier(clientMsg.SignedHeader.Header.Height + 1)
+				block, err := blockQuerier(clientMsg.Header.Height + 1)
 				if err != nil {
 					return nil, errors.Wrap(err, "failed to query block")
 				}
 
-				for sigIndex, signature := range clientMsg.SignedHeader.Commit.Signatures {
+				for sigIndex, signature := range clientMsg.Commit.Signatures {
 					if blockSigIndex := slices.IndexFunc(block.Block.LastCommit.Signatures, func(blockSig cmttypes.CommitSig) bool {
 						if signature.ValidatorAddress != nil &&
 							bytes.Equal(blockSig.ValidatorAddress.Bytes(), signature.ValidatorAddress) &&
 							blockSig.Timestamp.Equal(signature.Timestamp) &&
 							bytes.Equal(blockSig.Signature, signature.Signature) &&
-							uint8(blockSig.BlockIDFlag) == uint8(signature.BlockIdFlag) { //nolint
+							uint8(blockSig.BlockIDFlag) == uint8(signature.BlockIdFlag) {
 							return true
 						}
 						return false

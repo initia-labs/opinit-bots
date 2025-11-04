@@ -112,5 +112,5 @@ func (h *Host) registerHandlers() {
 }
 
 func (h *Host) QuerySyncedOutput(ctx context.Context, bridgeId uint64, outputIndex uint64) (*ophosttypes.QueryOutputProposalResponse, error) {
-	return h.BaseHost.QueryOutput(ctx, bridgeId, outputIndex, h.Height()-1)
+	return h.QueryOutput(ctx, bridgeId, outputIndex, h.Height()-1)
 }

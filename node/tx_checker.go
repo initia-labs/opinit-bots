@@ -69,7 +69,6 @@ func (n *Node) txChecker(ctx types.Context, enableEventHandler bool) error {
 			// tx not found
 			// it does not check the result of the broadcast
 			// this is in case the Tx gets removed from the mempool
-			//nolint:errcheck
 
 			// this is about 5 minutes.
 			if consecutiveErrors > types.MaxBroadcastErrorCount {

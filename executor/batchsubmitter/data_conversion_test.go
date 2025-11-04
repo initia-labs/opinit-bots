@@ -204,7 +204,7 @@ func TestEmptyUpdateClientData(t *testing.T) {
 	}{
 		{
 			name: "same signatures",
-			blocks: []*cmttypes.Block{ //nolint
+			blocks: []*cmttypes.Block{
 				{
 					Header: cmttypes.Header{
 						ChainID: l1ChainId,
@@ -380,7 +380,7 @@ func TestEmptyUpdateClientData(t *testing.T) {
 		},
 		{
 			name: "different signatures",
-			blocks: []*cmttypes.Block{ //nolint
+			blocks: []*cmttypes.Block{
 				{
 					Header: cmttypes.Header{
 						ChainID: l1ChainId,
@@ -562,7 +562,7 @@ func TestEmptyUpdateClientData(t *testing.T) {
 			batchSubmitter.host = mockHost
 
 			for _, block := range tc.blocks {
-				mockHost.SetBlock(block.Header.Height, block)
+				mockHost.SetBlock(block.Height, block)
 			}
 
 			txf := tx.Factory{}.WithChainID("test_chain").WithTxConfig(txConfig)

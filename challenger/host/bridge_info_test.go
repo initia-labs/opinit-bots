@@ -16,7 +16,7 @@ import (
 	"github.com/initia-labs/opinit-bots/types"
 )
 
-func TestUpdateProposerHandler(t *testing.T) { //nolint
+func TestUpdateProposerHandler(t *testing.T) {
 	db, err := db.NewMemDB()
 	require.NoError(t, err)
 	hostNode := node.NewTestNode(nodetypes.NodeConfig{}, db.WithPrefix([]byte("test_host")), nil, nil, nil, nil)
@@ -94,7 +94,7 @@ func TestUpdateProposerHandler(t *testing.T) { //nolint
 	}
 }
 
-func TestUpdateChallengerHandler(t *testing.T) { //nolint
+func TestUpdateChallengerHandler(t *testing.T) {
 	db, err := db.NewMemDB()
 	require.NoError(t, err)
 	hostNode := node.NewTestNode(nodetypes.NodeConfig{}, db.WithPrefix([]byte("test_host")), nil, nil, nil, nil)

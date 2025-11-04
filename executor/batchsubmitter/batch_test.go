@@ -309,7 +309,7 @@ func TestFinalizeBatch(t *testing.T) {
 	ctx := types.NewContext(context.TODO(), logger, "")
 
 	for i := 0; i < 10; i++ {
-		_, err := batchSubmitter.batchWriter.Write([]byte(fmt.Sprintf("block_bytes%d", i)))
+		_, err := fmt.Fprintf(batchSubmitter.batchWriter, "block_bytes%d", i)
 		if err != nil {
 			require.NoError(t, err)
 		}

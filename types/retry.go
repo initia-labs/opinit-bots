@@ -21,7 +21,7 @@ func SleepWithRetry(ctx context.Context, retry int) bool {
 	}
 
 	sleepTime := 2 * math.Exp2(float64(retry))
-	sleepTime += rand.Float64() * float64(sleepTime) * 0.5 //nolint:all
+	sleepTime += rand.Float64() * float64(sleepTime) * 0.5
 	timer := time.NewTimer(time.Duration(sleepTime) * time.Second)
 	defer timer.Stop()
 	select {
