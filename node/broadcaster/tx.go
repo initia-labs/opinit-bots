@@ -1,6 +1,7 @@
 package broadcaster
 
 import (
+	"context"
 	"fmt"
 	"regexp"
 	"strconv"
@@ -28,7 +29,7 @@ var ignoringErrors = []error{
 
 	opchildtypes.ErrRedundantTx,
 }
-var accountSeqRegex = regexp.MustCompile("account sequence mismatch, expected ([0-9]+), got ([0-9]+)")
+var AccountSeqRegex = regexp.MustCompile("account sequence mismatch, expected ([0-9]+), got ([0-9]+)")
 var outputIndexRegex = regexp.MustCompile("expected ([0-9]+), got ([0-9]+): invalid output index")
 
 var sentryCapturedErrors = []error{
@@ -41,7 +42,7 @@ var ErrAccountSequenceMismatch = errors.New("account sequence mismatch")
 // handleMsgError handles error when processing messages.
 // If there is an error known to be ignored, it will be ignored.
 func (b *Broadcaster) handleMsgError(ctx types.Context, err error, broadcasterAccount *BroadcasterAccount) error {
-	if strs := accountSeqRegex.FindStringSubmatch(err.Error()); strs != nil {
+	if strs := AccountSeqRegex.FindStringSubmatch(err.Error()); strs != nil {
 		sentry_integration.CaptureCurrentHubException(err, sentry.LevelWarning)
 		expected, parseErr := strconv.ParseUint(strs[1], 10, 64)
 		if parseErr != nil {
@@ -188,4 +189,70 @@ func (b *Broadcaster) dequeueLocalPendingTx() {
 	defer b.pendingTxMu.Unlock()
 
 	b.pendingTxs = b.pendingTxs[1:]
+}
+
+func (b *Broadcaster) RemovePendingTxsUntil(ctx types.Context, until uint64) {
+	b.pendingTxMu.Lock()
+	defer b.pendingTxMu.Unlock()
+
+	start := 0
+	for _, pendingTx := range b.pendingTxs {
+		if pendingTx.Sequence > until {
+			break
+		}
+		start++
+	}
+	b.pendingTxs = b.pendingTxs[start:]
+}
+
+func (b *Broadcaster) RebuildPendingTxs(ctx context.Context) (btypes.PendingTxInfo, error) {
+	b.pendingTxMu.Lock()
+	defer b.pendingTxMu.Unlock()
+
+	newPendingTxs := make([]btypes.PendingTxInfo, len(b.pendingTxs))
+
+	stage := b.db.NewStage()
+
+	err := DeletePendingTxs(stage, b.pendingTxs)
+	if err != nil {
+		return btypes.PendingTxInfo{}, err
+	}
+
+	for i, pendingTx := range b.pendingTxs {
+
+		broadcasterAccount, err := b.AccountByAddress(pendingTx.Sender)
+		if err != nil {
+			return btypes.PendingTxInfo{}, err
+		}
+		newTxBytes, newTxHash, err := broadcasterAccount.BuildTxWithNewMemo(ctx, pendingTx.Tx, pendingTx.Sequence)
+		if err != nil {
+			return btypes.PendingTxInfo{}, err
+		}
+
+		newPendingTxs[i] = btypes.PendingTxInfo{
+			Sender:          pendingTx.Sender,
+			ProcessedHeight: pendingTx.ProcessedHeight,
+			Sequence:        pendingTx.Sequence,
+			Tx:              newTxBytes,
+			TxHash:          newTxHash,
+			Timestamp:       pendingTx.Timestamp,
+			MsgTypes:        pendingTx.MsgTypes,
+			Save:            pendingTx.Save,
+		}
+
+		if pendingTx.Save {
+			err = SavePendingTx(stage, newPendingTxs[i])
+			if err != nil {
+				return btypes.PendingTxInfo{}, err
+			}
+		}
+	}
+
+	err = stage.Commit()
+	if err != nil {
+		return btypes.PendingTxInfo{}, err
+	}
+
+	b.pendingTxs = newPendingTxs
+	return b.pendingTxs[0], nil
 }

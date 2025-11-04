@@ -107,7 +107,12 @@ func (b *Broadcaster) Start(ctx types.Context) error {
 			if err != nil {
 				return err
 			}
-			for retry := 1; retry <= types.MaxRetryCount; retry++ {
+			for retry := 1; ; retry++ {
+				select {
+				case <-ctx.Done():
+					return nil
+				default:
+				}
 				err = b.handleProcessedMsgs(ctx, msgs, broadcasterAccount)
 				if err == nil {
 					break
@@ -118,6 +123,8 @@ func (b *Broadcaster) Start(ctx types.Context) error {
 						return err
 					}
 					break
+				} else if strings.Contains(err.Error(), "request failed") || strings.Contains(err.Error(), "post failed") {
+					ctx.Logger().Error("failed to request to broadcast tx", zap.Error(err))
 				} else if !msgs.Save && !errors.Is(err, ErrAccountSequenceMismatch) {
 					// if the message does not need to be saved and the error is not account sequence mismatch, we can skip retry
 					ctx.Logger().Warn("discard msgs: failed to handle processed msgs", zap.String("error", err.Error()))

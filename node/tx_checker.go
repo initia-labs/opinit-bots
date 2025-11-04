@@ -1,8 +1,10 @@
 package node
 
 import (
+	"strconv"
 	"time"
 
+	"github.com/initia-labs/opinit-bots/node/broadcaster"
 	"github.com/initia-labs/opinit-bots/types"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
@@ -27,6 +29,7 @@ func (n *Node) txChecker(ctx types.Context, enableEventHandler bool) error {
 	defer timer.Stop()
 
 	consecutiveErrors := 0
+	lastBlockHeight := int64(0)
 	for {
 		select {
 		case <-ctx.Done():
@@ -51,12 +54,66 @@ func (n *Node) txChecker(ctx types.Context, enableEventHandler bool) error {
 
 		height := int64(0)
 
+		latestHeader, err := n.rpcClient.Header(ctx, nil)
+		if err != nil {
+			ctx.Logger().Error("failed to get latest header", zap.Error(err))
+			continue
+		} else if latestHeader.Header.Height <= lastBlockHeight {
+			ctx.Logger().Warn("latest block height is less than or equal to the last block height", zap.Int64("latest_block_height", latestHeader.Header.Height), zap.Int64("last_block_height", lastBlockHeight))
+			continue
+		}
+		lastBlockHeight = latestHeader.Header.Height
+
 		res, blockTime, err := n.broadcaster.CheckPendingTx(ctx, pendingTx)
 		if errors.Is(err, types.ErrTxNotFound) {
 			// tx not found
 			// it does not check the result of the broadcast
 			// this is in case the Tx gets removed from the mempool
-			n.broadcaster.BroadcastTxAsync(ctx, pendingTx.Tx) //nolint:errcheck
+			//nolint:errcheck
+
+			// this is about 5 minutes.
+			if consecutiveErrors > types.MaxBroadcastErrorCount {
+				pendingTx, err = n.broadcaster.RebuildPendingTxs(ctx)
+				if err != nil {
+					ctx.Logger().Error("failed to rebuild pending txs", zap.String("tx_hash", pendingTx.TxHash), zap.String("error", err.Error()))
+				}
+			}
+
+			res, err := n.broadcaster.BroadcastTxSync(ctx, pendingTx.Tx)
+			var checkString string
+			if err != nil {
+				checkString = err.Error()
+				ctx.Logger().Debug("rebroadcast failed", zap.String("tx_hash", pendingTx.TxHash), zap.String("error", err.Error()))
+			} else if res.Code != 0 {
+				checkString = res.Log
+			}
+
+			// check if the error is related to account sequence mismatch
+			// if it is, remove the pending txs until the expected sequence
+			// otherwise, ignore the error
+			if checkString != "" {
+				if strs := broadcaster.AccountSeqRegex.FindStringSubmatch(checkString); strs != nil {
+					expected, parseErr := strconv.ParseUint(strs[1], 10, 64)
+					if parseErr != nil {
+						return parseErr
+					}
+					got, parseErr := strconv.ParseUint(strs[2], 10, 64)
+					if parseErr != nil {
+						return parseErr
+					}
+
+					if expected > got {
+						ctx.Logger().Warn("pending txs are already processed", zap.Uint64("expected", expected), zap.Uint64("got", got))
+						n.broadcaster.RemovePendingTxsUntil(ctx, expected-1)
+						ctx.Logger().Info("remove pending txs until expected sequence",
+							zap.Uint64("from", pendingTx.Sequence),
+							zap.Uint64("to", expected-1),
+						)
+						consecutiveErrors = 0
+						continue
+					}
+				}
+			}
 			continue
 		} else if err != nil {
 			ctx.Logger().Error("failed to check pending tx", zap.String("tx_hash", pendingTx.TxHash), zap.String("error", err.Error()))
