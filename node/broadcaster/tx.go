@@ -40,8 +40,8 @@ var ErrAccountSequenceMismatch = errors.New("account sequence mismatch")
 // handleMsgError handles error when processing messages.
 // If there is an error known to be ignored, it will be ignored.
 func (b *Broadcaster) handleMsgError(ctx types.Context, err error, broadcasterAccount *BroadcasterAccount) error {
-	expected, got, err := btypes.ParseAccountSequenceMismatch(err.Error())
-	if err == nil {
+	expected, got, seqErr := btypes.ParseAccountSequenceMismatch(err.Error())
+	if seqErr == nil {
 		sentry_integration.CaptureCurrentHubException(err, sentry.LevelWarning)
 		if expected > got {
 			broadcasterAccount.UpdateSequence(expected)
