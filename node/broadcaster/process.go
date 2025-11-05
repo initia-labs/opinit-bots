@@ -32,36 +32,8 @@ func (b *Broadcaster) CheckPendingTx(ctx types.Context, pendingTx btypes.Pending
 	res, txerr := b.rpcClient.QueryTx(ctx, txHash)
 	if txerr != nil && IsTxNotFoundErr(txerr, pendingTx.TxHash) {
 		// if the tx is not found, it means the tx is not processed yet
-		// or the tx is not indexed by the node in rare cases.
-		pendingTxTime := time.Unix(0, pendingTx.Timestamp).UTC()
-
-		lastHeader, err := b.rpcClient.Header(ctx, nil)
-		if err != nil {
-			return nil, time.Time{}, err
-		}
-
-		// before timeout
-		if lastHeader.Header.Time.Before(pendingTxTime.Add(b.cfg.TxTimeout)) {
-			ctx.Logger().Debug("failed to query tx", zap.String("tx_hash", pendingTx.TxHash), zap.String("error", txerr.Error()))
-			return nil, time.Time{}, types.ErrTxNotFound
-		} else {
-			// timeout case
-			account, err := b.AccountByAddress(pendingTx.Sender)
-			if err != nil {
-				return nil, time.Time{}, err
-			}
-			accountSequence, err := account.GetLatestSequence(ctx)
-			if err != nil {
-				return nil, time.Time{}, err
-			}
-
-			// if sequence is larger than the sequence of the pending tx,
-			// handle it as the tx has already been processed
-			if pendingTx.Sequence < accountSequence {
-				return nil, time.Time{}, nil
-			}
-			panic(fmt.Errorf("something wrong, pending txs are not processed for a long time; current block time: %s, pending tx processing time: %s", time.Now().UTC().String(), pendingTxTime.UTC().String()))
-		}
+		// skip this, and handle this error outside of this function
+		return nil, time.Time{}, types.ErrTxNotFound
 	} else if txerr != nil {
 		return nil, time.Time{}, txerr
 	} else if res.TxResult.Code != 0 {
