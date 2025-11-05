@@ -88,23 +88,34 @@ func (n *Node) txChecker(ctx types.Context, enableEventHandler bool) error {
 			}
 
 			// check if the error is related to account sequence mismatch
-			// if it is, remove the pending txs until the expected sequence
+			// if it is, remove the pending txs until the on-chain sequence
 			// otherwise, ignore the error
 			if checkString != "" {
 				expected, got, err := btypes.ParseAccountSequenceMismatch(checkString)
 				if err == nil && expected > got {
-					ctx.Logger().Warn("pending txs are already processed", zap.Uint64("expected", expected), zap.Uint64("got", got))
-					err = n.broadcaster.RemovePendingTxsUntil(ctx, expected-1)
+					acc, err := n.broadcaster.AccountByAddress(pendingTx.Sender)
 					if err != nil {
-						ctx.Logger().Error("failed to remove pending txs until expected sequence", zap.String("tx_hash", pendingTx.TxHash), zap.Error(err))
+						ctx.Logger().Error("failed to get broadcaster account", zap.String("account", pendingTx.Sender), zap.Error(err))
 						return err
 					}
-					ctx.Logger().Info("remove pending txs until expected sequence",
-						zap.Uint64("from", pendingTx.Sequence),
-						zap.Uint64("to", expected-1),
-					)
-					consecutiveErrors = 0
-					continue
+					onChainSeq, err := acc.GetLatestSequence(ctx)
+					if err != nil {
+						ctx.Logger().Error("failed to get latest sequence", zap.String("account", pendingTx.Sender), zap.Error(err))
+						return err
+					}
+					if onChainSeq > got {
+						ctx.Logger().Warn("pending txs are already processed", zap.Uint64("on-chain sequence", onChainSeq), zap.Uint64("got", got))
+						err = n.broadcaster.RemovePendingTxsUntil(ctx, onChainSeq-1)
+						if err != nil {
+							ctx.Logger().Error("failed to remove pending txs until on-chain sequence", zap.String("tx_hash", pendingTx.TxHash), zap.Error(err))
+							return err
+						}
+						ctx.Logger().Info("remove pending txs until on-chain sequence",
+							zap.Uint64("from", pendingTx.Sequence),
+							zap.Uint64("to", onChainSeq-1),
+						)
+						consecutiveErrors = 0
+					}
 				}
 			}
 			continue
