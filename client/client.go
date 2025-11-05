@@ -539,6 +539,20 @@ func (c *baseRPCClient) Tx(ctx context.Context, hash []byte, prove bool) (*ctype
 	return result, nil
 }
 
+func (c *baseRPCClient) CustomTx(ctx context.Context, hash []byte, prove bool) (*ctypes.ResultTx, error) {
+	result := new(clienttypes.ResultTx)
+	params := map[string]interface{}{
+		"hash":  hash,
+		"prove": prove,
+	}
+	_, err := c.caller.Call(ctx, "tx", params, result)
+	if err != nil {
+		return nil, err
+	}
+
+	return result.ToCoreTypes(), nil
+}
+
 func (c *baseRPCClient) TxSearch(
 	ctx context.Context,
 	query string,

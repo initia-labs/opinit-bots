@@ -2,7 +2,10 @@ package types
 
 import (
 	"cosmossdk.io/api/tendermint/abci"
+	abcitypes "github.com/cometbft/cometbft/abci/types"
 	"github.com/cometbft/cometbft/libs/bytes"
+	ctypes "github.com/cometbft/cometbft/rpc/core/types"
+	"github.com/cometbft/cometbft/types"
 )
 
 // Result of block bulk
@@ -48,4 +51,53 @@ type ExecTxResult struct {
 	Events    []*abci.Event `protobuf:"bytes,7,rep,name=events,proto3" json:"events,omitempty"`
 	Codespace string        `protobuf:"bytes,8,opt,name=codespace,proto3" json:"codespace,omitempty"`
 	Signers   []string      `protobuf:"bytes,9,rep,name=signers,proto3" json:"signers,omitempty"`
+}
+
+func (r ExecTxResult) ToCoreTypes() abcitypes.ExecTxResult {
+	events := make([]abcitypes.Event, len(r.Events))
+	for i, event := range r.Events {
+		attributes := make([]abcitypes.EventAttribute, len(event.Attributes))
+		for j, attribute := range event.Attributes {
+			attributes[j] = abcitypes.EventAttribute{
+				Key:   attribute.Key,
+				Value: attribute.Value,
+				Index: attribute.Index,
+			}
+		}
+		events[i] = abcitypes.Event{
+			Type:       event.Type_,
+			Attributes: attributes,
+		}
+	}
+
+	return abcitypes.ExecTxResult{
+		Code:      r.Code,
+		Data:      r.Data,
+		Log:       r.Log,
+		Info:      r.Info,
+		GasWanted: r.GasWanted,
+		GasUsed:   r.GasUsed,
+		Events:    events,
+		Codespace: r.Codespace,
+	}
+}
+
+type ResultTx struct {
+	Hash     bytes.HexBytes `json:"hash"`
+	Height   int64          `json:"height"`
+	Index    uint32         `json:"index"`
+	TxResult ExecTxResult   `json:"tx_result"`
+	Tx       types.Tx       `json:"tx"`
+	Proof    types.TxProof  `json:"proof,omitempty"`
+}
+
+func (r ResultTx) ToCoreTypes() *ctypes.ResultTx {
+	return &ctypes.ResultTx{
+		Hash:     r.Hash,
+		Height:   r.Height,
+		Index:    r.Index,
+		TxResult: r.TxResult.ToCoreTypes(),
+		Tx:       r.Tx,
+		Proof:    r.Proof,
+	}
 }
