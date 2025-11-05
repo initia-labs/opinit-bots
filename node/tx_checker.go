@@ -29,6 +29,8 @@ func (n *Node) txChecker(ctx types.Context, enableEventHandler bool) error {
 
 	consecutiveErrors := 0
 	lastBlockHeight := int64(0)
+	txNotFoundBefore := false
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -57,14 +59,17 @@ func (n *Node) txChecker(ctx types.Context, enableEventHandler bool) error {
 		if err != nil {
 			ctx.Logger().Error("failed to get latest header", zap.Error(err))
 			continue
-		} else if latestHeader.Header.Height <= lastBlockHeight {
+		} else if txNotFoundBefore && latestHeader.Header.Height <= lastBlockHeight {
 			ctx.Logger().Debug("latest block height is less than or equal to the last block height", zap.Int64("latest_block_height", latestHeader.Header.Height), zap.Int64("last_block_height", lastBlockHeight))
 			continue
 		}
+
+		txNotFoundBefore = false
 		lastBlockHeight = latestHeader.Header.Height
 
 		res, blockTime, err := n.broadcaster.CheckPendingTx(ctx, pendingTx)
 		if errors.Is(err, types.ErrTxNotFound) {
+			txNotFoundBefore = true
 			// tx not found
 			// it does not check the result of the broadcast
 			// this is in case the Tx gets removed from the mempool
