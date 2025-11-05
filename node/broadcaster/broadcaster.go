@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
-	"math"
 	"slices"
 	"sync"
 	"time"
@@ -196,7 +195,7 @@ func (b *Broadcaster) loadPendingTxs(ctx types.Context, stage types.BasicDB, las
 				}
 			}
 
-			ctx.Logger().Warn("retry to query pending tx", zap.String("hash", pendingTxs[txIndex].TxHash), zap.Int("seconds", int(2*math.Exp2(float64(retry)))), zap.Int("count", retry), zap.String("error", err.Error()))
+			ctx.Logger().Warn("retry to query pending tx", zap.String("hash", pendingTxs[txIndex].TxHash), zap.Int("count", retry), zap.String("error", err.Error()))
 			if types.SleepWithRetry(ctx, retry) {
 				return ctx.Err()
 			}
