@@ -43,7 +43,7 @@ func (b *Broadcaster) handleMsgError(ctx types.Context, err error, broadcasterAc
 	expected, got, seqErr := btypes.ParseAccountSequenceMismatch(err.Error())
 	if seqErr == nil {
 		sentry_integration.CaptureCurrentHubException(err, sentry.LevelWarning)
-		if expected > got {
+		if expected > b.peekLastSequenceInLocalPendingTx() {
 			broadcasterAccount.UpdateSequence(expected)
 		}
 		return errors.Wrapf(ErrAccountSequenceMismatch, "expected %d, got %d", expected, got)
@@ -178,6 +178,17 @@ func (b *Broadcaster) dequeueLocalPendingTx() {
 	defer b.pendingTxMu.Unlock()
 
 	b.pendingTxs = b.pendingTxs[1:]
+}
+
+func (b *Broadcaster) peekLastSequenceInLocalPendingTx() uint64 {
+	b.pendingTxMu.Lock()
+	defer b.pendingTxMu.Unlock()
+
+	if len(b.pendingTxs) == 0 {
+		return 0
+	}
+
+	return b.pendingTxs[len(b.pendingTxs)-1].Sequence
 }
 
 func (b *Broadcaster) RemovePendingTxsUntil(ctx types.Context, until uint64) error {
