@@ -58,7 +58,7 @@ func (n *Node) txChecker(ctx types.Context, enableEventHandler bool) error {
 			ctx.Logger().Error("failed to get latest header", zap.Error(err))
 			continue
 		} else if latestHeader.Header.Height <= lastBlockHeight {
-			ctx.Logger().Warn("latest block height is less than or equal to the last block height", zap.Int64("latest_block_height", latestHeader.Header.Height), zap.Int64("last_block_height", lastBlockHeight))
+			ctx.Logger().Debug("latest block height is less than or equal to the last block height", zap.Int64("latest_block_height", latestHeader.Header.Height), zap.Int64("last_block_height", lastBlockHeight))
 			continue
 		}
 		lastBlockHeight = latestHeader.Header.Height

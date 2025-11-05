@@ -3,7 +3,6 @@ package broadcaster
 import (
 	"encoding/hex"
 	"fmt"
-	"math"
 	"strings"
 	"time"
 
@@ -103,7 +102,7 @@ func (b *Broadcaster) Start(ctx types.Context) error {
 					err = nil
 					break
 				}
-				ctx.Logger().Warn("retry to handle processed msgs", zap.Int("seconds", int(2*math.Exp2(float64(retry)))), zap.Int("count", retry), zap.String("error", err.Error()))
+				ctx.Logger().Warn("retry to handle processed msgs", zap.Int("count", retry), zap.String("error", err.Error()))
 				if types.SleepWithRetry(ctx, retry) {
 					return nil
 				}
