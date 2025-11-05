@@ -202,5 +202,5 @@ func (q RPCClient) QueryBlockBulk(ctx context.Context, start int64, end int64) (
 func (q RPCClient) QueryTx(ctx context.Context, txHash []byte) (*coretypes.ResultTx, error) {
 	ctx, cancel := GetQueryContext(ctx, 0)
 	defer cancel()
-	return q.Tx(ctx, txHash, false)
+	return q.CustomTx(ctx, txHash, false)
 }
