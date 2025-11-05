@@ -63,6 +63,8 @@ func (n *Node) txChecker(ctx types.Context, enableEventHandler bool) error {
 			ctx.Logger().Debug("latest block height is less than or equal to the last block height", zap.Int64("latest_block_height", latestHeader.Header.Height), zap.Int64("last_block_height", lastBlockHeight))
 			continue
 		}
+
+		txNotFoundBefore = false
 		lastBlockHeight = latestHeader.Header.Height
 
 		res, blockTime, err := n.broadcaster.CheckPendingTx(ctx, pendingTx)
@@ -123,7 +125,6 @@ func (n *Node) txChecker(ctx types.Context, enableEventHandler bool) error {
 			}
 			continue
 		} else if err != nil {
-			txNotFoundBefore = false
 			ctx.Logger().Error("failed to check pending tx", zap.String("tx_hash", pendingTx.TxHash), zap.String("error", err.Error()))
 			continue
 		} else if res != nil {
@@ -159,7 +160,6 @@ func (n *Node) txChecker(ctx types.Context, enableEventHandler bool) error {
 			zap.Strings("msg_types", pendingTx.MsgTypes),
 			zap.Int("pending_txs", n.broadcaster.LenLocalPendingTx()),
 		)
-		txNotFoundBefore = false
 		consecutiveErrors = 0
 	}
 }
