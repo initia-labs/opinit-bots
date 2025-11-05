@@ -209,6 +209,9 @@ func (b *Broadcaster) RemovePendingTxsUntil(ctx types.Context, until uint64) err
 	return nil
 }
 
+// RebuildPendingTxs rebuilds all pending txs with new memos and re-fetches the
+// latest on-chain sequence for every broadcaster account so subsequent
+// broadcasts continue from the canonical sequence.
 func (b *Broadcaster) RebuildPendingTxs(ctx types.Context) (btypes.PendingTxInfo, error) {
 	b.pendingTxMu.Lock()
 	defer b.pendingTxMu.Unlock()
@@ -226,13 +229,27 @@ func (b *Broadcaster) RebuildPendingTxs(ctx types.Context) (btypes.PendingTxInfo
 		return btypes.PendingTxInfo{}, err
 	}
 
-	for i, pendingTx := range b.pendingTxs {
-
-		broadcasterAccount, err := b.AccountByAddress(pendingTx.Sender)
-		if err != nil {
-			return btypes.PendingTxInfo{}, err
+	// load accounts
+	accounts := make(map[string]*BroadcasterAccount)
+	sequences := make(map[string]uint64)
+	for _, pendingTx := range b.pendingTxs {
+		if _, exists := accounts[pendingTx.Sender]; !exists {
+			account, err := b.AccountByAddress(pendingTx.Sender)
+			if err != nil {
+				return btypes.PendingTxInfo{}, err
+			}
+			accounts[pendingTx.Sender] = account
+			sequences[pendingTx.Sender], err = account.GetLatestSequence(ctx)
+			if err != nil {
+				return btypes.PendingTxInfo{}, err
+			}
 		}
-		newTxBytes, newTxHash, err := broadcasterAccount.BuildTxWithNewMemo(ctx, pendingTx.Tx, pendingTx.Sequence)
+	}
+
+	// reset sequences
+	for i, pendingTx := range b.pendingTxs {
+		broadcastAccount := accounts[pendingTx.Sender]
+		newTxBytes, newTxHash, err := broadcastAccount.BuildTxWithNewMemo(ctx, pendingTx.Tx, sequences[pendingTx.Sender])
 		if err != nil {
 			return btypes.PendingTxInfo{}, err
 		}
@@ -240,25 +257,32 @@ func (b *Broadcaster) RebuildPendingTxs(ctx types.Context) (btypes.PendingTxInfo
 		newPendingTxs[i] = btypes.PendingTxInfo{
 			Sender:          pendingTx.Sender,
 			ProcessedHeight: pendingTx.ProcessedHeight,
-			Sequence:        pendingTx.Sequence,
+			Sequence:        sequences[pendingTx.Sender],
 			Tx:              newTxBytes,
 			TxHash:          newTxHash,
 			Timestamp:       pendingTx.Timestamp,
 			MsgTypes:        pendingTx.MsgTypes,
 			Save:            pendingTx.Save,
 		}
-
 		if pendingTx.Save {
 			err = SavePendingTx(stage, newPendingTxs[i])
 			if err != nil {
 				return btypes.PendingTxInfo{}, err
 			}
 		}
+
+		// increase sequence
+		sequences[pendingTx.Sender]++
 	}
 
 	err = stage.Commit()
 	if err != nil {
 		return btypes.PendingTxInfo{}, err
+	}
+
+	// update sequences in accounts
+	for _, account := range accounts {
+		account.UpdateSequence(sequences[account.GetAddressString()])
 	}
 
 	b.pendingTxs = newPendingTxs
