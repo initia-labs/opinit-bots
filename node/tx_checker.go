@@ -96,12 +96,12 @@ func (n *Node) txChecker(ctx types.Context, enableEventHandler bool) error {
 					acc, err := n.broadcaster.AccountByAddress(pendingTx.Sender)
 					if err != nil {
 						ctx.Logger().Error("failed to get broadcaster account", zap.String("account", pendingTx.Sender), zap.Error(err))
-						return err
+						continue
 					}
 					onChainSeq, err := acc.GetLatestSequence(ctx)
 					if err != nil {
 						ctx.Logger().Error("failed to get latest sequence", zap.String("account", pendingTx.Sender), zap.Error(err))
-						return err
+						continue
 					}
 					if onChainSeq > got {
 						ctx.Logger().Warn("pending txs are already processed", zap.Uint64("on-chain sequence", onChainSeq), zap.Uint64("got", got))
