@@ -124,9 +124,11 @@ func (n *Node) txChecker(ctx types.Context, enableEventHandler bool) error {
 				}
 			}
 			continue
-		} else if err != nil {
+		} else if err != nil && pendingTx.Save {
 			ctx.Logger().Error("failed to check pending tx", zap.String("tx_hash", pendingTx.TxHash), zap.String("error", err.Error()))
 			continue
+		} else if err != nil {
+			ctx.Logger().Error("discard pending tx", zap.String("tx_hash", pendingTx.TxHash), zap.String("error", err.Error()))
 		} else if res != nil {
 			// tx found
 			height = res.Height
@@ -147,19 +149,19 @@ func (n *Node) txChecker(ctx types.Context, enableEventHandler bool) error {
 					}
 				}
 			}
+			ctx.Logger().Info("tx inserted",
+				zap.Int64("height", height),
+				zap.Uint64("sequence", pendingTx.Sequence),
+				zap.String("tx_hash", pendingTx.TxHash),
+				zap.Strings("msg_types", pendingTx.MsgTypes),
+				zap.Int("pending_txs", n.broadcaster.LenLocalPendingTx()),
+			)
 		}
 
 		err = n.broadcaster.RemovePendingTx(ctx, pendingTx)
 		if err != nil {
 			return errors.Wrap(err, "failed to remove pending tx")
 		}
-		ctx.Logger().Info("tx inserted",
-			zap.Int64("height", height),
-			zap.Uint64("sequence", pendingTx.Sequence),
-			zap.String("tx_hash", pendingTx.TxHash),
-			zap.Strings("msg_types", pendingTx.MsgTypes),
-			zap.Int("pending_txs", n.broadcaster.LenLocalPendingTx()),
-		)
 		consecutiveErrors = 0
 	}
 }

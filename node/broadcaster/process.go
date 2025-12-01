@@ -99,7 +99,10 @@ func (b *Broadcaster) Start(ctx types.Context) error {
 				} else if !msgs.Save && !errors.Is(err, ErrAccountSequenceMismatch) {
 					// if the message does not need to be saved and the error is not account sequence mismatch, we can skip retry
 					ctx.Logger().Warn("discard msgs: failed to handle processed msgs", zap.String("error", err.Error()))
-					err = nil
+					err = DeleteProcessedMsgs(b.db, msgs)
+					if err != nil {
+						return err
+					}
 					break
 				}
 				ctx.Logger().Warn("retry to handle processed msgs", zap.Int("count", retry), zap.String("error", err.Error()))
