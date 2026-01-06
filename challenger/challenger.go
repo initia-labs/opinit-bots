@@ -7,11 +7,14 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/adaptor"
 	"github.com/initia-labs/opinit-bots/challenger/child"
 	challengerdb "github.com/initia-labs/opinit-bots/challenger/db"
 	"github.com/initia-labs/opinit-bots/challenger/host"
 	"github.com/initia-labs/opinit-bots/sentry_integration"
 	"github.com/initia-labs/opinit-bots/server"
+	"github.com/initia-labs/opinit-bots/server/metrics"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	bottypes "github.com/initia-labs/opinit-bots/bot/types"
 	challengertypes "github.com/initia-labs/opinit-bots/challenger/types"
@@ -179,6 +182,10 @@ func (c *Challenger) Start(ctx types.Context) error {
 		return c.challengeHandler(ctx)
 	})
 
+	ctx.ErrGrp().Go(func() error {
+		return metrics.StartMetricsUpdater(ctx, c)
+	})
+
 	c.host.Start(ctx.WithLogger(ctx.Logger().Named("host")))
 	c.child.Start(ctx.WithLogger(ctx.Logger().Named("child")))
 	return ctx.ErrGrp().Wait()
@@ -248,6 +255,11 @@ func (c *Challenger) RegisterQuerier(ctx types.Context) {
 		childSync := status.Child.Node.Syncing != nil && *status.Child.Node.Syncing
 		return fiberCtx.JSON(hostSync || childSync)
 	})
+
+	c.server.RegisterQuerier("/metrics", adaptor.HTTPHandler(promhttp.HandlerFor(
+		metrics.CustomRegistry,
+		promhttp.HandlerOpts{},
+	)))
 }
 
 func (c *Challenger) getNodeStartHeights(ctx types.Context, bridgeId uint64) (l1StartHeight int64, l2StartHeight int64, startOutputIndex uint64, err error) {

@@ -11,6 +11,7 @@ import (
 	"github.com/initia-labs/opinit-bots/executor/host"
 	"github.com/initia-labs/opinit-bots/sentry_integration"
 	"github.com/initia-labs/opinit-bots/server"
+	"github.com/initia-labs/opinit-bots/server/metrics"
 
 	bottypes "github.com/initia-labs/opinit-bots/bot/types"
 	executortypes "github.com/initia-labs/opinit-bots/executor/types"
@@ -134,6 +135,11 @@ func (ex *Executor) Start(ctx types.Context) error {
 		}()
 		return ex.server.Start()
 	})
+
+	ctx.ErrGrp().Go(func() error {
+		return metrics.StartMetricsUpdater(ctx, ex)
+	})
+
 	ex.host.Start(ctx.WithLogger(ctx.Logger().Named("host")))
 	ex.child.Start(ctx.WithLogger(ctx.Logger().Named("child")))
 	ex.batchSubmitter.Start(ctx.WithLogger(ctx.Logger().Named("batchSubmitter")))
