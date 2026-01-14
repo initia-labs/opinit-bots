@@ -25,15 +25,15 @@ import (
 
 // mockHostNode implements the hostNode interface for testing
 type mockHostNode struct {
-	chainID            string
-	bridgeInfo         ophosttypes.QueryBridgeResponse
-	oracleEnabled      bool
-	oraclePriceHash    *hostprovider.OraclePriceHashWithProof
-	currencyPairs      []connecttypes.CurrencyPair
-	oraclePrices       map[string]*oracletypes.GetPriceResponse
-	queryPriceErr      map[string]error
-	queryPriceHashErr  error
-	queryCurrencyErr   error
+	chainID           string
+	bridgeInfo        ophosttypes.QueryBridgeResponse
+	oracleEnabled     bool
+	oraclePriceHash   *hostprovider.OraclePriceHashWithProof
+	currencyPairs     []connecttypes.CurrencyPair
+	oraclePrices      map[string]*oracletypes.GetPriceResponse
+	queryPriceErr     map[string]error
+	queryPriceHashErr error
+	queryCurrencyErr  error
 }
 
 func newMockHostNode(chainID string, oracleEnabled bool) *mockHostNode {
@@ -89,19 +89,19 @@ var _ hostNode = (*mockHostNode)(nil)
 
 // mockChildNode implements the childNode interface for testing
 type mockChildNode struct {
-	l1ClientID          string
+	l1ClientID           string
 	latestRevisionHeight uint64
-	broadcastedMsgs     []sdk.Msg
-	queryL1ClientIDErr  error
-	queryRevisionErr    error
-	mu                  sync.Mutex
+	broadcastedMsgs      []sdk.Msg
+	queryL1ClientIDErr   error
+	queryRevisionErr     error
+	mu                   sync.Mutex
 }
 
 func newMockChildNode(l1ClientID string, latestRevisionHeight uint64) *mockChildNode {
 	return &mockChildNode{
-		l1ClientID:          l1ClientID,
+		l1ClientID:           l1ClientID,
 		latestRevisionHeight: latestRevisionHeight,
-		broadcastedMsgs:     make([]sdk.Msg, 0),
+		broadcastedMsgs:      make([]sdk.Msg, 0),
 	}
 }
 
@@ -228,12 +228,12 @@ func TestQueryAllOraclePrices(t *testing.T) {
 	}
 
 	cases := []struct {
-		name           string
-		currencyPairs  []connecttypes.CurrencyPair
-		prices         map[string]*oracletypes.GetPriceResponse
-		priceErrors    map[string]error
-		expectedCount  int
-		expectError    bool
+		name          string
+		currencyPairs []connecttypes.CurrencyPair
+		prices        map[string]*oracletypes.GetPriceResponse
+		priceErrors   map[string]error
+		expectedCount int
+		expectError   bool
 	}{
 		{
 			name: "successful query all prices",
@@ -281,12 +281,12 @@ func TestQueryAllOraclePrices(t *testing.T) {
 			expectError:   false,
 		},
 		{
-			name:           "empty currency pairs",
-			currencyPairs:  []connecttypes.CurrencyPair{},
-			prices:         nil,
-			priceErrors:    nil,
-			expectedCount:  0,
-			expectError:    false,
+			name:          "empty currency pairs",
+			currencyPairs: []connecttypes.CurrencyPair{},
+			prices:        nil,
+			priceErrors:   nil,
+			expectedCount: 0,
+			expectError:   false,
 		},
 		{
 			name: "all queries fail",
@@ -484,4 +484,470 @@ func TestStatusGettersSetters(t *testing.T) {
 	zeroTime := time.Time{}
 	or.SetLastRelayedTime(zeroTime)
 	require.Equal(t, zeroTime, or.GetLastRelayedTime())
+}
+
+func TestRelayOnce(t *testing.T) {
+	createPrice := func(priceVal int64, decimals uint64, nonce uint64, id uint64, timestamp time.Time) *oracletypes.GetPriceResponse {
+		return &oracletypes.GetPriceResponse{
+			Price: &oracletypes.QuotePrice{
+				Price:          math.NewInt(priceVal),
+				BlockTimestamp: timestamp,
+				BlockHeight:    100,
+			},
+			Decimals: decimals,
+			Nonce:    nonce,
+			Id:       id,
+		}
+	}
+
+	cases := []struct {
+		name              string
+		oracleEnabled     bool
+		chainID           string
+		l1ClientID        string
+		revisionHeight    uint64
+		currencyPairs     []string
+		hostCurrencyPairs []connecttypes.CurrencyPair
+		prices            map[string]*oracletypes.GetPriceResponse
+		oraclePriceHash   *hostprovider.OraclePriceHashWithProof
+		queryL1ClientErr  error
+		queryRevisionErr  error
+		queryPriceHashErr error
+		queryCurrencyErr  error
+		expectError       bool
+		expectSkip        bool
+		errorContains     string
+	}{
+		{
+			name:           "oracle disabled - skip relay",
+			oracleEnabled:  false,
+			chainID:        "test-chain-1",
+			l1ClientID:     "07-tendermint-0",
+			revisionHeight: 100,
+			expectError:    false,
+			expectSkip:     true,
+		},
+		{
+			name:             "failed to get L1 client ID",
+			oracleEnabled:    true,
+			chainID:          "test-chain-1",
+			queryL1ClientErr: context.DeadlineExceeded,
+			expectError:      true,
+			errorContains:    "failed to get L1 client ID",
+		},
+		{
+			name:             "failed to get latest revision height",
+			oracleEnabled:    true,
+			chainID:          "test-chain-1",
+			l1ClientID:       "07-tendermint-0",
+			queryRevisionErr: context.DeadlineExceeded,
+			expectError:      true,
+			errorContains:    "failed to get latest consensus height",
+		},
+		{
+			name:           "no consensus states available",
+			oracleEnabled:  true,
+			chainID:        "test-chain-1",
+			l1ClientID:     "07-tendermint-0",
+			revisionHeight: 0,
+			expectError:    true,
+			errorContains:  "no consensus states available",
+		},
+		{
+			name:           "invalid chain ID format",
+			oracleEnabled:  true,
+			chainID:        "invalid-chain",
+			l1ClientID:     "07-tendermint-0",
+			revisionHeight: 100,
+			expectError:    true,
+			errorContains:  "failed to parse oracle relay revision",
+		},
+		{
+			name:              "failed to query oracle price hash",
+			oracleEnabled:     true,
+			chainID:           "test-chain-1",
+			l1ClientID:        "07-tendermint-0",
+			revisionHeight:    100,
+			queryPriceHashErr: context.DeadlineExceeded,
+			expectError:       true,
+			errorContains:     "failed to query oracle price hash",
+		},
+		{
+			name:             "failed to query currency pairs",
+			oracleEnabled:    true,
+			chainID:          "test-chain-1",
+			l1ClientID:       "07-tendermint-0",
+			revisionHeight:   100,
+			currencyPairs:    []string{},
+			queryCurrencyErr: context.DeadlineExceeded,
+			oraclePriceHash: &hostprovider.OraclePriceHashWithProof{
+				OraclePriceHash: ophosttypes.OraclePriceHash{
+					Hash:          []byte("test_hash"),
+					L1BlockHeight: 99,
+					L1BlockTime:   1000000000,
+				},
+				Proof:       []byte("test_proof"),
+				QueryHeight: 99,
+			},
+			expectError:   true,
+			errorContains: "failed to query currency pairs",
+		},
+		{
+			name:           "no oracle prices retrieved",
+			oracleEnabled:  true,
+			chainID:        "test-chain-1",
+			l1ClientID:     "07-tendermint-0",
+			revisionHeight: 100,
+			currencyPairs:  []string{"BTC/USD"},
+			prices:         map[string]*oracletypes.GetPriceResponse{},
+			oraclePriceHash: &hostprovider.OraclePriceHashWithProof{
+				OraclePriceHash: ophosttypes.OraclePriceHash{
+					Hash:          []byte("test_hash"),
+					L1BlockHeight: 99,
+					L1BlockTime:   1000000000,
+				},
+				Proof:       []byte("test_proof"),
+				QueryHeight: 99,
+			},
+			expectError:   true,
+			errorContains: "no oracle prices retrieved",
+		},
+		{
+			name:           "successful relay with configured currency pairs",
+			oracleEnabled:  true,
+			chainID:        "test-chain-1",
+			l1ClientID:     "07-tendermint-0",
+			revisionHeight: 100,
+			currencyPairs:  []string{"BTC/USD", "ETH/USD"},
+			prices: map[string]*oracletypes.GetPriceResponse{
+				"BTC/USD": createPrice(5000000000000, 8, 1, 1, time.Now()),
+				"ETH/USD": createPrice(300000000000, 8, 1, 2, time.Now()),
+			},
+			oraclePriceHash: &hostprovider.OraclePriceHashWithProof{
+				OraclePriceHash: ophosttypes.OraclePriceHash{
+					Hash:          []byte("test_hash"),
+					L1BlockHeight: 99,
+					L1BlockTime:   1000000000,
+				},
+				Proof:       []byte("test_proof"),
+				QueryHeight: 99,
+			},
+			expectError: false,
+		},
+		{
+			name:           "successful relay with L1 currency pairs",
+			oracleEnabled:  true,
+			chainID:        "test-chain-1",
+			l1ClientID:     "07-tendermint-0",
+			revisionHeight: 100,
+			currencyPairs:  []string{},
+			hostCurrencyPairs: []connecttypes.CurrencyPair{
+				{Base: "BTC", Quote: "USD"},
+			},
+			prices: map[string]*oracletypes.GetPriceResponse{
+				"BTC/USD": createPrice(5000000000000, 8, 1, 1, time.Now()),
+			},
+			oraclePriceHash: &hostprovider.OraclePriceHashWithProof{
+				OraclePriceHash: ophosttypes.OraclePriceHash{
+					Hash:          []byte("test_hash"),
+					L1BlockHeight: 99,
+					L1BlockTime:   1000000000,
+				},
+				Proof:       []byte("test_proof"),
+				QueryHeight: 99,
+			},
+			expectError: false,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			mockHost := newMockHostNode(tc.chainID, tc.oracleEnabled)
+			mockHost.oraclePriceHash = tc.oraclePriceHash
+			mockHost.currencyPairs = tc.hostCurrencyPairs
+			mockHost.oraclePrices = tc.prices
+			mockHost.queryPriceHashErr = tc.queryPriceHashErr
+			mockHost.queryCurrencyErr = tc.queryCurrencyErr
+
+			mockChild := newMockChildNode(tc.l1ClientID, tc.revisionHeight)
+			mockChild.queryL1ClientIDErr = tc.queryL1ClientErr
+			mockChild.queryRevisionErr = tc.queryRevisionErr
+
+			or := NewOracleRelayV1(executortypes.OracleRelayConfig{
+				Enable:        true,
+				Interval:      30,
+				CurrencyPairs: tc.currencyPairs,
+			})
+			err := or.Initialize(mockHost, mockChild, "init1sender")
+			require.NoError(t, err)
+
+			ctx := types.NewContext(context.Background(), zap.NewNop(), "")
+			err = or.relayOnce(ctx)
+
+			if tc.expectSkip {
+				require.NoError(t, err)
+				require.Empty(t, mockChild.GetBroadcastedMsgs())
+				return
+			}
+
+			if tc.expectError {
+				require.Error(t, err)
+				if tc.errorContains != "" {
+					require.Contains(t, err.Error(), tc.errorContains)
+				}
+			} else {
+				require.NoError(t, err)
+				require.NotEmpty(t, mockChild.GetBroadcastedMsgs())
+				require.Greater(t, or.GetLastRelayedL1Height(), uint64(0))
+			}
+		})
+	}
+}
+
+func TestOracleRelayConfigValidate(t *testing.T) {
+	cases := []struct {
+		name        string
+		config      executortypes.OracleRelayConfig
+		expectError bool
+	}{
+		{
+			name: "valid config with default interval",
+			config: executortypes.OracleRelayConfig{
+				Enable:   true,
+				Interval: 30,
+			},
+			expectError: false,
+		},
+		{
+			name: "valid config with currency pairs",
+			config: executortypes.OracleRelayConfig{
+				Enable:        true,
+				Interval:      60,
+				CurrencyPairs: []string{"BTC/USD", "ETH/USD"},
+			},
+			expectError: false,
+		},
+		{
+			name: "valid disabled config",
+			config: executortypes.OracleRelayConfig{
+				Enable:   false,
+				Interval: 30,
+			},
+			expectError: false,
+		},
+		{
+			name: "invalid zero interval",
+			config: executortypes.OracleRelayConfig{
+				Enable:   true,
+				Interval: 0,
+			},
+			expectError: true,
+		},
+		{
+			name: "invalid negative interval",
+			config: executortypes.OracleRelayConfig{
+				Enable:   true,
+				Interval: -1,
+			},
+			expectError: true,
+		},
+		{
+			name:        "default config is valid",
+			config:      executortypes.DefaultOracleRelayConfig(),
+			expectError: false,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := tc.config.Validate()
+			if tc.expectError {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestCurrencyPairParsing(t *testing.T) {
+	ctx := types.NewContext(context.Background(), zap.NewNop(), "")
+
+	createPrice := func(priceVal int64) *oracletypes.GetPriceResponse {
+		return &oracletypes.GetPriceResponse{
+			Price: &oracletypes.QuotePrice{
+				Price:          math.NewInt(priceVal),
+				BlockTimestamp: time.Now(),
+				BlockHeight:    100,
+			},
+			Decimals: 8,
+			Nonce:    1,
+			Id:       1,
+		}
+	}
+
+	cases := []struct {
+		name          string
+		currencyPairs []string
+		prices        map[string]*oracletypes.GetPriceResponse
+		expectedCount int
+	}{
+		{
+			name:          "valid currency pairs",
+			currencyPairs: []string{"BTC/USD", "ETH/USD", "ATOM/USD"},
+			prices: map[string]*oracletypes.GetPriceResponse{
+				"BTC/USD":  createPrice(5000000000000),
+				"ETH/USD":  createPrice(300000000000),
+				"ATOM/USD": createPrice(1000000000),
+			},
+			expectedCount: 3,
+		},
+		{
+			name:          "invalid currency pair format ignored",
+			currencyPairs: []string{"BTC/USD", "INVALID", "ETH-USD", "ATOM/USD"},
+			prices: map[string]*oracletypes.GetPriceResponse{
+				"BTC/USD":  createPrice(5000000000000),
+				"ATOM/USD": createPrice(1000000000),
+			},
+			expectedCount: 2,
+		},
+		{
+			name:          "all invalid formats",
+			currencyPairs: []string{"INVALID", "ALSO-INVALID", "NOSLASH"},
+			prices:        map[string]*oracletypes.GetPriceResponse{},
+			expectedCount: 0,
+		},
+		{
+			name:          "empty string in pairs",
+			currencyPairs: []string{"BTC/USD", "", "ETH/USD"},
+			prices: map[string]*oracletypes.GetPriceResponse{
+				"BTC/USD": createPrice(5000000000000),
+				"ETH/USD": createPrice(300000000000),
+			},
+			expectedCount: 2,
+		},
+		{
+			name:          "currency pair with extra slashes",
+			currencyPairs: []string{"BTC/USD/EXTRA", "ETH/USD"},
+			prices: map[string]*oracletypes.GetPriceResponse{
+				"ETH/USD": createPrice(300000000000),
+			},
+			expectedCount: 1,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			mockHost := newMockHostNode("test-chain-1", true)
+			mockHost.oraclePrices = tc.prices
+			mockHost.oraclePriceHash = &hostprovider.OraclePriceHashWithProof{
+				OraclePriceHash: ophosttypes.OraclePriceHash{
+					Hash:          []byte("test_hash"),
+					L1BlockHeight: 99,
+					L1BlockTime:   1000000000,
+				},
+				Proof:       []byte("test_proof"),
+				QueryHeight: 99,
+			}
+
+			mockChild := newMockChildNode("07-tendermint-0", 100)
+
+			or := NewOracleRelayV1(executortypes.OracleRelayConfig{
+				Enable:        true,
+				Interval:      30,
+				CurrencyPairs: tc.currencyPairs,
+			})
+			err := or.Initialize(mockHost, mockChild, "init1sender")
+			require.NoError(t, err)
+
+			// attempting relayOnce and checking how many messages were broadcast
+			err = or.relayOnce(ctx)
+
+			if tc.expectedCount == 0 {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+				msgs := mockChild.GetBroadcastedMsgs()
+				require.Len(t, msgs, 1)
+			}
+		})
+	}
+}
+
+func TestRelayOnceProofHeightEdgeCases(t *testing.T) {
+	createPrice := func(priceVal int64) *oracletypes.GetPriceResponse {
+		return &oracletypes.GetPriceResponse{
+			Price: &oracletypes.QuotePrice{
+				Price:          math.NewInt(priceVal),
+				BlockTimestamp: time.Now(),
+				BlockHeight:    100,
+			},
+			Decimals: 8,
+			Nonce:    1,
+			Id:       1,
+		}
+	}
+
+	cases := []struct {
+		name           string
+		revisionHeight uint64
+		expectError    bool
+		errorContains  string
+	}{
+		{
+			name:           "minimum valid height (1)",
+			revisionHeight: 1,
+			expectError:    false,
+		},
+		{
+			name:           "normal height",
+			revisionHeight: 1000,
+			expectError:    false,
+		},
+		{
+			name:           "large height",
+			revisionHeight: 999999999,
+			expectError:    false,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			mockHost := newMockHostNode("test-chain-1", true)
+			mockHost.oraclePrices = map[string]*oracletypes.GetPriceResponse{
+				"BTC/USD": createPrice(5000000000000),
+			}
+			mockHost.oraclePriceHash = &hostprovider.OraclePriceHashWithProof{
+				OraclePriceHash: ophosttypes.OraclePriceHash{
+					Hash:          []byte("test_hash"),
+					L1BlockHeight: tc.revisionHeight - 1,
+					L1BlockTime:   1000000000,
+				},
+				Proof:       []byte("test_proof"),
+				QueryHeight: tc.revisionHeight - 1,
+			}
+
+			mockChild := newMockChildNode("07-tendermint-0", tc.revisionHeight)
+
+			or := NewOracleRelayV1(executortypes.OracleRelayConfig{
+				Enable:        true,
+				Interval:      30,
+				CurrencyPairs: []string{"BTC/USD"},
+			})
+			err := or.Initialize(mockHost, mockChild, "init1sender")
+			require.NoError(t, err)
+
+			ctx := types.NewContext(context.Background(), zap.NewNop(), "")
+			err = or.relayOnce(ctx)
+
+			if tc.expectError {
+				require.Error(t, err)
+				if tc.errorContains != "" {
+					require.Contains(t, err.Error(), tc.errorContains)
+				}
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
 }
