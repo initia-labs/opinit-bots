@@ -4,6 +4,8 @@ import (
 	"context"
 	"time"
 
+	ibcclienttypes "github.com/cosmos/ibc-go/v8/modules/core/02-client/types"
+	lightclienttypes "github.com/cosmos/ibc-go/v8/modules/light-clients/07-tendermint"
 	opchildtypes "github.com/initia-labs/OPinit/x/opchild/types"
 
 	"github.com/cosmos/cosmos-sdk/types/query"
@@ -115,4 +117,36 @@ func (b BaseChild) QueryGranteeGrants(botCtx types.Context, grantee string) ([]*
 	}
 
 	return result, nil
+}
+
+// QueryL1ClientID queries the L1 client ID from the child node's bridge info
+func (b BaseChild) QueryL1ClientID(ctx context.Context) (string, error) {
+	bridgeInfo, err := b.QueryBridgeInfo(ctx)
+	if err != nil {
+		return "", err
+	}
+
+	return bridgeInfo.L1ClientId, nil
+}
+
+// QueryLatestRevisionHeight queries the latest revision height from L2 IBC client
+func (b BaseChild) QueryLatestRevisionHeight(ctx context.Context, clientID string) (uint64, error) {
+	req := &ibcclienttypes.QueryClientStateRequest{
+		ClientId: clientID,
+	}
+	ctx, cancel := rpcclient.GetQueryContext(ctx, 0)
+	defer cancel()
+
+	ibcClient := ibcclienttypes.NewQueryClient(b.node.GetRPCClient())
+	res, err := ibcClient.ClientState(ctx, req)
+	if err != nil {
+		return 0, err
+	}
+
+	var clientState lightclienttypes.ClientState
+	if err := clientState.Unmarshal(res.ClientState.GetValue()); err != nil {
+		return 0, err
+	}
+
+	return clientState.GetLatestHeight().GetRevisionHeight(), nil
 }

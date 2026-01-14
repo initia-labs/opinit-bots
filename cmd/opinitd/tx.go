@@ -79,12 +79,17 @@ func txGrantOracleCmd(baseCtx *cmdContext) *cobra.Command {
 				return err
 			}
 
-			grantMsg, err := authz.NewMsgGrant(account.GetAddress(), oracleAddress, authz.NewGenericAuthorization(types.MsgUpdateOracleTypeUrl), nil)
+			grantUpdateMsg, err := authz.NewMsgGrant(account.GetAddress(), oracleAddress, authz.NewGenericAuthorization(types.MsgUpdateOracleTypeUrl), nil)
 			if err != nil {
 				return err
 			}
 
-			msgAllowance, err := feegrant.NewAllowedMsgAllowance(&feegrant.BasicAllowance{}, []string{types.MsgUpdateOracleTypeUrl, types.MsgAuthzExecTypeUrl})
+			grantRelayMsg, err := authz.NewMsgGrant(account.GetAddress(), oracleAddress, authz.NewGenericAuthorization(types.MsgRelayOracleTypeUrl), nil)
+			if err != nil {
+				return err
+			}
+
+			msgAllowance, err := feegrant.NewAllowedMsgAllowance(&feegrant.BasicAllowance{}, []string{types.MsgRelayOracleTypeUrl, types.MsgUpdateOracleTypeUrl, types.MsgAuthzExecTypeUrl})
 			if err != nil {
 				return err
 			}
@@ -94,7 +99,7 @@ func txGrantOracleCmd(baseCtx *cmdContext) *cobra.Command {
 				return err
 			}
 
-			txBytes, _, err := account.BuildTxWithMsgs(ctx, []sdk.Msg{grantMsg, feegrantMsg})
+			txBytes, _, err := account.BuildTxWithMsgs(ctx, []sdk.Msg{grantUpdateMsg, grantRelayMsg, feegrantMsg})
 			if err != nil {
 				return errors.Wrapf(err, "simulation failed")
 			}

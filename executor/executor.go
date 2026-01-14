@@ -9,6 +9,7 @@ import (
 	"github.com/initia-labs/opinit-bots/executor/celestia"
 	"github.com/initia-labs/opinit-bots/executor/child"
 	"github.com/initia-labs/opinit-bots/executor/host"
+	"github.com/initia-labs/opinit-bots/executor/oraclerelay"
 	"github.com/initia-labs/opinit-bots/sentry_integration"
 	"github.com/initia-labs/opinit-bots/server"
 	"github.com/initia-labs/opinit-bots/server/metrics"
@@ -31,6 +32,7 @@ type Executor struct {
 	host           *host.Host
 	child          *child.Child
 	batchSubmitter *batchsubmitter.BatchSubmitter
+	oracleRelay    *oraclerelay.OracleRelay
 
 	cfg    *executortypes.Config
 	db     types.DB
@@ -63,6 +65,7 @@ func NewExecutor(cfg *executortypes.Config, db types.DB, sv *server.Server) *Exe
 			db.WithPrefix([]byte(types.BatchName)),
 			cfg.L2Node.ChainID,
 		),
+		oracleRelay: oraclerelay.NewOracleRelayV1(cfg.OracleRelay),
 
 		cfg:    cfg,
 		db:     db,
@@ -99,7 +102,7 @@ func (ex *Executor) Initialize(ctx types.Context) error {
 
 	hostKeyringConfig, childKeyringConfig, childOracleKeyringConfig, daKeyringConfig := ex.getKeyringConfigs(*bridgeInfo)
 
-	err = ex.host.Initialize(ctx.WithLogger(ctx.Logger().Named("host")), l1StartHeight-1, ex.child, ex.batchSubmitter, *bridgeInfo, hostKeyringConfig)
+	err = ex.host.Initialize(ctx.WithLogger(ctx.Logger().Named("host")), l1StartHeight-1, ex.child, ex.batchSubmitter, *bridgeInfo, hostKeyringConfig, ex.cfg.OracleRelay.Enable)
 	if err != nil {
 		return errors.Wrap(err, "failed to initialize host")
 	}
@@ -117,6 +120,23 @@ func (ex *Executor) Initialize(ctx types.Context) error {
 		return errors.Wrap(err, "failed to make DA node")
 	}
 	ex.batchSubmitter.SetDANode(da)
+
+	if ex.cfg.OracleRelay.Enable {
+		oracleExecutorAddr, err := ex.child.OracleAccountAddressString()
+		if err != nil {
+			ctx.Logger().Warn("failed to get oracle executor address, oracle relay disabled", zap.Error(err))
+		} else {
+			err = ex.oracleRelay.Initialize(ex.host, ex.child, oracleExecutorAddr)
+			if err != nil {
+				return errors.Wrap(err, "failed to initialize oracle relay")
+			}
+			ctx.Logger().Info("oracle relay initialized",
+				zap.String("sender", oracleExecutorAddr),
+				zap.Int64("interval", ex.cfg.OracleRelay.Interval),
+			)
+		}
+	}
+
 	ex.RegisterQuerier(ctx)
 	return nil
 }
@@ -144,6 +164,13 @@ func (ex *Executor) Start(ctx types.Context) error {
 	ex.child.Start(ctx.WithLogger(ctx.Logger().Named("child")))
 	ex.batchSubmitter.Start(ctx.WithLogger(ctx.Logger().Named("batchSubmitter")))
 	ex.batchSubmitter.DA().Start(ctx.WithLogger(ctx.Logger().Named("da")))
+
+	if ex.oracleRelay != nil {
+		ctx.ErrGrp().Go(func() error {
+			return ex.oracleRelay.Start(ctx.WithLogger(ctx.Logger().Named("oracleRelay")))
+		})
+	}
+
 	return ctx.ErrGrp().Wait()
 }
 

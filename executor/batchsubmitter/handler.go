@@ -34,6 +34,11 @@ func (bs *BatchSubmitter) rawBlockHandler(ctx types.Context, args nodetypes.RawB
 		return errors.Wrap(err, "failed to empty oracle data")
 	}
 
+	pbb, err = bs.emptyRelayOracleData(pbb)
+	if err != nil {
+		return errors.Wrap(err, "failed to empty relay oracle data")
+	}
+
 	pbb, err = bs.emptyUpdateClientData(ctx, pbb)
 	if err != nil {
 		return errors.Wrap(err, "failed to empty update client data")

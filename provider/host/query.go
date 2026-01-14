@@ -7,7 +7,10 @@ import (
 	"strings"
 	"time"
 
+	abci "github.com/cometbft/cometbft/abci/types"
 	coretypes "github.com/cometbft/cometbft/rpc/core/types"
+	connecttypes "github.com/skip-mev/connect/v2/pkg/types"
+	oracletypes "github.com/skip-mev/connect/v2/x/oracle/types"
 
 	query "github.com/cosmos/cosmos-sdk/types/query"
 
@@ -227,4 +230,77 @@ func (b BaseHost) QueryDepositTxHeight(botCtx types.Context, bridgeId uint64, l1
 
 func (b BaseHost) QueryBlock(ctx context.Context, height int64) (*coretypes.ResultBlock, error) {
 	return b.node.GetRPCClient().Block(ctx, &height)
+}
+
+// OraclePriceHashWithProof contains oracle price hash and its proof
+type OraclePriceHashWithProof struct {
+	OraclePriceHash ophosttypes.OraclePriceHash
+	Proof           []byte
+	QueryHeight     uint64
+}
+
+// QueryOraclePriceHashWithProof queries L1 x/ophost module for oracle price hash along with proof
+func (b BaseHost) QueryOraclePriceHashWithProof(ctx context.Context, height uint64) (*OraclePriceHashWithProof, error) {
+	// query abci with prove=true from x/ophost module
+	req := abci.RequestQuery{
+		Data:   ophosttypes.OraclePriceHashPrefix,
+		Path:   "/store/ophost/key",
+		Height: int64(height),
+		Prove:  true,
+	}
+	ctx, cancel := rpcclient.GetQueryContext(ctx, 0)
+	defer cancel()
+
+	res, err := b.node.GetRPCClient().QueryABCI(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+
+	var oraclePriceHash ophosttypes.OraclePriceHash
+	if err := oraclePriceHash.Unmarshal(res.GetValue()); err != nil {
+		return nil, errors.Wrap(err, "failed to unmarshal oracle price hash")
+	}
+
+	proofBytes, err := res.ProofOps.Marshal()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to marshal proof")
+	}
+
+	return &OraclePriceHashWithProof{
+		OraclePriceHash: oraclePriceHash,
+		Proof:           proofBytes,
+		QueryHeight:     height,
+	}, nil
+}
+
+// QueryAllCurrencyPairs queries all available currency pairs from L1 Connect Oracle module
+func (b BaseHost) QueryAllCurrencyPairs(ctx context.Context) ([]connecttypes.CurrencyPair, error) {
+	req := &oracletypes.GetAllCurrencyPairsRequest{}
+	ctx, cancel := rpcclient.GetQueryContext(ctx, 0)
+	defer cancel()
+
+	connectClient := oracletypes.NewQueryClient(b.node.GetRPCClient())
+	res, err := connectClient.GetAllCurrencyPairs(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+
+	return res.CurrencyPairs, nil
+}
+
+// QueryOraclePrice queries a single currency pair price from L1 Connect Oracle module
+func (b BaseHost) QueryOraclePrice(ctx context.Context, base, quote string, height int64) (*oracletypes.GetPriceResponse, error) {
+	req := &oracletypes.GetPriceRequest{
+		CurrencyPair: fmt.Sprintf("%s/%s", base, quote),
+	}
+	ctx, cancel := rpcclient.GetQueryContext(ctx, height)
+	defer cancel()
+
+	connectClient := oracletypes.NewQueryClient(b.node.GetRPCClient())
+	res, err := connectClient.GetPrice(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+
+	return res, nil
 }

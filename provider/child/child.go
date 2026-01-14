@@ -215,6 +215,22 @@ func (b BaseChild) BroadcastProcessedMsgs(batch ...btypes.ProcessedMsgs) {
 	}
 }
 
+func (b BaseChild) BroadcastMsgs(msgs []sdk.Msg, sender string) {
+	if len(msgs) == 0 {
+		return
+	}
+	broadcaster := b.node.MustGetBroadcaster()
+
+	processedMsgs := btypes.ProcessedMsgs{
+		Sender:    sender,
+		Msgs:      msgs,
+		Timestamp: types.CurrentNanoTimestamp(),
+		Save:      false, // do not save to db since this is an immediate broadcast
+	}
+
+	broadcaster.BroadcastProcessedMsgs(processedMsgs)
+}
+
 func (b BaseChild) DB() types.DB {
 	return b.node.DB()
 }
