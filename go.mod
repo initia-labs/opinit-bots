@@ -181,6 +181,7 @@ require (
 replace (
 	github.com/gogo/protobuf => github.com/regen-network/protobuf v1.3.3-alpha.regen.1
 
+	// TODO: bump OPinit to proper release once available
 	github.com/initia-labs/OPinit => github.com/initia-labs/OPinit v1.2.5-0.20260107083754-59f065ad85ab
 
 	// node/rpcclient/client.go#32 returns nil with the latest version of grpc.
