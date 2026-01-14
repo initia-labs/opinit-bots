@@ -204,13 +204,22 @@ func (or *OracleRelay) queryAllOraclePrices(ctx types.Context, currencyPairs []c
 			)
 			continue
 		}
+
+		priceData := price.GetPrice()
+		if priceData == nil {
+			ctx.Logger().Warn("price data is nil, skipping",
+				zap.String("currency_pair", fmt.Sprintf("%s/%s", cp.Base, cp.Quote)),
+			)
+			continue
+		}
+
 		prices = append(prices, opchildtypes.OraclePriceData{
 			CurrencyPair:   fmt.Sprintf("%s/%s", cp.Base, cp.Quote),
-			Price:          price.GetPrice().Price.String(),
+			Price:          priceData.Price.String(),
 			Decimals:       price.Decimals,
 			Nonce:          price.Nonce,
 			CurrencyPairId: price.Id,
-			Timestamp:      price.GetPrice().BlockTimestamp.UnixNano(),
+			Timestamp:      priceData.GetBlockTimestamp().UnixNano(),
 		})
 	}
 
