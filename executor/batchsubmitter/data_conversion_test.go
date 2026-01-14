@@ -176,6 +176,307 @@ func TestEmptyOracleData(t *testing.T) {
 	}
 }
 
+func TestEmptyRelayOracleData(t *testing.T) {
+	baseDB, err := db.NewMemDB()
+	require.NoError(t, err)
+
+	batchDB := baseDB.WithPrefix([]byte("test_batch"))
+	appCodec, txConfig, err := childprovider.GetCodec("init")
+	require.NoError(t, err)
+	batchNode := node.NewTestNode(nodetypes.NodeConfig{}, batchDB, appCodec, txConfig, nil, nil)
+
+	batchSubmitter := BatchSubmitter{node: batchNode}
+
+	createAuthzMsg := func(t *testing.T, sender string, msgs []sdk.Msg) *authz.MsgExec {
+		msgsAny := make([]*cdctypes.Any, 0)
+		for _, msg := range msgs {
+			any, err := cdctypes.NewAnyWithValue(msg)
+			require.NoError(t, err)
+			msgsAny = append(msgsAny, any)
+		}
+		return &authz.MsgExec{
+			Grantee: sender,
+			Msgs:    msgsAny,
+		}
+	}
+
+	cases := []struct {
+		name        string
+		txs         [][]sdk.Msg
+		expectedTxs [][]sdk.Msg
+		err         bool
+	}{
+		{
+			name: "relay oracle data with prices and proof",
+			txs: [][]sdk.Msg{
+				{
+					&opchildtypes.MsgRelayOracleData{
+						Sender: "init1hrasklz3tr6s9rls4r8fjuf0k4zuha6w9rude5",
+						OracleData: opchildtypes.OracleData{
+							BridgeId:        1,
+							OraclePriceHash: []byte("price_hash"),
+							Prices: []opchildtypes.OraclePriceData{
+								{CurrencyPair: "BTC/USD", Price: "50000.00", Decimals: 8, Nonce: 1},
+								{CurrencyPair: "ETH/USD", Price: "3000.00", Decimals: 8, Nonce: 1},
+							},
+							L1BlockHeight: 100,
+							L1BlockTime:   1000000000,
+							Proof:         []byte("merkle_proof_data"),
+							ProofHeight:   ibcclienttypes.NewHeight(1, 101),
+						},
+					},
+				},
+			},
+			expectedTxs: [][]sdk.Msg{
+				{
+					&opchildtypes.MsgRelayOracleData{
+						Sender: "init1hrasklz3tr6s9rls4r8fjuf0k4zuha6w9rude5",
+						OracleData: opchildtypes.OracleData{
+							BridgeId:        1,
+							OraclePriceHash: []byte("price_hash"),
+							Prices:          []opchildtypes.OraclePriceData{},
+							L1BlockHeight:   100,
+							L1BlockTime:     1000000000,
+							Proof:           []byte{},
+							ProofHeight:     ibcclienttypes.NewHeight(1, 101),
+						},
+					},
+				},
+			},
+			err: false,
+		},
+		{
+			name: "relay oracle data in authz wrapper",
+			txs: [][]sdk.Msg{
+				{
+					createAuthzMsg(t, "init1z3689ct7pc72yr5an97nsj89dnlefydxwdhcv0", []sdk.Msg{
+						&opchildtypes.MsgRelayOracleData{
+							Sender: "init1hrasklz3tr6s9rls4r8fjuf0k4zuha6w9rude5",
+							OracleData: opchildtypes.OracleData{
+								BridgeId:        1,
+								OraclePriceHash: []byte("price_hash"),
+								Prices: []opchildtypes.OraclePriceData{
+									{CurrencyPair: "BTC/USD", Price: "50000.00", Decimals: 8, Nonce: 1},
+								},
+								L1BlockHeight: 100,
+								L1BlockTime:   1000000000,
+								Proof:         []byte("merkle_proof_data"),
+								ProofHeight:   ibcclienttypes.NewHeight(1, 101),
+							},
+						},
+					}),
+				},
+			},
+			expectedTxs: [][]sdk.Msg{
+				{
+					createAuthzMsg(t, "init1z3689ct7pc72yr5an97nsj89dnlefydxwdhcv0", []sdk.Msg{
+						&opchildtypes.MsgRelayOracleData{
+							Sender: "init1hrasklz3tr6s9rls4r8fjuf0k4zuha6w9rude5",
+							OracleData: opchildtypes.OracleData{
+								BridgeId:        1,
+								OraclePriceHash: []byte("price_hash"),
+								Prices:          []opchildtypes.OraclePriceData{},
+								L1BlockHeight:   100,
+								L1BlockTime:     1000000000,
+								Proof:           []byte{},
+								ProofHeight:     ibcclienttypes.NewHeight(1, 101),
+							},
+						},
+					}),
+				},
+			},
+			err: false,
+		},
+		{
+			name: "mixed txs - only relay oracle data modified",
+			txs: [][]sdk.Msg{
+				{
+					&opchildtypes.MsgFinalizeTokenDeposit{Sender: "init1hrasklz3tr6s9rls4r8fjuf0k4zuha6w9rude5", Data: []byte("token_deposit_data"), Amount: sdk.NewInt64Coin("init", 10), Height: 5},
+				},
+				{
+					&opchildtypes.MsgRelayOracleData{
+						Sender: "init1hrasklz3tr6s9rls4r8fjuf0k4zuha6w9rude5",
+						OracleData: opchildtypes.OracleData{
+							BridgeId:        1,
+							OraclePriceHash: []byte("price_hash"),
+							Prices: []opchildtypes.OraclePriceData{
+								{CurrencyPair: "BTC/USD", Price: "50000.00", Decimals: 8, Nonce: 1},
+							},
+							L1BlockHeight: 100,
+							L1BlockTime:   1000000000,
+							Proof:         []byte("merkle_proof_data"),
+							ProofHeight:   ibcclienttypes.NewHeight(1, 101),
+						},
+					},
+				},
+			},
+			expectedTxs: [][]sdk.Msg{
+				{
+					&opchildtypes.MsgFinalizeTokenDeposit{Sender: "init1hrasklz3tr6s9rls4r8fjuf0k4zuha6w9rude5", Data: []byte("token_deposit_data"), Amount: sdk.NewInt64Coin("init", 10), Height: 5},
+				},
+				{
+					&opchildtypes.MsgRelayOracleData{
+						Sender: "init1hrasklz3tr6s9rls4r8fjuf0k4zuha6w9rude5",
+						OracleData: opchildtypes.OracleData{
+							BridgeId:        1,
+							OraclePriceHash: []byte("price_hash"),
+							Prices:          []opchildtypes.OraclePriceData{},
+							L1BlockHeight:   100,
+							L1BlockTime:     1000000000,
+							Proof:           []byte{},
+							ProofHeight:     ibcclienttypes.NewHeight(1, 101),
+						},
+					},
+				},
+			},
+			err: false,
+		},
+		{
+			name: "multiple relay oracle data in same tx",
+			txs: [][]sdk.Msg{
+				{
+					&opchildtypes.MsgRelayOracleData{
+						Sender: "init1hrasklz3tr6s9rls4r8fjuf0k4zuha6w9rude5",
+						OracleData: opchildtypes.OracleData{
+							BridgeId:        1,
+							OraclePriceHash: []byte("price_hash_1"),
+							Prices: []opchildtypes.OraclePriceData{
+								{CurrencyPair: "BTC/USD", Price: "50000.00", Decimals: 8, Nonce: 1},
+							},
+							L1BlockHeight: 100,
+							L1BlockTime:   1000000000,
+							Proof:         []byte("proof_1"),
+							ProofHeight:   ibcclienttypes.NewHeight(1, 101),
+						},
+					},
+					&opchildtypes.MsgRelayOracleData{
+						Sender: "init1hrasklz3tr6s9rls4r8fjuf0k4zuha6w9rude5",
+						OracleData: opchildtypes.OracleData{
+							BridgeId:        2,
+							OraclePriceHash: []byte("price_hash_2"),
+							Prices: []opchildtypes.OraclePriceData{
+								{CurrencyPair: "ETH/USD", Price: "3000.00", Decimals: 8, Nonce: 1},
+							},
+							L1BlockHeight: 100,
+							L1BlockTime:   1000000000,
+							Proof:         []byte("proof_2"),
+							ProofHeight:   ibcclienttypes.NewHeight(1, 101),
+						},
+					},
+				},
+			},
+			expectedTxs: [][]sdk.Msg{
+				{
+					&opchildtypes.MsgRelayOracleData{
+						Sender: "init1hrasklz3tr6s9rls4r8fjuf0k4zuha6w9rude5",
+						OracleData: opchildtypes.OracleData{
+							BridgeId:        1,
+							OraclePriceHash: []byte("price_hash_1"),
+							Prices:          []opchildtypes.OraclePriceData{},
+							L1BlockHeight:   100,
+							L1BlockTime:     1000000000,
+							Proof:           []byte{},
+							ProofHeight:     ibcclienttypes.NewHeight(1, 101),
+						},
+					},
+					&opchildtypes.MsgRelayOracleData{
+						Sender: "init1hrasklz3tr6s9rls4r8fjuf0k4zuha6w9rude5",
+						OracleData: opchildtypes.OracleData{
+							BridgeId:        2,
+							OraclePriceHash: []byte("price_hash_2"),
+							Prices:          []opchildtypes.OraclePriceData{},
+							L1BlockHeight:   100,
+							L1BlockTime:     1000000000,
+							Proof:           []byte{},
+							ProofHeight:     ibcclienttypes.NewHeight(1, 101),
+						},
+					},
+				},
+			},
+			err: false,
+		},
+		{
+			name:        "no txs",
+			txs:         [][]sdk.Msg{},
+			expectedTxs: [][]sdk.Msg{},
+			err:         false,
+		},
+		{
+			name: "already empty prices and proof",
+			txs: [][]sdk.Msg{
+				{
+					&opchildtypes.MsgRelayOracleData{
+						Sender: "init1hrasklz3tr6s9rls4r8fjuf0k4zuha6w9rude5",
+						OracleData: opchildtypes.OracleData{
+							BridgeId:        1,
+							OraclePriceHash: []byte("price_hash"),
+							Prices:          []opchildtypes.OraclePriceData{},
+							L1BlockHeight:   100,
+							L1BlockTime:     1000000000,
+							Proof:           []byte{},
+							ProofHeight:     ibcclienttypes.NewHeight(1, 101),
+						},
+					},
+				},
+			},
+			expectedTxs: [][]sdk.Msg{
+				{
+					&opchildtypes.MsgRelayOracleData{
+						Sender: "init1hrasklz3tr6s9rls4r8fjuf0k4zuha6w9rude5",
+						OracleData: opchildtypes.OracleData{
+							BridgeId:        1,
+							OraclePriceHash: []byte("price_hash"),
+							Prices:          []opchildtypes.OraclePriceData{},
+							L1BlockHeight:   100,
+							L1BlockTime:     1000000000,
+							Proof:           []byte{},
+							ProofHeight:     ibcclienttypes.NewHeight(1, 101),
+						},
+					},
+				},
+			},
+			err: false,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			txf := tx.Factory{}.WithChainID("test_chain").WithTxConfig(txConfig)
+			pbb := cmtproto.Block{
+				Data: cmtproto.Data{
+					Txs: [][]byte{},
+				},
+			}
+
+			for _, msgs := range tc.txs {
+				txb, err := txf.BuildUnsignedTx(msgs...)
+				require.NoError(t, err)
+				txBytes, err := txutils.EncodeTx(txConfig, txb.GetTx())
+				require.NoError(t, err)
+				pbb.Data.Txs = append(pbb.Data.Txs, txBytes)
+			}
+
+			changedBlock, err := batchSubmitter.emptyRelayOracleData(&pbb)
+			if tc.err {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+
+			changedBlockTxs := changedBlock.Data.GetTxs()
+			require.Len(t, changedBlockTxs, len(tc.expectedTxs))
+
+			for i, txBytes := range changedBlockTxs {
+				tx, err := txutils.DecodeTx(txConfig, txBytes)
+				require.NoError(t, err)
+				for j, actual := range tx.GetMsgs() {
+					require.Equal(t, tc.expectedTxs[i][j].String(), actual.String())
+				}
+			}
+		})
+	}
+}
+
 func TestEmptyUpdateClientData(t *testing.T) {
 	baseDB, err := db.NewMemDB()
 	require.NoError(t, err)
