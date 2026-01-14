@@ -208,6 +208,11 @@ func (cfg *Config) Validate() error {
 	if cfg.BatchStartHeight <= 0 {
 		return errors.New("batch start height must be greater than 0")
 	}
+
+	if err := cfg.OracleRelay.Validate(); err != nil {
+		return errors.Wrap(err, "oracle relay validation error")
+	}
+
 	return nil
 }
 

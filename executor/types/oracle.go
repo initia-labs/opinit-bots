@@ -1,5 +1,9 @@
 package types
 
+import (
+	"github.com/pkg/errors"
+)
+
 // OracleRelayConfig holds the configuration for the oracle relay handler
 type OracleRelayConfig struct {
 	// Enable enables the oracle relay feature
@@ -25,7 +29,7 @@ func DefaultOracleRelayConfig() OracleRelayConfig {
 // Validate validates the oracle relay configuration
 func (cfg OracleRelayConfig) Validate() error {
 	if cfg.Interval <= 0 {
-		return nil // disabled
+		return errors.New("oracle relay interval must be greater than zero")
 	}
 	return nil
 }

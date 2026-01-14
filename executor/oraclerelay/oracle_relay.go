@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/pkg/errors"
@@ -51,6 +52,7 @@ type OracleRelay struct {
 	sender string // sender address for relay messages
 
 	// status info
+	statusMu            sync.RWMutex
 	lastRelayedL1Height uint64
 	lastRelayedTime     time.Time
 }
@@ -228,20 +230,28 @@ func (or *OracleRelay) parseRevisionFromChainID(chainID string) (uint64, error) 
 
 // SetLastRelayedL1Height sets the last relayed L1 height
 func (or *OracleRelay) SetLastRelayedL1Height(height uint64) {
+	or.statusMu.Lock()
+	defer or.statusMu.Unlock()
 	or.lastRelayedL1Height = height
 }
 
 // GetLastRelayedL1Height returns the last relayed L1 height
 func (or *OracleRelay) GetLastRelayedL1Height() uint64 {
+	or.statusMu.RLock()
+	defer or.statusMu.RUnlock()
 	return or.lastRelayedL1Height
 }
 
 // SetLastRelayedTime sets the last relay time
 func (or *OracleRelay) SetLastRelayedTime(t time.Time) {
+	or.statusMu.Lock()
+	defer or.statusMu.Unlock()
 	or.lastRelayedTime = t
 }
 
 // GetLastRelayedTime returns the last relay time
 func (or *OracleRelay) GetLastRelayedTime() time.Time {
+	or.statusMu.RLock()
+	defer or.statusMu.RUnlock()
 	return or.lastRelayedTime
 }

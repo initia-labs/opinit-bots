@@ -260,6 +260,9 @@ func (b BaseHost) QueryOraclePriceHashWithProof(ctx context.Context, height uint
 	if err := oraclePriceHash.Unmarshal(res.GetValue()); err != nil {
 		return nil, errors.Wrap(err, "failed to unmarshal oracle price hash")
 	}
+	if res.ProofOps == nil {
+		return nil, errors.New("proof not available for oracle price hash query")
+	}
 
 	proofBytes, err := res.ProofOps.Marshal()
 	if err != nil {

@@ -125,6 +125,7 @@ func (ex *Executor) Initialize(ctx types.Context) error {
 		oracleExecutorAddr, err := ex.child.OracleAccountAddressString()
 		if err != nil {
 			ctx.Logger().Warn("failed to get oracle executor address, oracle relay disabled", zap.Error(err))
+			ex.oracleRelay = nil
 		} else {
 			err = ex.oracleRelay.Initialize(ex.host, ex.child, oracleExecutorAddr)
 			if err != nil {
