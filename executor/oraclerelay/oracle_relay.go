@@ -125,6 +125,15 @@ func (or *OracleRelay) relayOnce(ctx types.Context) error {
 
 	queryHeight := proofHeight - 1 // query at height-1 to verify against height
 
+	// skip if we already relayed this L1 height (no new oracle data)
+	if queryHeight <= or.GetLastRelayedL1Height() {
+		ctx.Logger().Debug("skipping relay, L1 height unchanged",
+			zap.Uint64("l1_height", queryHeight),
+			zap.Uint64("last_relayed_l1_height", or.GetLastRelayedL1Height()),
+		)
+		return nil
+	}
+
 	ctx.Logger().Debug("querying oracle data",
 		zap.Uint64("proof_height", proofHeight),
 		zap.Uint64("query_height", queryHeight),

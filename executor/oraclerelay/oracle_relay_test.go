@@ -484,6 +484,7 @@ func TestStatusGettersSetters(t *testing.T) {
 	zeroTime := time.Time{}
 	or.SetLastRelayedTime(zeroTime)
 	require.Equal(t, zeroTime, or.GetLastRelayedTime())
+
 }
 
 func TestRelayOnce(t *testing.T) {
@@ -950,4 +951,140 @@ func TestRelayOnceProofHeightEdgeCases(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestDuplicateRelayPrevention(t *testing.T) {
+	createPrice := func(priceVal int64) *oracletypes.GetPriceResponse {
+		return &oracletypes.GetPriceResponse{
+			Price: &oracletypes.QuotePrice{
+				Price:          math.NewInt(priceVal),
+				BlockTimestamp: time.Now(),
+				BlockHeight:    100,
+			},
+			Decimals: 8,
+			Nonce:    1,
+			Id:       1,
+		}
+	}
+
+	t.Run("skip relay when L1 height unchanged", func(t *testing.T) {
+		mockHost := newMockHostNode("test-chain-1", true)
+		mockHost.oraclePrices = map[string]*oracletypes.GetPriceResponse{
+			"BTC/USD": createPrice(5000000000000),
+		}
+		mockHost.oraclePriceHash = &hostprovider.OraclePriceHashWithProof{
+			OraclePriceHash: ophosttypes.OraclePriceHash{
+				Hash:          []byte("test_hash"),
+				L1BlockHeight: 99,
+				L1BlockTime:   1000000000,
+			},
+			Proof:       []byte("test_proof"),
+			QueryHeight: 99,
+		}
+
+		mockChild := newMockChildNode("07-tendermint-0", 100)
+
+		or := NewOracleRelayV1(executortypes.OracleRelayConfig{
+			Enable:        true,
+			Interval:      30,
+			CurrencyPairs: []string{"BTC/USD"},
+		})
+		err := or.Initialize(mockHost, mockChild, "init1sender")
+		require.NoError(t, err)
+
+		ctx := types.NewContext(context.Background(), zap.NewNop(), "")
+
+		// first relay should succeed
+		err = or.relayOnce(ctx)
+		require.NoError(t, err)
+		require.Len(t, mockChild.GetBroadcastedMsgs(), 1)
+		require.Equal(t, uint64(99), or.GetLastRelayedL1Height())
+
+		// second relay with same L1 height should skip
+		err = or.relayOnce(ctx)
+		require.NoError(t, err)
+		require.Len(t, mockChild.GetBroadcastedMsgs(), 1) // still 1, not 2
+	})
+
+	t.Run("relay when L1 height increases", func(t *testing.T) {
+		mockHost := newMockHostNode("test-chain-1", true)
+		mockHost.oraclePrices = map[string]*oracletypes.GetPriceResponse{
+			"BTC/USD": createPrice(5000000000000),
+		}
+		mockHost.oraclePriceHash = &hostprovider.OraclePriceHashWithProof{
+			OraclePriceHash: ophosttypes.OraclePriceHash{
+				Hash:          []byte("test_hash"),
+				L1BlockHeight: 99,
+				L1BlockTime:   1000000000,
+			},
+			Proof:       []byte("test_proof"),
+			QueryHeight: 99,
+		}
+
+		mockChild := newMockChildNode("07-tendermint-0", 100)
+
+		or := NewOracleRelayV1(executortypes.OracleRelayConfig{
+			Enable:        true,
+			Interval:      30,
+			CurrencyPairs: []string{"BTC/USD"},
+		})
+		err := or.Initialize(mockHost, mockChild, "init1sender")
+		require.NoError(t, err)
+
+		ctx := types.NewContext(context.Background(), zap.NewNop(), "")
+
+		// first relay
+		err = or.relayOnce(ctx)
+		require.NoError(t, err)
+		require.Len(t, mockChild.GetBroadcastedMsgs(), 1)
+		require.Equal(t, uint64(99), or.GetLastRelayedL1Height())
+
+		// simulate new oracle data (new L1 height)
+		mockChild.latestRevisionHeight = 101
+		mockHost.oraclePriceHash.QueryHeight = 100
+		mockHost.oraclePriceHash.OraclePriceHash.L1BlockHeight = 100
+
+		// second relay with new L1 height should succeed
+		err = or.relayOnce(ctx)
+		require.NoError(t, err)
+		require.Len(t, mockChild.GetBroadcastedMsgs(), 2)
+		require.Equal(t, uint64(100), or.GetLastRelayedL1Height())
+	})
+
+	t.Run("first relay always proceeds (zero lastRelayedL1Height)", func(t *testing.T) {
+		mockHost := newMockHostNode("test-chain-1", true)
+		mockHost.oraclePrices = map[string]*oracletypes.GetPriceResponse{
+			"BTC/USD": createPrice(5000000000000),
+		}
+		mockHost.oraclePriceHash = &hostprovider.OraclePriceHashWithProof{
+			OraclePriceHash: ophosttypes.OraclePriceHash{
+				Hash:          []byte("test_hash"),
+				L1BlockHeight: 99,
+				L1BlockTime:   1000000000,
+			},
+			Proof:       []byte("test_proof"),
+			QueryHeight: 99,
+		}
+
+		mockChild := newMockChildNode("07-tendermint-0", 100)
+
+		or := NewOracleRelayV1(executortypes.OracleRelayConfig{
+			Enable:        true,
+			Interval:      30,
+			CurrencyPairs: []string{"BTC/USD"},
+		})
+		err := or.Initialize(mockHost, mockChild, "init1sender")
+		require.NoError(t, err)
+
+		// verify initial state
+		require.Equal(t, uint64(0), or.GetLastRelayedL1Height())
+
+		ctx := types.NewContext(context.Background(), zap.NewNop(), "")
+
+		// first relay should succeed
+		err = or.relayOnce(ctx)
+		require.NoError(t, err)
+		require.Len(t, mockChild.GetBroadcastedMsgs(), 1)
+		require.Equal(t, uint64(99), or.GetLastRelayedL1Height())
+	})
 }
