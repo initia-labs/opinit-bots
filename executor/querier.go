@@ -4,9 +4,13 @@ import (
 	"strconv"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/initia-labs/opinit-bots/types"
+	"github.com/gofiber/fiber/v2/middleware/adaptor"
 	"github.com/pkg/errors"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.uber.org/zap"
+
+	"github.com/initia-labs/opinit-bots/server/metrics"
+	"github.com/initia-labs/opinit-bots/types"
 )
 
 func (ex *Executor) RegisterQuerier(ctx types.Context) {
@@ -81,4 +85,9 @@ func (ex *Executor) RegisterQuerier(ctx types.Context) {
 		batchSync := status.BatchSubmitter.Node.Syncing != nil && *status.BatchSubmitter.Node.Syncing
 		return c.JSON(hostSync || childSync || batchSync)
 	})
+
+	ex.server.RegisterQuerier("/metrics", adaptor.HTTPHandler(promhttp.HandlerFor(
+		metrics.CustomRegistry,
+		promhttp.HandlerOpts{},
+	)))
 }
