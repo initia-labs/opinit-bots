@@ -8,7 +8,6 @@ import (
 	cmtproto "github.com/cometbft/cometbft/proto/tendermint/types"
 	coretypes "github.com/cometbft/cometbft/rpc/core/types"
 
-	codectypes "github.com/cosmos/cosmos-sdk/codec/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/x/authz"
 
@@ -84,70 +83,56 @@ func (bs *BatchSubmitter) emptyRelayOracleData(pbb *cmtproto.Block) (*cmtproto.B
 	if len(txs) == 0 {
 		return pbb, nil
 	}
+	txBytes := txs[0]
+
 	txConfig := bs.node.GetTxConfig()
-
-	for txIndex, txBytes := range txs {
-		tx, err := txutils.DecodeTx(txConfig, txBytes)
-		if err != nil {
-			// ignore not registered tx in codec
-			continue
-		}
-
-		msgs := tx.GetMsgs()
-		modified := false
-
-		for msgIndex, msg := range msgs {
-			switch msg := msg.(type) {
-			case *opchildtypes.MsgRelayOracleData:
-				// empty prices array and proof to reduce batch size.
-				// keeping only oracle_price_hash, l1_block_height, l1_block_time, and proof_height.
-				// these fields are sufficient to restore both the prices and proof from L1.
-				msg.OracleData.Prices = []opchildtypes.OraclePriceData{}
-				msg.OracleData.Proof = []byte{}
-				msgs[msgIndex] = msg
-				modified = true
-
-			case *authz.MsgExec:
-				// handle MsgRelayOracleData wrapped in authz.MsgExec
-				if len(msg.Msgs) > 0 {
-					for i, anyMsg := range msg.Msgs {
-						if anyMsg.TypeUrl == "/opinit.opchild.v1.MsgRelayOracleData" {
-							relayMsg := &opchildtypes.MsgRelayOracleData{}
-							err = bs.node.Codec().UnpackAny(anyMsg, &relayMsg)
-							if err != nil {
-								return nil, errors.Wrap(err, "failed to unpack relay oracle msg from authz msg")
-							}
-
-							relayMsg.OracleData.Prices = []opchildtypes.OraclePriceData{}
-							relayMsg.OracleData.Proof = []byte{}
-
-							newAny, err := codectypes.NewAnyWithValue(relayMsg)
-							if err != nil {
-								return nil, errors.Wrap(err, "failed to pack relay oracle msg")
-							}
-							msg.Msgs[i] = newAny
-							modified = true
-						}
-					}
-					if modified {
-						msgs[msgIndex] = msg
-					}
-				}
-			}
-		}
-
-		if modified {
-			tx, err = txutils.ChangeMsgsFromTx(txConfig, tx, msgs)
-			if err != nil {
-				return nil, errors.Wrap(err, "failed to change msgs from tx")
-			}
-			convertedTxBytes, err := txutils.EncodeTx(txConfig, tx)
-			if err != nil {
-				return nil, errors.Wrap(err, "failed to encode tx")
-			}
-			pbb.Data.Txs[txIndex] = convertedTxBytes
-		}
+	tx, err := txutils.DecodeTx(txConfig, txBytes)
+	if err != nil {
+		// ignore not registered tx in codec
+		return pbb, nil
 	}
+
+	msgs := tx.GetMsgs()
+	// relay oracle tx has only one message
+	if len(msgs) != 1 {
+		return pbb, nil
+	}
+
+	switch msg := msgs[0].(type) {
+	case *opchildtypes.MsgRelayOracleData:
+		// empty prices array and proof to reduce batch size.
+		// keeping only oracle_price_hash, l1_block_height, l1_block_time, and proof_height.
+		// these fields are sufficient to restore both the prices and proof from L1.
+		msg.OracleData.Prices = []opchildtypes.OraclePriceData{}
+		msg.OracleData.Proof = []byte{}
+	case *authz.MsgExec:
+		if len(msg.Msgs) != 1 || msg.Msgs[0].TypeUrl != "/opinit.opchild.v1.MsgRelayOracleData" {
+			return pbb, nil
+		}
+		relayMsg := &opchildtypes.MsgRelayOracleData{}
+		err = bs.node.Codec().UnpackAny(msg.Msgs[0], &relayMsg)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to unpack relay oracle msg from authz msg")
+		}
+		relayMsg.OracleData.Prices = []opchildtypes.OraclePriceData{}
+		relayMsg.OracleData.Proof = []byte{}
+		msgs[0], err = childprovider.CreateAuthzMsg(msg.Grantee, relayMsg)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to create authz msg")
+		}
+	default:
+		return pbb, nil
+	}
+
+	tx, err = txutils.ChangeMsgsFromTx(txConfig, tx, []sdk.Msg{msgs[0]})
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to change msgs from tx")
+	}
+	convertedTxBytes, err := txutils.EncodeTx(txConfig, tx)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to encode tx")
+	}
+	pbb.Data.Txs[0] = convertedTxBytes
 
 	return pbb, nil
 }
