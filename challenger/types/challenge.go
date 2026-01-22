@@ -56,6 +56,8 @@ func UnmarshalChallengeEvent(eventType EventType, data []byte) (ChallengeEvent, 
 		event = &Output{}
 	case EventTypeOracle:
 		event = &Oracle{}
+	case EventTypeOracleRelay:
+		event = &OracleRelay{}
 	default:
 		return nil, fmt.Errorf("invalid event type: %d", eventType)
 	}
@@ -71,10 +73,11 @@ const (
 	EventTypeDeposit EventType = iota
 	EventTypeOutput
 	EventTypeOracle
+	EventTypeOracleRelay
 )
 
 func (e EventType) Validate() error {
-	if e != EventTypeDeposit && e != EventTypeOutput && e != EventTypeOracle {
+	if e != EventTypeDeposit && e != EventTypeOutput && e != EventTypeOracle && e != EventTypeOracleRelay {
 		return fmt.Errorf("invalid event type: %d", e)
 	}
 	return nil
@@ -88,6 +91,8 @@ func (e EventType) String() string {
 		return "Output"
 	case EventTypeOracle:
 		return "Oracle"
+	case EventTypeOracleRelay:
+		return "OracleRelay"
 	default:
 		return "Unknown"
 	}
@@ -294,5 +299,70 @@ func (o *Oracle) SetTimeout() {
 }
 
 func (o Oracle) IsTimeout() bool {
+	return o.Timeout
+}
+
+// OracleRelay represents an oracle relay event using OraclePriceHash for verification
+type OracleRelay struct {
+	EventType       string    `json:"event_type"`
+	L1Height        int64     `json:"l1_height"`
+	OraclePriceHash []byte    `json:"oracle_price_hash"`
+	Time            time.Time `json:"time"`
+	Timeout         bool      `json:"timeout"`
+}
+
+var _ ChallengeEvent = &OracleRelay{}
+
+func NewOracleRelay(l1Height int64, oraclePriceHash []byte, time time.Time) *OracleRelay {
+	o := &OracleRelay{
+		L1Height:        l1Height,
+		OraclePriceHash: oraclePriceHash,
+		Time:            time,
+	}
+	o.EventType = o.Type().String()
+	return o
+}
+
+func (o OracleRelay) Marshal() ([]byte, error) {
+	return json.Marshal(&o)
+}
+
+func (o *OracleRelay) Unmarshal(data []byte) error {
+	return json.Unmarshal(data, o)
+}
+
+func (o OracleRelay) Equal(another ChallengeEvent) (bool, error) {
+	anotherOracleRelay, ok := another.(*OracleRelay)
+	if !ok {
+		return false, fmt.Errorf("invalid type: %T", another)
+	}
+	return o.L1Height == anotherOracleRelay.L1Height &&
+		bytes.Equal(o.OraclePriceHash, anotherOracleRelay.OraclePriceHash), nil
+}
+
+func (o OracleRelay) String() string {
+	return fmt.Sprintf("OracleRelay{L1Height: %d, OraclePriceHash: %s, Time: %s}", o.L1Height, base64.RawStdEncoding.EncodeToString(o.OraclePriceHash), o.Time)
+}
+
+func (o OracleRelay) Type() EventType {
+	return EventTypeOracleRelay
+}
+
+func (o OracleRelay) EventTime() time.Time {
+	return o.Time
+}
+
+func (o OracleRelay) Id() ChallengeId {
+	return ChallengeId{
+		Type: EventTypeOracleRelay,
+		Id:   types.MustInt64ToUint64(o.L1Height),
+	}
+}
+
+func (o *OracleRelay) SetTimeout() {
+	o.Timeout = true
+}
+
+func (o OracleRelay) IsTimeout() bool {
 	return o.Timeout
 }

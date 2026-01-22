@@ -1,6 +1,7 @@
 package host
 
 import (
+	"context"
 	"time"
 
 	comettypes "github.com/cometbft/cometbft/types"
@@ -21,6 +22,38 @@ func (h *Host) oracleTxHandler(blockHeight int64, blockTime time.Time, oracleDat
 	oracle := challengertypes.NewOracle(blockHeight, checksum, blockTime)
 
 	h.eventQueue = append(h.eventQueue, oracle)
+}
+
+func (h *Host) oracleRelayHandler(ctx context.Context, blockHeight int64, blockTime time.Time) error {
+	if !h.OracleEnabled() {
+		return nil
+	}
+
+	// query OraclePriceHash from x/ophost module state at previous height
+	// state at height H is available after block H is committed
+	queryHeight := uint64(blockHeight - 1)
+	if blockHeight <= 1 {
+		return nil
+	}
+
+	oraclePriceHashData, err := h.QueryOraclePriceHashWithProof(ctx, queryHeight)
+	if err != nil {
+		// OraclePriceHash may not exist yet, skip silently
+		return nil
+	}
+
+	if oraclePriceHashData == nil || len(oraclePriceHashData.OraclePriceHash.Hash) == 0 {
+		return nil
+	}
+
+	oracleRelay := challengertypes.NewOracleRelay(
+		types.MustUint64ToInt64(oraclePriceHashData.OraclePriceHash.L1BlockHeight),
+		oraclePriceHashData.OraclePriceHash.Hash,
+		blockTime,
+	)
+
+	h.eventQueue = append(h.eventQueue, oracleRelay)
+	return nil
 }
 
 func (h *Host) updateOracleConfigHandler(ctx types.Context, args nodetypes.EventHandlerArgs) error {

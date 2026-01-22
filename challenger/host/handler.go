@@ -1,6 +1,8 @@
 package host
 
 import (
+	"go.uber.org/zap"
+
 	challengerdb "github.com/initia-labs/opinit-bots/challenger/db"
 	"github.com/initia-labs/opinit-bots/challenger/eventhandler"
 	challengertypes "github.com/initia-labs/opinit-bots/challenger/types"
@@ -79,9 +81,13 @@ func (h *Host) endBlockHandler(_ types.Context, args nodetypes.EndBlockArgs) err
 	return nil
 }
 
-func (h *Host) txHandler(_ types.Context, args nodetypes.TxHandlerArgs) error {
+func (h *Host) txHandler(ctx types.Context, args nodetypes.TxHandlerArgs) error {
 	if args.TxIndex == 0 {
 		h.oracleTxHandler(args.BlockHeight, args.BlockTime, args.Tx)
+
+		if err := h.oracleRelayHandler(ctx, args.BlockHeight, args.BlockTime); err != nil {
+			ctx.Logger().Warn("failed to capture oracle price hash", zap.Error(err))
+		}
 	}
 	return nil
 }

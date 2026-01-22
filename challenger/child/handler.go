@@ -117,32 +117,33 @@ func (ch *Child) txHandler(ctx types.Context, args nodetypes.TxHandlerArgs) erro
 		return nil
 	}
 
-	var msgSender string
-	var msgHeight int64
-	var msgData []byte
-
 	switch msg := msgs[0].(type) {
 	case *opchildtypes.MsgUpdateOracle:
-		msgSender = msg.Sender
-		msgHeight = types.MustUint64ToInt64(msg.Height)
-		msgData = msg.Data
+		ch.oracleTxHandler(ctx, args.BlockTime, msg.Sender, types.MustUint64ToInt64(msg.Height), msg.Data)
+	case *opchildtypes.MsgRelayOracleData:
+		ch.oracleRelayTxHandler(ctx, args.BlockTime, msg.Sender, msg.OracleData)
 	case *authz.MsgExec:
-		msgSender = msg.Grantee
-
-		if len(msg.Msgs) != 1 || msg.Msgs[0].TypeUrl != "/opinit.opchild.v1.MsgUpdateOracle" {
+		if len(msg.Msgs) != 1 {
 			return nil
 		}
-		oracleMsg := new(opchildtypes.MsgUpdateOracle)
-		err = oracleMsg.Unmarshal(msg.Msgs[0].Value)
-		if err != nil {
-			return err
+
+		switch msg.Msgs[0].TypeUrl {
+		case "/opinit.opchild.v1.MsgUpdateOracle":
+			oracleMsg := new(opchildtypes.MsgUpdateOracle)
+			err = oracleMsg.Unmarshal(msg.Msgs[0].Value)
+			if err != nil {
+				return err
+			}
+			ch.oracleTxHandler(ctx, args.BlockTime, msg.Grantee, types.MustUint64ToInt64(oracleMsg.Height), oracleMsg.Data)
+		case "/opinit.opchild.v1.MsgRelayOracleData":
+			relayMsg := new(opchildtypes.MsgRelayOracleData)
+			err = relayMsg.Unmarshal(msg.Msgs[0].Value)
+			if err != nil {
+				return err
+			}
+			ch.oracleRelayTxHandler(ctx, args.BlockTime, msg.Grantee, relayMsg.OracleData)
 		}
-		msgHeight = types.MustUint64ToInt64(oracleMsg.Height)
-		msgData = oracleMsg.Data
-	default:
-		return nil
 	}
 
-	ch.oracleTxHandler(ctx, args.BlockTime, msgSender, msgHeight, msgData)
 	return nil
 }

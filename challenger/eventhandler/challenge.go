@@ -43,6 +43,12 @@ func (ch *ChallengeEventHandler) CheckValue(ctx types.Context, events []challeng
 			oracleEvents := ch.getOraclePendingEvents(event.Id().Id)
 			processedEvents = append(processedEvents, oracleEvents...)
 		}
+
+		// clearing pending oracle relay events up to l1 height of the last oracle relay event
+		if event.Type() == challengertypes.EventTypeOracleRelay {
+			oracleRelayEvents := ch.getOracleRelayPendingEvents(event.Id().Id)
+			processedEvents = append(processedEvents, oracleRelayEvents...)
+		}
 	}
 
 	return challenges, processedEvents, nil
