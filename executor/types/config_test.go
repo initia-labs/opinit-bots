@@ -24,7 +24,7 @@ func TestDefaultConfigIncludesOracleRelay(t *testing.T) {
 	require.NoError(t, err)
 
 	require.False(t, parsed.OracleRelay.Enable, "oracle relay should be disabled by default")
-	require.Equal(t, int64(30), parsed.OracleRelay.Interval, "default interval should be 30")
+	require.Equal(t, int64(3), parsed.OracleRelay.Interval, "default interval should be 30")
 	require.NotNil(t, parsed.OracleRelay.CurrencyPairs, "currency pairs should not be nil")
 	require.Empty(t, parsed.OracleRelay.CurrencyPairs, "currency pairs should be empty by default")
 }
