@@ -21,7 +21,7 @@ type OracleRelayConfig struct {
 func DefaultOracleRelayConfig() OracleRelayConfig {
 	return OracleRelayConfig{
 		Enable:        false,
-		Interval:      30,
+		Interval:      3,
 		CurrencyPairs: []string{}, // empty means relay all currency pairs
 	}
 }
