@@ -11,6 +11,8 @@ import (
 	"github.com/cosmos/cosmos-sdk/x/auth"
 	"github.com/cosmos/cosmos-sdk/x/authz"
 
+	"cosmossdk.io/x/feegrant"
+
 	"github.com/initia-labs/OPinit/x/opchild"
 	opchildtypes "github.com/initia-labs/OPinit/x/opchild/types"
 	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
@@ -94,6 +96,7 @@ func GetCodec(bech32Prefix string) (codec.Codec, client.TxConfig, error) {
 	_, codec, txConfig, err := keys.CreateCodec([]keys.RegisterInterfaces{
 		auth.AppModuleBasic{}.RegisterInterfaces,
 		authz.RegisterInterfaces,
+		feegrant.RegisterInterfaces,
 		ibcclienttypes.RegisterInterfaces,
 		ibctmlightclients.RegisterInterfaces,
 		opchild.AppModuleBasic{}.RegisterInterfaces,
