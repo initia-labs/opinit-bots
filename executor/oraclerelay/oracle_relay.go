@@ -32,7 +32,7 @@ type hostNode interface {
 	OracleEnabled() bool
 	QueryOraclePriceHashWithProof(context.Context, uint64) (*hostprovider.OraclePriceHashWithProof, error)
 	QueryAllCurrencyPairs(context.Context) ([]connecttypes.CurrencyPair, error)
-	QueryOraclePrice(context.Context, string, string, int64) (*oracletypes.GetPriceResponse, error)
+	QueryOraclePrices(context.Context, []string, int64) ([]oracletypes.GetPriceResponse, error)
 }
 
 // childNode defines the interface for L2 operations needed by oracle relay
@@ -202,37 +202,37 @@ func (or *OracleRelay) relayOnce(ctx types.Context) error {
 
 // queryAllOraclePrices queries all currency pair prices from L1 and transforms them to executor types
 func (or *OracleRelay) queryAllOraclePrices(ctx types.Context, currencyPairs []connecttypes.CurrencyPair, height int64) ([]opchildtypes.OraclePriceData, error) {
-	prices := make([]opchildtypes.OraclePriceData, 0, len(currencyPairs))
+	currencyPairIds := make([]string, len(currencyPairs))
+	for idx, cp := range currencyPairs {
+		currencyPairIds[idx] = cp.String()
+	}
 
-	for _, cp := range currencyPairs {
-		price, err := or.host.QueryOraclePrice(ctx, cp.Base, cp.Quote, height)
-		if err != nil {
-			ctx.Logger().Warn("failed to query price, skipping",
-				zap.String("currency_pair", fmt.Sprintf("%s/%s", cp.Base, cp.Quote)),
-				zap.Error(err),
-			)
-			continue
-		}
+	prices, err := or.host.QueryOraclePrices(ctx, currencyPairIds, height)
+	if err != nil {
+		ctx.Logger().Error("failed to query prices", zap.Error(err))
+		return nil, err
+	}
 
-		priceData := price.GetPrice()
-		if priceData == nil {
-			ctx.Logger().Warn("price data is nil, skipping",
-				zap.String("currency_pair", fmt.Sprintf("%s/%s", cp.Base, cp.Quote)),
-			)
-			continue
-		}
+	if len(prices) != len(currencyPairIds) {
+		return nil, fmt.Errorf("oracle price count mismatch: got %d, expected %d",
+			len(prices), len(currencyPairIds))
+	}
 
-		prices = append(prices, opchildtypes.OraclePriceData{
-			CurrencyPair:   fmt.Sprintf("%s/%s", cp.Base, cp.Quote),
-			Price:          priceData.Price.String(),
+	priceDatas := make([]opchildtypes.OraclePriceData, len(prices))
+
+	for idx, price := range prices {
+		quotePrice := price.GetPrice()
+		priceDatas[idx] = opchildtypes.OraclePriceData{
+			CurrencyPair:   currencyPairIds[idx],
+			Price:          quotePrice.Price.String(),
 			Decimals:       price.Decimals,
 			Nonce:          price.Nonce,
 			CurrencyPairId: price.Id,
-			Timestamp:      priceData.GetBlockTimestamp().UnixNano(),
-		})
+			Timestamp:      quotePrice.GetBlockTimestamp().UnixNano(),
+		}
 	}
 
-	return prices, nil
+	return priceDatas, nil
 }
 
 // parseRevisionFromChainID extracts the revision number from chain ID, e.g. "interwoven-1" -> 1

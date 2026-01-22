@@ -291,19 +291,19 @@ func (b BaseHost) QueryAllCurrencyPairs(ctx context.Context) ([]connecttypes.Cur
 	return res.CurrencyPairs, nil
 }
 
-// QueryOraclePrice queries a single currency pair price from L1 Connect Oracle module
-func (b BaseHost) QueryOraclePrice(ctx context.Context, base, quote string, height int64) (*oracletypes.GetPriceResponse, error) {
-	req := &oracletypes.GetPriceRequest{
-		CurrencyPair: fmt.Sprintf("%s/%s", base, quote),
+// QueryOraclePrices queries a single currency pair price from L1 Connect Oracle module
+func (b BaseHost) QueryOraclePrices(ctx context.Context, currencyIds []string, height int64) ([]oracletypes.GetPriceResponse, error) {
+	req := &oracletypes.GetPricesRequest{
+		CurrencyPairIds: currencyIds,
 	}
 	ctx, cancel := rpcclient.GetQueryContext(ctx, height)
 	defer cancel()
 
 	connectClient := oracletypes.NewQueryClient(b.node.GetRPCClient())
-	res, err := connectClient.GetPrice(ctx, req)
+	res, err := connectClient.GetPrices(ctx, req)
 	if err != nil {
 		return nil, err
 	}
 
-	return res, nil
+	return res.GetPrices(), nil
 }
