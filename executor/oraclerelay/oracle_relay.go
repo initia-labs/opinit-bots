@@ -16,13 +16,12 @@ import (
 	coretypes "github.com/cometbft/cometbft/rpc/core/types"
 	cmtypes "github.com/cometbft/cometbft/types"
 	codectypes "github.com/cosmos/cosmos-sdk/codec/types"
+	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/x/authz"
 	clienttypes "github.com/cosmos/ibc-go/v8/modules/core/02-client/types"
 	ibctmlightclients "github.com/cosmos/ibc-go/v8/modules/light-clients/07-tendermint"
 	connecttypes "github.com/skip-mev/connect/v2/pkg/types"
 	oracletypes "github.com/skip-mev/connect/v2/x/oracle/types"
-
-	sdk "github.com/cosmos/cosmos-sdk/types"
 
 	opchildtypes "github.com/initia-labs/OPinit/x/opchild/types"
 	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
@@ -82,6 +81,7 @@ func (or *OracleRelay) Initialize(host hostNode, child childNode, sender string)
 	or.host = host
 	or.child = child
 	or.sender = sender
+
 	return nil
 }
 
@@ -303,6 +303,7 @@ func (or *OracleRelay) parseRevisionFromChainID(chainID string) (uint64, error) 
 			return rev, nil
 		}
 	}
+
 	return 0, fmt.Errorf("cannot find revision from chain id %s", chainID)
 }
 
@@ -310,6 +311,7 @@ func (or *OracleRelay) parseRevisionFromChainID(chainID string) (uint64, error) 
 func (or *OracleRelay) SetLastRelayedL1Height(height uint64) {
 	or.statusMu.Lock()
 	defer or.statusMu.Unlock()
+
 	or.lastRelayedL1Height = height
 }
 
@@ -317,6 +319,7 @@ func (or *OracleRelay) SetLastRelayedL1Height(height uint64) {
 func (or *OracleRelay) GetLastRelayedL1Height() uint64 {
 	or.statusMu.RLock()
 	defer or.statusMu.RUnlock()
+
 	return or.lastRelayedL1Height
 }
 
@@ -324,6 +327,7 @@ func (or *OracleRelay) GetLastRelayedL1Height() uint64 {
 func (or *OracleRelay) SetLastRelayedTime(t time.Time) {
 	or.statusMu.Lock()
 	defer or.statusMu.Unlock()
+
 	or.lastRelayedTime = t
 }
 
@@ -331,6 +335,7 @@ func (or *OracleRelay) SetLastRelayedTime(t time.Time) {
 func (or *OracleRelay) GetLastRelayedTime() time.Time {
 	or.statusMu.RLock()
 	defer or.statusMu.RUnlock()
+
 	return or.lastRelayedTime
 }
 
