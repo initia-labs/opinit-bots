@@ -94,7 +94,6 @@ func (or *OracleRelay) Start(ctx types.Context) error {
 
 	ctx.Logger().Info("starting oracle relay handler",
 		zap.Int64("interval", or.cfg.Interval),
-		zap.Strings("currency_pairs", or.cfg.CurrencyPairs),
 	)
 
 	ticker := time.NewTicker(time.Duration(or.cfg.Interval) * time.Second)
@@ -196,22 +195,9 @@ func (or *OracleRelay) relayOnce(ctx types.Context) error {
 		return nil
 	}
 
-	var currencyPairs []connecttypes.CurrencyPair
-	if len(or.cfg.CurrencyPairs) == 0 {
-		currencyPairs, err = or.host.QueryAllCurrencyPairs(ctx)
-		if err != nil {
-			return errors.Wrap(err, "failed to query currency pairs")
-		}
-	} else {
-		for _, cp := range or.cfg.CurrencyPairs {
-			parts := strings.Split(cp, "/")
-			if len(parts) == 2 {
-				currencyPairs = append(currencyPairs, connecttypes.CurrencyPair{
-					Base:  parts[0],
-					Quote: parts[1],
-				})
-			}
-		}
+	currencyPairs, err := or.host.QueryAllCurrencyPairs(ctx)
+	if err != nil {
+		return errors.Wrap(err, "failed to query currency pairs")
 	}
 
 	prices, err := or.queryAllOraclePrices(ctx, currencyPairs, int64(queryHeight))

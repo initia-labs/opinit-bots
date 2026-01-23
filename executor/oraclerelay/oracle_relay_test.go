@@ -527,9 +527,8 @@ func TestInitialize(t *testing.T) {
 
 func TestNewOracleRelayV1(t *testing.T) {
 	cfg := executortypes.OracleRelayConfig{
-		Enable:        true,
-		Interval:      60,
-		CurrencyPairs: []string{"BTC/USD", "ETH/USD"},
+		Enable:   true,
+		Interval: 60,
 	}
 
 	or := NewOracleRelayV1(cfg)
@@ -580,7 +579,6 @@ func TestRelayOnce(t *testing.T) {
 		chainID           string
 		l1ClientID        string
 		revisionHeight    uint64
-		currencyPairs     []string
 		hostCurrencyPairs []connecttypes.CurrencyPair
 		prices            map[string]oracletypes.GetPriceResponse
 		oraclePriceHash   *hostprovider.OraclePriceHashWithProof
@@ -652,7 +650,6 @@ func TestRelayOnce(t *testing.T) {
 			chainID:          "test-chain-1",
 			l1ClientID:       "07-tendermint-0",
 			revisionHeight:   100,
-			currencyPairs:    []string{},
 			queryCurrencyErr: context.DeadlineExceeded,
 			oraclePriceHash: &hostprovider.OraclePriceHashWithProof{
 				OraclePriceHash: ophosttypes.OraclePriceHash{
@@ -672,8 +669,10 @@ func TestRelayOnce(t *testing.T) {
 			chainID:        "test-chain-1",
 			l1ClientID:     "07-tendermint-0",
 			revisionHeight: 100,
-			currencyPairs:  []string{"BTC/USD"},
-			prices:         map[string]oracletypes.GetPriceResponse{},
+			hostCurrencyPairs: []connecttypes.CurrencyPair{
+				{Base: "BTC", Quote: "USD"},
+			},
+			prices: map[string]oracletypes.GetPriceResponse{},
 			oraclePriceHash: &hostprovider.OraclePriceHashWithProof{
 				OraclePriceHash: ophosttypes.OraclePriceHash{
 					Hash:          []byte("test_hash"),
@@ -687,12 +686,15 @@ func TestRelayOnce(t *testing.T) {
 			errorContains: "oracle price count mismatch",
 		},
 		{
-			name:           "successful relay with configured currency pairs",
+			name:           "successful relay with multiple currency pairs",
 			oracleEnabled:  true,
 			chainID:        "test-chain-1",
 			l1ClientID:     "07-tendermint-0",
 			revisionHeight: 100,
-			currencyPairs:  []string{"BTC/USD", "ETH/USD"},
+			hostCurrencyPairs: []connecttypes.CurrencyPair{
+				{Base: "BTC", Quote: "USD"},
+				{Base: "ETH", Quote: "USD"},
+			},
 			prices: map[string]oracletypes.GetPriceResponse{
 				"BTC/USD": createPrice(5000000000000, 8, 1, 1, time.Now()),
 				"ETH/USD": createPrice(300000000000, 8, 1, 2, time.Now()),
@@ -709,12 +711,11 @@ func TestRelayOnce(t *testing.T) {
 			expectError: false,
 		},
 		{
-			name:           "successful relay with L1 currency pairs",
+			name:           "successful relay with single currency pair",
 			oracleEnabled:  true,
 			chainID:        "test-chain-1",
 			l1ClientID:     "07-tendermint-0",
 			revisionHeight: 100,
-			currencyPairs:  []string{},
 			hostCurrencyPairs: []connecttypes.CurrencyPair{
 				{Base: "BTC", Quote: "USD"},
 			},
@@ -751,9 +752,8 @@ func TestRelayOnce(t *testing.T) {
 			mockChild.queryRevisionErr = tc.queryRevisionErr
 
 			or := NewOracleRelayV1(executortypes.OracleRelayConfig{
-				Enable:        true,
-				Interval:      30,
-				CurrencyPairs: tc.currencyPairs,
+				Enable:   true,
+				Interval: 30,
 			})
 			err := or.Initialize(mockHost, mockChild, "init1hrasklz3tr6s9rls4r8fjuf0k4zuha6w9rude5")
 			require.NoError(t, err)
@@ -796,11 +796,10 @@ func TestOracleRelayConfigValidate(t *testing.T) {
 			expectError: false,
 		},
 		{
-			name: "valid config with currency pairs",
+			name: "valid config with custom interval",
 			config: executortypes.OracleRelayConfig{
-				Enable:        true,
-				Interval:      60,
-				CurrencyPairs: []string{"BTC/USD", "ETH/USD"},
+				Enable:   true,
+				Interval: 60,
 			},
 			expectError: false,
 		},
@@ -842,122 +841,6 @@ func TestOracleRelayConfigValidate(t *testing.T) {
 				require.Error(t, err)
 			} else {
 				require.NoError(t, err)
-			}
-		})
-	}
-}
-
-func TestCurrencyPairParsing(t *testing.T) {
-	ctx := types.NewContext(context.Background(), zap.NewNop(), "")
-
-	createPrice := func(priceVal int64) oracletypes.GetPriceResponse {
-		return oracletypes.GetPriceResponse{
-			Price: &oracletypes.QuotePrice{
-				Price:          math.NewInt(priceVal),
-				BlockTimestamp: time.Now(),
-				BlockHeight:    100,
-			},
-			Decimals: 8,
-			Nonce:    1,
-			Id:       1,
-		}
-	}
-
-	cases := []struct {
-		name          string
-		currencyPairs []string
-		prices        map[string]oracletypes.GetPriceResponse
-		expectError   bool
-	}{
-		{
-			name:          "valid currency pairs",
-			currencyPairs: []string{"BTC/USD", "ETH/USD", "ATOM/USD"},
-			prices: map[string]oracletypes.GetPriceResponse{
-				"BTC/USD":  createPrice(5000000000000),
-				"ETH/USD":  createPrice(300000000000),
-				"ATOM/USD": createPrice(1000000000),
-			},
-			expectError: false,
-		},
-		{
-			name:          "invalid currency pair format ignored",
-			currencyPairs: []string{"BTC/USD", "INVALID", "ETH-USD", "ATOM/USD"},
-			prices: map[string]oracletypes.GetPriceResponse{
-				"BTC/USD":  createPrice(5000000000000),
-				"ATOM/USD": createPrice(1000000000),
-			},
-			expectError: false, // filtered to 2 valid pairs, 2 prices available - success
-		},
-		{
-			name:          "all invalid formats",
-			currencyPairs: []string{"INVALID", "ALSO-INVALID", "NOSLASH"},
-			prices:        map[string]oracletypes.GetPriceResponse{},
-			expectError:   true, // 0 valid pairs results in "no oracle prices retrieved" error
-		},
-		{
-			name:          "empty string in pairs",
-			currencyPairs: []string{"BTC/USD", "", "ETH/USD"},
-			prices: map[string]oracletypes.GetPriceResponse{
-				"BTC/USD": createPrice(5000000000000),
-				"ETH/USD": createPrice(300000000000),
-			},
-			expectError: false, // filtered to 2 valid pairs, 2 prices available - success
-		},
-		{
-			name:          "currency pair with extra slashes",
-			currencyPairs: []string{"BTC/USD/EXTRA", "ETH/USD"},
-			prices: map[string]oracletypes.GetPriceResponse{
-				"ETH/USD": createPrice(300000000000),
-			},
-			expectError: false, // filtered to 1 valid pair, 1 price available - success
-		},
-		{
-			name:          "single valid currency pair",
-			currencyPairs: []string{"ETH/USD"},
-			prices: map[string]oracletypes.GetPriceResponse{
-				"ETH/USD": createPrice(300000000000),
-			},
-			expectError: false,
-		},
-	}
-
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			unlock := keys.SetSDKConfigContext("init")
-			defer unlock()
-
-			mockHost := newMockHostNode("test-chain-1", true)
-			mockHost.oraclePrices = tc.prices
-			mockHost.oraclePriceHash = &hostprovider.OraclePriceHashWithProof{
-				OraclePriceHash: ophosttypes.OraclePriceHash{
-					Hash:          []byte("test_hash"),
-					L1BlockHeight: 99,
-					L1BlockTime:   1000000000,
-				},
-				Proof:       []byte("test_proof"),
-				QueryHeight: 99,
-			}
-
-			mockChild := newMockChildNode("07-tendermint-0", 100)
-
-			or := NewOracleRelayV1(executortypes.OracleRelayConfig{
-				Enable:        true,
-				Interval:      30,
-				CurrencyPairs: tc.currencyPairs,
-			})
-			err := or.Initialize(mockHost, mockChild, "init1hrasklz3tr6s9rls4r8fjuf0k4zuha6w9rude5")
-			require.NoError(t, err)
-
-			// attempting relayOnce and checking how many messages were broadcast
-			err = or.relayOnce(ctx)
-
-			if tc.expectError {
-				require.Error(t, err)
-			} else {
-				require.NoError(t, err)
-				msgs := mockChild.GetBroadcastedMsgs()
-				// Always 2 messages: MsgUpdateClient + MsgExec
-				require.Len(t, msgs, 2)
 			}
 		})
 	}
@@ -1008,6 +891,7 @@ func TestRelayOnceProofHeightEdgeCases(t *testing.T) {
 			mockHost := newMockHostNode("test-chain-1", true)
 			mockHost.latestHeight = int64(tc.revisionHeight)
 			mockHost.commit = createMockCommit(int64(tc.revisionHeight))
+			mockHost.currencyPairs = []connecttypes.CurrencyPair{{Base: "BTC", Quote: "USD"}}
 			mockHost.oraclePrices = map[string]oracletypes.GetPriceResponse{
 				"BTC/USD": createPrice(5000000000000),
 			}
@@ -1024,9 +908,8 @@ func TestRelayOnceProofHeightEdgeCases(t *testing.T) {
 			mockChild := newMockChildNode("07-tendermint-0", tc.revisionHeight)
 
 			or := NewOracleRelayV1(executortypes.OracleRelayConfig{
-				Enable:        true,
-				Interval:      30,
-				CurrencyPairs: []string{"BTC/USD"},
+				Enable:   true,
+				Interval: 30,
 			})
 			err := or.Initialize(mockHost, mockChild, "init1hrasklz3tr6s9rls4r8fjuf0k4zuha6w9rude5")
 			require.NoError(t, err)
@@ -1067,6 +950,7 @@ func TestDuplicateRelayPrevention(t *testing.T) {
 		mockHost := newMockHostNode("test-chain-1", true)
 		mockHost.latestHeight = 100
 		mockHost.commit = createMockCommit(100)
+		mockHost.currencyPairs = []connecttypes.CurrencyPair{{Base: "BTC", Quote: "USD"}}
 		mockHost.oraclePrices = map[string]oracletypes.GetPriceResponse{
 			"BTC/USD": createPrice(5000000000000),
 		}
@@ -1083,9 +967,8 @@ func TestDuplicateRelayPrevention(t *testing.T) {
 		mockChild := newMockChildNode("07-tendermint-0", 50) // trusted height < target height
 
 		or := NewOracleRelayV1(executortypes.OracleRelayConfig{
-			Enable:        true,
-			Interval:      30,
-			CurrencyPairs: []string{"BTC/USD"},
+			Enable:   true,
+			Interval: 30,
 		})
 		err := or.Initialize(mockHost, mockChild, "init1hrasklz3tr6s9rls4r8fjuf0k4zuha6w9rude5")
 		require.NoError(t, err)
@@ -1111,6 +994,7 @@ func TestDuplicateRelayPrevention(t *testing.T) {
 		mockHost := newMockHostNode("test-chain-1", true)
 		mockHost.latestHeight = 100
 		mockHost.commit = createMockCommit(100)
+		mockHost.currencyPairs = []connecttypes.CurrencyPair{{Base: "BTC", Quote: "USD"}}
 		mockHost.oraclePrices = map[string]oracletypes.GetPriceResponse{
 			"BTC/USD": createPrice(5000000000000),
 		}
@@ -1127,9 +1011,8 @@ func TestDuplicateRelayPrevention(t *testing.T) {
 		mockChild := newMockChildNode("07-tendermint-0", 50)
 
 		or := NewOracleRelayV1(executortypes.OracleRelayConfig{
-			Enable:        true,
-			Interval:      30,
-			CurrencyPairs: []string{"BTC/USD"},
+			Enable:   true,
+			Interval: 30,
 		})
 		err := or.Initialize(mockHost, mockChild, "init1hrasklz3tr6s9rls4r8fjuf0k4zuha6w9rude5")
 		require.NoError(t, err)
@@ -1162,6 +1045,7 @@ func TestDuplicateRelayPrevention(t *testing.T) {
 		mockHost := newMockHostNode("test-chain-1", true)
 		mockHost.latestHeight = 100
 		mockHost.commit = createMockCommit(100)
+		mockHost.currencyPairs = []connecttypes.CurrencyPair{{Base: "BTC", Quote: "USD"}}
 		mockHost.oraclePrices = map[string]oracletypes.GetPriceResponse{
 			"BTC/USD": createPrice(5000000000000),
 		}
@@ -1178,9 +1062,8 @@ func TestDuplicateRelayPrevention(t *testing.T) {
 		mockChild := newMockChildNode("07-tendermint-0", 50)
 
 		or := NewOracleRelayV1(executortypes.OracleRelayConfig{
-			Enable:        true,
-			Interval:      30,
-			CurrencyPairs: []string{"BTC/USD"},
+			Enable:   true,
+			Interval: 30,
 		})
 		err := or.Initialize(mockHost, mockChild, "init1hrasklz3tr6s9rls4r8fjuf0k4zuha6w9rude5")
 		require.NoError(t, err)
