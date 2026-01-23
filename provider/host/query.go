@@ -292,7 +292,7 @@ func (b BaseHost) QueryAllCurrencyPairs(ctx context.Context) ([]connecttypes.Cur
 	return res.CurrencyPairs, nil
 }
 
-// QueryOraclePrices queries a single currency pair price from L1 Connect Oracle module
+// QueryOraclePrices queries prices from an array of currency pairs from L1 Connect Oracle module
 func (b BaseHost) QueryOraclePrices(ctx context.Context, currencyIds []string, height int64) ([]oracletypes.GetPriceResponse, error) {
 	req := &oracletypes.GetPricesRequest{
 		CurrencyPairIds: currencyIds,

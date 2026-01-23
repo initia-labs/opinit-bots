@@ -139,16 +139,14 @@ func (or *OracleRelay) relayOnce(ctx types.Context) error {
 	if err != nil {
 		return errors.Wrap(err, "failed to query latest L1 height")
 	}
-	queryHeight := uint64(targetHeight - 1) // query at height-1 to verify against height
-
-	// skip if we already relayed this L1 height (no new oracle data)
-	if queryHeight <= or.GetLastRelayedL1Height() {
-		ctx.Logger().Debug("skipping relay, L1 height unchanged",
-			zap.Uint64("query_height", queryHeight),
-			zap.Uint64("last_relayed_l1_height", or.GetLastRelayedL1Height()),
+	if targetHeight < 2 {
+		ctx.Logger().Debug("skipping relay, target height too low",
+			zap.Int64("target_height", targetHeight),
 		)
 		return nil
 	}
+
+	queryHeight := uint64(targetHeight - 1) // query at height-1 to verify against height
 
 	ctx.Logger().Debug("querying oracle data",
 		zap.Int64("target_height", targetHeight),
@@ -187,6 +185,15 @@ func (or *OracleRelay) relayOnce(ctx types.Context) error {
 	providerOracleData, err := or.host.QueryOraclePriceHashWithProof(ctx, queryHeight)
 	if err != nil {
 		return errors.Wrap(err, "failed to query oracle price hash")
+	}
+
+	// skip if oracle data hasn't changed (compare actual oracle L1 height, not query height)
+	if providerOracleData.OraclePriceHash.L1BlockHeight <= or.GetLastRelayedL1Height() {
+		ctx.Logger().Debug("skipping relay, oracle data unchanged",
+			zap.Uint64("oracle_l1_height", providerOracleData.OraclePriceHash.L1BlockHeight),
+			zap.Uint64("last_relayed_l1_height", or.GetLastRelayedL1Height()),
+		)
+		return nil
 	}
 
 	var currencyPairs []connecttypes.CurrencyPair

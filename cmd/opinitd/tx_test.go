@@ -2,7 +2,6 @@ package main
 
 import (
 	"testing"
-	"time"
 
 	"cosmossdk.io/x/feegrant"
 	"github.com/cosmos/cosmos-sdk/codec"
@@ -212,9 +211,6 @@ func createBasicFeegrant(t *testing.T) *feegrant.Grant {
 
 	anyAllowance, err := codectypes.NewAnyWithValue(basicAllowance)
 	require.NoError(t, err)
-
-	expiration := time.Now().Add(24 * time.Hour)
-	basicAllowance.Expiration = &expiration
 
 	return &feegrant.Grant{
 		Granter:   "granter_address",
