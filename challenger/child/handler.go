@@ -112,36 +112,36 @@ func (ch *Child) txHandler(ctx types.Context, args nodetypes.TxHandlerArgs) erro
 		return nil
 	}
 	msgs := tx.GetMsgs()
-	if len(msgs) > 1 {
-		// we only expect one message for oracle tx
-		return nil
-	}
 
-	switch msg := msgs[0].(type) {
-	case *opchildtypes.MsgUpdateOracle:
-		ch.oracleTxHandler(ctx, args.BlockTime, msg.Sender, types.MustUint64ToInt64(msg.Height), msg.Data)
-	case *opchildtypes.MsgRelayOracleData:
-		ch.oracleRelayTxHandler(ctx, args.BlockTime, msg.Sender, msg.OracleData)
-	case *authz.MsgExec:
-		if len(msg.Msgs) != 1 {
-			return nil
-		}
+	// iterate through all msgs to find oracle-related ones
+	// oracle relay tx may contain multiple msgs (e.g., MsgUpdateClient + MsgExec wrapping MsgRelayOracleData)
+	for _, m := range msgs {
+		switch msg := m.(type) {
+		case *opchildtypes.MsgUpdateOracle:
+			ch.oracleTxHandler(ctx, args.BlockTime, msg.Sender, types.MustUint64ToInt64(msg.Height), msg.Data)
+		case *opchildtypes.MsgRelayOracleData:
+			ch.oracleRelayTxHandler(ctx, args.BlockTime, msg.Sender, msg.OracleData)
+		case *authz.MsgExec:
+			if len(msg.Msgs) != 1 {
+				continue
+			}
 
-		switch msg.Msgs[0].TypeUrl {
-		case "/opinit.opchild.v1.MsgUpdateOracle":
-			oracleMsg := new(opchildtypes.MsgUpdateOracle)
-			err = oracleMsg.Unmarshal(msg.Msgs[0].Value)
-			if err != nil {
-				return err
+			switch msg.Msgs[0].TypeUrl {
+			case "/opinit.opchild.v1.MsgUpdateOracle":
+				oracleMsg := new(opchildtypes.MsgUpdateOracle)
+				err = oracleMsg.Unmarshal(msg.Msgs[0].Value)
+				if err != nil {
+					return err
+				}
+				ch.oracleTxHandler(ctx, args.BlockTime, msg.Grantee, types.MustUint64ToInt64(oracleMsg.Height), oracleMsg.Data)
+			case "/opinit.opchild.v1.MsgRelayOracleData":
+				relayMsg := new(opchildtypes.MsgRelayOracleData)
+				err = relayMsg.Unmarshal(msg.Msgs[0].Value)
+				if err != nil {
+					return err
+				}
+				ch.oracleRelayTxHandler(ctx, args.BlockTime, msg.Grantee, relayMsg.OracleData)
 			}
-			ch.oracleTxHandler(ctx, args.BlockTime, msg.Grantee, types.MustUint64ToInt64(oracleMsg.Height), oracleMsg.Data)
-		case "/opinit.opchild.v1.MsgRelayOracleData":
-			relayMsg := new(opchildtypes.MsgRelayOracleData)
-			err = relayMsg.Unmarshal(msg.Msgs[0].Value)
-			if err != nil {
-				return err
-			}
-			ch.oracleRelayTxHandler(ctx, args.BlockTime, msg.Grantee, relayMsg.OracleData)
 		}
 	}
 
