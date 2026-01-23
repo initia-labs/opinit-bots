@@ -60,6 +60,8 @@ type Host struct {
 	lastProposedOutputTime          time.Time
 
 	lastUpdatedBatchTime time.Time
+
+	oracleRelayEnabled bool
 }
 
 func NewHostV1(cfg nodetypes.NodeConfig, db types.DB) *Host {
@@ -76,6 +78,7 @@ func (h *Host) Initialize(
 	batch batchNode,
 	bridgeInfo ophosttypes.QueryBridgeResponse,
 	keyringConfig *btypes.KeyringConfig,
+	oracleRelayEnabled bool,
 ) error {
 	err := h.BaseHost.Initialize(ctx, syncedHeight, bridgeInfo, keyringConfig)
 	if err != nil {
@@ -83,6 +86,7 @@ func (h *Host) Initialize(
 	}
 	h.child = child
 	h.batch = batch
+	h.oracleRelayEnabled = oracleRelayEnabled
 	h.initialL1Sequence, err = h.child.QueryNextL1Sequence(ctx, 0)
 	if err != nil {
 		return errors.Wrap(err, "failed to query next L1 sequence")

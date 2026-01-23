@@ -65,6 +65,20 @@ func (ch *ChallengeEventHandler) getOraclePendingEvents(toL1BlockHeight uint64) 
 	return events
 }
 
+// get all pending oracle relay events that are less than to L1BlockHeight
+func (ch *ChallengeEventHandler) getOracleRelayPendingEvents(toL1BlockHeight uint64) []challengertypes.ChallengeEvent {
+	ch.pendingEventsMu.Lock()
+	defer ch.pendingEventsMu.Unlock()
+
+	events := make([]challengertypes.ChallengeEvent, 0)
+	for _, event := range ch.pendingEvents {
+		if event.Type() == challengertypes.EventTypeOracleRelay && event.Id().Id < toL1BlockHeight {
+			events = append(events, event)
+		}
+	}
+	return events
+}
+
 func (ch *ChallengeEventHandler) NumPendingEvents() map[string]int64 {
 	ch.pendingEventsMu.Lock()
 	defer ch.pendingEventsMu.Unlock()

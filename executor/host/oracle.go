@@ -14,10 +14,17 @@ import (
 
 // If the relay oracle is enabled and the extended commit info contains votes, create a new MsgUpdateOracle message.
 // Else return nil.
+// Note: This is the legacy oracle method. When the new oracle relay is enabled, this method is disabled.
 func (h *Host) oracleTxHandler(blockHeight int64, extCommitBz comettypes.Tx) (sdk.Msg, string, error) {
 	if !h.OracleEnabled() {
 		return nil, "", nil
 	}
+
+	// skip legacy oracle processing when the new oracle relay is enabled
+	if h.oracleRelayEnabled {
+		return nil, "", nil
+	}
+
 	return h.child.GetMsgUpdateOracle(
 		blockHeight,
 		extCommitBz,

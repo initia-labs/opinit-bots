@@ -75,6 +75,73 @@ func (bs *BatchSubmitter) emptyOracleData(pbb *cmtproto.Block) (*cmtproto.Block,
 	return pbb, nil
 }
 
+// emptyRelayOracleData converts the MsgRelayOracleData message's prices field to empty
+// to decrease the size of the batch. The oracle data can be restored from L1 using the
+// oracle price hash and proof.
+func (bs *BatchSubmitter) emptyRelayOracleData(pbb *cmtproto.Block) (*cmtproto.Block, error) {
+	txs := pbb.Data.GetTxs()
+	if len(txs) == 0 {
+		return pbb, nil
+	}
+	txBytes := txs[0]
+
+	txConfig := bs.node.GetTxConfig()
+	tx, err := txutils.DecodeTx(txConfig, txBytes)
+	if err != nil {
+		// ignore not registered tx in codec
+		return pbb, nil
+	}
+
+	msgs := tx.GetMsgs()
+	modified := false
+
+	// iterate through all msgs to find oracle relay msgs
+	// oracle relay tx may contain multiple msgs (e.g., MsgUpdateClient + MsgExec wrapping MsgRelayOracleData)
+	for i, m := range msgs {
+		switch msg := m.(type) {
+		case *opchildtypes.MsgRelayOracleData:
+			// empty prices array and proof to reduce batch size.
+			// keeping only oracle_price_hash, l1_block_height, l1_block_time, and proof_height.
+			// these fields are sufficient to restore both the prices and proof from L1.
+			msg.OracleData.Prices = []opchildtypes.OraclePriceData{}
+			msg.OracleData.Proof = []byte{}
+			modified = true
+		case *authz.MsgExec:
+			if len(msg.Msgs) != 1 || msg.Msgs[0].TypeUrl != "/opinit.opchild.v1.MsgRelayOracleData" {
+				continue
+			}
+			relayMsg := &opchildtypes.MsgRelayOracleData{}
+			err = bs.node.Codec().UnpackAny(msg.Msgs[0], &relayMsg)
+			if err != nil {
+				return nil, errors.Wrap(err, "failed to unpack relay oracle msg from authz msg")
+			}
+			relayMsg.OracleData.Prices = []opchildtypes.OraclePriceData{}
+			relayMsg.OracleData.Proof = []byte{}
+			msgs[i], err = childprovider.CreateAuthzMsg(msg.Grantee, relayMsg)
+			if err != nil {
+				return nil, errors.Wrap(err, "failed to create authz msg")
+			}
+			modified = true
+		}
+	}
+
+	if !modified {
+		return pbb, nil
+	}
+
+	tx, err = txutils.ChangeMsgsFromTx(txConfig, tx, msgs)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to change msgs from tx")
+	}
+	convertedTxBytes, err := txutils.EncodeTx(txConfig, tx)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to encode tx")
+	}
+	pbb.Data.Txs[0] = convertedTxBytes
+
+	return pbb, nil
+}
+
 // emptyUpdateClientData converts the MsgUpdateClient messages's validator set and part of signature fields to empty
 func (bs *BatchSubmitter) emptyUpdateClientData(ctx types.Context, pbb *cmtproto.Block) (*cmtproto.Block, error) {
 	blockQuerier := func(height int64) (*coretypes.ResultBlock, error) {

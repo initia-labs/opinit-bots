@@ -79,22 +79,89 @@ func txGrantOracleCmd(baseCtx *cmdContext) *cobra.Command {
 				return err
 			}
 
-			grantMsg, err := authz.NewMsgGrant(account.GetAddress(), oracleAddress, authz.NewGenericAuthorization(types.MsgUpdateOracleTypeUrl), nil)
+			existingGrants, err := queryAuthzGrants(baseCtx, cfg, account.GetAddressString(), oracleAddress.String())
 			if err != nil {
-				return err
+				return errors.Wrap(err, "failed to query authz grants")
 			}
 
-			msgAllowance, err := feegrant.NewAllowedMsgAllowance(&feegrant.BasicAllowance{}, []string{types.MsgUpdateOracleTypeUrl, types.MsgAuthzExecTypeUrl})
-			if err != nil {
-				return err
+			msgs := make([]sdk.Msg, 0)
+
+			if !hasAuthzGrant(existingGrants, types.MsgUpdateOracleTypeUrl) {
+				grantUpdateMsg, err := authz.NewMsgGrant(account.GetAddress(), oracleAddress, authz.NewGenericAuthorization(types.MsgUpdateOracleTypeUrl), nil)
+				if err != nil {
+					return err
+				}
+				msgs = append(msgs, grantUpdateMsg)
+				fmt.Println("Adding authz grant for MsgUpdateOracle")
+			} else {
+				fmt.Println("MsgUpdateOracle authz grant already exists, skipping")
 			}
 
-			feegrantMsg, err := feegrant.NewMsgGrantAllowance(msgAllowance, account.GetAddress(), oracleAddress)
-			if err != nil {
-				return err
+			if !hasAuthzGrant(existingGrants, types.MsgRelayOracleTypeUrl) {
+				grantRelayMsg, err := authz.NewMsgGrant(account.GetAddress(), oracleAddress, authz.NewGenericAuthorization(types.MsgRelayOracleTypeUrl), nil)
+				if err != nil {
+					return err
+				}
+				msgs = append(msgs, grantRelayMsg)
+				fmt.Println("Adding authz grant for MsgRelayOracleData")
+			} else {
+				fmt.Println("MsgRelayOracleData authz grant already exists, skipping")
 			}
 
-			txBytes, _, err := account.BuildTxWithMsgs(ctx, []sdk.Msg{grantMsg, feegrantMsg})
+			existingAllowance, err := queryFeegrant(baseCtx, cfg, account.GetAddressString(), oracleAddress.String())
+			if err != nil {
+				return errors.Wrap(err, "failed to query feegrant")
+			}
+
+			requiredMsgTypes := []string{types.MsgRelayOracleTypeUrl, types.MsgUpdateOracleTypeUrl, types.MsgAuthzExecTypeUrl, types.MsgUpdateClientTypeUrl}
+
+			if existingAllowance != nil {
+				hasAllTypes, err := hasAllMsgTypes(existingAllowance, requiredMsgTypes)
+				if err != nil {
+					return err
+				}
+
+				if !hasAllTypes {
+					revokeMsg := feegrant.NewMsgRevokeAllowance(account.GetAddress(), oracleAddress)
+					msgs = append(msgs, &revokeMsg)
+					fmt.Println("Revoking existing feegrant to update with complete message types")
+
+					msgAllowance, err := feegrant.NewAllowedMsgAllowance(&feegrant.BasicAllowance{}, requiredMsgTypes)
+					if err != nil {
+						return err
+					}
+
+					feegrantMsg, err := feegrant.NewMsgGrantAllowance(msgAllowance, account.GetAddress(), oracleAddress)
+					if err != nil {
+						return err
+					}
+
+					msgs = append(msgs, feegrantMsg)
+					fmt.Println("Adding feegrant with all required message types")
+				} else {
+					fmt.Println("Feegrant already exists with all required message types, skipping")
+				}
+			} else {
+				msgAllowance, err := feegrant.NewAllowedMsgAllowance(&feegrant.BasicAllowance{}, requiredMsgTypes)
+				if err != nil {
+					return err
+				}
+
+				feegrantMsg, err := feegrant.NewMsgGrantAllowance(msgAllowance, account.GetAddress(), oracleAddress)
+				if err != nil {
+					return err
+				}
+
+				msgs = append(msgs, feegrantMsg)
+				fmt.Println("Adding new feegrant")
+			}
+
+			if len(msgs) == 0 {
+				fmt.Println("All grants already exist, nothing to do")
+				return nil
+			}
+
+			txBytes, _, err := account.BuildTxWithMsgs(ctx, msgs)
 			if err != nil {
 				return errors.Wrapf(err, "simulation failed")
 			}
@@ -282,4 +349,123 @@ func l2BroadcasterAccount(ctx types.Context, cfg *executortypes.Config) (*broadc
 	}
 
 	return broadcaster.NewBroadcasterAccount(ctx, *broadcasterConfig, cdc, txConfig, rpcClient, keyringConfig)
+}
+
+// queryAuthzGrants queries existing authz grants from granter to grantee
+func queryAuthzGrants(ctx types.Context, cfg *executortypes.Config, granter string, grantee string) ([]*authz.Grant, error) {
+	l2Config := cfg.L2NodeConfig()
+	cdc, _, err := child.GetCodec(l2Config.BroadcasterConfig.Bech32Prefix)
+	if err != nil {
+		return nil, err
+	}
+
+	rpcClient, err := rpcclient.NewRPCClient(cdc, l2Config.RPC)
+	if err != nil {
+		return nil, err
+	}
+	queryCtx, cancel := rpcclient.GetQueryContext(ctx, 0)
+	defer cancel()
+	resp, err := authz.NewQueryClient(rpcClient).Grants(queryCtx, &authz.QueryGrantsRequest{
+		Granter: granter,
+		Grantee: grantee,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	for _, grant := range resp.Grants {
+		if grant.Authorization != nil {
+			var authI authz.Authorization
+			err = cdc.UnpackAny(grant.Authorization, &authI)
+			if err != nil {
+				return nil, errors.Wrap(err, "failed to unpack authorization")
+			}
+		}
+	}
+
+	return resp.Grants, nil
+}
+
+// hasAuthzGrant checks if a grant exists for the given message type URL
+func hasAuthzGrant(grants []*authz.Grant, msgTypeUrl string) bool {
+	for _, grant := range grants {
+		auth, ok := grant.Authorization.GetCachedValue().(*authz.GenericAuthorization)
+		if ok && auth.Msg == msgTypeUrl {
+			return true
+		}
+	}
+
+	return false
+}
+
+// queryFeegrant queries existing feegrant allowance from granter to grantee
+func queryFeegrant(ctx types.Context, cfg *executortypes.Config, granter string, grantee string) (*feegrant.Grant, error) {
+	l2Config := cfg.L2NodeConfig()
+	cdc, _, err := child.GetCodec(l2Config.BroadcasterConfig.Bech32Prefix)
+	if err != nil {
+		return nil, err
+	}
+
+	rpcClient, err := rpcclient.NewRPCClient(cdc, l2Config.RPC)
+	if err != nil {
+		return nil, err
+	}
+	queryCtx, cancel := rpcclient.GetQueryContext(ctx, 0)
+	defer cancel()
+	resp, err := feegrant.NewQueryClient(rpcClient).Allowance(queryCtx, &feegrant.QueryAllowanceRequest{
+		Granter: granter,
+		Grantee: grantee,
+	})
+	if err != nil {
+		if strings.Contains(err.Error(), "not found") || strings.Contains(err.Error(), "no allowance") {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	if resp.Allowance != nil && resp.Allowance.Allowance != nil {
+		var allowanceI feegrant.FeeAllowanceI
+		err = cdc.UnpackAny(resp.Allowance.Allowance, &allowanceI)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to unpack allowance")
+		}
+	}
+
+	return resp.Allowance, nil
+}
+
+// hasAllMsgTypes checks if the feegrant allowance includes all required message types
+func hasAllMsgTypes(grant *feegrant.Grant, requiredMsgTypes []string) (bool, error) {
+	if grant == nil {
+		return false, nil
+	}
+
+	allowance := grant.Allowance.GetCachedValue()
+	if allowance == nil {
+		return false, fmt.Errorf("allowance cached value is nil")
+	}
+
+	switch a := allowance.(type) {
+	case *feegrant.AllowedMsgAllowance:
+		allowedMsgs := a.AllowedMessages
+		if len(allowedMsgs) == 0 {
+			return true, nil
+		}
+
+		allowedSet := make(map[string]bool)
+		for _, msg := range allowedMsgs {
+			allowedSet[msg] = true
+		}
+
+		for _, required := range requiredMsgTypes {
+			if !allowedSet[required] {
+				return false, nil
+			}
+		}
+
+		return true, nil
+	default:
+		// other types, assume they need to be updated
+		return false, nil
+	}
 }

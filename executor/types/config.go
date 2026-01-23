@@ -62,6 +62,11 @@ type Config struct {
 	// If L2 is using oracle, you need to set this field.
 	OracleBridgeExecutor string `json:"oracle_bridge_executor"`
 
+	// OracleRelay is the configuration for the oracle relay feature.
+	// This enables batched oracle price relaying from L1 to L2 using IBC proof verification.
+	// If not set or disabled, the bot will use the legacy oracle method (vote extensions).
+	OracleRelay OracleRelayConfig `json:"oracle_relay"`
+
 	// DisableOutputSubmitter is the flag to disable the output submitter.
 	// If it is true, the output submitter will not be started.
 	DisableOutputSubmitter bool `json:"disable_output_submitter"`
@@ -139,6 +144,7 @@ func DefaultConfig() *Config {
 
 		BridgeExecutor:         "",
 		OracleBridgeExecutor:   "",
+		OracleRelay:            DefaultOracleRelayConfig(),
 		DisableOutputSubmitter: false,
 		DisableBatchSubmitter:  false,
 
@@ -202,6 +208,11 @@ func (cfg *Config) Validate() error {
 	if cfg.BatchStartHeight <= 0 {
 		return errors.New("batch start height must be greater than 0")
 	}
+
+	if err := cfg.OracleRelay.Validate(); err != nil {
+		return errors.Wrap(err, "oracle relay validation error")
+	}
+
 	return nil
 }
 

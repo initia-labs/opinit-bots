@@ -39,6 +39,16 @@ func (ex *Executor) UpdateMetrics() error {
 		metrics.HostLastProposedOutputTime.Set(float64(status.Host.LastProposedOutputTime.Unix()))
 	}
 
+	if ex.oracleRelay != nil {
+		metrics.OracleRelayEnabled.Set(1)
+		metrics.OracleRelayLastRelayedOracleL1Height.Set(float64(ex.oracleRelay.GetLastRelayedL1Height()))
+		if !ex.oracleRelay.GetLastRelayedTime().IsZero() {
+			metrics.OracleRelayLastRelayedOracleTime.Set(float64(ex.oracleRelay.GetLastRelayedTime().Unix()))
+		}
+	} else {
+		metrics.OracleRelayEnabled.Set(0)
+	}
+
 	// child metrics
 	if status.Child.Node.Syncing != nil {
 		if *status.Child.Node.Syncing {

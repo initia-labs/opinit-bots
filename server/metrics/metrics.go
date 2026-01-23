@@ -191,4 +191,20 @@ var (
 		Name: "opinit_batch_info_chain_type",
 		Help: "Batch chain type (1=INITIA, 2=CELESTIA) by submitter",
 	}, []string{"submitter"})
+
+	// oracle relay metrics
+	OracleRelayEnabled = factory.NewGauge(prometheus.GaugeOpts{
+		Name: "opinit_oracle_relay_enabled",
+		Help: "Oracle relay enabled status (1 = enabled, 0 = disabled)",
+	})
+
+	OracleRelayLastRelayedOracleL1Height = factory.NewGauge(prometheus.GaugeOpts{
+		Name: "opinit_last_relayed_oracle_l1_height",
+		Help: "Last relayed oracle L1 height",
+	})
+
+	OracleRelayLastRelayedOracleTime = factory.NewGauge(prometheus.GaugeOpts{
+		Name: "opinit_last_relayed_oracle_time",
+		Help: "Last relayed oracle time (unix timestamp)",
+	})
 )

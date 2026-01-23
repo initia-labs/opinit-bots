@@ -7,7 +7,11 @@ import (
 	"strings"
 	"time"
 
+	abci "github.com/cometbft/cometbft/abci/types"
 	coretypes "github.com/cometbft/cometbft/rpc/core/types"
+	cmtypes "github.com/cometbft/cometbft/types"
+	connecttypes "github.com/skip-mev/connect/v2/pkg/types"
+	oracletypes "github.com/skip-mev/connect/v2/x/oracle/types"
 
 	query "github.com/cosmos/cosmos-sdk/types/query"
 
@@ -227,4 +231,125 @@ func (b BaseHost) QueryDepositTxHeight(botCtx types.Context, bridgeId uint64, l1
 
 func (b BaseHost) QueryBlock(ctx context.Context, height int64) (*coretypes.ResultBlock, error) {
 	return b.node.GetRPCClient().Block(ctx, &height)
+}
+
+// OraclePriceHashWithProof contains oracle price hash and its proof
+type OraclePriceHashWithProof struct {
+	OraclePriceHash ophosttypes.OraclePriceHash
+	Proof           []byte
+	QueryHeight     uint64
+}
+
+// QueryOraclePriceHashWithProof queries L1 x/ophost module for oracle price hash along with proof
+func (b BaseHost) QueryOraclePriceHashWithProof(ctx context.Context, height uint64) (*OraclePriceHashWithProof, error) {
+	// query abci with prove=true from x/ophost module
+	req := abci.RequestQuery{
+		Data:   ophosttypes.OraclePriceHashPrefix,
+		Path:   "/store/ophost/key",
+		Height: int64(height),
+		Prove:  true,
+	}
+	ctx, cancel := rpcclient.GetQueryContext(ctx, 0)
+	defer cancel()
+
+	res, err := b.node.GetRPCClient().QueryABCI(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+
+	var oraclePriceHash ophosttypes.OraclePriceHash
+	if err := oraclePriceHash.Unmarshal(res.GetValue()); err != nil {
+		return nil, errors.Wrap(err, "failed to unmarshal oracle price hash")
+	}
+	if res.ProofOps == nil {
+		return nil, errors.New("proof not available for oracle price hash query")
+	}
+
+	proofBytes, err := res.ProofOps.Marshal()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to marshal proof")
+	}
+
+	return &OraclePriceHashWithProof{
+		OraclePriceHash: oraclePriceHash,
+		Proof:           proofBytes,
+		QueryHeight:     height,
+	}, nil
+}
+
+// QueryAllCurrencyPairs queries all available currency pairs from L1 Connect Oracle module
+func (b BaseHost) QueryAllCurrencyPairs(ctx context.Context) ([]connecttypes.CurrencyPair, error) {
+	req := &oracletypes.GetAllCurrencyPairsRequest{}
+	ctx, cancel := rpcclient.GetQueryContext(ctx, 0)
+	defer cancel()
+
+	connectClient := oracletypes.NewQueryClient(b.node.GetRPCClient())
+	res, err := connectClient.GetAllCurrencyPairs(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+
+	return res.CurrencyPairs, nil
+}
+
+// QueryOraclePrices queries prices from an array of currency pairs from L1 Connect Oracle module
+func (b BaseHost) QueryOraclePrices(ctx context.Context, currencyIds []string, height int64) ([]oracletypes.GetPriceResponse, error) {
+	req := &oracletypes.GetPricesRequest{
+		CurrencyPairIds: currencyIds,
+	}
+	ctx, cancel := rpcclient.GetQueryContext(ctx, height)
+	defer cancel()
+
+	connectClient := oracletypes.NewQueryClient(b.node.GetRPCClient())
+	res, err := connectClient.GetPrices(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+
+	return res.GetPrices(), nil
+}
+
+// QueryCommit queries the commit at a specific height from L1
+func (b BaseHost) QueryCommit(ctx context.Context, height int64) (*coretypes.ResultCommit, error) {
+	ctx, cancel := rpcclient.GetQueryContext(ctx, 0)
+	defer cancel()
+
+	return b.node.GetRPCClient().Commit(ctx, &height)
+}
+
+// QueryValidators queries all validators at a specific height from L1, along with pagination
+func (b BaseHost) QueryValidators(ctx context.Context, height int64) ([]*cmtypes.Validator, error) {
+	ctx, cancel := rpcclient.GetQueryContext(ctx, 0)
+	defer cancel()
+
+	page := 1
+	perPage := 100
+
+	validators := make([]*cmtypes.Validator, 0)
+	for {
+		result, err := b.node.GetRPCClient().Validators(ctx, &height, &page, &perPage)
+		if err != nil {
+			return nil, err
+		}
+		validators = append(validators, result.Validators...)
+		page++
+		if len(validators) >= result.Total {
+			break
+		}
+	}
+
+	return validators, nil
+}
+
+// QueryLatestHeight queries the latest block height from L1
+func (b BaseHost) QueryLatestHeight(ctx context.Context) (int64, error) {
+	ctx, cancel := rpcclient.GetQueryContext(ctx, 0)
+	defer cancel()
+
+	status, err := b.node.GetRPCClient().Status(ctx)
+	if err != nil {
+		return 0, err
+	}
+
+	return status.SyncInfo.LatestBlockHeight, nil
 }
