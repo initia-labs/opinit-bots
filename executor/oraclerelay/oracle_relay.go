@@ -1,6 +1,7 @@
 package oraclerelay
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"strconv"
@@ -11,7 +12,13 @@ import (
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 
+	cmtproto "github.com/cometbft/cometbft/proto/tendermint/types"
+	coretypes "github.com/cometbft/cometbft/rpc/core/types"
+	cmtypes "github.com/cometbft/cometbft/types"
+	codectypes "github.com/cosmos/cosmos-sdk/codec/types"
+	"github.com/cosmos/cosmos-sdk/x/authz"
 	clienttypes "github.com/cosmos/ibc-go/v8/modules/core/02-client/types"
+	ibctmlightclients "github.com/cosmos/ibc-go/v8/modules/light-clients/07-tendermint"
 	connecttypes "github.com/skip-mev/connect/v2/pkg/types"
 	oracletypes "github.com/skip-mev/connect/v2/x/oracle/types"
 
@@ -33,6 +40,10 @@ type hostNode interface {
 	QueryOraclePriceHashWithProof(context.Context, uint64) (*hostprovider.OraclePriceHashWithProof, error)
 	QueryAllCurrencyPairs(context.Context) ([]connecttypes.CurrencyPair, error)
 	QueryOraclePrices(context.Context, []string, int64) ([]oracletypes.GetPriceResponse, error)
+	QueryCommit(context.Context, int64) (*coretypes.ResultCommit, error)
+	QueryValidators(context.Context, int64) ([]*cmtypes.Validator, error)
+	QueryLatestHeight(context.Context) (int64, error)
+	QueryBlock(context.Context, int64) (*coretypes.ResultBlock, error)
 }
 
 // childNode defines the interface for L2 operations needed by oracle relay
@@ -40,6 +51,7 @@ type childNode interface {
 	BroadcastMsgs([]sdk.Msg, string)
 	QueryL1ClientID(context.Context) (string, error)
 	QueryLatestRevisionHeight(context.Context, string) (uint64, error)
+	BaseAccountAddressString() (string, error)
 }
 
 // OracleRelay handles batched oracle price relaying from L1 to L2
@@ -115,34 +127,62 @@ func (or *OracleRelay) relayOnce(ctx types.Context) error {
 		return errors.Wrap(err, "failed to get L1 client ID")
 	}
 
-	proofHeight, err := or.child.QueryLatestRevisionHeight(ctx, l1ClientID)
+	trustedHeight, err := or.child.QueryLatestRevisionHeight(ctx, l1ClientID)
 	if err != nil {
 		return errors.Wrap(err, "failed to get latest consensus height")
 	}
-	if proofHeight == 0 {
+	if trustedHeight == 0 {
 		return errors.New("no consensus states available")
 	}
 
-	queryHeight := proofHeight - 1 // query at height-1 to verify against height
+	targetHeight, err := or.host.QueryLatestHeight(ctx)
+	if err != nil {
+		return errors.Wrap(err, "failed to query latest L1 height")
+	}
+	queryHeight := uint64(targetHeight - 1) // query at height-1 to verify against height
 
 	// skip if we already relayed this L1 height (no new oracle data)
 	if queryHeight <= or.GetLastRelayedL1Height() {
 		ctx.Logger().Debug("skipping relay, L1 height unchanged",
-			zap.Uint64("l1_height", queryHeight),
+			zap.Uint64("query_height", queryHeight),
 			zap.Uint64("last_relayed_l1_height", or.GetLastRelayedL1Height()),
 		)
 		return nil
 	}
 
 	ctx.Logger().Debug("querying oracle data",
-		zap.Uint64("proof_height", proofHeight),
+		zap.Int64("target_height", targetHeight),
 		zap.Uint64("query_height", queryHeight),
+		zap.Uint64("trusted_height", trustedHeight),
 	)
 
 	revision, err := or.parseRevisionFromChainID(or.host.ChainId())
 	if err != nil {
 		return errors.Wrap(err, "failed to parse oracle relay revision")
 	}
+
+	var msgs []sdk.Msg
+	header, err := or.buildIBCHeader(ctx, targetHeight, trustedHeight)
+	if err != nil {
+		return errors.Wrap(err, "failed to build IBC header")
+	}
+
+	headerAny, err := codectypes.NewAnyWithValue(header)
+	if err != nil {
+		return errors.Wrap(err, "failed to pack IBC header")
+	}
+
+	msgUpdateClient := &clienttypes.MsgUpdateClient{
+		ClientId:      l1ClientID,
+		ClientMessage: headerAny,
+		Signer:        or.sender,
+	}
+	msgs = append(msgs, msgUpdateClient)
+
+	ctx.Logger().Debug("adding MsgUpdateClient to transaction",
+		zap.Int64("target_height", targetHeight),
+		zap.Uint64("trusted_height", trustedHeight),
+	)
 
 	providerOracleData, err := or.host.QueryOraclePriceHashWithProof(ctx, queryHeight)
 	if err != nil {
@@ -175,8 +215,13 @@ func (or *OracleRelay) relayOnce(ctx types.Context) error {
 		return errors.New("no oracle prices retrieved")
 	}
 
-	msg := &opchildtypes.MsgRelayOracleData{
-		Sender: or.sender,
+	executorAddr, err := or.child.BaseAccountAddressString()
+	if err != nil {
+		return errors.Wrap(err, "failed to get executor address")
+	}
+
+	msgRelayOracleData := &opchildtypes.MsgRelayOracleData{
+		Sender: executorAddr,
 		OracleData: opchildtypes.OracleData{
 			BridgeId:        bridgeInfo.BridgeId,
 			OraclePriceHash: providerOracleData.OraclePriceHash.Hash,
@@ -184,10 +229,18 @@ func (or *OracleRelay) relayOnce(ctx types.Context) error {
 			L1BlockHeight:   providerOracleData.OraclePriceHash.L1BlockHeight,
 			L1BlockTime:     providerOracleData.OraclePriceHash.L1BlockTime,
 			Proof:           providerOracleData.Proof,
-			ProofHeight:     clienttypes.NewHeight(revision, proofHeight),
+			ProofHeight:     clienttypes.NewHeight(revision, uint64(targetHeight)),
 		},
 	}
-	or.child.BroadcastMsgs([]sdk.Msg{msg}, or.sender)
+
+	senderAddr, err := sdk.AccAddressFromBech32(or.sender)
+	if err != nil {
+		return errors.Wrap(err, "failed to parse sender address")
+	}
+	msgExec := authz.NewMsgExec(senderAddr, []sdk.Msg{msgRelayOracleData})
+	msgs = append(msgs, &msgExec)
+
+	or.child.BroadcastMsgs(msgs, or.sender)
 
 	or.SetLastRelayedL1Height(providerOracleData.OraclePriceHash.L1BlockHeight)
 	or.SetLastRelayedTime(time.Now())
@@ -272,4 +325,76 @@ func (or *OracleRelay) GetLastRelayedTime() time.Time {
 	or.statusMu.RLock()
 	defer or.statusMu.RUnlock()
 	return or.lastRelayedTime
+}
+
+// buildIBCHeader constructs an IBC Tendermint header for client update
+func (or *OracleRelay) buildIBCHeader(ctx types.Context, targetHeight int64, trustedHeight uint64) (*ibctmlightclients.Header, error) {
+	commit, err := or.host.QueryCommit(ctx, targetHeight)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to query commit")
+	}
+
+	validators, err := or.host.QueryValidators(ctx, targetHeight)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to query validators at target height")
+	}
+
+	trustedValidators, err := or.host.QueryValidators(ctx, int64(trustedHeight))
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to query validators at trusted height")
+	}
+
+	trustedBlock, err := or.host.QueryBlock(ctx, int64(trustedHeight))
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to query block at trusted height")
+	}
+
+	validatorSet, err := or.toProtoValidatorSet(validators, commit.ProposerAddress)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to convert validator set")
+	}
+
+	trustedValidatorSet, err := or.toProtoValidatorSet(trustedValidators, trustedBlock.Block.ProposerAddress)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to convert trusted validator set")
+	}
+
+	revision, err := or.parseRevisionFromChainID(or.host.ChainId())
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to parse revision from chain ID")
+	}
+
+	return &ibctmlightclients.Header{
+		SignedHeader:      commit.ToProto(),
+		ValidatorSet:      validatorSet,
+		TrustedHeight:     clienttypes.NewHeight(revision, trustedHeight),
+		TrustedValidators: trustedValidatorSet,
+	}, nil
+}
+
+// toProtoValidatorSet converts validators to proto format with optional proposer
+func (or *OracleRelay) toProtoValidatorSet(validators []*cmtypes.Validator, proposerAddress []byte) (*cmtproto.ValidatorSet, error) {
+	protoValidators := make([]*cmtproto.Validator, 0, len(validators))
+	var proposer *cmtproto.Validator
+	totalVotingPower := int64(0)
+
+	for _, val := range validators {
+		protoVal, err := val.ToProto()
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to convert validator to proto")
+		}
+		protoVal.ProposerPriority = 0
+		totalVotingPower += protoVal.VotingPower
+		protoValidators = append(protoValidators, protoVal)
+
+		if proposerAddress != nil && bytes.Equal(protoVal.Address, proposerAddress) {
+			proposer = protoVal
+		}
+	}
+
+	return &cmtproto.ValidatorSet{
+		Validators:       protoValidators,
+		Proposer:         proposer,
+		TotalVotingPower: totalVotingPower,
+	}, nil
 }

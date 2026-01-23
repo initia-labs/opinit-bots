@@ -9,6 +9,7 @@ import (
 
 	abci "github.com/cometbft/cometbft/abci/types"
 	coretypes "github.com/cometbft/cometbft/rpc/core/types"
+	cmtypes "github.com/cometbft/cometbft/types"
 	connecttypes "github.com/skip-mev/connect/v2/pkg/types"
 	oracletypes "github.com/skip-mev/connect/v2/x/oracle/types"
 
@@ -306,4 +307,49 @@ func (b BaseHost) QueryOraclePrices(ctx context.Context, currencyIds []string, h
 	}
 
 	return res.GetPrices(), nil
+}
+
+// QueryCommit queries the commit at a specific height from L1
+func (b BaseHost) QueryCommit(ctx context.Context, height int64) (*coretypes.ResultCommit, error) {
+	ctx, cancel := rpcclient.GetQueryContext(ctx, 0)
+	defer cancel()
+
+	return b.node.GetRPCClient().Commit(ctx, &height)
+}
+
+// QueryValidators queries all validators at a specific height from L1, along with pagination
+func (b BaseHost) QueryValidators(ctx context.Context, height int64) ([]*cmtypes.Validator, error) {
+	ctx, cancel := rpcclient.GetQueryContext(ctx, 0)
+	defer cancel()
+
+	page := 1
+	perPage := 100
+
+	validators := make([]*cmtypes.Validator, 0)
+	for {
+		result, err := b.node.GetRPCClient().Validators(ctx, &height, &page, &perPage)
+		if err != nil {
+			return nil, err
+		}
+		validators = append(validators, result.Validators...)
+		page++
+		if len(validators) >= result.Total {
+			break
+		}
+	}
+
+	return validators, nil
+}
+
+// QueryLatestHeight queries the latest block height from L1
+func (b BaseHost) QueryLatestHeight(ctx context.Context) (int64, error) {
+	ctx, cancel := rpcclient.GetQueryContext(ctx, 0)
+	defer cancel()
+
+	status, err := b.node.GetRPCClient().Status(ctx)
+	if err != nil {
+		return 0, err
+	}
+
+	return status.SyncInfo.LatestBlockHeight, nil
 }

@@ -113,7 +113,7 @@ func txGrantOracleCmd(baseCtx *cmdContext) *cobra.Command {
 				return errors.Wrap(err, "failed to query feegrant")
 			}
 
-			requiredMsgTypes := []string{types.MsgRelayOracleTypeUrl, types.MsgUpdateOracleTypeUrl, types.MsgAuthzExecTypeUrl}
+			requiredMsgTypes := []string{types.MsgRelayOracleTypeUrl, types.MsgUpdateOracleTypeUrl, types.MsgAuthzExecTypeUrl, types.MsgUpdateClientTypeUrl}
 
 			if existingAllowance != nil {
 				hasAllTypes, err := hasAllMsgTypes(existingAllowance, requiredMsgTypes)

@@ -11,6 +11,8 @@ import (
 
 	"cosmossdk.io/math"
 
+	coretypes "github.com/cometbft/cometbft/rpc/core/types"
+	cmtypes "github.com/cometbft/cometbft/types"
 	connecttypes "github.com/skip-mev/connect/v2/pkg/types"
 	oracletypes "github.com/skip-mev/connect/v2/x/oracle/types"
 
@@ -19,6 +21,7 @@ import (
 	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
 
 	executortypes "github.com/initia-labs/opinit-bots/executor/types"
+	"github.com/initia-labs/opinit-bots/keys"
 	hostprovider "github.com/initia-labs/opinit-bots/provider/host"
 	"github.com/initia-labs/opinit-bots/types"
 )
@@ -34,6 +37,15 @@ type mockHostNode struct {
 	queryPricesErr    error
 	queryPriceHashErr error
 	queryCurrencyErr  error
+
+	latestHeight         int64
+	commit               *coretypes.ResultCommit
+	validators           []*cmtypes.Validator
+	block                *coretypes.ResultBlock
+	queryCommitErr       error
+	queryValidatorsErr   error
+	queryLatestHeightErr error
+	queryBlockErr        error
 }
 
 func newMockHostNode(chainID string, oracleEnabled bool) *mockHostNode {
@@ -47,6 +59,47 @@ func newMockHostNode(chainID string, oracleEnabled bool) *mockHostNode {
 			},
 		},
 		oraclePrices: make(map[string]oracletypes.GetPriceResponse),
+		latestHeight: 100,
+		commit:       createMockCommit(100),
+		validators:   createMockValidators(),
+		block:        createMockBlock(100),
+	}
+}
+
+func createMockCommit(height int64) *coretypes.ResultCommit {
+	return &coretypes.ResultCommit{
+		SignedHeader: cmtypes.SignedHeader{
+			Header: &cmtypes.Header{
+				Height:          height,
+				ProposerAddress: []byte("proposer_address_bytes"),
+			},
+			Commit: &cmtypes.Commit{
+				Height: height,
+			},
+		},
+	}
+}
+
+func createMockValidators() []*cmtypes.Validator {
+	pubKey := cmtypes.NewMockPV().PrivKey.PubKey()
+	return []*cmtypes.Validator{
+		{
+			Address:          []byte("proposer_address_bytes"),
+			PubKey:           pubKey,
+			VotingPower:      100,
+			ProposerPriority: 0,
+		},
+	}
+}
+
+func createMockBlock(height int64) *coretypes.ResultBlock {
+	return &coretypes.ResultBlock{
+		Block: &cmtypes.Block{
+			Header: cmtypes.Header{
+				Height:          height,
+				ProposerAddress: []byte("proposer_address_bytes"),
+			},
+		},
 	}
 }
 
@@ -89,6 +142,34 @@ func (m *mockHostNode) QueryOraclePrices(_ context.Context, currencyPairIds []st
 	return result, nil
 }
 
+func (m *mockHostNode) QueryCommit(_ context.Context, _ int64) (*coretypes.ResultCommit, error) {
+	if m.queryCommitErr != nil {
+		return nil, m.queryCommitErr
+	}
+	return m.commit, nil
+}
+
+func (m *mockHostNode) QueryValidators(_ context.Context, _ int64) ([]*cmtypes.Validator, error) {
+	if m.queryValidatorsErr != nil {
+		return nil, m.queryValidatorsErr
+	}
+	return m.validators, nil
+}
+
+func (m *mockHostNode) QueryLatestHeight(_ context.Context) (int64, error) {
+	if m.queryLatestHeightErr != nil {
+		return 0, m.queryLatestHeightErr
+	}
+	return m.latestHeight, nil
+}
+
+func (m *mockHostNode) QueryBlock(_ context.Context, _ int64) (*coretypes.ResultBlock, error) {
+	if m.queryBlockErr != nil {
+		return nil, m.queryBlockErr
+	}
+	return m.block, nil
+}
+
 var _ hostNode = (*mockHostNode)(nil)
 
 // mockChildNode implements the childNode interface for testing
@@ -98,6 +179,8 @@ type mockChildNode struct {
 	broadcastedMsgs      []sdk.Msg
 	queryL1ClientIDErr   error
 	queryRevisionErr     error
+	baseAccountAddr      string
+	baseAccountAddrErr   error
 	mu                   sync.Mutex
 }
 
@@ -106,6 +189,7 @@ func newMockChildNode(l1ClientID string, latestRevisionHeight uint64) *mockChild
 		l1ClientID:           l1ClientID,
 		latestRevisionHeight: latestRevisionHeight,
 		broadcastedMsgs:      make([]sdk.Msg, 0),
+		baseAccountAddr:      "init1cy0v3p2exf5qdylc3h6wjyq8hl8yf9q0z7f8zd",
 	}
 }
 
@@ -127,6 +211,13 @@ func (m *mockChildNode) QueryLatestRevisionHeight(_ context.Context, _ string) (
 		return 0, m.queryRevisionErr
 	}
 	return m.latestRevisionHeight, nil
+}
+
+func (m *mockChildNode) BaseAccountAddressString() (string, error) {
+	if m.baseAccountAddrErr != nil {
+		return "", m.baseAccountAddrErr
+	}
+	return m.baseAccountAddr, nil
 }
 
 func (m *mockChildNode) GetBroadcastedMsgs() []sdk.Msg {
@@ -382,7 +473,7 @@ func TestStartContextCancellation(t *testing.T) {
 	mockHost := newMockHostNode("test-chain-1", false) // oracle disabled to skip relay logic
 	mockChild := newMockChildNode("07-tendermint-0", 100)
 
-	err := or.Initialize(mockHost, mockChild, "init1test")
+	err := or.Initialize(mockHost, mockChild, "init1wlvk4e083pd2lnfwu4e499vp5px7s4hgxmujql")
 	require.NoError(t, err)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -427,11 +518,11 @@ func TestInitialize(t *testing.T) {
 	mockHost := newMockHostNode("test-chain-1", true)
 	mockChild := newMockChildNode("07-tendermint-0", 100)
 
-	err := or.Initialize(mockHost, mockChild, "init1sender")
+	err := or.Initialize(mockHost, mockChild, "init1hrasklz3tr6s9rls4r8fjuf0k4zuha6w9rude5")
 	require.NoError(t, err)
 	require.NotNil(t, or.host)
 	require.NotNil(t, or.child)
-	require.Equal(t, "init1sender", or.sender)
+	require.Equal(t, "init1hrasklz3tr6s9rls4r8fjuf0k4zuha6w9rude5", or.sender)
 }
 
 func TestNewOracleRelayV1(t *testing.T) {
@@ -645,6 +736,9 @@ func TestRelayOnce(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
+			unlock := keys.SetSDKConfigContext("init")
+			defer unlock()
+
 			mockHost := newMockHostNode(tc.chainID, tc.oracleEnabled)
 			mockHost.oraclePriceHash = tc.oraclePriceHash
 			mockHost.currencyPairs = tc.hostCurrencyPairs
@@ -661,7 +755,7 @@ func TestRelayOnce(t *testing.T) {
 				Interval:      30,
 				CurrencyPairs: tc.currencyPairs,
 			})
-			err := or.Initialize(mockHost, mockChild, "init1sender")
+			err := or.Initialize(mockHost, mockChild, "init1hrasklz3tr6s9rls4r8fjuf0k4zuha6w9rude5")
 			require.NoError(t, err)
 
 			ctx := types.NewContext(context.Background(), zap.NewNop(), "")
@@ -829,6 +923,9 @@ func TestCurrencyPairParsing(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
+			unlock := keys.SetSDKConfigContext("init")
+			defer unlock()
+
 			mockHost := newMockHostNode("test-chain-1", true)
 			mockHost.oraclePrices = tc.prices
 			mockHost.oraclePriceHash = &hostprovider.OraclePriceHashWithProof{
@@ -848,7 +945,7 @@ func TestCurrencyPairParsing(t *testing.T) {
 				Interval:      30,
 				CurrencyPairs: tc.currencyPairs,
 			})
-			err := or.Initialize(mockHost, mockChild, "init1sender")
+			err := or.Initialize(mockHost, mockChild, "init1hrasklz3tr6s9rls4r8fjuf0k4zuha6w9rude5")
 			require.NoError(t, err)
 
 			// attempting relayOnce and checking how many messages were broadcast
@@ -859,7 +956,8 @@ func TestCurrencyPairParsing(t *testing.T) {
 			} else {
 				require.NoError(t, err)
 				msgs := mockChild.GetBroadcastedMsgs()
-				require.Len(t, msgs, 1)
+				// Always 2 messages: MsgUpdateClient + MsgExec
+				require.Len(t, msgs, 2)
 			}
 		})
 	}
@@ -904,7 +1002,12 @@ func TestRelayOnceProofHeightEdgeCases(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
+			unlock := keys.SetSDKConfigContext("init")
+			defer unlock()
+
 			mockHost := newMockHostNode("test-chain-1", true)
+			mockHost.latestHeight = int64(tc.revisionHeight)
+			mockHost.commit = createMockCommit(int64(tc.revisionHeight))
 			mockHost.oraclePrices = map[string]oracletypes.GetPriceResponse{
 				"BTC/USD": createPrice(5000000000000),
 			}
@@ -925,7 +1028,7 @@ func TestRelayOnceProofHeightEdgeCases(t *testing.T) {
 				Interval:      30,
 				CurrencyPairs: []string{"BTC/USD"},
 			})
-			err := or.Initialize(mockHost, mockChild, "init1sender")
+			err := or.Initialize(mockHost, mockChild, "init1hrasklz3tr6s9rls4r8fjuf0k4zuha6w9rude5")
 			require.NoError(t, err)
 
 			ctx := types.NewContext(context.Background(), zap.NewNop(), "")
@@ -958,7 +1061,12 @@ func TestDuplicateRelayPrevention(t *testing.T) {
 	}
 
 	t.Run("skip relay when L1 height unchanged", func(t *testing.T) {
+		unlock := keys.SetSDKConfigContext("init")
+		defer unlock()
+
 		mockHost := newMockHostNode("test-chain-1", true)
+		mockHost.latestHeight = 100
+		mockHost.commit = createMockCommit(100)
 		mockHost.oraclePrices = map[string]oracletypes.GetPriceResponse{
 			"BTC/USD": createPrice(5000000000000),
 		}
@@ -972,32 +1080,37 @@ func TestDuplicateRelayPrevention(t *testing.T) {
 			QueryHeight: 99,
 		}
 
-		mockChild := newMockChildNode("07-tendermint-0", 100)
+		mockChild := newMockChildNode("07-tendermint-0", 50) // trusted height < target height
 
 		or := NewOracleRelayV1(executortypes.OracleRelayConfig{
 			Enable:        true,
 			Interval:      30,
 			CurrencyPairs: []string{"BTC/USD"},
 		})
-		err := or.Initialize(mockHost, mockChild, "init1sender")
+		err := or.Initialize(mockHost, mockChild, "init1hrasklz3tr6s9rls4r8fjuf0k4zuha6w9rude5")
 		require.NoError(t, err)
 
 		ctx := types.NewContext(context.Background(), zap.NewNop(), "")
 
-		// first relay should succeed
+		// first relay should succeed (2 msgs: MsgUpdateClient + MsgExec)
 		err = or.relayOnce(ctx)
 		require.NoError(t, err)
-		require.Len(t, mockChild.GetBroadcastedMsgs(), 1)
+		require.Len(t, mockChild.GetBroadcastedMsgs(), 2)
 		require.Equal(t, uint64(99), or.GetLastRelayedL1Height())
 
 		// second relay with same L1 height should skip
 		err = or.relayOnce(ctx)
 		require.NoError(t, err)
-		require.Len(t, mockChild.GetBroadcastedMsgs(), 1) // still 1, not 2
+		require.Len(t, mockChild.GetBroadcastedMsgs(), 2) // still 2, not 4
 	})
 
 	t.Run("relay when L1 height increases", func(t *testing.T) {
+		unlock := keys.SetSDKConfigContext("init")
+		defer unlock()
+
 		mockHost := newMockHostNode("test-chain-1", true)
+		mockHost.latestHeight = 100
+		mockHost.commit = createMockCommit(100)
 		mockHost.oraclePrices = map[string]oracletypes.GetPriceResponse{
 			"BTC/USD": createPrice(5000000000000),
 		}
@@ -1011,38 +1124,44 @@ func TestDuplicateRelayPrevention(t *testing.T) {
 			QueryHeight: 99,
 		}
 
-		mockChild := newMockChildNode("07-tendermint-0", 100)
+		mockChild := newMockChildNode("07-tendermint-0", 50)
 
 		or := NewOracleRelayV1(executortypes.OracleRelayConfig{
 			Enable:        true,
 			Interval:      30,
 			CurrencyPairs: []string{"BTC/USD"},
 		})
-		err := or.Initialize(mockHost, mockChild, "init1sender")
+		err := or.Initialize(mockHost, mockChild, "init1hrasklz3tr6s9rls4r8fjuf0k4zuha6w9rude5")
 		require.NoError(t, err)
 
 		ctx := types.NewContext(context.Background(), zap.NewNop(), "")
 
-		// first relay
-		err = or.relayOnce(ctx)
-		require.NoError(t, err)
-		require.Len(t, mockChild.GetBroadcastedMsgs(), 1)
-		require.Equal(t, uint64(99), or.GetLastRelayedL1Height())
-
-		// simulate new oracle data (new L1 height)
-		mockChild.latestRevisionHeight = 101
-		mockHost.oraclePriceHash.QueryHeight = 100
-		mockHost.oraclePriceHash.OraclePriceHash.L1BlockHeight = 100
-
-		// second relay with new L1 height should succeed
+		// first relay (2 msgs)
 		err = or.relayOnce(ctx)
 		require.NoError(t, err)
 		require.Len(t, mockChild.GetBroadcastedMsgs(), 2)
+		require.Equal(t, uint64(99), or.GetLastRelayedL1Height())
+
+		// simulate new oracle data (new L1 height)
+		mockHost.latestHeight = 101
+		mockHost.commit = createMockCommit(101)
+		mockHost.oraclePriceHash.QueryHeight = 100
+		mockHost.oraclePriceHash.OraclePriceHash.L1BlockHeight = 100
+
+		// second relay with new L1 height should succeed (2 more msgs)
+		err = or.relayOnce(ctx)
+		require.NoError(t, err)
+		require.Len(t, mockChild.GetBroadcastedMsgs(), 4)
 		require.Equal(t, uint64(100), or.GetLastRelayedL1Height())
 	})
 
 	t.Run("first relay always proceeds (zero lastRelayedL1Height)", func(t *testing.T) {
+		unlock := keys.SetSDKConfigContext("init")
+		defer unlock()
+
 		mockHost := newMockHostNode("test-chain-1", true)
+		mockHost.latestHeight = 100
+		mockHost.commit = createMockCommit(100)
 		mockHost.oraclePrices = map[string]oracletypes.GetPriceResponse{
 			"BTC/USD": createPrice(5000000000000),
 		}
@@ -1056,14 +1175,14 @@ func TestDuplicateRelayPrevention(t *testing.T) {
 			QueryHeight: 99,
 		}
 
-		mockChild := newMockChildNode("07-tendermint-0", 100)
+		mockChild := newMockChildNode("07-tendermint-0", 50)
 
 		or := NewOracleRelayV1(executortypes.OracleRelayConfig{
 			Enable:        true,
 			Interval:      30,
 			CurrencyPairs: []string{"BTC/USD"},
 		})
-		err := or.Initialize(mockHost, mockChild, "init1sender")
+		err := or.Initialize(mockHost, mockChild, "init1hrasklz3tr6s9rls4r8fjuf0k4zuha6w9rude5")
 		require.NoError(t, err)
 
 		// verify initial state
@@ -1071,10 +1190,10 @@ func TestDuplicateRelayPrevention(t *testing.T) {
 
 		ctx := types.NewContext(context.Background(), zap.NewNop(), "")
 
-		// the first relay should succeed
+		// the first relay should succeed (2 msgs: MsgUpdateClient + MsgExec)
 		err = or.relayOnce(ctx)
 		require.NoError(t, err)
-		require.Len(t, mockChild.GetBroadcastedMsgs(), 1)
+		require.Len(t, mockChild.GetBroadcastedMsgs(), 2)
 		require.Equal(t, uint64(99), or.GetLastRelayedL1Height())
 	})
 }
