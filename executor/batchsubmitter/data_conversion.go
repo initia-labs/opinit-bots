@@ -93,38 +93,43 @@ func (bs *BatchSubmitter) emptyRelayOracleData(pbb *cmtproto.Block) (*cmtproto.B
 	}
 
 	msgs := tx.GetMsgs()
-	// relay oracle tx has only one message
-	if len(msgs) != 1 {
+	modified := false
+
+	// iterate through all msgs to find oracle relay msgs
+	// oracle relay tx may contain multiple msgs (e.g., MsgUpdateClient + MsgExec wrapping MsgRelayOracleData)
+	for i, m := range msgs {
+		switch msg := m.(type) {
+		case *opchildtypes.MsgRelayOracleData:
+			// empty prices array and proof to reduce batch size.
+			// keeping only oracle_price_hash, l1_block_height, l1_block_time, and proof_height.
+			// these fields are sufficient to restore both the prices and proof from L1.
+			msg.OracleData.Prices = []opchildtypes.OraclePriceData{}
+			msg.OracleData.Proof = []byte{}
+			modified = true
+		case *authz.MsgExec:
+			if len(msg.Msgs) != 1 || msg.Msgs[0].TypeUrl != "/opinit.opchild.v1.MsgRelayOracleData" {
+				continue
+			}
+			relayMsg := &opchildtypes.MsgRelayOracleData{}
+			err = bs.node.Codec().UnpackAny(msg.Msgs[0], &relayMsg)
+			if err != nil {
+				return nil, errors.Wrap(err, "failed to unpack relay oracle msg from authz msg")
+			}
+			relayMsg.OracleData.Prices = []opchildtypes.OraclePriceData{}
+			relayMsg.OracleData.Proof = []byte{}
+			msgs[i], err = childprovider.CreateAuthzMsg(msg.Grantee, relayMsg)
+			if err != nil {
+				return nil, errors.Wrap(err, "failed to create authz msg")
+			}
+			modified = true
+		}
+	}
+
+	if !modified {
 		return pbb, nil
 	}
 
-	switch msg := msgs[0].(type) {
-	case *opchildtypes.MsgRelayOracleData:
-		// empty prices array and proof to reduce batch size.
-		// keeping only oracle_price_hash, l1_block_height, l1_block_time, and proof_height.
-		// these fields are sufficient to restore both the prices and proof from L1.
-		msg.OracleData.Prices = []opchildtypes.OraclePriceData{}
-		msg.OracleData.Proof = []byte{}
-	case *authz.MsgExec:
-		if len(msg.Msgs) != 1 || msg.Msgs[0].TypeUrl != "/opinit.opchild.v1.MsgRelayOracleData" {
-			return pbb, nil
-		}
-		relayMsg := &opchildtypes.MsgRelayOracleData{}
-		err = bs.node.Codec().UnpackAny(msg.Msgs[0], &relayMsg)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to unpack relay oracle msg from authz msg")
-		}
-		relayMsg.OracleData.Prices = []opchildtypes.OraclePriceData{}
-		relayMsg.OracleData.Proof = []byte{}
-		msgs[0], err = childprovider.CreateAuthzMsg(msg.Grantee, relayMsg)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to create authz msg")
-		}
-	default:
-		return pbb, nil
-	}
-
-	tx, err = txutils.ChangeMsgsFromTx(txConfig, tx, []sdk.Msg{msgs[0]})
+	tx, err = txutils.ChangeMsgsFromTx(txConfig, tx, msgs)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to change msgs from tx")
 	}

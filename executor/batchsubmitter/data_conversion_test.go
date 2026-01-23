@@ -329,6 +329,78 @@ func TestEmptyRelayOracleData(t *testing.T) {
 			},
 			err: false,
 		},
+		{
+			name: "relay oracle data bundled with MsgUpdateClient",
+			txs: [][]sdk.Msg{
+				{
+					func() sdk.Msg {
+						header := &ibctmlightclients.Header{
+							SignedHeader: &cmtproto.SignedHeader{
+								Header: &cmtproto.Header{
+									ChainID: "test-chain",
+									Height:  100,
+								},
+							},
+							ValidatorSet:      &cmtproto.ValidatorSet{},
+							TrustedHeight:     ibcclienttypes.NewHeight(1, 99),
+							TrustedValidators: &cmtproto.ValidatorSet{},
+						}
+						msg, _ := ibcclienttypes.NewMsgUpdateClient("07-tendermint-0", header, "init1hrasklz3tr6s9rls4r8fjuf0k4zuha6w9rude5")
+						return msg
+					}(),
+					createAuthzMsg(t, "init1z3689ct7pc72yr5an97nsj89dnlefydxwdhcv0", []sdk.Msg{
+						&opchildtypes.MsgRelayOracleData{
+							Sender: "init1hrasklz3tr6s9rls4r8fjuf0k4zuha6w9rude5",
+							OracleData: opchildtypes.OracleData{
+								BridgeId:        1,
+								OraclePriceHash: []byte("price_hash"),
+								Prices: []opchildtypes.OraclePriceData{
+									{CurrencyPair: "BTC/USD", Price: "50000.00", Decimals: 8, Nonce: 1},
+								},
+								L1BlockHeight: 100,
+								L1BlockTime:   1000000000,
+								Proof:         []byte("merkle_proof_data"),
+								ProofHeight:   ibcclienttypes.NewHeight(1, 101),
+							},
+						},
+					}),
+				},
+			},
+			expectedTxs: [][]sdk.Msg{
+				{
+					func() sdk.Msg {
+						header := &ibctmlightclients.Header{
+							SignedHeader: &cmtproto.SignedHeader{
+								Header: &cmtproto.Header{
+									ChainID: "test-chain",
+									Height:  100,
+								},
+							},
+							ValidatorSet:      &cmtproto.ValidatorSet{},
+							TrustedHeight:     ibcclienttypes.NewHeight(1, 99),
+							TrustedValidators: &cmtproto.ValidatorSet{},
+						}
+						msg, _ := ibcclienttypes.NewMsgUpdateClient("07-tendermint-0", header, "init1hrasklz3tr6s9rls4r8fjuf0k4zuha6w9rude5")
+						return msg
+					}(),
+					createAuthzMsg(t, "init1z3689ct7pc72yr5an97nsj89dnlefydxwdhcv0", []sdk.Msg{
+						&opchildtypes.MsgRelayOracleData{
+							Sender: "init1hrasklz3tr6s9rls4r8fjuf0k4zuha6w9rude5",
+							OracleData: opchildtypes.OracleData{
+								BridgeId:        1,
+								OraclePriceHash: []byte("price_hash"),
+								Prices:          []opchildtypes.OraclePriceData{},
+								L1BlockHeight:   100,
+								L1BlockTime:     1000000000,
+								Proof:           []byte{},
+								ProofHeight:     ibcclienttypes.NewHeight(1, 101),
+							},
+						},
+					}),
+				},
+			},
+			err: false,
+		},
 	}
 
 	for _, tc := range cases {
