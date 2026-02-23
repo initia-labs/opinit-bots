@@ -189,9 +189,6 @@ func (b BaseHost) QueryDepositTxHeight(botCtx types.Context, bridgeId uint64, l1
 	ticker := time.NewTicker(botCtx.PollingInterval())
 	defer ticker.Stop()
 
-	ctx, cancel := rpcclient.GetQueryContextWithTimeout(botCtx, 0, b.node.GetRPCClient().QueryTimeout())
-	defer cancel()
-
 	query := fmt.Sprintf("%s.%s = %d",
 		ophosttypes.EventTypeInitiateTokenDeposit,
 		ophosttypes.AttributeKeyL1Sequence,
@@ -200,12 +197,14 @@ func (b BaseHost) QueryDepositTxHeight(botCtx types.Context, bridgeId uint64, l1
 	per_page := 100
 	for page := 1; ; page++ {
 		select {
-		case <-ctx.Done():
-			return 0, ctx.Err()
+		case <-botCtx.Done():
+			return 0, botCtx.Err()
 		case <-ticker.C:
 		}
 
-		res, err := b.node.GetRPCClient().TxSearch(ctx, query, false, &page, &per_page, "asc")
+		requestCtx, cancel := rpcclient.GetQueryContextWithTimeout(botCtx, 0, b.node.GetRPCClient().QueryTimeout())
+		res, err := b.node.GetRPCClient().TxSearch(requestCtx, query, false, &page, &per_page, "asc")
+		cancel()
 		if err != nil {
 			return 0, err
 		}
