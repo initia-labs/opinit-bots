@@ -201,7 +201,9 @@ func (bs *BatchSubmitter) Close(ctx types.Context) {
 			errs = append(errs, bs.batchFile.Close())
 		}
 
-		ctx.Logger().Error("failed to close batchSubmitter", zap.Error(errors.Join(errs...)))
+		if err := errors.Join(errs...); err != nil {
+			ctx.Logger().Error("failed to close batchSubmitter", zap.Error(err))
+		}
 	})
 }
 
