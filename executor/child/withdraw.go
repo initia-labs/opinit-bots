@@ -125,8 +125,10 @@ func (ch *Child) prepareOutput(ctx context.Context) error {
 
 	output, err := ch.host.QueryOutput(ctx, ch.BridgeId(), workingTree.Index, 0)
 	if err != nil {
+		// Normally this query returns "not found".
+		// During sync, the next output may already exist.
 		if strings.Contains(err.Error(), "collections: not found") {
-			return errors.Wrapf(nodetypes.ErrIgnoreAndTryLater, "output does not exist at index: %d", workingTree.Index)
+			return nil
 		}
 		if isRetryableQueryErr(err) {
 			return errors.Wrapf(nodetypes.ErrIgnoreAndTryLater, "failed to query output at index %d: %v", workingTree.Index, err)

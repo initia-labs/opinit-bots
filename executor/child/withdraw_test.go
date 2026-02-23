@@ -386,7 +386,7 @@ func TestPrepareOutput(t *testing.T) {
 			expected: func() (lastOutputTime time.Time, nextOutputTime time.Time, finalizingBlockHeight int64) {
 				return time.Time{}, time.Time{}, 0
 			},
-			err: true,
+			err: false,
 		},
 		{
 			name: "no output, index 3", // chain rolled back
@@ -462,7 +462,7 @@ func TestPrepareOutput(t *testing.T) {
 			expected: func() (lastOutputTime time.Time, nextOutputTime time.Time, finalizingBlockHeight int64) {
 				return time.Unix(0, 10000).UTC(), time.Unix(0, 10200).UTC(), 0
 			},
-			err: true,
+			err: false,
 		},
 	}
 

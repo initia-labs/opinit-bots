@@ -67,7 +67,7 @@ func TestBeginBlockHandler(t *testing.T) {
 			},
 		},
 	})
-	require.ErrorIs(t, err, nodetypes.ErrIgnoreAndTryLater)
+	require.NoError(t, err)
 
 	msgQueue = ch.GetMsgQueue()
 	require.Empty(t, msgQueue["init1hrasklz3tr6s9rls4r8fjuf0k4zuha6w9rude5"])
