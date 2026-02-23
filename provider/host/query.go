@@ -311,17 +311,11 @@ func (b BaseHost) QueryOraclePrices(ctx context.Context, currencyIds []string, h
 
 // QueryCommit queries the commit at a specific height from L1
 func (b BaseHost) QueryCommit(ctx context.Context, height int64) (*coretypes.ResultCommit, error) {
-	ctx, cancel := rpcclient.GetQueryContextWithTimeout(ctx, 0, b.node.GetRPCClient().QueryTimeout())
-	defer cancel()
-
 	return b.node.GetRPCClient().Commit(ctx, &height)
 }
 
 // QueryValidators queries all validators at a specific height from L1, along with pagination
 func (b BaseHost) QueryValidators(ctx context.Context, height int64) ([]*cmtypes.Validator, error) {
-	ctx, cancel := rpcclient.GetQueryContextWithTimeout(ctx, 0, b.node.GetRPCClient().QueryTimeout())
-	defer cancel()
-
 	page := 1
 	perPage := 100
 
@@ -343,9 +337,6 @@ func (b BaseHost) QueryValidators(ctx context.Context, height int64) ([]*cmtypes
 
 // QueryLatestHeight queries the latest block height from L1
 func (b BaseHost) QueryLatestHeight(ctx context.Context) (int64, error) {
-	ctx, cancel := rpcclient.GetQueryContextWithTimeout(ctx, 0, b.node.GetRPCClient().QueryTimeout())
-	defer cancel()
-
 	status, err := b.node.GetRPCClient().Status(ctx)
 	if err != nil {
 		return 0, err
