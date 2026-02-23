@@ -2,6 +2,7 @@ package types
 
 import (
 	"fmt"
+	"time"
 
 	btypes "github.com/initia-labs/opinit-bots/node/broadcaster/types"
 )
@@ -26,6 +27,10 @@ type NodeConfig struct {
 
 	// Bech32Prefix is the Bech32 prefix of the chain.
 	Bech32Prefix string
+
+	// QueryTimeout is timeout for RPC query calls.
+	// If zero, default timeout is used.
+	QueryTimeout time.Duration
 
 	// You can leave it empty, then the bot will skip the transaction submission.
 	BroadcasterConfig *btypes.BroadcasterConfig

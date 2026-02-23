@@ -297,7 +297,8 @@ func QueryBridgeId(ctx types.Context, cfg *executortypes.Config) (uint64, error)
 	if err != nil {
 		return 0, err
 	}
-	queryCtx, cancel := rpcclient.GetQueryContext(ctx, 0)
+	l2RpcClient.SetQueryTimeout(l2Config.QueryTimeout)
+	queryCtx, cancel := rpcclient.GetQueryContextWithTimeout(ctx, 0, l2RpcClient.QueryTimeout())
 	defer cancel()
 	bridgeInfoResponse, err := opchildtypes.NewQueryClient(l2RpcClient).BridgeInfo(queryCtx, &opchildtypes.QueryBridgeInfoRequest{})
 	if err != nil {
@@ -318,7 +319,8 @@ func l1ProposerAccount(ctx types.Context, cfg *executortypes.Config, bridgeId ui
 	if err != nil {
 		return nil, err
 	}
-	queryCtx, cancel := rpcclient.GetQueryContext(ctx, 0)
+	rpcClient.SetQueryTimeout(l1Config.QueryTimeout)
+	queryCtx, cancel := rpcclient.GetQueryContextWithTimeout(ctx, 0, rpcClient.QueryTimeout())
 	defer cancel()
 	bridgeResponse, err := ophosttypes.NewQueryClient(rpcClient).Bridge(queryCtx, &ophosttypes.QueryBridgeRequest{BridgeId: bridgeId})
 	if err != nil {
@@ -343,6 +345,7 @@ func l2BroadcasterAccount(ctx types.Context, cfg *executortypes.Config) (*broadc
 	if err != nil {
 		return nil, err
 	}
+	rpcClient.SetQueryTimeout(l2Config.QueryTimeout)
 
 	keyringConfig := broadcastertypes.KeyringConfig{
 		Name: cfg.BridgeExecutor,
@@ -363,7 +366,8 @@ func queryAuthzGrants(ctx types.Context, cfg *executortypes.Config, granter stri
 	if err != nil {
 		return nil, err
 	}
-	queryCtx, cancel := rpcclient.GetQueryContext(ctx, 0)
+	rpcClient.SetQueryTimeout(l2Config.QueryTimeout)
+	queryCtx, cancel := rpcclient.GetQueryContextWithTimeout(ctx, 0, rpcClient.QueryTimeout())
 	defer cancel()
 	resp, err := authz.NewQueryClient(rpcClient).Grants(queryCtx, &authz.QueryGrantsRequest{
 		Granter: granter,
@@ -410,7 +414,8 @@ func queryFeegrant(ctx types.Context, cfg *executortypes.Config, granter string,
 	if err != nil {
 		return nil, err
 	}
-	queryCtx, cancel := rpcclient.GetQueryContext(ctx, 0)
+	rpcClient.SetQueryTimeout(l2Config.QueryTimeout)
+	queryCtx, cancel := rpcclient.GetQueryContextWithTimeout(ctx, 0, rpcClient.QueryTimeout())
 	defer cancel()
 	resp, err := feegrant.NewQueryClient(rpcClient).Allowance(queryCtx, &feegrant.QueryAllowanceRequest{
 		Granter: granter,

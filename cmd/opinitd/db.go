@@ -83,6 +83,7 @@ v0.1.9-2: Fill block hash of finalized tree
 				if err != nil {
 					return err
 				}
+				rpcClient.SetQueryTimeout(l2Config.QueryTimeout)
 
 				return executor.Migration019_2(baseCtx, db, rpcClient)
 			case "v0.1.10":

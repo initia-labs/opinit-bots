@@ -26,7 +26,7 @@ func (b BaseHost) QueryBridgeConfig(ctx context.Context, bridgeId uint64) (*opho
 	req := &ophosttypes.QueryBridgeRequest{
 		BridgeId: bridgeId,
 	}
-	ctx, cancel := rpcclient.GetQueryContext(ctx, 0)
+	ctx, cancel := rpcclient.GetQueryContextWithTimeout(ctx, 0, b.node.GetRPCClient().QueryTimeout())
 	defer cancel()
 
 	return b.ophostQueryClient.Bridge(ctx, req)
@@ -36,7 +36,7 @@ func (b BaseHost) QueryLastFinalizedOutput(ctx context.Context, bridgeId uint64)
 	req := &ophosttypes.QueryLastFinalizedOutputRequest{
 		BridgeId: bridgeId,
 	}
-	ctx, cancel := rpcclient.GetQueryContext(ctx, 0)
+	ctx, cancel := rpcclient.GetQueryContextWithTimeout(ctx, 0, b.node.GetRPCClient().QueryTimeout())
 	defer cancel()
 
 	res, err := b.ophostQueryClient.LastFinalizedOutput(ctx, req)
@@ -57,7 +57,7 @@ func (b BaseHost) QueryLastOutput(ctx context.Context, bridgeId uint64) (*ophost
 			Reverse: true,
 		},
 	}
-	ctx, cancel := rpcclient.GetQueryContext(ctx, 0)
+	ctx, cancel := rpcclient.GetQueryContextWithTimeout(ctx, 0, b.node.GetRPCClient().QueryTimeout())
 	defer cancel()
 
 	res, err := b.ophostQueryClient.OutputProposals(ctx, req)
@@ -75,7 +75,7 @@ func (b BaseHost) QueryOutput(ctx context.Context, bridgeId uint64, outputIndex 
 		BridgeId:    bridgeId,
 		OutputIndex: outputIndex,
 	}
-	ctx, cancel := rpcclient.GetQueryContext(ctx, height)
+	ctx, cancel := rpcclient.GetQueryContextWithTimeout(ctx, height, b.node.GetRPCClient().QueryTimeout())
 	defer cancel()
 
 	return b.ophostQueryClient.OutputProposal(ctx, req)
@@ -125,7 +125,7 @@ func (b BaseHost) QueryOutputByL2BlockNumber(ctx context.Context, bridgeId uint6
 }
 
 func (b BaseHost) QueryCreateBridgeHeight(ctx context.Context, bridgeId uint64) (int64, error) {
-	ctx, cancel := rpcclient.GetQueryContext(ctx, 0)
+	ctx, cancel := rpcclient.GetQueryContextWithTimeout(ctx, 0, b.node.GetRPCClient().QueryTimeout())
 	defer cancel()
 
 	query := fmt.Sprintf("%s.%s = %d",
@@ -146,7 +146,7 @@ func (b BaseHost) QueryCreateBridgeHeight(ctx context.Context, bridgeId uint64) 
 }
 
 func (b BaseHost) QueryBatchInfos(botCtx types.Context, bridgeId uint64) ([]ophosttypes.BatchInfoWithOutput, error) {
-	ctx, cancel := rpcclient.GetQueryContext(botCtx, 0)
+	ctx, cancel := rpcclient.GetQueryContextWithTimeout(botCtx, 0, b.node.GetRPCClient().QueryTimeout())
 	defer cancel()
 
 	ticker := time.NewTicker(botCtx.PollingInterval())
@@ -189,7 +189,7 @@ func (b BaseHost) QueryDepositTxHeight(botCtx types.Context, bridgeId uint64, l1
 	ticker := time.NewTicker(botCtx.PollingInterval())
 	defer ticker.Stop()
 
-	ctx, cancel := rpcclient.GetQueryContext(botCtx, 0)
+	ctx, cancel := rpcclient.GetQueryContextWithTimeout(botCtx, 0, b.node.GetRPCClient().QueryTimeout())
 	defer cancel()
 
 	query := fmt.Sprintf("%s.%s = %d",
@@ -249,7 +249,7 @@ func (b BaseHost) QueryOraclePriceHashWithProof(ctx context.Context, height uint
 		Height: int64(height),
 		Prove:  true,
 	}
-	ctx, cancel := rpcclient.GetQueryContext(ctx, 0)
+	ctx, cancel := rpcclient.GetQueryContextWithTimeout(ctx, 0, b.node.GetRPCClient().QueryTimeout())
 	defer cancel()
 
 	res, err := b.node.GetRPCClient().QueryABCI(ctx, req)
@@ -280,7 +280,7 @@ func (b BaseHost) QueryOraclePriceHashWithProof(ctx context.Context, height uint
 // QueryAllCurrencyPairs queries all available currency pairs from L1 Connect Oracle module
 func (b BaseHost) QueryAllCurrencyPairs(ctx context.Context) ([]connecttypes.CurrencyPair, error) {
 	req := &oracletypes.GetAllCurrencyPairsRequest{}
-	ctx, cancel := rpcclient.GetQueryContext(ctx, 0)
+	ctx, cancel := rpcclient.GetQueryContextWithTimeout(ctx, 0, b.node.GetRPCClient().QueryTimeout())
 	defer cancel()
 
 	connectClient := oracletypes.NewQueryClient(b.node.GetRPCClient())
@@ -297,7 +297,7 @@ func (b BaseHost) QueryOraclePrices(ctx context.Context, currencyIds []string, h
 	req := &oracletypes.GetPricesRequest{
 		CurrencyPairIds: currencyIds,
 	}
-	ctx, cancel := rpcclient.GetQueryContext(ctx, height)
+	ctx, cancel := rpcclient.GetQueryContextWithTimeout(ctx, height, b.node.GetRPCClient().QueryTimeout())
 	defer cancel()
 
 	connectClient := oracletypes.NewQueryClient(b.node.GetRPCClient())
@@ -311,7 +311,7 @@ func (b BaseHost) QueryOraclePrices(ctx context.Context, currencyIds []string, h
 
 // QueryCommit queries the commit at a specific height from L1
 func (b BaseHost) QueryCommit(ctx context.Context, height int64) (*coretypes.ResultCommit, error) {
-	ctx, cancel := rpcclient.GetQueryContext(ctx, 0)
+	ctx, cancel := rpcclient.GetQueryContextWithTimeout(ctx, 0, b.node.GetRPCClient().QueryTimeout())
 	defer cancel()
 
 	return b.node.GetRPCClient().Commit(ctx, &height)
@@ -319,7 +319,7 @@ func (b BaseHost) QueryCommit(ctx context.Context, height int64) (*coretypes.Res
 
 // QueryValidators queries all validators at a specific height from L1, along with pagination
 func (b BaseHost) QueryValidators(ctx context.Context, height int64) ([]*cmtypes.Validator, error) {
-	ctx, cancel := rpcclient.GetQueryContext(ctx, 0)
+	ctx, cancel := rpcclient.GetQueryContextWithTimeout(ctx, 0, b.node.GetRPCClient().QueryTimeout())
 	defer cancel()
 
 	page := 1
@@ -343,7 +343,7 @@ func (b BaseHost) QueryValidators(ctx context.Context, height int64) ([]*cmtypes
 
 // QueryLatestHeight queries the latest block height from L1
 func (b BaseHost) QueryLatestHeight(ctx context.Context) (int64, error) {
-	ctx, cancel := rpcclient.GetQueryContext(ctx, 0)
+	ctx, cancel := rpcclient.GetQueryContextWithTimeout(ctx, 0, b.node.GetRPCClient().QueryTimeout())
 	defer cancel()
 
 	status, err := b.node.GetRPCClient().Status(ctx)

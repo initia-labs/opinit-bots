@@ -111,8 +111,13 @@ func (ch *Child) prepareOutput(ctx context.Context) error {
 	if ch.nextOutputTime.IsZero() && workingTree.Index > 1 {
 		output, err := ch.host.QueryOutput(ctx, ch.BridgeId(), workingTree.Index-1, 0)
 		if err != nil {
-			// TODO: maybe not return error here and roll back
-			return fmt.Errorf("output does not exist at index: %d", workingTree.Index-1)
+			if strings.Contains(err.Error(), "collections: not found") {
+				return errors.Wrapf(nodetypes.ErrIgnoreAndTryLater, "output does not exist at index: %d", workingTree.Index-1)
+			}
+			if isRetryableQueryErr(err) {
+				return errors.Wrapf(nodetypes.ErrIgnoreAndTryLater, "failed to query previous output at index %d: %v", workingTree.Index-1, err)
+			}
+			return errors.Wrapf(err, "failed to query previous output at index: %d", workingTree.Index-1)
 		}
 		ch.lastOutputTime = output.OutputProposal.L1BlockTime
 		ch.nextOutputTime = output.OutputProposal.L1BlockTime.Add(ch.BridgeInfo().BridgeConfig.SubmissionInterval * 2 / 3)
@@ -121,7 +126,10 @@ func (ch *Child) prepareOutput(ctx context.Context) error {
 	output, err := ch.host.QueryOutput(ctx, ch.BridgeId(), workingTree.Index, 0)
 	if err != nil {
 		if strings.Contains(err.Error(), "collections: not found") {
-			return nil
+			return errors.Wrapf(nodetypes.ErrIgnoreAndTryLater, "output does not exist at index: %d", workingTree.Index)
+		}
+		if isRetryableQueryErr(err) {
+			return errors.Wrapf(nodetypes.ErrIgnoreAndTryLater, "failed to query output at index %d: %v", workingTree.Index, err)
 		}
 		return errors.Wrap(err, "failed to query output")
 	} else {
@@ -129,6 +137,20 @@ func (ch *Child) prepareOutput(ctx context.Context) error {
 		ch.finalizingBlockHeight = types.MustUint64ToInt64(output.OutputProposal.L2BlockNumber)
 	}
 	return nil
+}
+
+func isRetryableQueryErr(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "context deadline exceeded") ||
+		strings.Contains(msg, "post failed") ||
+		strings.Contains(msg, "i/o timeout") ||
+		strings.Contains(msg, "connection refused") ||
+		strings.Contains(msg, "connection reset by peer") ||
+		strings.Contains(msg, "eof")
 }
 
 // handleTree handles the working tree for the given block height.

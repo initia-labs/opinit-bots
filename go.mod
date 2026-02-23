@@ -19,7 +19,7 @@ require (
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.0
 	github.com/getsentry/sentry-go v0.27.0
 	github.com/gofiber/fiber/v2 v2.52.5
-	github.com/initia-labs/OPinit v1.0.0
+	github.com/initia-labs/OPinit v1.3.0-alpha.1
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.21.0
 	github.com/skip-mev/connect/v2 v2.3.0
@@ -114,7 +114,7 @@ require (
 	github.com/iancoleman/strcase v0.3.0 // indirect
 	github.com/improbable-eng/grpc-web v0.15.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
-	github.com/initia-labs/OPinit/api v1.2.0 // indirect
+	github.com/initia-labs/OPinit/api v1.3.0 // indirect
 	github.com/jmhodges/levigo v1.0.0 // indirect
 	github.com/klauspost/compress v1.17.11 // indirect
 	github.com/kr/pretty v0.3.1 // indirect
@@ -180,9 +180,6 @@ require (
 
 replace (
 	github.com/gogo/protobuf => github.com/regen-network/protobuf v1.3.3-alpha.regen.1
-
-	// TODO: bump OPinit to proper release once available
-	github.com/initia-labs/OPinit => github.com/initia-labs/OPinit v1.2.5-0.20260107083754-59f065ad85ab
 
 	// node/rpcclient/client.go#32 returns nil with the latest version of grpc.
 	google.golang.org/grpc => google.golang.org/grpc v1.65.0
