@@ -64,7 +64,9 @@ func (bs *BatchSubmitter) prepareBatch(ctx types.Context, blockHeight int64) err
 		}
 
 		if bs.batchWriter != nil {
+			bs.batchWriterMu.Lock()
 			err := bs.batchWriter.Close()
+			bs.batchWriterMu.Unlock()
 			if err != nil {
 				return errors.Wrap(err, "failed to close batch writer")
 			}
@@ -101,7 +103,9 @@ func (bs *BatchSubmitter) prepareBatch(ctx types.Context, blockHeight int64) err
 		bs.localBatchInfo.Start = blockHeight
 		bs.localBatchInfo.End = 0
 		bs.localBatchInfo.BatchSize = 0
+		bs.batchWriterMu.Lock()
 		bs.batchWriter.Reset(bs.batchFile)
+		bs.batchWriterMu.Unlock()
 	}
 	return nil
 }
@@ -111,6 +115,10 @@ func (bs *BatchSubmitter) handleBatch(blockBytes []byte) (int, error) {
 	if len(blockBytes) == 0 {
 		return 0, errors.New("block bytes is empty")
 	}
+
+	bs.batchWriterMu.Lock()
+	defer bs.batchWriterMu.Unlock()
+
 	return bs.batchWriter.Write(prependLength(blockBytes))
 }
 
@@ -127,11 +135,14 @@ func (bs *BatchSubmitter) finalizeBatch(parentCtx types.Context, blockHeight int
 	if err != nil {
 		return errors.Wrap(err, "failed to query raw commit")
 	}
+	bs.batchWriterMu.Lock()
 	_, err = bs.batchWriter.Write(prependLength(rawCommit))
 	if err != nil {
+		bs.batchWriterMu.Unlock()
 		return errors.Wrap(err, "failed to write raw commit")
 	}
 	err = bs.batchWriter.Close()
+	bs.batchWriterMu.Unlock()
 	if err != nil {
 		return errors.Wrap(err, "failed to close batch writer")
 	}
@@ -236,7 +247,9 @@ func (bs *BatchSubmitter) batchFileSize(flush bool) (int64, error) {
 		return 0, errors.New("batch file is not initialized")
 	}
 	if flush {
+		bs.batchWriterMu.Lock()
 		err := bs.batchWriter.Flush()
+		bs.batchWriterMu.Unlock()
 		if err != nil {
 			return 0, errors.Wrap(err, "failed to flush batch writer")
 		}

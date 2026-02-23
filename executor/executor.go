@@ -147,6 +147,11 @@ func (ex *Executor) Start(ctx types.Context) error {
 
 	ctx.ErrGrp().Go(func() (err error) {
 		<-ctx.Done()
+
+		// close batch submitter eagerly on context cancellation to flush
+		// the gzip writer before the process is killed.
+		ex.batchSubmitter.Close()
+
 		return ex.server.Shutdown()
 	})
 

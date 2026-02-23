@@ -41,6 +41,7 @@ type BatchSubmitter struct {
 
 	batchInfoMu    *sync.Mutex
 	batchInfos     []ophosttypes.BatchInfoWithOutput
+	batchWriterMu  sync.Mutex
 	batchWriter    *gzip.Writer
 	batchFile      *os.File
 	localBatchInfo *executortypes.LocalBatchInfo
@@ -50,6 +51,8 @@ type BatchSubmitter struct {
 	chainID string
 
 	stage types.CommitDB
+
+	closeOnce sync.Once
 
 	// status info
 	LastBatchEndBlockNumber int64
@@ -183,12 +186,16 @@ func (bs *BatchSubmitter) Start(ctx types.Context) {
 }
 
 func (bs *BatchSubmitter) Close() {
-	if bs.batchWriter != nil {
-		bs.batchWriter.Close()
-	}
-	if bs.batchFile != nil {
-		bs.batchFile.Close()
-	}
+	bs.closeOnce.Do(func() {
+		bs.batchWriterMu.Lock()
+		defer bs.batchWriterMu.Unlock()
+		if bs.batchWriter != nil {
+			bs.batchWriter.Close()
+		}
+		if bs.batchFile != nil {
+			bs.batchFile.Close()
+		}
+	})
 }
 
 func (bs *BatchSubmitter) SetBridgeInfo(bridgeInfo ophosttypes.QueryBridgeResponse) {
