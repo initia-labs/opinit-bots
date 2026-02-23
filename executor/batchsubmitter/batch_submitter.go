@@ -3,10 +3,12 @@ package batchsubmitter
 import (
 	"compress/gzip"
 	"context"
+	"errors"
 	"io"
 	"os"
 	"sync"
 
+	pkgerrors "github.com/pkg/errors"
 	"go.uber.org/zap"
 
 	ophosttypes "github.com/initia-labs/OPinit/x/ophost/types"
@@ -18,7 +20,6 @@ import (
 	nodetypes "github.com/initia-labs/opinit-bots/node/types"
 	childprovider "github.com/initia-labs/opinit-bots/provider/child"
 	"github.com/initia-labs/opinit-bots/types"
-	"github.com/pkg/errors"
 )
 
 type hostNode interface {
@@ -73,7 +74,7 @@ func NewBatchSubmitterV1(
 	cfg.ProcessType = nodetypes.PROCESS_TYPE_RAW
 	node, err := node.NewNode(cfg, db, appCodec, txConfig)
 	if err != nil {
-		panic(errors.Wrap(err, "failed to create node"))
+		panic(pkgerrors.Wrap(err, "failed to create node"))
 	}
 
 	ch := &BatchSubmitter{
@@ -101,14 +102,14 @@ func NewBatchSubmitterV1(
 func (bs *BatchSubmitter) Initialize(ctx types.Context, syncedHeight int64, host hostNode, bridgeInfo ophosttypes.QueryBridgeResponse) error {
 	localBatchInfo, err := GetLocalBatchInfo(bs.DB())
 	if err != nil {
-		return errors.Wrap(err, "failed to get local batch info")
+		return pkgerrors.Wrap(err, "failed to get local batch info")
 	}
 	bs.localBatchInfo = &localBatchInfo
 
 	fileFlag := os.O_CREATE | os.O_RDWR | os.O_APPEND
 	bs.batchFile, err = os.OpenFile(ctx.HomePath()+"/batch", fileFlag, 0640)
 	if err != nil {
-		return errors.Wrap(err, "failed to open batch file")
+		return pkgerrors.Wrap(err, "failed to open batch file")
 	}
 
 	resetBatchFile := func(height int64) error {
@@ -118,7 +119,7 @@ func (bs *BatchSubmitter) Initialize(ctx types.Context, syncedHeight int64, host
 
 		err = SaveLocalBatchInfo(bs.DB(), *bs.localBatchInfo)
 		if err != nil {
-			return errors.Wrap(err, "failed to save local batch info")
+			return pkgerrors.Wrap(err, "failed to save local batch info")
 		}
 		// reset batch file
 		return bs.emptyBatchFile()
@@ -147,23 +148,23 @@ func (bs *BatchSubmitter) Initialize(ctx types.Context, syncedHeight int64, host
 	// linux command gzip use level 6 as default
 	bs.batchWriter, err = gzip.NewWriterLevel(bs.batchFile, 6)
 	if err != nil {
-		return errors.Wrap(err, "failed to create gzip writer")
+		return pkgerrors.Wrap(err, "failed to create gzip writer")
 	}
 
 	err = bs.node.Initialize(ctx, syncedHeight, nil)
 	if err != nil {
-		return errors.Wrap(err, "failed to initialize node")
+		return pkgerrors.Wrap(err, "failed to initialize node")
 	}
 	bs.host = host
 	bs.bridgeInfo = bridgeInfo
 
 	res, err := bs.host.QueryBatchInfos(ctx, bridgeInfo.BridgeId)
 	if err != nil {
-		return errors.Wrap(err, "failed to query batch infos")
+		return pkgerrors.Wrap(err, "failed to query batch infos")
 	}
 	bs.batchInfos = res
 	if len(bs.batchInfos) == 0 {
-		return errors.New("no batch info")
+		return pkgerrors.New("no batch info")
 	}
 
 	for i, batchInfo := range bs.batchInfos {
@@ -188,16 +189,19 @@ func (bs *BatchSubmitter) Start(ctx types.Context) {
 	bs.node.Start(ctx)
 }
 
-func (bs *BatchSubmitter) Close() {
+func (bs *BatchSubmitter) Close(ctx types.Context) {
 	bs.closeOnce.Do(func() {
+		var errs []error
 		bs.batchWriterMu.Lock()
 		defer bs.batchWriterMu.Unlock()
 		if bs.batchWriter != nil {
-			bs.batchWriter.Close()
+			errs = append(errs, bs.batchWriter.Close())
 		}
 		if bs.batchFile != nil {
-			bs.batchFile.Close()
+			errs = append(errs, bs.batchFile.Close())
 		}
+
+		ctx.Logger().Error("failed to close batchSubmitter", zap.Error(errors.Join(errs...)))
 	})
 }
 
@@ -224,14 +228,14 @@ func (bs BatchSubmitter) DB() types.DB {
 func (bs *BatchSubmitter) checkBatchFileCorruption() (bool, error) {
 	info, err := bs.batchFile.Stat()
 	if err != nil {
-		return false, errors.Wrap(err, "failed to stat batch file")
+		return false, pkgerrors.Wrap(err, "failed to stat batch file")
 	}
 	if info.Size() == 0 {
 		return false, nil
 	}
 
 	if _, err := bs.batchFile.Seek(0, io.SeekStart); err != nil {
-		return false, errors.Wrap(err, "failed to seek batch file")
+		return false, pkgerrors.Wrap(err, "failed to seek batch file")
 	}
 
 	reader, err := gzip.NewReader(bs.batchFile)
@@ -246,7 +250,7 @@ func (bs *BatchSubmitter) checkBatchFileCorruption() (bool, error) {
 	}
 
 	if _, err := bs.batchFile.Seek(0, io.SeekEnd); err != nil {
-		return false, errors.Wrap(err, "failed to seek batch file")
+		return false, pkgerrors.Wrap(err, "failed to seek batch file")
 	}
 	return false, nil
 }
