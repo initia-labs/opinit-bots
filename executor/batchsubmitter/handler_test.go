@@ -69,7 +69,8 @@ func TestRawBlockHandler(t *testing.T) {
 				SubmissionInterval: 150,
 			},
 		},
-		batchInfoMu: &sync.Mutex{},
+		batchInfoMu:   &sync.Mutex{},
+		batchWriterMu: &sync.Mutex{},
 		batchInfos: []ophosttypes.BatchInfoWithOutput{
 			{
 				BatchInfo: ophosttypes.BatchInfo{
