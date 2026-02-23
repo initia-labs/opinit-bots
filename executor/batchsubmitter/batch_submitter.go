@@ -41,7 +41,7 @@ type BatchSubmitter struct {
 
 	batchInfoMu    *sync.Mutex
 	batchInfos     []ophosttypes.BatchInfoWithOutput
-	batchWriterMu  sync.Mutex
+	batchWriterMu  *sync.Mutex
 	batchWriter    *gzip.Writer
 	batchFile      *os.File
 	localBatchInfo *executortypes.LocalBatchInfo
@@ -52,7 +52,7 @@ type BatchSubmitter struct {
 
 	stage types.CommitDB
 
-	closeOnce sync.Once
+	closeOnce *sync.Once
 
 	// status info
 	LastBatchEndBlockNumber int64
@@ -85,12 +85,15 @@ func NewBatchSubmitterV1(
 		batchCfg: batchCfg,
 
 		batchInfoMu:    &sync.Mutex{},
+		batchWriterMu:  &sync.Mutex{},
 		localBatchInfo: &executortypes.LocalBatchInfo{},
 
 		processedMsgs: make([]btypes.ProcessedMsgs, 0),
 		chainID:       chainID,
 
 		stage: db.NewStage(),
+
+		closeOnce: &sync.Once{},
 	}
 	return ch
 }
