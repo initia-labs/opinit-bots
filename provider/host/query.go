@@ -146,9 +146,6 @@ func (b BaseHost) QueryCreateBridgeHeight(ctx context.Context, bridgeId uint64) 
 }
 
 func (b BaseHost) QueryBatchInfos(botCtx types.Context, bridgeId uint64) ([]ophosttypes.BatchInfoWithOutput, error) {
-	ctx, cancel := rpcclient.GetQueryContextWithTimeout(botCtx, 0, b.node.GetRPCClient().QueryTimeout())
-	defer cancel()
-
 	ticker := time.NewTicker(botCtx.PollingInterval())
 	defer ticker.Stop()
 
@@ -156,8 +153,8 @@ func (b BaseHost) QueryBatchInfos(botCtx types.Context, bridgeId uint64) ([]opho
 	var nextKey []byte
 	for {
 		select {
-		case <-ctx.Done():
-			return nil, ctx.Err()
+		case <-botCtx.Done():
+			return nil, botCtx.Err()
 		case <-ticker.C:
 		}
 
@@ -168,7 +165,9 @@ func (b BaseHost) QueryBatchInfos(botCtx types.Context, bridgeId uint64) ([]opho
 				Key:   nextKey,
 			},
 		}
-		res, err := b.ophostQueryClient.BatchInfos(ctx, req)
+		requestCtx, cancel := rpcclient.GetQueryContextWithTimeout(botCtx, 0, b.node.GetRPCClient().QueryTimeout())
+		res, err := b.ophostQueryClient.BatchInfos(requestCtx, req)
+		cancel()
 		if err != nil {
 			return nil, err
 		}
