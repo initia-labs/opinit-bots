@@ -31,6 +31,10 @@ func TestConfigWithoutOracleRelayFails(t *testing.T) {
 	cfg.OracleRelay.Interval = 0
 
 	err := cfg.Validate()
+	require.NoError(t, err)
+
+	cfg.OracleRelay.Enable = true
+	err = cfg.Validate()
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "oracle relay")
 }
