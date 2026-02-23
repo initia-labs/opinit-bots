@@ -5,6 +5,7 @@ import (
 	"time"
 
 	btypes "github.com/initia-labs/opinit-bots/node/broadcaster/types"
+	"github.com/pkg/errors"
 )
 
 type BlockProcessType uint8
@@ -52,5 +53,10 @@ func (nc NodeConfig) Validate() error {
 	if nc.Bech32Prefix == "" {
 		return fmt.Errorf("bech32 prefix is empty")
 	}
+
+	if nc.QueryTimeout < 0 {
+		return errors.New("query timeout cannot be negative")
+	}
+
 	return nil
 }
