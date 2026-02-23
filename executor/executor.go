@@ -143,10 +143,15 @@ func (ex *Executor) Initialize(ctx types.Context) error {
 }
 
 func (ex *Executor) Start(ctx types.Context) error {
-	defer ex.Close()
+	defer ex.Close(ctx)
 
 	ctx.ErrGrp().Go(func() (err error) {
 		<-ctx.Done()
+
+		// close batch submitter eagerly on context cancellation to flush
+		// the gzip writer before the process is killed.
+		ex.batchSubmitter.Close(ctx)
+
 		return ex.server.Shutdown()
 	})
 
@@ -175,8 +180,8 @@ func (ex *Executor) Start(ctx types.Context) error {
 	return ctx.ErrGrp().Wait()
 }
 
-func (ex *Executor) Close() {
-	ex.batchSubmitter.Close()
+func (ex *Executor) Close(ctx types.Context) {
+	ex.batchSubmitter.Close(ctx)
 }
 
 // makeDANode creates a DA node based on the bridge info

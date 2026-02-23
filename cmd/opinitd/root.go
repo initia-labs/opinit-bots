@@ -76,8 +76,8 @@ func getLogger(logLevel string, logFormat string) (*zap.Logger, error) {
 	}
 
 	encoding := "console"
-	if logFormat == "json" {
-		encoding = "json"
+	if logFormat == outputFormatJSON {
+		encoding = outputFormatJSON
 	}
 
 	config := zap.NewProductionConfig()

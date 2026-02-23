@@ -45,6 +45,8 @@ const (
 	flagOutput         = "output"
 	flagKeyType        = "key-type"
 	flagCoinType       = "coin-type"
+
+	outputFormatJSON = "json"
 )
 
 type keyJsonOutput map[string]keyJsonOutputElem
@@ -174,7 +176,7 @@ $ keys add l2 key2 --output json`),
 			outputFormat, _ := cmd.Flags().GetString(flagOutput)
 			var output string
 			switch outputFormat {
-			case "json": //nolint
+			case outputFormatJSON:
 				jsonOutput := make(keyJsonOutput)
 				jsonOutput[account.Name] = keyJsonOutputElem{
 					Address:  addrString,

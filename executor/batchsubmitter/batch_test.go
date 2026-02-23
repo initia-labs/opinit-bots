@@ -189,10 +189,12 @@ func TestPrepareBatch(t *testing.T) {
 			batchNode := node.NewTestNode(nodetypes.NodeConfig{}, batchDB, appCodec, txConfig, nil, nil)
 
 			batchSubmitter := BatchSubmitter{
-				node:        batchNode,
-				batchInfoMu: &sync.Mutex{},
-				batchInfos:  tc.batchInfoQueue,
-				da:          NewMockDA(nil, nil, 1, ""),
+				node:          batchNode,
+				batchInfoMu:   &sync.Mutex{},
+				batchWriterMu: &sync.Mutex{},
+				batchInfos:    tc.batchInfoQueue,
+				da:            NewMockDA(nil, nil, 1, ""),
+				closeOnce:     &sync.Once{},
 			}
 
 			err = SaveLocalBatchInfo(batchDB, tc.existingLocalBatchInfo)
@@ -241,7 +243,9 @@ func TestPrepareBatch(t *testing.T) {
 func TestHandleBatch(t *testing.T) {
 	var err error
 
-	batchSubmitter := BatchSubmitter{}
+	batchSubmitter := BatchSubmitter{
+		batchWriterMu: &sync.Mutex{},
+	}
 	batchSubmitter.batchFile, err = os.CreateTemp("", "batchfile")
 	require.NoError(t, err)
 	defer os.Remove(batchSubmitter.batchFile.Name())
@@ -286,9 +290,10 @@ func TestFinalizeBatch(t *testing.T) {
 	}
 
 	batchSubmitter := BatchSubmitter{
-		node:     batchNode,
-		da:       mockDA,
-		batchCfg: batchConfig,
+		node:          batchNode,
+		da:            mockDA,
+		batchCfg:      batchConfig,
+		batchWriterMu: &sync.Mutex{},
 		localBatchInfo: &executortypes.LocalBatchInfo{
 			Start: 1,
 			End:   10,
