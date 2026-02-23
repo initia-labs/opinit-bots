@@ -23,6 +23,9 @@ func DefaultOracleRelayConfig() OracleRelayConfig {
 
 // Validate validates the oracle relay configuration
 func (cfg OracleRelayConfig) Validate() error {
+	if !cfg.Enable {
+		return nil
+	}
 	if cfg.Interval <= 0 {
 		return errors.New("oracle relay interval must be greater than zero")
 	}
