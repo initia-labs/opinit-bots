@@ -17,7 +17,7 @@ import (
 
 func (b BaseChild) QueryBridgeInfo(ctx context.Context) (opchildtypes.BridgeInfo, error) {
 	req := &opchildtypes.QueryBridgeInfoRequest{}
-	ctx, cancel := rpcclient.GetQueryContext(ctx, 0)
+	ctx, cancel := rpcclient.GetQueryContextWithTimeout(ctx, 0, b.node.GetRPCClient().QueryTimeout())
 	defer cancel()
 
 	res, err := b.opchildQueryClient.BridgeInfo(ctx, req)
@@ -29,7 +29,7 @@ func (b BaseChild) QueryBridgeInfo(ctx context.Context) (opchildtypes.BridgeInfo
 
 func (b BaseChild) QueryNextL1Sequence(ctx context.Context, height int64) (uint64, error) {
 	req := &opchildtypes.QueryNextL1SequenceRequest{}
-	ctx, cancel := rpcclient.GetQueryContext(ctx, height)
+	ctx, cancel := rpcclient.GetQueryContextWithTimeout(ctx, height, b.node.GetRPCClient().QueryTimeout())
 	defer cancel()
 
 	res, err := b.opchildQueryClient.NextL1Sequence(ctx, req)
@@ -41,7 +41,7 @@ func (b BaseChild) QueryNextL1Sequence(ctx context.Context, height int64) (uint6
 
 func (b BaseChild) QueryNextL2Sequence(ctx context.Context, height int64) (uint64, error) {
 	req := &opchildtypes.QueryNextL2SequenceRequest{}
-	ctx, cancel := rpcclient.GetQueryContext(ctx, height)
+	ctx, cancel := rpcclient.GetQueryContextWithTimeout(ctx, height, b.node.GetRPCClient().QueryTimeout())
 	defer cancel()
 
 	res, err := b.opchildQueryClient.NextL2Sequence(ctx, req)
@@ -53,7 +53,7 @@ func (b BaseChild) QueryNextL2Sequence(ctx context.Context, height int64) (uint6
 
 func (b BaseChild) QueryExecutors(ctx context.Context) ([]string, error) {
 	req := &opchildtypes.QueryParamsRequest{}
-	ctx, cancel := rpcclient.GetQueryContext(ctx, 0)
+	ctx, cancel := rpcclient.GetQueryContextWithTimeout(ctx, 0, b.node.GetRPCClient().QueryTimeout())
 	defer cancel()
 
 	res, err := b.opchildQueryClient.Params(ctx, req)
@@ -69,7 +69,7 @@ func (b BaseChild) QueryGrantsRequest(ctx context.Context, granter, grantee, msg
 		Grantee:    grantee,
 		MsgTypeUrl: msgTypeUrl,
 	}
-	ctx, cancel := rpcclient.GetQueryContext(ctx, 0)
+	ctx, cancel := rpcclient.GetQueryContextWithTimeout(ctx, 0, b.node.GetRPCClient().QueryTimeout())
 	defer cancel()
 
 	authzClient := authz.NewQueryClient(b.node.GetRPCClient())
@@ -87,7 +87,7 @@ func (b BaseChild) QueryGranteeGrants(botCtx types.Context, grantee string) ([]*
 			Limit: 100,
 		},
 	}
-	ctx, cancel := rpcclient.GetQueryContext(botCtx, 0)
+	ctx, cancel := rpcclient.GetQueryContextWithTimeout(botCtx, 0, b.node.GetRPCClient().QueryTimeout())
 	defer cancel()
 
 	authzClient := authz.NewQueryClient(b.node.GetRPCClient())
@@ -134,7 +134,7 @@ func (b BaseChild) QueryLatestRevisionHeight(ctx context.Context, clientID strin
 	req := &ibcclienttypes.QueryClientStateRequest{
 		ClientId: clientID,
 	}
-	ctx, cancel := rpcclient.GetQueryContext(ctx, 0)
+	ctx, cancel := rpcclient.GetQueryContextWithTimeout(ctx, 0, b.node.GetRPCClient().QueryTimeout())
 	defer cancel()
 
 	ibcClient := ibcclienttypes.NewQueryClient(b.node.GetRPCClient())

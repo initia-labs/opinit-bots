@@ -14,6 +14,7 @@ type NodeConfig struct {
 	ChainID         string                 `json:"chain_id"`
 	Bech32Prefix    string                 `json:"bech32_prefix"`
 	RPCAddress      string                 `json:"rpc_address"`
+	QueryTimeout    int64                  `json:"query_timeout"` // seconds
 	GasPrice        string                 `json:"gas_price"`
 	GasAdjustment   float64                `json:"gas_adjustment"`
 	TxTimeout       int64                  `json:"tx_timeout"` // seconds
@@ -29,6 +30,9 @@ func (nc NodeConfig) Validate() error {
 	}
 	if nc.RPCAddress == "" {
 		return errors.New("RPC address is required")
+	}
+	if nc.QueryTimeout < 0 {
+		return errors.New("query timeout cannot be negative")
 	}
 	if nc.BroadcastOption > btypes.BROADCAST_OPTION_COMMIT {
 		return errors.New("invalid broadcast option")
@@ -119,6 +123,7 @@ func DefaultConfig() *Config {
 			ChainID:       "testnet-l1-1",
 			Bech32Prefix:  "init",
 			RPCAddress:    "tcp://localhost:26657",
+			QueryTimeout:  30,
 			GasPrice:      "0.15uinit",
 			GasAdjustment: 1.5,
 			TxTimeout:     60,
@@ -128,6 +133,7 @@ func DefaultConfig() *Config {
 			ChainID:       "testnet-l2-1",
 			Bech32Prefix:  "init",
 			RPCAddress:    "tcp://localhost:27657",
+			QueryTimeout:  30,
 			GasPrice:      "",
 			GasAdjustment: 1.5,
 			TxTimeout:     60,
@@ -137,6 +143,7 @@ func DefaultConfig() *Config {
 			ChainID:       "testnet-l1-1",
 			Bech32Prefix:  "init",
 			RPCAddress:    "tcp://localhost:26657",
+			QueryTimeout:  30,
 			GasPrice:      "0.15uinit",
 			GasAdjustment: 1.5,
 			TxTimeout:     60,
@@ -222,6 +229,7 @@ func (cfg Config) L1NodeConfig() nodetypes.NodeConfig {
 		RPC:          cfg.L1Node.RPCAddress,
 		ProcessType:  nodetypes.PROCESS_TYPE_DEFAULT,
 		Bech32Prefix: cfg.L1Node.Bech32Prefix,
+		QueryTimeout: time.Duration(cfg.L1Node.QueryTimeout) * time.Second,
 	}
 
 	if !cfg.DisableOutputSubmitter {
@@ -244,6 +252,7 @@ func (cfg Config) L2NodeConfig() nodetypes.NodeConfig {
 		RPC:          cfg.L2Node.RPCAddress,
 		ProcessType:  nodetypes.PROCESS_TYPE_DEFAULT,
 		Bech32Prefix: cfg.L2Node.Bech32Prefix,
+		QueryTimeout: time.Duration(cfg.L2Node.QueryTimeout) * time.Second,
 	}
 
 	if cfg.BridgeExecutor != "" || cfg.OracleBridgeExecutor != "" {
@@ -266,6 +275,7 @@ func (cfg Config) DANodeConfig() nodetypes.NodeConfig {
 		RPC:          cfg.DANode.RPCAddress,
 		ProcessType:  nodetypes.PROCESS_TYPE_ONLY_BROADCAST,
 		Bech32Prefix: cfg.DANode.Bech32Prefix,
+		QueryTimeout: time.Duration(cfg.DANode.QueryTimeout) * time.Second,
 	}
 
 	if !cfg.DisableBatchSubmitter {

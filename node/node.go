@@ -53,6 +53,7 @@ func NewNode(cfg nodetypes.NodeConfig, db types.DB, cdc codec.Codec, txConfig cl
 	if err != nil {
 		return nil, err
 	}
+	rpcClient.SetQueryTimeout(cfg.QueryTimeout)
 
 	n := &Node{
 		rpcClient: rpcClient,

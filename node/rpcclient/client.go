@@ -31,11 +31,14 @@ var _ gogogrpc.ClientConn = &RPCClient{}
 
 var protoCodec = encoding.GetCodec(proto.Name)
 
+const DefaultQueryTimeout = 30 * time.Second
+
 // RPCClient defines a gRPC querier client.
 type RPCClient struct {
 	*clienthttp.HTTP
 
-	cdc codec.Codec
+	cdc          codec.Codec
+	queryTimeout time.Duration
 }
 
 func NewRPCClient(cdc codec.Codec, rpcAddr string) (*RPCClient, error) {
@@ -45,16 +48,33 @@ func NewRPCClient(cdc codec.Codec, rpcAddr string) (*RPCClient, error) {
 	}
 
 	return &RPCClient{
-		HTTP: client,
-		cdc:  cdc,
+		HTTP:         client,
+		cdc:          cdc,
+		queryTimeout: DefaultQueryTimeout,
 	}, nil
 }
 
 func NewRPCClientWithClient(cdc codec.Codec, client *clienthttp.HTTP) *RPCClient {
 	return &RPCClient{
-		HTTP: client,
-		cdc:  cdc,
+		HTTP:         client,
+		cdc:          cdc,
+		queryTimeout: DefaultQueryTimeout,
 	}
+}
+
+func (q *RPCClient) SetQueryTimeout(timeout time.Duration) {
+	if timeout <= 0 {
+		q.queryTimeout = DefaultQueryTimeout
+		return
+	}
+	q.queryTimeout = timeout
+}
+
+func (q RPCClient) QueryTimeout() time.Duration {
+	if q.queryTimeout <= 0 {
+		return DefaultQueryTimeout
+	}
+	return q.queryTimeout
 }
 
 // Invoke implements the grpc ClientConq.Invoke method
@@ -176,31 +196,81 @@ func GetHeightFromMetadata(md metadata.MD) (int64, error) {
 // Canceling this context releases resources associated with it, so code should
 // call cancel as soon as the operations running in this [Context] complete:
 func GetQueryContext(ctx context.Context, height int64) (context.Context, context.CancelFunc) {
-	// TODO: configurable timeout
-	timeout := 10 * time.Second
-	ctx, cancel := context.WithTimeout(ctx, timeout)
+	return GetQueryContextWithTimeout(ctx, height, DefaultQueryTimeout)
+}
 
+func GetQueryContextWithTimeout(ctx context.Context, height int64, timeout time.Duration) (context.Context, context.CancelFunc) {
 	strHeight := strconv.FormatInt(height, 10)
+	ctx, cancel := withQueryTimeout(ctx, timeout)
 	ctx = metadata.AppendToOutgoingContext(ctx, grpctypes.GRPCBlockHeightHeader, strHeight)
 	return ctx, cancel
 }
 
+func withQueryTimeout(ctx context.Context, timeout time.Duration) (context.Context, context.CancelFunc) {
+	if timeout <= 0 {
+		timeout = DefaultQueryTimeout
+	}
+	if deadline, ok := ctx.Deadline(); ok {
+		remaining := time.Until(deadline)
+		if remaining < timeout {
+			timeout = remaining
+		}
+	}
+	return context.WithTimeout(ctx, timeout)
+}
+
+func (q RPCClient) Status(ctx context.Context) (*coretypes.ResultStatus, error) {
+	ctx, cancel := withQueryTimeout(ctx, q.QueryTimeout())
+	defer cancel()
+	return q.HTTP.Status(ctx)
+}
+
+func (q RPCClient) Header(ctx context.Context, height *int64) (*coretypes.ResultHeader, error) {
+	ctx, cancel := withQueryTimeout(ctx, q.QueryTimeout())
+	defer cancel()
+	return q.HTTP.Header(ctx, height)
+}
+
+func (q RPCClient) Block(ctx context.Context, height *int64) (*coretypes.ResultBlock, error) {
+	ctx, cancel := withQueryTimeout(ctx, q.QueryTimeout())
+	defer cancel()
+	return q.HTTP.Block(ctx, height)
+}
+
+func (q RPCClient) BlockResults(ctx context.Context, height *int64) (*coretypes.ResultBlockResults, error) {
+	ctx, cancel := withQueryTimeout(ctx, q.QueryTimeout())
+	defer cancel()
+	return q.HTTP.BlockResults(ctx, height)
+}
+
+func (q RPCClient) Commit(ctx context.Context, height *int64) (*coretypes.ResultCommit, error) {
+	ctx, cancel := withQueryTimeout(ctx, q.QueryTimeout())
+	defer cancel()
+	return q.HTTP.Commit(ctx, height)
+}
+
+func (q RPCClient) Validators(ctx context.Context, height *int64, page *int, perPage *int) (*coretypes.ResultValidators, error) {
+	ctx, cancel := withQueryTimeout(ctx, q.QueryTimeout())
+	defer cancel()
+	return q.HTTP.Validators(ctx, height, page, perPage)
+}
+
 // QueryRawCommit queries the raw commit at a given height.
 func (q RPCClient) QueryRawCommit(ctx context.Context, height int64) ([]byte, error) {
-	ctx, cancel := GetQueryContext(ctx, height)
+	ctx, cancel := withQueryTimeout(ctx, q.QueryTimeout())
 	defer cancel()
 	return q.RawCommit(ctx, &height)
 }
 
 // QueryBlockBulk queries blocks in bulk.
 func (q RPCClient) QueryBlockBulk(ctx context.Context, start int64, end int64) ([][]byte, error) {
-	ctx, cancel := GetQueryContext(ctx, 0)
+	ctx, cancel := withQueryTimeout(ctx, q.QueryTimeout())
 	defer cancel()
 	return q.BlockBulk(ctx, &start, &end)
 }
 
 func (q RPCClient) QueryTx(ctx context.Context, txHash []byte) (*coretypes.ResultTx, error) {
-	ctx, cancel := GetQueryContext(ctx, 0)
+	ctx, cancel := withQueryTimeout(ctx, q.QueryTimeout())
 	defer cancel()
 	return q.CustomTx(ctx, txHash, false)
 }

@@ -2,6 +2,7 @@ package types
 
 import (
 	"errors"
+	"time"
 
 	nodetypes "github.com/initia-labs/opinit-bots/node/types"
 	servertypes "github.com/initia-labs/opinit-bots/server/types"
@@ -11,6 +12,7 @@ type NodeConfig struct {
 	ChainID      string `json:"chain_id"`
 	Bech32Prefix string `json:"bech32_prefix"`
 	RPCAddress   string `json:"rpc_address"`
+	QueryTimeout int64  `json:"query_timeout"` // seconds
 }
 
 func (nc NodeConfig) Validate() error {
@@ -22,6 +24,9 @@ func (nc NodeConfig) Validate() error {
 	}
 	if nc.RPCAddress == "" {
 		return errors.New("RPC address is required")
+	}
+	if nc.QueryTimeout < 0 {
+		return errors.New("query timeout cannot be negative")
 	}
 	return nil
 }
@@ -67,12 +72,14 @@ func DefaultConfig() *Config {
 			ChainID:      "testnet-l1-1",
 			Bech32Prefix: "init",
 			RPCAddress:   "tcp://localhost:26657",
+			QueryTimeout: 30,
 		},
 
 		L2Node: NodeConfig{
 			ChainID:      "testnet-l2-1",
 			Bech32Prefix: "init",
 			RPCAddress:   "tcp://localhost:27657",
+			QueryTimeout: 30,
 		},
 		DisableAutoSetL1Height: false,
 		L1StartHeight:          1,
@@ -117,6 +124,7 @@ func (cfg Config) L1NodeConfig() nodetypes.NodeConfig {
 		RPC:          cfg.L1Node.RPCAddress,
 		ProcessType:  nodetypes.PROCESS_TYPE_DEFAULT,
 		Bech32Prefix: cfg.L1Node.Bech32Prefix,
+		QueryTimeout: time.Duration(cfg.L1Node.QueryTimeout) * time.Second,
 	}
 	return nc
 }
@@ -127,6 +135,7 @@ func (cfg Config) L2NodeConfig() nodetypes.NodeConfig {
 		RPC:          cfg.L2Node.RPCAddress,
 		ProcessType:  nodetypes.PROCESS_TYPE_DEFAULT,
 		Bech32Prefix: cfg.L2Node.Bech32Prefix,
+		QueryTimeout: time.Duration(cfg.L2Node.QueryTimeout) * time.Second,
 	}
 	return nc
 }

@@ -2,8 +2,10 @@ package types
 
 import (
 	"fmt"
+	"time"
 
 	btypes "github.com/initia-labs/opinit-bots/node/broadcaster/types"
+	"github.com/pkg/errors"
 )
 
 type BlockProcessType uint8
@@ -27,6 +29,10 @@ type NodeConfig struct {
 	// Bech32Prefix is the Bech32 prefix of the chain.
 	Bech32Prefix string
 
+	// QueryTimeout is timeout for RPC query calls.
+	// If zero, default timeout is used.
+	QueryTimeout time.Duration
+
 	// You can leave it empty, then the bot will skip the transaction submission.
 	BroadcasterConfig *btypes.BroadcasterConfig
 }
@@ -47,5 +53,10 @@ func (nc NodeConfig) Validate() error {
 	if nc.Bech32Prefix == "" {
 		return fmt.Errorf("bech32 prefix is empty")
 	}
+
+	if nc.QueryTimeout < 0 {
+		return errors.New("query timeout cannot be negative")
+	}
+
 	return nil
 }
