@@ -97,15 +97,17 @@ func txGrantOracleCmd(baseCtx *cmdContext) *cobra.Command {
 				fmt.Println("MsgUpdateOracle authz grant already exists, skipping")
 			}
 
-			if !hasAuthzGrant(existingGrants, types.MsgRelayOracleTypeUrl) {
-				grantRelayMsg, err := authz.NewMsgGrant(account.GetAddress(), oracleAddress, authz.NewGenericAuthorization(types.MsgRelayOracleTypeUrl), nil)
-				if err != nil {
-					return err
+			if cfg.OracleRelay.Enable {
+				if !hasAuthzGrant(existingGrants, types.MsgRelayOracleTypeUrl) {
+					grantRelayMsg, err := authz.NewMsgGrant(account.GetAddress(), oracleAddress, authz.NewGenericAuthorization(types.MsgRelayOracleTypeUrl), nil)
+					if err != nil {
+						return err
+					}
+					msgs = append(msgs, grantRelayMsg)
+					fmt.Println("Adding authz grant for MsgRelayOracleData")
+				} else {
+					fmt.Println("MsgRelayOracleData authz grant already exists, skipping")
 				}
-				msgs = append(msgs, grantRelayMsg)
-				fmt.Println("Adding authz grant for MsgRelayOracleData")
-			} else {
-				fmt.Println("MsgRelayOracleData authz grant already exists, skipping")
 			}
 
 			existingAllowance, err := queryFeegrant(baseCtx, cfg, account.GetAddressString(), oracleAddress.String())
@@ -113,7 +115,10 @@ func txGrantOracleCmd(baseCtx *cmdContext) *cobra.Command {
 				return errors.Wrap(err, "failed to query feegrant")
 			}
 
-			requiredMsgTypes := []string{types.MsgRelayOracleTypeUrl, types.MsgUpdateOracleTypeUrl, types.MsgAuthzExecTypeUrl, types.MsgUpdateClientTypeUrl}
+			requiredMsgTypes := []string{types.MsgRelayOracleTypeUrl, types.MsgAuthzExecTypeUrl}
+			if cfg.OracleRelay.Enable {
+				requiredMsgTypes = append(requiredMsgTypes, types.MsgUpdateOracleTypeUrl, types.MsgUpdateClientTypeUrl)
+			}
 
 			if existingAllowance != nil {
 				hasAllTypes, err := hasAllMsgTypes(existingAllowance, requiredMsgTypes)
