@@ -11,6 +11,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/encoding"
 	"google.golang.org/grpc/encoding/proto"
+	"google.golang.org/grpc/mem"
 	"google.golang.org/grpc/metadata"
 
 	sdkerrors "cosmossdk.io/errors"
@@ -29,7 +30,25 @@ import (
 
 var _ gogogrpc.ClientConn = &RPCClient{}
 
-var protoCodec = encoding.GetCodec(proto.Name)
+// protoCodec is gRPC's registered "proto" codec. Since gRPC-Go v1.66 it is
+// registered only as an encoding.CodecV2, so encoding.GetCodec returns nil.
+var protoCodec = encoding.GetCodecV2(proto.Name)
+
+// marshalProto encodes v with the gRPC proto codec into a standalone byte slice.
+func marshalProto(v interface{}) ([]byte, error) {
+	bufs, err := protoCodec.Marshal(v)
+	if err != nil {
+		return nil, err
+	}
+	defer bufs.Free()
+
+	return bufs.Materialize(), nil
+}
+
+// unmarshalProto decodes bz into v with the gRPC proto codec.
+func unmarshalProto(bz []byte, v interface{}) error {
+	return protoCodec.Unmarshal(mem.BufferSlice{mem.SliceBuffer(bz)}, v)
+}
 
 const DefaultQueryTimeout = 30 * time.Second
 
@@ -90,7 +109,7 @@ func (q RPCClient) Invoke(ctx context.Context, method string, req, reply interfa
 		return err
 	}
 
-	if err = protoCodec.Unmarshal(abciRes.Value, reply); err != nil {
+	if err = unmarshalProto(abciRes.Value, reply); err != nil {
 		return err
 	}
 
@@ -120,7 +139,7 @@ func (q RPCClient) NewStream(context.Context, *grpc.StreamDesc, string, ...grpc.
 // to factorize code between client (Invoke) and server (RegisterGRPCServer)
 // gRPC handlers.
 func (q RPCClient) RunGRPCQuery(ctx context.Context, method string, req interface{}, md metadata.MD) (abci.ResponseQuery, metadata.MD, error) {
-	reqBz, err := protoCodec.Marshal(req)
+	reqBz, err := marshalProto(req)
 	if err != nil {
 		return abci.ResponseQuery{}, nil, err
 	}
