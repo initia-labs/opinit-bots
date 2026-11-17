@@ -202,14 +202,19 @@ func (b *Broadcaster) RemovePendingTxsUntil(ctx types.Context, until uint64) err
 	b.pendingTxMu.Lock()
 	defer b.pendingTxMu.Unlock()
 
-	start := 0
+	if len(b.pendingTxs) == 0 {
+		return nil
+	}
+
+	sender := b.pendingTxs[0].Sender
+	remaining := make([]btypes.PendingTxInfo, 0, len(b.pendingTxs))
 	stage := b.db.NewStage()
 
 	for _, pendingTx := range b.pendingTxs {
-		if pendingTx.Sequence > until {
-			break
+		if pendingTx.Sender != sender || pendingTx.Sequence > until {
+			remaining = append(remaining, pendingTx)
+			continue
 		}
-		start++
 		err := DeletePendingTx(stage, pendingTx)
 		if err != nil {
 			return err
@@ -221,8 +226,8 @@ func (b *Broadcaster) RemovePendingTxsUntil(ctx types.Context, until uint64) err
 		return err
 	}
 
-	// if successful, remove from local pending txs
-	b.pendingTxs = b.pendingTxs[start:]
+	// if successful, remove only that sender's processed transactions from local pending txs
+	b.pendingTxs = remaining
 
 	return nil
 }

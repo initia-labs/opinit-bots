@@ -5,6 +5,8 @@ import (
 	"slices"
 	"time"
 
+	"go.uber.org/zap"
+
 	cmtproto "github.com/cometbft/cometbft/proto/tendermint/types"
 	coretypes "github.com/cometbft/cometbft/rpc/core/types"
 
@@ -148,7 +150,6 @@ func (bs *BatchSubmitter) emptyUpdateClientData(ctx types.Context, pbb *cmtproto
 		ticker := time.NewTicker(ctx.PollingInterval())
 		defer ticker.Stop()
 
-		var block *coretypes.ResultBlock
 		var err error
 		for retry := 1; retry <= types.MaxRetryCount; retry++ {
 			select {
@@ -156,12 +157,19 @@ func (bs *BatchSubmitter) emptyUpdateClientData(ctx types.Context, pbb *cmtproto
 				return nil, ctx.Err()
 			case <-ticker.C:
 			}
+			var block *coretypes.ResultBlock
 			block, err = bs.host.QueryBlock(ctx, height)
 			if err != nil {
 				continue
 			}
+			if block == nil || block.Block == nil || block.Block.LastCommit == nil {
+				err = errors.New("missing block or last commit in block response")
+				continue
+			}
+			// the first usable answer is the result, do not query again
+			return block, nil
 		}
-		return block, err
+		return nil, err
 	}
 
 	for txIndex, txBytes := range pbb.Data.GetTxs() {
@@ -192,7 +200,16 @@ func (bs *BatchSubmitter) emptyUpdateClientData(ctx types.Context, pbb *cmtproto
 
 				block, err := blockQuerier(clientMsg.Header.Height + 1)
 				if err != nil {
-					return nil, errors.Wrap(err, "failed to query block")
+					if ctx.Err() != nil {
+						return nil, ctx.Err()
+					}
+					// host block is only used to shorten this message. if the node cannot serve it just
+					// keep the message as it is and the batch stays valid.
+					ctx.Logger().Warn("host block unavailable, MsgUpdateClient kept unshortened",
+						zap.Int64("host_height", clientMsg.Header.Height+1),
+						zap.String("error", err.Error()),
+					)
+					continue
 				}
 
 				for sigIndex, signature := range clientMsg.Commit.Signatures {
